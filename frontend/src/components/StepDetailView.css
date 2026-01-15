@@ -1,0 +1,73 @@
+.step-detail-view {
+  padding: 12px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.detail-meta > div {
+  font-size: 0.9rem;
+  color: #444;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.toolbar button {
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+}
+
+.output {
+  border-top: 1px solid #eee;
+  padding-top: 12px;
+}
+
+.grid {
+  display: block;
+  overflow: auto;
+}
+
+.row {
+  display: flex;
+}
+
+.row.header {
+  font-weight: 600;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 6px;
+}
+
+.cell {
+  padding: 6px 8px;
+  min-width: 80px;
+  border-right: 1px solid #eee;
+}
+
+.cell.empty {
+  color: #bbb;
+}
+
+.cell.has-value {
+  cursor: pointer;
+}
+
+.cell.row-label {
+  min-width: 40px;
+  font-weight: 600;
+}
+
+.no-outputs {
+  color: #666;
+  font-style: italic;
+}

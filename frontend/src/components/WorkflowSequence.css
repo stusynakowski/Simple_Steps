@@ -1,0 +1,38 @@
+.workflow-sequence {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  gap: 0;
+  overflow-x: auto;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.sequence-slot {
+  display: flex;
+  align-items: center;
+}
+
+.btn-add {
+  background: transparent;
+  border: 1px dashed rgba(0, 0, 0, 0.12);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  margin: 0 8px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.btn-add:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.sequence-end .btn-add.end {
+  margin-left: 12px;
+  border-style: solid;
+}

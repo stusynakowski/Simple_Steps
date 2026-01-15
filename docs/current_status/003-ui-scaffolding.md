@@ -16,14 +16,22 @@ Began implementation of the UI scaffolding defined in `docs/dev_plan/003-ui-scaf
    - `AgentWidget.test.tsx`
    - `MainLayout.test.tsx`
    - Updated `App.test.tsx` to verify layout renders.
+6. Began implementation of the Workflow Visualizer (Dev Step 4):
+   - Added `StepIcon` (`frontend/src/components/StepIcon.tsx` + `StepIcon.css`)
+   - Added `WorkflowSequence` (`frontend/src/components/WorkflowSequence.tsx` + `WorkflowSequence.css`)
+   - Added `useWorkflow` hook (`frontend/src/hooks/useWorkflow.ts`) to manage in-memory workflow state
+   - Added tests for the new pieces:
+     - `StepIcon.test.tsx`
+     - `WorkflowSequence.test.tsx`
+   - Integrated `WorkflowSequence` into `MainLayout` and wired selection to the Step Detail view.
 
 ## Verification Steps
 - Run frontend tests: `npm test` (in `frontend/`).
-- Start the frontend dev server and visually confirm header and placeholders: `npm run dev`.
+- Start the frontend dev server and visually confirm header and Workflow Visualizer: `npm run dev`.
 
 ## Next Steps
-1. Implement `WorkflowSequence` and `StepIcon` components (Dev Step 4).
-2. Implement `StepDetailView` (Dev Step 5) with an operation toolbar and output grid.
-3. Add a small state management hook (`useWorkflow`) to provide the sample `initialWorkflow` to components.
-4. Add integration tests for step selection and expansion.
+1. Complete `StepDetailView` (Dev Step 5) with an operation toolbar and an output grid.
+2. Add richer interactions to the `useWorkflow` hook (reorder, remove, save/load workflows).
+3. Add integration tests for step selection, expansion, and add-step behavior.
+4. Add visual polish and accessibility checks for the sequence and detail views.
 

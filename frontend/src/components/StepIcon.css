@@ -1,0 +1,62 @@
+.step-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin: 0 6px;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  position: relative;
+  min-width: 120px;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.step-icon .chevron {
+  margin-left: 8px;
+  width: 18px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.step-icon::after {
+  content: '';
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 18px solid transparent;
+  border-bottom: 18px solid transparent;
+  border-left: 12px solid var(--bg, #6b7280);
+  z-index: 0;
+}
+
+/* status colors use a CSS variable so the arrow triangle can match */
+.status-pending { --bg: #6b7280; background-color: var(--bg); }
+.status-running { --bg: #3b82f6; background-color: var(--bg); }
+.status-completed { --bg: #10b981; background-color: var(--bg); }
+.status-error { --bg: #ef4444; background-color: var(--bg); }
+
+.step-icon.selected {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18);
+  transform: translateY(-2px);
+}
+
+/* small responsive fix when container is narrow */
+@media (max-width: 480px) {
+  .step-icon {
+    min-width: 80px;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+  .step-icon::after {
+    border-top: 12px solid transparent;
+    border-bottom: 12px solid transparent;
+    border-left: 9px solid var(--bg, #6b7280);
+  }
+}

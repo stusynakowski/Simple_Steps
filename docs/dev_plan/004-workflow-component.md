@@ -24,3 +24,7 @@ Implement the core visualization of the workflow as a linear sequence of arrow-s
 - The mock workflow displays a row of arrow steps.
 - Clicking a step visually selects it (console log selection ID).
 - Different statuses render with distinct colors.
+
+## Progress
+
+Work begun on the Workflow Visualizer. `StepIcon` and `WorkflowSequence` components have been implemented with basic styling and interaction. A small `useWorkflow` hook provides an in-memory workflow for development/testing. Tests for these components have been added to validate selection and add-step interactions.

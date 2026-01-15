@@ -25,3 +25,13 @@ Connect the components with the state management logic defined in `docs/spec/003
   - User can select it.
   - User can click "Run" -> Status changes to "Running" -> "Completed".
   - Output grid populates with new data upon completion.
+
+## Progress
+- Implemented a mock API service (`frontend/src/services/api.ts`) with `runStep(stepId, config)` that resolves with a completed status and mock output.
+- Updated `useWorkflow` hook to call the mock API and update step status/output on completion or `error` on failure.
+- Wired the existing toolbar `Run` button to the flow and added/updated tests to verify the end-to-end run behavior.
+
+## Next Tasks (detailed)
+- Add cancellation/abort semantics for running jobs and surface `Stop` behavior in the toolbar.
+- Extend mock API to simulate errors and streaming/progress events for more robust UI handling and tests.
+- Add E2E tests to validate the full workflow including persistence and workflow save/load.
