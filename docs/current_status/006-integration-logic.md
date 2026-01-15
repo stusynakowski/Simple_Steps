@@ -21,3 +21,12 @@ Begin executing `docs/dev_plan/006-integration-logic.md` by wiring frontend comp
 2. Add error simulation in the mock API and tests for error handling.
 3. Consider replacing mock API with a lightweight dev server or WebSocket mock to test streaming/progress updates.
 4. Add E2E tests to validate the full workflow (Create -> Add Step -> Run -> View Output).
+
+## How to Use
+
+- Quick start:
+  1. cd into `frontend` and run `npm install` (first time) then `npm run dev`.
+  2. Open the app at `http://localhost:5173`.
+  3. Select a step and click `Run` in the toolbar — the UI will show `running` and then `completed`, and the Output grid will populate with sample data.
+
+- For a consolidated overview of what is implemented and remaining work, see `docs/current_status/000-summary.md`.

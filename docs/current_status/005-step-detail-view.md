@@ -21,3 +21,11 @@ Begin execution of `docs/dev_plan/005-step-detail-view.md` to provide a Step Det
 2. Implement configuration editing UI in `StepToolbar` (form controls that map to `step.configuration`).
 3. Add tests to validate the Glide integration and keyboard accessibility.
 4. Polish styles and responsive behavior.
+
+## How to Use
+
+- Selecting a step in the Workflow Visualizer displays the Step Detail Pane which shows the step label, metadata, a toolbar (`Run`, `Edit`, `Delete`), and an output preview grid.
+- Click `Run` to trigger the run lifecycle (status moves to `running` then `completed`); once completed the `DataOutputGrid` will show sample output data.
+- You can interact with output cells (click handlers are wired), and `Delete` will remove the step from the workflow.
+
+- See `docs/current_status/000-summary.md` for a consolidated project summary and `docs/current_status/006-integration-logic.md` for the integration details.
