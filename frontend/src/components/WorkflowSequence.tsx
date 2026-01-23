@@ -31,7 +31,7 @@ export default function WorkflowSequence({ steps, selectedStepId, onSelect, onAd
 
       <div className="sequence-end">
         <button className="btn-add end" data-testid="btn-add-end" onClick={() => onAdd?.(steps.length)}>
-          +
+          Add Step +
         </button>
       </div>
     </div>

@@ -35,4 +35,9 @@
 .sequence-end .btn-add.end {
   margin-left: 12px;
   border-style: solid;
+  border-radius: 4px;
+  width: auto;
+  padding: 0 16px;
+  background-color: #e0e0e0; 
+  color: #333;
 }

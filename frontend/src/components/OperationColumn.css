@@ -19,7 +19,7 @@
 
 /* Squeezed State */
 .operation-column.squeezed {
-  min-width: 50px;
+  min-width: 150px;
   cursor: pointer;
 }
 
@@ -295,6 +295,7 @@
   padding: 8px;
   background: #fafafa;
   border-bottom: 1px solid #eee;
+  color: #333;
 }
 
 .op-toolbar.hidden {
@@ -308,6 +309,7 @@
   cursor: pointer;
   padding: 2px 6px;
   font-size: 0.8rem;
+  color: #333;
 }
 
 .btn-icon:hover {
@@ -331,6 +333,7 @@
   cursor: pointer;
   border-bottom: 1px solid #eee;
   user-select: none;
+  color: #333;
 }
 
 .expander-header:hover {

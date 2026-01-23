@@ -1,3 +1,4 @@
+import { useState, useCallback, useRef, useEffect } from 'react';
 import TopBar from './TopBar';
 import AgentWidget from './AgentWidget';
 import GlobalControls from './GlobalControls';
@@ -7,6 +8,9 @@ import { getStepColor } from '../styles/theme';
 import './MainLayout.css';
 
 export default function MainLayout() {
+  const [headerHeight, setHeaderHeight] = useState(200);
+  const isResizing = useRef(false);
+
   const { 
     workflow, 
     expandedStepIds, 
@@ -16,6 +20,34 @@ export default function MainLayout() {
     runStep, 
     deleteStep 
   } = useWorkflow();
+
+  const startResizing = useCallback(() => {
+    isResizing.current = true;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    isResizing.current = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  }, []);
+
+  const resize = useCallback((mouseMoveEvent: any) => {
+    if (isResizing.current) {
+        const newHeight = Math.max(120, Math.min(mouseMoveEvent.clientY, 600)); 
+        setHeaderHeight(newHeight);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('mousemove', resize);
+    window.addEventListener('mouseup', stopResizing);
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [resize, stopResizing]);
 
   const handleRunAll = () => {
     // Basic implementation: Run all steps
@@ -28,19 +60,26 @@ export default function MainLayout() {
 
   return (
     <div className="main-layout" data-testid="main-layout">
-      <header className="header-container">
-        <div className="agent-area">
-          <AgentWidget />
+      <header className="header-container" style={{ height: headerHeight }}>
+        <div className="system-tools-row">
+            <TopBar 
+               onAddStep={() => addStepAt(workflow.steps.length)} 
+               showAddStep={false} 
+            />
         </div>
-        <div className="controls-area">
-          <GlobalControls onRunAll={handleRunAll} onPauseAll={handlePauseAll} />
-          {/* Keep TopBar for Load/Save checks, though visually it might need adjustment */}
-          <TopBar 
-             onAddStep={() => addStepAt(workflow.steps.length)} 
-             showAddStep={false} // We will hide the old button
-          />
+        <div className="workflow-tools-row">
+            <div className="workflow-controls-wrapper">
+                <GlobalControls onRunAll={handleRunAll} onPauseAll={handlePauseAll} />
+            </div>
+            <div className="agent-wrapper">
+                <AgentWidget />
+            </div>
         </div>
       </header>
+
+      <div className="resize-handle" onMouseDown={startResizing}>
+         <div className="resize-line" />
+      </div>
       
       <main className={`main-content horizontal-scroll-area`}>
         <div className="columns-container" data-testid="columns-container">
@@ -63,14 +102,13 @@ export default function MainLayout() {
               );
             })}
             
-            {/* Phase 5: New Add Button */}
-           <div className="add-step-container">
+            <div className="add-step-container">
               <button 
-                className="add-step-button"
+                className="add-step-button rectangular-add-btn"
                 onClick={() => addStepAt(workflow.steps.length)}
                 title="Add New Step"
               >
-                +
+                Add Step +
               </button>
             </div>
         </div>
@@ -78,3 +116,4 @@ export default function MainLayout() {
     </div>
   );
 }
+
