@@ -3,54 +3,99 @@
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+  background-color: #121212;
+  color: #fff;
 }
 
-.header {
-  flex: 0 0 auto;
+.header-container {
+  display: flex;
+  align-items: center;
+  background-color: #1e1e1e;
+  border-bottom: 2px solid #333;
+  padding: 0;
+  height: 60px; /* fixed height for header area */
+}
+
+.agent-area {
+  flex: 0 0 320px; /* Fixed width for Agent */
+  border-right: 1px solid #333;
+  height: 100%;
+}
+
+.controls-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 20px;
 }
 
 .main-content {
   flex: 1;
   display: flex;
   overflow: hidden;
+  position: relative;
 }
 
 .horizontal-scroll-area {
   overflow-x: auto;
   overflow-y: hidden;
-  background-color: #eef;
+  background-color: #121212;
+  /* scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: #444 #121212;
 }
 
 .columns-container {
     display: flex;
     flex-direction: row;
     height: 100%;
-    padding: 10px;
-    gap: 0;
+    /* No gap, elements touch */
+    gap: 0; 
+    padding: 20px;
+    align-items: flex-start;
 }
 
 .column-wrapper {
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
+    height: 100%;
+    transition: all 0.3s ease;
 }
 
-.add-column-btn {
-    width: 20px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: #999;
-    font-size: 1.2rem;
-    transition: color 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.column-wrapper.expanded {
+    flex: 0 0 450px; /* Expanded width */
+    width: 450px;
 }
 
-.add-column-btn:hover {
-    color: #007acc;
-    background: rgba(0,0,0,0.05);
+.column-wrapper.collapsed {
+    flex: 0 0 50px; /* Sliver width */
+    width: 50px;
+}
+
+.add-step-container {
+   display: flex;
+   align-items: flex-start;
+   padding-top: 10px; /* Align with headers roughly */
+   padding-left: 10px;
+}
+
+.add-step-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid #555;
+  background: #2a2a2a;
+  color: #fff;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.add-step-button:hover {
+  background: #646cff;
+  border-color: #646cff;
+  transform: scale(1.1);
 }
 
 .empty-state {

@@ -4,109 +4,135 @@ import './OperationColumn.css';
 
 interface OperationColumnProps {
   step: Step;
+  color?: string;
   isActive: boolean;
+  isSqueezed?: boolean;
   onActivate: (id: string) => void;
   onRun: (id: string) => void;
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
+  onMinimize?: () => void;
 }
 
 export default function OperationColumn({
   step,
+  color = '#444', 
   isActive,
+  isSqueezed = false,
   onActivate,
   onRun,
   onPause,
   onDelete,
+  onMinimize,
 }: OperationColumnProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [statusExpanded, setStatusExpanded] = useState(true);
 
   // If the column is not active, treat expanders as collapsed 
-  // (unless we want them to remember state, but spec says "minimize other operations")
   const isDetailsVisible = isActive && detailsExpanded;
   const isStatusVisible = isActive && statusExpanded;
 
   const handleColumnClick = () => {
-    if (!isActive) {
-      onActivate(step.id);
-    }
+    // Toggling behavior handled by parent's onActivate = toggleStep
+    onActivate(step.id);
   };
 
   return (
     <div
-      className={`operation-column ${isActive ? 'active' : 'inactive'} status-${step.status}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
+      style={{ '--step-color': color } as React.CSSProperties}
       onClick={handleColumnClick}
       data-testid={`operation-column-${step.id}`}
     >
       <div className="op-header">
-        <h3 className="op-name">{step.label}</h3>
-        <div className="op-status-indicator">{step.status}</div>
-      </div>
-
-      <div className={`op-toolbar ${isActive ? 'visible' : 'hidden'}`}>
-        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onRun(step.id); }} title="Run">
-          ▶
-        </button>
-        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onPause(step.id); }} title="Pause">
-          ⏸
-        </button>
-        <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); onDelete(step.id); }} title="Delete">
-          🗑
-        </button>
-      </div>
-
-      {isActive && (
-        <div className="op-expander-section">
-          <div
-            className="expander-header"
-            onClick={(e) => { e.stopPropagation(); setDetailsExpanded(!detailsExpanded); }}
-          >
-            {detailsExpanded ? '▼' : '▶'} Operation Details
-          </div>
-          {isDetailsVisible && (
-            <div className="expander-content details-content">
-              <div className="config-item">
-                <label>Type:</label>
-                <span>{step.process_type}</span>
-              </div>
-              <div className="config-item">
-                <label>Params:</label>
-                <div className="json-preview">{JSON.stringify(step.configuration)}</div>
-              </div>
-            </div>
-          )}
-
-          <div
-            className="expander-header"
-            onClick={(e) => { e.stopPropagation(); setStatusExpanded(!statusExpanded); }}
-          >
-            {statusExpanded ? '▼' : '▶'} Status Details
-          </div>
-          {isStatusVisible && (
-            <div className="expander-content status-content">
-               <p>Execution ID: {step.id.substring(0, 8)}</p>
-               {/* Placeholder for logs/timings */}
-            </div>
-          )}
+        <div className="arrow-background" />
+        <div className="arrow-content">
+            {isSqueezed ? (
+                 <span className="vertical-label">{step.label}</span>
+            ) : (
+                <>
+                    <div className="header-titles">
+                        <h3 className="op-name">{step.label}</h3>
+                        <span className="op-status-indicator">{step.status}</span>
+                    </div>
+                    {isActive && onMinimize && (
+                        <button 
+                            className="btn-minimize"
+                            onClick={(e) => { e.stopPropagation(); onMinimize(); }}
+                            title="Minimize"
+                        >
+                            _
+                        </button>
+                    )}
+                </>
+            )}
         </div>
-      )}
+      </div>
 
-      <div className="op-data-column">
-        {step.output_preview && step.output_preview.length > 0 ? (
-           // We reuse DataOutputGrid but styled vertically effectively by its container
-           // Or we could implement a simpler list if a grid isn't desired.
-           // For now, let's keep it simple: A list of values
-           <div className="data-list">
+
+      <div className={`op-body ${isSqueezed ? 'hidden' : ''}`}>
+        <div className={`op-toolbar ${isActive ? 'visible' : 'hidden'}`}>
+          <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onRun(step.id); }} title="Run">
+            ▶
+          </button>
+          <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onPause(step.id); }} title="Pause">
+            ⏸
+          </button>
+          <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); onDelete(step.id); }} title="Delete">
+            🗑
+          </button>
+        </div>
+
+        {isActive && (
+          <div className="op-expander-section">
+            <div
+              className="expander-header"
+              onClick={(e) => { e.stopPropagation(); setDetailsExpanded(!detailsExpanded); }}
+            >
+              {detailsExpanded ? '▼' : '▶'} Operation Details
+            </div>
+            {isDetailsVisible && (
+              <div className="expander-content details-content">
+                <div className="config-item">
+                  <label>Type:</label>
+                  <span>{step.process_type}</span>
+                </div>
+                <div className="config-item">
+                  <label>Params:</label>
+                  <div className="json-preview">{JSON.stringify(step.configuration)}</div>
+                </div>
+              </div>
+            )}
+
+            <div
+              className="expander-header"
+              onClick={(e) => { e.stopPropagation(); setStatusExpanded(!statusExpanded); }}
+            >
+              {statusExpanded ? '▼' : '▶'} Status Details
+            </div>
+            {/* ...existing code... */}
+            {isStatusVisible && (
+              <div className="expander-content status-content">
+                 <p>Execution ID: {step.id.substring(0, 8)}</p>
+                 {/* Placeholder for logs/timings */}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="op-data-column">
+          {step.output_preview && step.output_preview.length > 0 ? (
+             <div className="data-list">
              {step.output_preview.map((cell) => (
                <div key={`${cell.row_id}-${cell.column_id}`} className="data-cell-item">
                  {cell.display_value}
                </div>
              ))}
            </div>
-        ) : (
-          <div className="no-data-placeholder">No Data</div>
-        )}
+          ) : (
+            <div className="no-data-placeholder">No Data</div>
+          )}
+        </div>
       </div>
     </div>
   );

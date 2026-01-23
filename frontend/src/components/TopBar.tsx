@@ -1,26 +1,34 @@
+import './TopBar.css';
+
 interface TopBarProps {
   onLoad?: () => void;
   onSave?: () => void;
   onSettings?: () => void;
+  onAddStep?: () => void;
   title?: string;
+  showAddStep?: boolean;
 }
 
-export default function TopBar({ onLoad, onSave, onSettings, title = 'Simple Steps' }: TopBarProps) {
+export default function TopBar({ onLoad, onSave, onSettings, onAddStep, showAddStep = true }: TopBarProps) {
   return (
     <div className="topbar" data-testid="topbar">
       <div className="topbar-left">
-        <h1 className="app-title">{title}</h1>
-      </div>
-      <div className="topbar-right">
-        <button onClick={onLoad} data-testid="btn-load">
+        <button onClick={onLoad} data-testid="btn-load" className="tool-btn">
           Load
         </button>
-        <button onClick={onSave} data-testid="btn-save">
+        <button onClick={onSave} data-testid="btn-save" className="tool-btn">
           Save
         </button>
-        <button onClick={onSettings} data-testid="btn-settings">
+        <button onClick={onSettings} data-testid="btn-settings" className="tool-btn">
           Settings
         </button>
+      </div>
+      <div className="topbar-right">
+        {showAddStep && (
+          <button onClick={onAddStep} data-testid="btn-add-step" className="primary-btn">
+            + Add Step
+          </button>
+        )}
       </div>
     </div>
   );

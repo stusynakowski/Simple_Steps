@@ -1,52 +1,287 @@
 .operation-column {
-  border-right: 1px solid #ddd;
+  /* Remove old basic styling */
+  border: none;
+  background-color: transparent;
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  background-color: #f9f9f9;
-  height: 100%;
   overflow: hidden;
-  min-width: 120px; /* Base width for inactive */
+  position: relative;
+  height: 100%;
+  margin-right: -15px; /* Visual overlap for arrows */
+  z-index: 1;
 }
 
 .operation-column.active {
-  flex-grow: 1; /* Explode to take space */
-  background-color: #ffffff;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-  min-width: 300px;
   z-index: 10;
+  margin-right: 0; /* Reset overlap when expanding? or keep it */
 }
 
-.operation-column.inactive {
-  flex-grow: 0;
-  width: 120px;
+/* Squeezed State */
+.operation-column.squeezed {
+  min-width: 50px;
   cursor: pointer;
 }
 
+/* Header with Arrow */
 .op-header {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
-  background-color: #f0f0f0;
+  position: relative;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  /* background is handled by the arrow */
+  padding: 0; 
+  cursor: pointer;
 }
 
-.operation-column.active .op-header {
-  background-color: #e6f7ff; /* light blue highlight */
+.arrow-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--step-color, #444);
+  /* Arrow shape using clip-path */
+  clip-path: polygon(
+    0% 0%, 
+    calc(100% - 20px) 0%, 
+    100% 50%, 
+    calc(100% - 20px) 100%, 
+    0% 100%
+  );
+  z-index: 0;
+  transition: background-color 0.3s;
+  /* Add border effect via a pseudo element would be complex with clip-path, 
+   * so we will just use sufficient contrast or drop shadow filter 
+   */
+  filter: drop-shadow(2px 0 2px rgba(0,0,0,0.3));
+}
+
+/* When preceding step overlaps, we need inset for the tail? 
+   Actually standard arrow is usually: tail -> head.
+   If we want them to interlock, the left side needs a cutout.
+   Left cutout: polygon(20px 0, 100% 0, 100% 100%, 20px 100%, 0 50%)
+   But for the first item? 
+   Let's keep it simple: Right pointing arrow head, straight left edge (or cutout left edge).
+*/
+
+/* Let's try interlocking: Re-clip */
+.operation-column:not(:first-child) .arrow-background {
+  clip-path: polygon(
+    20px 0%, 
+    calc(100% - 20px) 0%, 
+    100% 50%, 
+    calc(100% - 20px) 100%, 
+    20px 100%, 
+    0% 50%
+  );
+  left: -15px; /* Pull back to overlap previous */
+  width: calc(100% + 15px);
+}
+
+/* First child just flat left */
+.operation-column:first-child .arrow-background {
+  clip-path: polygon(
+    0% 0%, 
+    calc(100% - 20px) 0%, 
+    100% 50%, 
+    calc(100% - 20px) 100%, 
+    0% 100%
+  );
+}
+
+
+.arrow-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 30px; /* Space for arrow tips */
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.operation-column:first-child .arrow-content {
+    padding-left: 15px; /* Less padding on left for first item */
+}
+
+/* Vertical Label for Squeezed */
+.vertical-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    white-space: nowrap;
+    height: 30px; /* constrain height so it doesn't overflow header? No, header is 50px */
+    /* Wait, vertical text inside a 50px high header won't fit much.
+       Maybe header height grows or we just show initials?
+       Or we rotate the whole header? 
+       For "sliver" state, usually the whole column is the sliver.
+    */
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* But wait, if column is squeezed, header is still horizontal?
+   If width is 50px, horizontal text won't fit.
+   The user asked explicitly for vertical label: "vertical sliver (20-40px) or just the arrow header".
+   We should probably hide text or show icon if it doesn't fit.
+*/
+
+.operation-column.squeezed .arrow-content {
+    justify-content: center;
+    padding: 0;
+}
+.operation-column.squeezed .vertical-label {
+   /* Actually, if header is 50px tall, vertical text 200px long won't fit vertically inside header. 
+      Unless the header becomes vertical?
+      The Dev plan says "vertical sliver". 
+      Usually this means the whole column acts as a tab.
+      But here we are keeping height 100% and width var.
+      If we want vertical text, it needs to run down the column BODY, not the header.
+      Or header text is rotated -90deg? 
+   */
+   display: none; /* Let's hide text for now to be safe, or just show number */
+}
+
+.header-titles {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
 }
 
 .op-name {
   margin: 0;
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 250px;
 }
 
 .op-status-indicator {
   font-size: 0.75rem;
-  margin-top: 4px;
+  opacity: 0.8;
   text-transform: uppercase;
-  color: #666;
+}
+
+.btn-minimize {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 0 5px;
+    line-height: 1;
+}
+.btn-minimize:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+}
+
+.op-body {
+  border: 1px solid #444;
+  border-top: none;
+  background-color: #2a2a2a;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  /* Ensure body goes under the next arrow visually if needed, but standard block is fine */
+  margin-top: 0; 
+  /* Visual gap adjustment if columns overlap */
+  margin-right: 15px; /* Counteract parent neg margin to keep body straight? */
+  margin-left: 20px; /* Indent body to align with arrow "cutout" */
+}
+
+.operation-column:first-child .op-body {
+    margin-left: 0;
+}
+
+.operation-column.squeezed .op-body {
+    display: none; /* Hide body when squeezed */
+}
+
+.operation-column.active .op-body {
+     /* Active body */
+     border-color: var(--step-color, #646cff);
+}
+
+/* Arrow Shape Implementation */
+.arrow-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--step-color, #444);
+  /* The nice arrow shape */
+  clip-path: polygon(
+    0% 0%, 
+    calc(100% - 20px) 0%, 
+    100% 50%, 
+    calc(100% - 20px) 100%, 
+    0% 100%
+  );
+  z-index: 1;
+}
+
+/* For squeezed state, maybe just a rectangle or smaller arrow? */
+.operation-column.squeezed .arrow-background {
+  clip-path: none; /* simple bar when squeezed */
+  width: 100%;
+}
+
+.arrow-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  padding-left: 15px;
+  padding-right: 30px; /* Make room for arrow tip */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+  font-weight: bold;
+  pointer-events: none; /* Let clicks pass to header */
+}
+
+.op-name {
+  margin: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.op-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: #1e1e1e;
+  border-top: 1px solid #444;
+}
+
+.op-body.hidden {
+  display: none;
+}
+
+.op-status-indicator {
+  font-size: 0.75rem;
+  margin-top: 0;
+  text-transform: uppercase;
+  color: #fff;
+  /* Make status pop */
+  background: rgba(0,0,0,0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* Status colors */

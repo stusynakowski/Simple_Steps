@@ -15,7 +15,15 @@ describe('MainLayout', () => {
     const first = screen.getByTestId('operation-column-step-001');
     expect(first).toBeInTheDocument();
 
-    // Clicking it should activate it (add 'active' class)
+    // The first step should be active by default
+    expect(first).toHaveClass('active');
+
+    // Clicking it should toggle it (deactivate since it was active)
+    fireEvent.click(first);
+    expect(first).not.toHaveClass('active');
+    expect(first).toHaveClass('squeezed');
+
+    // Clicking again should reactivate it
     fireEvent.click(first);
     expect(first).toHaveClass('active');
   });

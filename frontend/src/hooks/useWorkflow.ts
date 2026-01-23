@@ -9,7 +9,10 @@ function genId(prefix = 'step') {
 
 export default function useWorkflow() {
   const [workflow, setWorkflow] = useState<Workflow>(initialWorkflow);
-  const [selectedStepId, setSelectedStepId] = useState<string | null>(initialWorkflow.steps[0]?.id ?? null);
+  // Replaced single selected ID with a Set of expanded IDs
+  const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(
+    new Set(initialWorkflow.steps.length > 0 ? [initialWorkflow.steps[0].id] : [])
+  );
 
   function addStepAt(index: number) {
     const newStep: Step = {
@@ -26,11 +29,32 @@ export default function useWorkflow() {
 
     const reindexed = newSteps.map((s, i) => ({ ...s, sequence_index: i }));
     setWorkflow({ ...workflow, steps: reindexed });
-    setSelectedStepId(newStep.id);
+    // Automatically expand the new step
+    setExpandedStepIds(prev => new Set(prev).add(newStep.id));
   }
 
-  function selectStep(id: string) {
-    setSelectedStepId(id);
+  function toggleStep(id: string) {
+    setExpandedStepIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function expandStep(id: string) {
+    setExpandedStepIds(prev => new Set(prev).add(id));
+  }
+
+  function collapseStep(id: string) {
+    setExpandedStepIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   function runStep(id: string) {
@@ -68,11 +92,23 @@ export default function useWorkflow() {
   function deleteStep(id: string) {
     setWorkflow((prev) => {
       const newSteps = prev.steps.filter((s) => s.id !== id).map((s, i) => ({ ...s, sequence_index: i }));
-      // update selection if deleted
-      setSelectedStepId((current) => (current === id ? (newSteps[0]?.id ?? null) : current));
       return { ...prev, steps: newSteps };
+    });
+    setExpandedStepIds(prev => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
     });
   }
 
-  return { workflow, selectedStepId, addStepAt, selectStep, runStep, deleteStep };
+  return { 
+    workflow, 
+    expandedStepIds, 
+    addStepAt, 
+    toggleStep, 
+    expandStep, 
+    collapseStep, 
+    runStep, 
+    deleteStep 
+  };
 }
