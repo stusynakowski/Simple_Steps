@@ -1,50 +1,48 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import MainLayout from './MainLayout';
 import { describe, it, expect } from 'vitest';
 
 describe('MainLayout', () => {
-  it('renders header and workflow components and supports step selection', () => {
+  it('renders header and dynamic columns', () => {
     render(<MainLayout />);
     expect(screen.getByTestId('main-layout')).toBeInTheDocument();
-    expect(screen.getByTestId('workflow-area')).toBeInTheDocument();
-    expect(screen.getByTestId('step-detail')).toBeInTheDocument();
+    
+    // Check for the new columns container
+    expect(screen.getByTestId('columns-container')).toBeInTheDocument();
 
-    // WorkflowSequence should exist and contain step icons from mock data
-    const sequence = screen.getByTestId('workflow-sequence');
-    expect(sequence).toBeInTheDocument();
-
-    const first = screen.getByTestId('step-icon-step-001');
+    // Check for the first column exists instead of workflow sequence
+    // The test ID is constructed inside OperationColumn: `operation-column-${step.id}`
+    const first = screen.getByTestId('operation-column-step-001');
     expect(first).toBeInTheDocument();
 
-    // selecting the first step should show its details
+    // Clicking it should activate it (add 'active' class)
     fireEvent.click(first);
-    expect(screen.getByTestId('step-detail-content')).toHaveTextContent('Load Data');
-
-    // toolbar should be present in the detail view
-    expect(screen.getByTestId('step-toolbar')).toBeInTheDocument();
+    expect(first).toHaveClass('active');
   });
 
-  it('can run a pending step and updates UI accordingly', async () => {
-    // use real timers here to let the mock API resolve naturally
+  it('can run a pending step from the column toolbar', async () => {
     render(<MainLayout />);
 
-    const third = screen.getByTestId('step-icon-step-003');
+    const third = screen.getByTestId('operation-column-step-003');
     expect(third).toBeInTheDocument();
 
-    // select and run
+    // Activate the column to make toolbar visible (though button might be in DOM anyway, CSS hides it)
     fireEvent.click(third);
-    expect(screen.getByTestId('step-detail-content')).toHaveTextContent('Export Report');
+    
+    // Find the run button. Since we use title="Run" in the newcomponent
+    // Scope search to the active column to avoid finding buttons in other columns
+    const runBtn = within(third).getByTitle('Run');
+    fireEvent.click(runBtn);
 
-    fireEvent.click(screen.getByTestId('btn-run'));
+    // Status is shown in the column header area as text
+    // "running" status class should appear
+    await waitFor(() => {
+        expect(third).toHaveClass('status-running');
+    });
 
-    // status should update immediately to running
-    expect(screen.getByTestId('step-detail-content')).toHaveTextContent('Status: running');
-    expect(screen.getByTestId('step-icon-step-003')).toHaveClass('status-running');
-
-    // wait for the mock API to resolve and update the UI to completed
-    await waitFor(() => expect(screen.getByTestId('step-detail-content')).toHaveTextContent('Status: completed'), { timeout: 2000 });
-
-    // output grid should be present after completion
-    expect(screen.getByTestId('output-grid')).toBeInTheDocument();
+    // Wait for completion
+    await waitFor(() => {
+        expect(third).toHaveClass('status-completed');
+    }, { timeout: 2000 });
   });
 });
