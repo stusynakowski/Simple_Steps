@@ -219,11 +219,7 @@
   z-index: 1;
 }
 
-/* Squeezed state retains the arrow shape */
-.operation-column.squeezed .arrow-background {
-  /* We want to keep the clip-path defined for :first-child / :not(:first-child) */
-  /* Just ensure width is handled if needed */
-}
+
 
 .arrow-content {
   position: relative;
