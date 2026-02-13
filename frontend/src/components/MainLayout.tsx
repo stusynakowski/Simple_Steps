@@ -5,11 +5,18 @@ import GlobalControls from './GlobalControls';
 import OperationColumn from './OperationColumn';
 import useWorkflow from '../hooks/useWorkflow';
 import { getStepColor } from '../styles/theme';
+import Sidebar from './Sidebar';
+import ChatSidebar from './ChatSidebar';
 import './MainLayout.css';
 
 export default function MainLayout() {
   const [headerHeight, setHeaderHeight] = useState(200);
-  const isResizing = useRef(false);
+  const [sidebarWidth, setSidebarWidth] = useState(250);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
+  const [isChatVisible, setIsChatVisible] = useState(true);
+  const isResizingHeader = useRef(false);
+  const isResizingSidebar = useRef(false);
+  const isResizingRightSidebar = useRef(false);
 
   const { 
     workflow, 
@@ -21,22 +28,44 @@ export default function MainLayout() {
     deleteStep 
   } = useWorkflow();
 
-  const startResizing = useCallback(() => {
-    isResizing.current = true;
+  const startResizingHeader = useCallback(() => {
+    isResizingHeader.current = true;
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
   }, []);
 
+  const startResizingSidebar = useCallback(() => {
+    isResizingSidebar.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  const startResizingRightSidebar = useCallback(() => {
+    isResizingRightSidebar.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
   const stopResizing = useCallback(() => {
-    isResizing.current = false;
+    isResizingHeader.current = false;
+    isResizingSidebar.current = false;
+    isResizingRightSidebar.current = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   }, []);
 
   const resize = useCallback((mouseMoveEvent: any) => {
-    if (isResizing.current) {
+    if (isResizingHeader.current) {
         const newHeight = Math.max(120, Math.min(mouseMoveEvent.clientY, 600)); 
         setHeaderHeight(newHeight);
+    }
+    if (isResizingSidebar.current) {
+        const newWidth = Math.max(150, Math.min(mouseMoveEvent.clientX, 500));
+        setSidebarWidth(newWidth);
+    }
+    if (isResizingRightSidebar.current) {
+        const newWidth = Math.max(200, Math.min(window.innerWidth - mouseMoveEvent.clientX, 600));
+        setRightSidebarWidth(newWidth);
     }
   }, []);
 
@@ -60,11 +89,21 @@ export default function MainLayout() {
 
   return (
     <div className="main-layout" data-testid="main-layout">
+        <div style={{ width: sidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+            <Sidebar isVisible={true} />
+        </div>
+        
+        <div className="sidebar-resize-handle" onMouseDown={startResizingSidebar}>
+            <div className="sidebar-resize-line" />
+        </div>
+
+      <div className="content-area">
       <header className="header-container" style={{ height: headerHeight }}>
         <div className="system-tools-row">
             <TopBar 
                onAddStep={() => addStepAt(workflow.steps.length)} 
                showAddStep={false} 
+               onToggleChat={() => setIsChatVisible(!isChatVisible)}
             />
         </div>
         <div className="workflow-tools-row">
@@ -77,7 +116,7 @@ export default function MainLayout() {
         </div>
       </header>
 
-      <div className="resize-handle" onMouseDown={startResizing}>
+      <div className="resize-handle" onMouseDown={startResizingHeader}>
          <div className="resize-line" />
       </div>
       
@@ -102,18 +141,20 @@ export default function MainLayout() {
                 </div>
               );
             })}
-            
-            <div className="add-step-container">
-              <button 
-                className="add-step-button rectangular-add-btn"
-                onClick={() => addStepAt(workflow.steps.length)}
-                title="Add New Step"
-              >
-                Add Step +
-              </button>
-            </div>
         </div>
       </main>
+      </div> 
+
+      {isChatVisible && (
+        <>
+            <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar}>
+                <div className="sidebar-resize-line" />
+            </div>
+            <div style={{ width: rightSidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+                <ChatSidebar isVisible={isChatVisible} onClose={() => setIsChatVisible(false)} />
+            </div>
+        </>
+      )}
     </div>
   );
 }

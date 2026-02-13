@@ -5,11 +5,12 @@ interface TopBarProps {
   onSave?: () => void;
   onSettings?: () => void;
   onAddStep?: () => void;
+  onToggleChat?: () => void;
   title?: string;
   showAddStep?: boolean;
 }
 
-export default function TopBar({ onLoad, onSave, onSettings, onAddStep, showAddStep = true }: TopBarProps) {
+export default function TopBar({ onLoad, onSave, onSettings, onAddStep, onToggleChat, showAddStep = true }: TopBarProps) {
   return (
     <div className="topbar" data-testid="topbar">
       <div className="topbar-left">
@@ -29,7 +30,13 @@ export default function TopBar({ onLoad, onSave, onSettings, onAddStep, showAddS
             + Add Step
           </button>
         )}
+        {onToggleChat && (
+          <button onClick={onToggleChat} title="Toggle Copilot Chat" className="tool-btn chat-toggle-btn">
+            Chat
+          </button>
+        )}
       </div>
     </div>
   );
 }
+

@@ -1,0 +1,95 @@
+.sidebar {
+  background-color: #1e1e1e; /* VS Code sidebar bg */
+  border-right: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  color: #cccccc;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+.sidebar-header {
+  padding: 10px 20px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #888;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-section {
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.sidebar-section-title {
+  padding: 8px 15px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: #bbb;
+}
+
+.sidebar-section-title:hover {
+  color: #fff;
+}
+
+.sidebar-section-title .chevron {
+  margin-right: 6px;
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.sidebar-section-title.collapsed .chevron {
+  transform: rotate(-90deg);
+}
+
+.sidebar-content {
+  padding: 0 0 10px 0;
+}
+
+.file-item {
+  padding: 4px 15px 4px 32px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+}
+
+.file-item:hover {
+  background-color: #2a2d2e;
+}
+
+.file-item.active {
+  background-color: #37373d;
+  color: #fff;
+}
+
+.file-icon {
+  margin-right: 6px;
+  opacity: 0.7;
+}
+
+.folder-item {
+    padding: 4px 15px 4px 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    color: #ddd;
+}
+
+.folder-item:hover {
+    background-color: #2a2d2e;
+}
+
+.folder-icon {
+    margin-right: 6px;
+    opacity: 0.8;
+}
