@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import TopBar from './TopBar';
-import AgentWidget from './AgentWidget';
 import GlobalControls from './GlobalControls';
 import OperationColumn from './OperationColumn';
 import useWorkflow from '../hooks/useWorkflow';
@@ -15,7 +14,6 @@ export default function MainLayout() {
   const [headerHeight, setHeaderHeight] = useState(200);
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
-  const [isChatVisible, setIsChatVisible] = useState(true);
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
   
   // Track dragging state to disable transitions
@@ -154,14 +152,13 @@ export default function MainLayout() {
   };
 
   const toggleChat = () => {
-      if (isChatVisible) {
-          setIsChatVisible(false);
-          // If we want to animate out, we might handle it via width, but for now specific width logic:
-          // We'll keep isChatVisible for logic, but maybe use width 0?
-          // Actually let's use the width variable to control visibility animation
+      if (rightSidebarWidth > 20) {
+          // Collapse
+          lastRightSidebarWidth.current = rightSidebarWidth;
+          setRightSidebarWidth(0);
       } else {
-          setIsChatVisible(true);
-          setRightSidebarWidth(lastRightSidebarWidth.current > 0 ? lastRightSidebarWidth.current : 300);
+          // Expand
+          setRightSidebarWidth(lastRightSidebarWidth.current > 20 ? lastRightSidebarWidth.current : 300);
       }
   };
   
@@ -211,9 +208,6 @@ export default function MainLayout() {
         <div className="workflow-tools-row">
             <div className="workflow-controls-wrapper">
                 <GlobalControls onRunAll={handleRunAll} onPauseAll={handlePauseAll} />
-            </div>
-            <div className="agent-wrapper">
-                <AgentWidget />
             </div>
         </div>
       </header>
@@ -266,25 +260,25 @@ export default function MainLayout() {
       </div> 
 
       
-        <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar} style={{display: isChatVisible ? 'flex' : 'none'}}>
+        <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar} title="Double-click to verify size" onDoubleClick={toggleChat}>
             <div className="sidebar-resize-line" />
             <button 
                 className="resize-toggle-btn"
                 onClick={(e) => { e.stopPropagation(); toggleChat(); }}
                 onMouseDown={(e) => e.stopPropagation()}
-                title="Close Chat"
+                title={rightSidebarWidth > 20 ? "Close Chat" : "Open Chat"}
             >
-                ▶
+                {rightSidebarWidth > 20 ? '▶' : '◀'}
             </button>
         </div>
         <div style={{ 
-            width: isChatVisible ? rightSidebarWidth : 0, 
+            width: rightSidebarWidth, 
             flexShrink: 0, 
             display: 'flex', 
             flexDirection: 'column',
             overflow: 'hidden',
             transition: transitionStyle,
-            opacity: isChatVisible ? 1 : 0 // Fade out content as well
+            opacity: rightSidebarWidth > 20 ? 1 : 0 // Fade out content as well
         }}>
             <ChatSidebar isVisible={true /* Always rendered, hiding controlled by parent width */} onClose={toggleChat} />
         </div>
