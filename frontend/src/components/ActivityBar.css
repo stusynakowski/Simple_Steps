@@ -1,0 +1,60 @@
+.activity-bar {
+    width: 48px;
+    height: 100%;
+    background-color: #333333; /* Slightly lighter/different than sidebar to distinguish */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    z-index: 200;
+    flex-shrink: 0;
+    border-right: 1px solid #252525;
+}
+
+.activity-bar-top, .activity-bar-bottom {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+.activity-item {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    color: #ccc;
+}
+
+.activity-item:hover {
+    opacity: 1;
+    color: #fff;
+}
+
+.activity-item.active {
+    opacity: 1;
+    color: #fff;
+}
+
+.activity-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 24px;
+    width: 2px;
+    background-color: #fff;
+}
+
+.activity-icon {
+    width: 24px;
+    height: 24px;
+}

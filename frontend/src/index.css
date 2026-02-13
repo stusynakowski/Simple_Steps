@@ -13,6 +13,14 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
 /* ...existing code... */
 
 button {
@@ -30,11 +38,6 @@ button {
 button:hover {
   border-color: #646cff;
   background-color: #333;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
 }
 button:focus,
 button:focus-visible {

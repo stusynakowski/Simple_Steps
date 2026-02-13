@@ -17,7 +17,7 @@
 
 /* Sidebar Resize Handle */
 .sidebar-resize-handle {
-    width: 6px;
+    width: 12px; /* Thicker to fit the chevron inside */
     background: #1e1e1e;
     cursor: col-resize;
     position: relative;
@@ -26,6 +26,7 @@
     justify-content: center;
     align-items: center;
     border-right: 1px solid #333;
+    transition: background-color 0.2s;
 }
 
 .sidebar-resize-handle:hover, .sidebar-resize-handle:active {
@@ -37,6 +38,74 @@
     height: 40px;
     background: #555;
     border-radius: 1px;
+}
+
+/* Chevron Toggle Button - Streamlit Style (Clean & Embedded) */
+.resize-toggle-btn {
+    position: absolute;
+    background: transparent;
+    border: none;
+    color: #888;
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 105;
+    
+    /* Font style for the chevron */
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+    
+    opacity: 0; /* Hidden by default */
+    transition: all 0.2s ease;
+    box-shadow: none;
+}
+
+/* Show button when hovering the handle OR the button itself */
+.sidebar-resize-handle:hover .resize-toggle-btn,
+.resize-handle:hover .resize-toggle-btn,
+.resize-toggle-btn:hover,
+.resize-toggle-btn:focus {
+    opacity: 1;
+}
+
+.resize-toggle-btn:hover {
+    color: #fff;
+    /* Optional: very subtle background on hover for click target clarity */
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 2px;
+}
+
+/* Specific positioning for Sidebars (Vertical) */
+.sidebar-resize-handle .resize-toggle-btn {
+    width: 20px; /* Wider hit area */
+    height: 100%; /* Full height of handle segment if we wanted, or just consistent size */
+    height: 24px;
+    
+    top: 50%;
+    transform: translateY(-50%);
+    left: 50%;
+    margin-left: -10px; /* Center horizontally (20/2) */
+}
+
+/* Specific positioning for Header (Horizontal) */
+.resize-handle .resize-toggle-btn {
+    width: 24px; 
+    height: 16px; /* Match handle height */
+    
+    left: 50%;
+    transform: translateX(-50%);
+    
+    top: 50%;
+    margin-top: -8px; /* Center vertically (16/2) */
+}
+
+/* Hide the old decorative line completely for the cleaner look */
+.sidebar-resize-line, .resize-line {
+    display: none;
 }
 
 .header-container {
@@ -79,7 +148,7 @@
 }
 
 .resize-handle {
-  height: 8px;
+  height: 16px; /* Thicker to fit the chevron inside */
   background: #2a2a2a;
   cursor: row-resize;
   position: relative;

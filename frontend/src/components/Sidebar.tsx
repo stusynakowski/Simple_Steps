@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
+import type { ActivityView } from './ActivityBar';
 import './Sidebar.css';
 
 interface SidebarProps {
   isVisible: boolean;
+  currentView: ActivityView;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView }) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     pipelines: true,
     environments: true,
@@ -15,6 +17,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
   const [activeFile, setActiveFile] = useState<string>('pipeline-01.json');
 
   if (!isVisible) return null;
+
+  // Header Title Logic
+  const getHeaderTitle = () => {
+      switch(currentView) {
+          case 'explorer': return 'Explorer';
+          case 'search': return 'Search';
+          case 'components': return 'Components';
+          case 'settings': return 'Settings';
+          case 'account': return 'Account';
+          default: return 'Explorer';
+      }
+  };
 
   const toggleSection = (section: string) => {
     setOpenSections(prev => ({
@@ -44,10 +58,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <span>Explorer</span>
+        <span>{getHeaderTitle()}</span>
         <span>...</span>
       </div>
 
+      {currentView === 'explorer' && (
+      <>
       <div className="sidebar-section">
         <div 
             className={`sidebar-section-title ${!openSections.pipelines ? 'collapsed' : ''}`}
@@ -100,7 +116,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
             </div>
         )}
       </div>
-      
        <div className="sidebar-section">
         <div 
             className={`sidebar-section-title ${!openSections.configs ? 'collapsed' : ''}`}
@@ -118,6 +133,32 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible }) => {
              </div>
         )}
       </div>
+      </>
+      )}
+
+      {currentView === 'search' && (
+          <div className="sidebar-padding">
+              <input type="text" placeholder="Search..." style={{width: '90%', margin: '10px 5%', padding: '5px', background: '#252526', border: '1px solid #3c3c3c', color: '#fff'}} />
+              <div style={{marginTop: '10px', marginLeft: '5%', color: '#888', fontSize: '0.9em'}}>No results found.</div>
+          </div>
+      )}
+      
+      {currentView === 'components' && (
+          <div className="sidebar-padding" style={{padding: '10px'}}>
+             <div className="sidebar-section-title" style={{paddingLeft: 0}}><span>INSTALLED</span></div>
+             <div className="file-item"><span>Agent Widget</span></div>
+             <div className="file-item"><span>Data Grid</span></div>
+             
+             <div className="sidebar-section-title" style={{paddingLeft: 0, marginTop: '20px'}}><span>RECOMMENDED</span></div>
+             <div className="file-item"><span>Graph Viz</span></div>
+          </div>
+      )}
+      
+      {(currentView === 'settings' || currentView === 'account') && (
+           <div className="sidebar-padding" style={{color: '#888', fontStyle: 'italic', padding: '20px'}}>
+               {currentView === 'settings' ? 'Global Settings' : 'User Profiles'}
+           </div>
+      )}
 
     </div>
   );
