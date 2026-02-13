@@ -107,43 +107,30 @@
     padding-left: 15px; /* Less padding on left for first item */
 }
 
-/* Vertical Label for Squeezed */
+/* Label for Squeezed State */
 .vertical-label {
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
+    writing-mode: horizontal-tb;
+    transform: none;
     white-space: nowrap;
-    height: 30px; /* constrain height so it doesn't overflow header? No, header is 50px */
-    /* Wait, vertical text inside a 50px high header won't fit much.
-       Maybe header height grows or we just show initials?
-       Or we rotate the whole header? 
-       For "sliver" state, usually the whole column is the sliver.
-    */
-    font-size: 0.8rem;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-size: 0.9rem;
+    font-weight: 600;
+    width: 100%;
+    text-align: center;
 }
 
-/* But wait, if column is squeezed, header is still horizontal?
-   If width is 50px, horizontal text won't fit.
-   The user asked explicitly for vertical label: "vertical sliver (20-40px) or just the arrow header".
-   We should probably hide text or show icon if it doesn't fit.
-*/
-
+/* Squeezed header adjustments */
 .operation-column.squeezed .arrow-content {
     justify-content: center;
-    padding: 0;
+    padding: 0 20px; /* Space inside arrow */
+    height: 100%;
 }
-.operation-column.squeezed .vertical-label {
-   /* Actually, if header is 50px tall, vertical text 200px long won't fit vertically inside header. 
-      Unless the header becomes vertical?
-      The Dev plan says "vertical sliver". 
-      Usually this means the whole column acts as a tab.
-      But here we are keeping height 100% and width var.
-      If we want vertical text, it needs to run down the column BODY, not the header.
-      Or header text is rotated -90deg? 
-   */
-   display: none; /* Let's hide text for now to be safe, or just show number */
+
+.operation-column.squeezed .op-header {
+    /* Keep standard height */
+    height: 50px; 
+    align-items: center;
 }
 
 .header-titles {
