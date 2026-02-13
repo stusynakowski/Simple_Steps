@@ -44,7 +44,7 @@ export default function OperationColumn({
       className={`operation-column ${isActive ? 'active' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
       style={{ 
         '--step-color': color,
-        zIndex: isActive ? 100 : zIndex 
+        zIndex: zIndex 
       } as React.CSSProperties}
       onClick={handleColumnClick}
       data-testid={`operation-column-${step.id}`}

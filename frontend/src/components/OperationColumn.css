@@ -128,6 +128,14 @@
     display: flex;
     flex-direction: column;
     line-height: 1.2;
+    flex: 1; /* Take up available space */
+    align-items: center; /* Center text horizontally */
+    min-width: 0; /* Allow flex item to shrink for text-overflow */
+}
+
+.header-titles h3, 
+.header-titles span {
+    text-align: center;
 }
 
 .op-name {
@@ -137,7 +145,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 250px;
+  max-width: 100%; /* Ensure truncation works within flex item */
 }
 
 .op-status-indicator {
@@ -154,6 +162,8 @@
     font-size: 1.2rem;
     padding: 0 5px;
     line-height: 1;
+    pointer-events: auto; /* Enable clicks since parent is pointer-events: none */
+    margin-left: 8px;
 }
 .btn-minimize:hover {
     color: #fff;
@@ -171,9 +181,10 @@
   padding: 10px;
   /* Ensure body goes under the next arrow visually if needed, but standard block is fine */
   margin-top: 0; 
-  /* Visual gap adjustment if columns overlap */
-  margin-right: 15px; /* Counteract parent neg margin to keep body straight? */
-  margin-left: 20px; /* Indent body to align with arrow "cutout" */
+  /* Visual gap adjustment: Make Body narrower than Header so Header Tip overhangs */
+  /* This allows the NEXT step's body to abut perfectly without overlap */
+  margin-right: 28px; 
+  margin-left: 0; /* Body starts flush left (under the previous arrow tail) */
 }
 
 .operation-column:first-child .op-body {
