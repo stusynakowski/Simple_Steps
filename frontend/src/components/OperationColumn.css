@@ -5,21 +5,23 @@
   display: flex;
   flex-direction: column;
   transition: all 0.3s ease;
-  overflow: hidden;
+  overflow: visible; 
   position: relative;
   height: 100%;
-  margin-right: -15px; /* Visual overlap for arrows */
-  z-index: 1;
+  margin-right: -28px; /* High overlap to ensure flush connection */
+  /* z-index is handled inline by React */
 }
 
 .operation-column.active {
-  z-index: 10;
-  margin-right: 0; /* Reset overlap when expanding? or keep it */
+  /* z-index handled inline (100) */
+  margin-right: -28px;
+  /* Add drop shadow to active card to make it pop over others */
+  filter: drop-shadow(0 0 10px rgba(0,0,0,0.5));
 }
 
 /* Squeezed State */
 .operation-column.squeezed {
-  min-width: 150px;
+  min-width: 140px;
   cursor: pointer;
 }
 
@@ -29,9 +31,10 @@
   height: 50px;
   display: flex;
   align-items: center;
-  /* background is handled by the arrow */
   padding: 0; 
   cursor: pointer;
+  /* Shadow for depth */
+  filter: drop-shadow(-2px 0 2px rgba(0,0,0,0.1));
 }
 
 .arrow-background {
@@ -41,55 +44,37 @@
   right: 0;
   bottom: 0;
   background-color: var(--step-color, #444);
-  /* Arrow shape using clip-path */
-  clip-path: polygon(
-    0% 0%, 
-    calc(100% - 20px) 0%, 
-    100% 50%, 
-    calc(100% - 20px) 100%, 
-    0% 100%
-  );
   z-index: 0;
   transition: background-color 0.3s;
-  /* Add border effect via a pseudo element would be complex with clip-path, 
-   * so we will just use sufficient contrast or drop shadow filter 
-   */
-  filter: drop-shadow(2px 0 2px rgba(0,0,0,0.3));
 }
 
-/* When preceding step overlaps, we need inset for the tail? 
-   Actually standard arrow is usually: tail -> head.
-   If we want them to interlock, the left side needs a cutout.
-   Left cutout: polygon(20px 0, 100% 0, 100% 100%, 20px 100%, 0 50%)
-   But for the first item? 
-   Let's keep it simple: Right pointing arrow head, straight left edge (or cutout left edge).
-*/
+/* ARROW GEOMETRY: Depth 28px */
 
-/* Let's try interlocking: Re-clip */
-.operation-column:not(:first-child) .arrow-background {
-  clip-path: polygon(
-    20px 0%, 
-    calc(100% - 20px) 0%, 
-    100% 50%, 
-    calc(100% - 20px) 100%, 
-    20px 100%, 
-    0% 50%
-  );
-  left: -15px; /* Pull back to overlap previous */
-  width: calc(100% + 15px);
-}
-
-/* First child just flat left */
+/* First Step: Flat Left -> Pointed Right */
 .operation-column:first-child .arrow-background {
   clip-path: polygon(
-    0% 0%, 
-    calc(100% - 20px) 0%, 
-    100% 50%, 
-    calc(100% - 20px) 100%, 
-    0% 100%
+    0% 0%,                  /* Top Left */
+    calc(100% - 28px) 0%,   /* Top Right Shoulder */
+    100% 50%,               /* Tip */
+    calc(100% - 28px) 100%, /* Bottom Right Shoulder */
+    0% 100%                 /* Bottom Left */
   );
 }
 
+/* Subsequent Steps: Cutout Left -> Pointed Right */
+.operation-column:not(:first-child) .arrow-background {
+  left: 0;
+  width: 100%;
+  /* The nice interlocking shape */
+  clip-path: polygon(
+    0% 0%,                  /* Top Left Outer */
+    calc(100% - 28px) 0%,   /* Top Right Shoulder */
+    100% 50%,               /* Tip */
+    calc(100% - 28px) 100%, /* Bottom Right Shoulder */
+    0% 100%,                /* Bottom Left Outer */
+    28px 50%                /* Inner Cutout (Tail) - Matching Tip Depth */
+  );
+}
 
 .arrow-content {
   position: relative;
@@ -98,14 +83,20 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 0 30px; /* Space for arrow tips */
+  
+  /* Text Padding to clear arrows */
+  padding-left: 36px; /* Clear the 28px Cutout */
+  padding-right: 36px; /* Clear the 28px Tip */
+  
   color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 
 .operation-column:first-child .arrow-content {
-    padding-left: 15px; /* Less padding on left for first item */
+    /* First item has no cutout, so standard padding */
+    padding-left: 20px;
 }
+
 
 /* Label for Squeezed State */
 .vertical-label {
@@ -217,10 +208,10 @@
   z-index: 1;
 }
 
-/* For squeezed state, maybe just a rectangle or smaller arrow? */
+/* Squeezed state retains the arrow shape */
 .operation-column.squeezed .arrow-background {
-  clip-path: none; /* simple bar when squeezed */
-  width: 100%;
+  /* We want to keep the clip-path defined for :first-child / :not(:first-child) */
+  /* Just ensure width is handled if needed */
 }
 
 .arrow-content {

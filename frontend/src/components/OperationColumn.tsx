@@ -7,6 +7,7 @@ interface OperationColumnProps {
   color?: string;
   isActive: boolean;
   isSqueezed?: boolean;
+  zIndex?: number;
   onActivate: (id: string) => void;
   onRun: (id: string) => void;
   onPause: (id: string) => void;
@@ -19,6 +20,7 @@ export default function OperationColumn({
   color = '#444', 
   isActive,
   isSqueezed = false,
+  zIndex = 1,
   onActivate,
   onRun,
   onPause,
@@ -40,7 +42,10 @@ export default function OperationColumn({
   return (
     <div
       className={`operation-column ${isActive ? 'active' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
-      style={{ '--step-color': color } as React.CSSProperties}
+      style={{ 
+        '--step-color': color,
+        zIndex: isActive ? 100 : zIndex 
+      } as React.CSSProperties}
       onClick={handleColumnClick}
       data-testid={`operation-column-${step.id}`}
     >
@@ -110,7 +115,6 @@ export default function OperationColumn({
             >
               {statusExpanded ? '▼' : '▶'} Status Details
             </div>
-            {/* ...existing code... */}
             {isStatusVisible && (
               <div className="expander-content status-content">
                  <p>Execution ID: {step.id.substring(0, 8)}</p>

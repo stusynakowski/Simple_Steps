@@ -92,6 +92,7 @@ export default function MainLayout() {
                         color={getStepColor(index)}
                         isActive={isExpanded}
                         isSqueezed={!isExpanded}
+                        zIndex={workflow.steps.length - index}
                         onActivate={() => toggleStep(step.id)}
                         onRun={runStep}
                         onPause={(id) => console.log('Pause', id)} 
