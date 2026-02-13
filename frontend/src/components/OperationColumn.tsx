@@ -91,7 +91,7 @@ export default function OperationColumn({
                 className="expander-header"
                 onClick={(e) => { e.stopPropagation(); setDetailsExpanded(!detailsExpanded); }}
               >
-                {detailsExpanded ? '▼' : '▶'} Operation Details
+                {detailsExpanded ? '▼' : '▶'} Operation
               </div>
               <div className={`expander-content details-content ${detailsExpanded ? 'expanded' : ''}`}>
                 <div className="expander-inner">
@@ -110,7 +110,7 @@ export default function OperationColumn({
                 className="expander-header"
                 onClick={(e) => { e.stopPropagation(); setStatusExpanded(!statusExpanded); }}
               >
-                {statusExpanded ? '▼' : '▶'} Status Details
+                {statusExpanded ? '▼' : '▶'} Data
               </div>
               <div className={`expander-content status-content ${statusExpanded ? 'expanded' : ''}`}>
                 <div className="expander-inner">
