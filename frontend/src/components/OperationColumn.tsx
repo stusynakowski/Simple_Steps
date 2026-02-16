@@ -35,6 +35,7 @@ export default function OperationColumn({
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [statusExpanded, setStatusExpanded] = useState(true);
   const [summaryExpanded, setSummaryExpanded] = useState(true);
+  const [isEditMode, setIsEditMode] = useState(true);
 
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
@@ -89,9 +90,22 @@ export default function OperationColumn({
             <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onPause(step.id); }} title="Pause">
               ⏸
             </button>
-            <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); onDelete(step.id); }} title="Delete">
-              🗑
+            
+            <div style={{ flex: 1 }} /> {/* Spacer */}
+
+            <button 
+                className={`btn-pill-toggle ${isEditMode ? 'active' : ''}`}
+                onClick={(e) => { e.stopPropagation(); setIsEditMode(!isEditMode); }}
+                title="Toggle Edit Mode"
+            >
+                {isEditMode ? 'Done' : 'Edit'}
             </button>
+
+            {isEditMode && (
+                <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); onDelete(step.id); }} title="Delete">
+                🗑
+                </button>
+            )}
           </div>
 
           {isActive && (
@@ -126,6 +140,8 @@ export default function OperationColumn({
               </div>
 
               {/* Operation Details Section */}
+              {isEditMode && (
+              <>
               <div
                 className="expander-header"
                 onClick={(e) => { e.stopPropagation(); setDetailsExpanded(!detailsExpanded); }}
@@ -175,6 +191,8 @@ export default function OperationColumn({
                   ))}
                 </div>
               </div>
+              </>
+              )}
 
               {/* Data Section */}
               <div

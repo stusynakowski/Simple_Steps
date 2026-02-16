@@ -313,6 +313,30 @@
 .operation-column.status-running .op-status-indicator { color: orange; }
 .operation-column.status-error .op-status-indicator { color: red; }
 
+.btn-pill-toggle {
+    border: 1px solid #ccc;
+    background: #fff;
+    border-radius: 12px;
+    padding: 2px 12px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 600;
+    color: #555;
+    transition: all 0.2s ease;
+    outline: none;
+    margin-right: 5px;
+}
+
+.btn-pill-toggle:hover {
+    background: #f0f0f0;
+}
+
+.btn-pill-toggle.active {
+    background: #0078d4;
+    color: white;
+    border-color: #005a9e;
+}
+
 .op-toolbar {
   display: flex;
   gap: 5px;
