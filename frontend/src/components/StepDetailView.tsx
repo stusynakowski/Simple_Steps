@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Step, Cell } from '../types/models';
 import './StepDetailView.css';
 import StepToolbar from './StepToolbar';
@@ -12,6 +13,8 @@ interface StepDetailViewProps {
 }
 
 export default function StepDetailView({ step, onRun, onDelete, onEdit, onCellClick }: StepDetailViewProps) {
+  const [activeTab, setActiveTab] = useState<'output' | 'summary'>('output');
+
   if (!step) {
     return <div data-testid="step-detail-empty">No step selected</div>;
   }
@@ -30,7 +33,47 @@ export default function StepDetailView({ step, onRun, onDelete, onEdit, onCellCl
 
       <StepToolbar step={step} onRun={onRun} onDelete={onDelete} onEdit={() => onEdit?.(step.id)} />
 
-      <DataOutputGrid cells={preview} onCellClick={onCellClick} />
+      <div className="step-tabs">
+        <button 
+          className={`step-tab ${activeTab === 'output' ? 'active' : ''}`}
+          onClick={() => setActiveTab('output')}
+        >
+          Output
+        </button>
+        <button 
+          className={`step-tab ${activeTab === 'summary' ? 'active' : ''}`}
+          onClick={() => setActiveTab('summary')}
+        >
+          Summary
+        </button>
+      </div>
+
+      <div className="step-tab-content">
+        {activeTab === 'output' && (
+          <DataOutputGrid cells={preview} onCellClick={onCellClick} />
+        )}
+        {activeTab === 'summary' && (
+          <div className="step-summary">
+            <h4>Pipeline Status</h4>
+            <div className="summary-item">
+              <span className="label">Step Status:</span>
+              <span className={`status-badge status-${step.status}`}>{step.status}</span>
+            </div>
+            <div className="summary-item">
+               <span className="label">Step Type:</span>
+               <span>{step.process_type}</span>
+            </div>
+            <div className="summary-item">
+               <span className="label">Step ID:</span>
+               <span>{step.id}</span>
+            </div>
+             <div className="summary-info">
+              <p>General status of the pipeline details for this step.</p>
+              {/* Placeholder for more detailed pipeline capability status */}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

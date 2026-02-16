@@ -71,3 +71,75 @@
   color: #666;
   font-style: italic;
 }
+
+.step-tabs {
+  display: flex;
+  border-bottom: 1px solid #ccc;
+  margin-bottom: 10px;
+}
+
+.step-tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.step-tab.active {
+  color: #0078d4;
+  border-bottom: 2px solid #0078d4;
+}
+
+.step-tab:hover {
+  color: #333;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.step-summary {
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.summary-item {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.summary-item .label {
+  font-weight: 600;
+  margin-right: 8px;
+  color: #333;
+}
+
+.status-badge {
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.status-badge.status-completed {
+  background-color: #e6fffa;
+  color: #047857;
+}
+
+.status-badge.status-running {
+  background-color: #ebf8ff;
+  color: #0078d4;
+}
+
+.status-badge.status-error {
+  background-color: #fde8e8;
+  color: #c53030;
+}
+
+.status-badge.status-pending {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}

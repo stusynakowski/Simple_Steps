@@ -29,6 +29,7 @@ export default function OperationColumn({
 }: OperationColumnProps) {
   const [detailsExpanded, setDetailsExpanded] = useState(true);
   const [statusExpanded, setStatusExpanded] = useState(true);
+  const [summaryExpanded, setSummaryExpanded] = useState(true);
 
   const handleColumnClick = () => {
     // Toggling behavior handled by parent's onActivate = toggleStep
@@ -103,6 +104,24 @@ export default function OperationColumn({
                     <label>Params:</label>
                     <div className="json-preview">{JSON.stringify(step.configuration)}</div>
                   </div>
+                </div>
+              </div>
+
+               <div
+                className="expander-header"
+                onClick={(e) => { e.stopPropagation(); setSummaryExpanded(!summaryExpanded); }}
+              >
+                {summaryExpanded ? '▼' : '▶'} Summary
+              </div>
+              <div className={`expander-content summary-content ${summaryExpanded ? 'expanded' : ''}`}>
+                <div className="expander-inner">
+                   <div className="summary-item">
+                      <span className="label">Pipeline Status:</span>
+                      <span className={`status-badge status-${step.status}`}>{step.status}</span>
+                   </div>
+                   <div className="summary-info">
+                      <p>Details about general status of the pipeline.</p>
+                   </div>
                 </div>
               </div>
 
