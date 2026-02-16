@@ -7,7 +7,8 @@
   transition: all 0.3s ease;
   overflow: visible; 
   position: relative;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   margin-right: -28px; /* High overlap to ensure flush connection */
   /* z-index is handled inline by React */
 }
@@ -175,18 +176,18 @@
   border: 1px solid #444;
   border-top: none;
   background-color: #2a2a2a;
-  flex: 1;
-  padding: 0; /* Remove padding from outer container */
+  flex: initial; /* Don't stretch */
+  padding: 0; 
   /* Ensure body goes under the next arrow visually if needed, but standard block is fine */
   margin-top: 0; 
   /* Visual gap adjustment: Make Body narrower than Header so Header Tip overhangs */
   margin-right: 28px; 
   margin-left: 0; 
   
-  /* GRID ANIMATION */
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows 0.3s ease-out, opacity 0.3s ease-out;
+  /* GRID ANIMATION - Removed due to flex: initial usage */
+  display: flex; /* Changed from grid to flex column */
+  flex-direction: column;
+  transition: opacity 0.3s ease-out;
   overflow: hidden;
   opacity: 1;
 }
@@ -200,11 +201,11 @@
 
 /* Inner container holds the actual content and padding */
 .op-body-inner {
-    min-height: 0; /* Required for grid transition */
-    padding: 10px; /* Padding moves here */
+    min-height: 0; 
+    padding: 10px;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    /* Removed height: 100% */
 }
 
 .operation-column:first-child .op-body {
@@ -399,8 +400,9 @@
 }
 
 .expander-content.expanded {
-  max-height: 500px;
+  max-height: 80vh; /* Allow it to grow quite large for data */
   transition: max-height 0.3s ease-in-out;
+  overflow-y: auto; /* Enable scrolling for long data lists */
 }
 
 .expander-inner {

@@ -32,7 +32,7 @@ export default function useWorkflow() {
     const newStep: Step = {
       id: genId('step'),
       sequence_index: index,
-      label: 'New Step',
+      label: `Step ${index}`,
       process_type: 'noop',
       configuration: {},
       status: 'pending',

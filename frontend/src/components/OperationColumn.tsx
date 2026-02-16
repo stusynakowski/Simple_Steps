@@ -98,7 +98,7 @@ export default function OperationColumn({
                 onClick={(e) => { e.stopPropagation(); setIsEditMode(!isEditMode); }}
                 title="Toggle Edit Mode"
             >
-                {isEditMode ? 'Done' : 'Edit'}
+                Edit Step
             </button>
 
             {isEditMode && (
@@ -126,6 +126,8 @@ export default function OperationColumn({
                         value={step.label} 
                         onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
                         placeholder="Enter step name..."
+                        disabled={!isEditMode}
+                        style={{ opacity: isEditMode ? 1 : 0.8, cursor: isEditMode ? 'text' : 'default'  }}
                       />
                    </div>
                    <div className="summary-item">
@@ -156,10 +158,8 @@ export default function OperationColumn({
                         value={step.process_type} 
                         onChange={(e) => {
                             const newOpId = e.target.value;
-                            const op = availableOperations.find(o => o.id === newOpId);
                             onUpdate?.(step.id, { 
                                 process_type: newOpId,
-                                label: op?.label || step.label,
                                 configuration: {} // Reset config on change
                             });
                         }}
@@ -202,26 +202,26 @@ export default function OperationColumn({
                 {statusExpanded ? '▼' : '▶'} Data
               </div>
               <div className={`expander-content status-content ${statusExpanded ? 'expanded' : ''}`}>
-                <div className="expander-inner">
-                  <p>Execution ID: {step.id.substring(0, 8)}</p>
+                <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#666' }}>
+                    Execution ID: {step.id.substring(0, 8)}
+                  </p>
+                  
+                   {step.output_preview && step.output_preview.length > 0 ? (
+                      <div className="data-list">
+                        {step.output_preview.map((cell) => (
+                          <div key={`${cell.row_id}-${cell.column_id}`} className="data-cell-item">
+                            {cell.display_value}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="no-data-placeholder">No Data</div>
+                    )}
                 </div>
               </div>
             </div>
           )}
-
-          <div className="op-data-column">
-            {step.output_preview && step.output_preview.length > 0 ? (
-              <div className="data-list">
-                {step.output_preview.map((cell) => (
-                  <div key={`${cell.row_id}-${cell.column_id}`} className="data-cell-item">
-                    {cell.display_value}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="no-data-placeholder">No Data</div>
-            )}
-          </div>
         </div>
       </div>
     </div>
