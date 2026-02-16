@@ -12,6 +12,12 @@
   gap: 10px;
 }
 
+.topbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
 .topbar-right {
   display: flex;
   gap: 10px;
@@ -44,4 +50,42 @@
 
 .primary-btn:hover {
   background: #535bf2;
+}
+
+.search-bar-container {
+  display: flex;
+  align-items: center;
+  background-color: #313131;
+  border: 1px solid #454545;
+  border-radius: 4px; /* VS Code style */
+  padding: 3px 8px;
+  width: 35vw; 
+  min-width: 200px;
+  max-width: 600px;
+  margin: 0 10px;
+}
+
+.search-bar-container:focus-within {
+  border-color: #007fd4; /* VS Code focus color */
+}
+
+.search-icon {
+  display: flex;
+  color: #ccc;
+  margin-right: 6px;
+  opacity: 0.8;
+}
+
+.search-input {
+  background: transparent;
+  border: none;
+  color: #cccccc;
+  width: 100%;
+  outline: none;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.search-input::placeholder {
+  color: #888;
 }

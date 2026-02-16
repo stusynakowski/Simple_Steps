@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import TopBar from './TopBar';
+import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import GlobalControls from './GlobalControls';
 import OperationColumn from './OperationColumn';
 import useWorkflow from '../hooks/useWorkflow';
@@ -11,7 +12,7 @@ import type { ActivityView } from './ActivityBar';
 import './MainLayout.css';
 
 export default function MainLayout() {
-  const [headerHeight, setHeaderHeight] = useState(200);
+  const [headerHeight, setHeaderHeight] = useState(240); // Increased default height
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
@@ -26,7 +27,7 @@ export default function MainLayout() {
   // Store previous widths for restoring after collapse
   const lastRightSidebarWidth = useRef(300);
   const lastSidebarWidth = useRef(250);
-  const lastHeaderHeight = useRef(200);
+  const lastHeaderHeight = useRef(240); // Increased ref height
 
   const { 
     workflow, 
@@ -50,7 +51,7 @@ export default function MainLayout() {
           lastHeaderHeight.current = headerHeight;
           setHeaderHeight(50); // Collapse to just TopBar
       } else {
-          setHeaderHeight(lastHeaderHeight.current > 60 ? lastHeaderHeight.current : 200);
+          setHeaderHeight(lastHeaderHeight.current > 60 ? lastHeaderHeight.current : 240);
       }
   }, [headerHeight]);
 
@@ -165,6 +166,41 @@ export default function MainLayout() {
   // Transition style
   const transitionStyle = isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
 
+  // Workflow Tabs State
+  const [tabs, setTabs] = useState<WorkflowTab[]>([
+    { id: '1', title: 'Data Processing 1.json', isActive: true, isModified: false },
+    { id: '2', title: 'User Onboarding.json', isActive: false, isModified: true },
+    { id: '3', title: 'Draft Workflow', isActive: false }
+  ]);
+
+  const handleTabClick = (id: string) => {
+    setTabs(tabs.map(t => ({ ...t, isActive: t.id === id })));
+  };
+
+  const handleTabClose = (id: string) => {
+    // Prevent closing the last tab for now
+    if (tabs.length <= 1) return;
+    
+    const newTabs = tabs.filter(t => t.id !== id);
+    // If we closed the active tab, activate the last remaining one
+    if (tabs.find(t => t.id === id)?.isActive) {
+        newTabs[newTabs.length - 1].isActive = true;
+    }
+    setTabs(newTabs);
+  };
+
+  const handleNewTab = () => {
+    const newId = Date.now().toString();
+    const newTabs = tabs.map(t => ({ ...t, isActive: false }));
+    newTabs.push({ 
+        id: newId, 
+        title: `Untitled-${newId.slice(-4)}.json`, 
+        isActive: true, 
+        isModified: false 
+    });
+    setTabs(newTabs);
+  };
+
   return (
     <div className="main-layout" data-testid="main-layout">
         <ActivityBar activeView={activeActivityView} onViewChange={handleViewChange} />
@@ -202,7 +238,14 @@ export default function MainLayout() {
             <TopBar 
                onAddStep={() => addStepAt(workflow.steps.length)} 
                showAddStep={false} 
-               onToggleChat={toggleChat}
+            />
+        </div>
+        <div className="tabs-row">
+            <WorkflowTabs 
+                tabs={tabs}
+                onTabClick={handleTabClick}
+                onTabClose={handleTabClose}
+                onNewTab={handleNewTab}
             />
         </div>
         <div className="workflow-tools-row">

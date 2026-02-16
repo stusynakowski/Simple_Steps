@@ -1,0 +1,115 @@
+.workflow-tabs-container {
+    display: flex;
+    align-items: center;
+    background-color: #252526; /* VS Code tab container bg */
+    border-bottom: 1px solid #1e1e1e;
+    height: 35px;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    /* Hide scrollbar */
+    scrollbar-width: none; 
+}
+
+.workflow-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+.workflow-tabs-list {
+    display: flex;
+    height: 100%;
+}
+
+.workflow-tab {
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    min-width: 120px;
+    height: 100%;
+    background-color: #2d2d2d; /* Inactive tab bg */
+    color: #969696;
+    border-right: 1px solid #252526;
+    cursor: pointer;
+    font-size: 13px;
+    user-select: none;
+    position: relative;
+    gap: 6px;
+}
+
+.workflow-tab:hover {
+    background-color: #2a2d2e;
+}
+
+.workflow-tab.active {
+    background-color: #1e1e1e; /* Active tab bg - usually matches the editor bg */
+    color: #ffffff;
+    border-top: 1px solid #007fd4; /* Active tab top border highlight (blue) */
+}
+
+.tab-icon {
+    display: flex;
+    align-items: center;
+    opacity: 0.8;
+}
+
+.workflow-tab.active .tab-icon {
+    opacity: 1;
+    color: #4EC9B0; /* Highlight color for icon if desired */
+}
+
+.tab-title {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-modified-indicator {
+    font-size: 10px;
+    color: #ffffff;
+    margin-right: 2px;
+}
+
+.tab-close-btn {
+    background: transparent;
+    border: none;
+    color: #ccccc7;
+    border-radius: 3px;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    opacity: 0; /* Hidden by default similar to VS Code until hover */
+    cursor: pointer;
+}
+
+.workflow-tab:hover .tab-close-btn,
+.workflow-tab.active .tab-close-btn {
+    opacity: 1;
+}
+
+.tab-close-btn:hover {
+    background-color: #4b4b4b;
+    color: #ffffff;
+}
+
+.new-tab-btn {
+    background: transparent;
+    border: none;
+    color: #ccccc7;
+    width: 30px;
+    height: 100%;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.new-tab-btn:hover {
+    background-color: #333;
+    color: #fff;
+}
