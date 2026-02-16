@@ -255,6 +255,32 @@
   pointer-events: none; /* Let clicks pass to header */
 }
 
+/* Config Item Styles */
+.config-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.config-item label {
+  width: 100px;
+  font-weight: 600;
+  color: #333;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.config-item input,
+.config-item select {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-width: 0; /* Allow shrinking */
+  font-size: 0.85rem;
+}
+
 .op-name {
   margin: 0;
   white-space: nowrap;
@@ -265,14 +291,7 @@
   font-weight: 600;
 }
 
-.op-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background-color: #1e1e1e;
-  border-top: 1px solid #444;
-}
+/* Removed duplicate op-body definition that was interfering with grid layout */
 
 .op-body.hidden {
   display: none;
@@ -346,22 +365,27 @@
 }
 
 .expander-content {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.3s ease-out;
+  display: block;
+  max-height: 0;
+  transition: max-height 0.3s cubic-bezier(0, 1, 0, 1);
   overflow: hidden;
   font-size: 0.8rem;
   background: white;
-  padding: 0; /* Important: padding interferes with height anim if on parent */
+  padding: 0;
 }
 
 .expander-content.expanded {
-  grid-template-rows: 1fr;
+  max-height: 500px;
+  transition: max-height 0.3s ease-in-out;
 }
 
 .expander-inner {
-  min-height: 0;
-  padding: 10px; /* Moved padding here */
+  padding: 10px;
+  /* padding moves here so it gets clipped by max-height on parent */
+}
+
+.expander-inner {
+  padding: 10px;
 }
 
 .json-preview {

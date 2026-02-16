@@ -106,12 +106,12 @@ export default function OperationColumn({
               <div className={`expander-content summary-content ${summaryExpanded ? 'expanded' : ''}`}>
                 <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                    <div className="config-item">
-                      <label>Step Name:</label>
+                      <label>Step Name</label>
                       <input 
                         type="text" 
                         value={step.label} 
                         onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
-                        placeholder="Step Name"
+                        placeholder="Enter step name..."
                       />
                    </div>
                    <div className="summary-item">
