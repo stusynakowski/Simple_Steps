@@ -4,9 +4,11 @@ import './GlobalControls.css';
 interface GlobalControlsProps {
   onRunAll: () => void;
   onPauseAll: () => void;
+  onStopAll: () => void;
+  pipelineStatus: 'idle' | 'running' | 'paused';
 }
 
-export default function GlobalControls({ onRunAll, onPauseAll }: GlobalControlsProps) {
+export default function GlobalControls({ onRunAll, onPauseAll, onStopAll, pipelineStatus }: GlobalControlsProps) {
   const [computeTarget, setComputeTarget] = useState('Local');
   const [pythonEnv, setPythonEnv] = useState('simple-steps-env');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -55,19 +57,35 @@ export default function GlobalControls({ onRunAll, onPauseAll }: GlobalControlsP
 
         <div className="right-align-group">
           <div className="status-widget">
-            <span className="status-dot online"></span>
-            <span className="status-text">Backend: Online</span>
+            <span className={`status-dot ${pipelineStatus === 'running' ? 'running' : 'online'}`}></span>
+            <span className="status-text">Backend: {pipelineStatus === 'running' ? 'Running' : 'Online'}</span>
           </div>
         </div>
       </div>
 
       <div className="execution-row">
         <div className="control-group main-controls">
-            <button className="control-btn run-btn" onClick={onRunAll} title="Run Workflow">
-            <span className="icon">▶</span> Run Pipeline
-            </button>
-            <button className="control-btn pause-btn" onClick={onPauseAll} title="Pause Workflow">
-            <span className="icon">⏸</span> Pause
+            {pipelineStatus === 'running' ? (
+                <button className="control-btn pause-btn" onClick={onPauseAll} title="Pause Workflow">
+                    <span className="icon">⏸</span> Pause
+                </button>
+            ) : (
+                <button 
+                  className={`control-btn run-btn ${pipelineStatus === 'paused' ? 'resume-btn' : ''}`} 
+                  onClick={onRunAll} 
+                  title={pipelineStatus === 'paused' ? "Resume Workflow" : "Run Workflow"}
+                >
+                    <span className="icon">▶</span> {pipelineStatus === 'paused' ? "Resume" : "Run Pipeline"}
+                </button>
+            )}
+            
+            <button 
+              className="control-btn stop-btn" 
+              onClick={onStopAll} 
+              title="Stop Workflow"
+              disabled={pipelineStatus === 'idle'}
+            >
+              <span className="icon">⏹</span> Stop
             </button>
         </div>
       </div>

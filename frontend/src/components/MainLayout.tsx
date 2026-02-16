@@ -31,11 +31,17 @@ export default function MainLayout() {
 
   const { 
     workflow, 
+    availableOperations,
     expandedStepIds, 
+    pipelineStatus,
     addStepAt, 
     toggleStep, 
     collapseStep, 
-    runStep, 
+    updateStep,
+    runStep,
+    runPipeline,
+    pausePipeline,
+    stopPipeline,
     deleteStep 
   } = useWorkflow();
 
@@ -144,12 +150,15 @@ export default function MainLayout() {
   };
 
   const handleRunAll = () => {
-    // Basic implementation: Run all steps
-    workflow.steps.forEach(s => runStep(s.id));
+    runPipeline();
   };
   
   const handlePauseAll = () => {
-    console.log('Pause All');
+    pausePipeline();
+  };
+
+  const handleStopAll = () => {
+      stopPipeline();
   };
 
   const toggleChat = () => {
@@ -250,7 +259,12 @@ export default function MainLayout() {
         </div>
         <div className="workflow-tools-row">
             <div className="workflow-controls-wrapper">
-                <GlobalControls onRunAll={handleRunAll} onPauseAll={handlePauseAll} />
+                <GlobalControls 
+                    onRunAll={handleRunAll} 
+                    onPauseAll={handlePauseAll} 
+                    onStopAll={handleStopAll}
+                    pipelineStatus={pipelineStatus}
+                />
             </div>
         </div>
       </header>
@@ -279,7 +293,9 @@ export default function MainLayout() {
                         isActive={isExpanded}
                         isSqueezed={!isExpanded}
                         zIndex={workflow.steps.length - index}
+                        availableOperations={availableOperations}
                         onActivate={() => toggleStep(step.id)}
+                        onUpdate={(id, updates) => updateStep(id, updates)}
                         onRun={runStep}
                         onPause={(id) => console.log('Pause', id)} 
                         onDelete={deleteStep}

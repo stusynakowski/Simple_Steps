@@ -1,4 +1,4 @@
-export type StepStatus = 'pending' | 'running' | 'completed' | 'error';
+export type StepStatus = 'pending' | 'running' | 'completed' | 'error' | 'paused' | 'stopped';
 
 export interface Cell {
   row_id: number;
@@ -17,6 +17,7 @@ export interface Step {
   process_type: string;
   configuration: StepConfiguration;
   status: StepStatus;
+  outputRefId?: string; // The backend reference ID for the result DataFrame
   output_preview?: Cell[]; 
   // For glide datagrid, we might eventually need specific GridCell types, 
   // but for now we stick to the project spec `Cell` abstraction.
