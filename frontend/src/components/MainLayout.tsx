@@ -34,8 +34,10 @@ export default function MainLayout() {
     availableOperations,
     expandedStepIds, 
     pipelineStatus,
+    maximizedStepId,
     addStepAt, 
     toggleStep, 
+    toggleMaximizeStep,
     collapseStep, 
     updateStep,
     runStep,
@@ -285,13 +287,15 @@ export default function MainLayout() {
         <div className="columns-container" data-testid="columns-container">
             {workflow.steps.map((step, index) => {
               const isExpanded = expandedStepIds.has(step.id);
+              const isMaximized = maximizedStepId === step.id;
               return (
-                <div key={step.id} className={`column-wrapper ${isExpanded ? 'expanded' : 'collapsed'}`}>
+                <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
                     <OperationColumn
                         step={step}
                         color={getStepColor(index)}
                         isActive={isExpanded}
                         isSqueezed={!isExpanded}
+                        isMaximized={isMaximized}
                         zIndex={workflow.steps.length - index}
                         availableOperations={availableOperations}
                         onActivate={() => toggleStep(step.id)}
@@ -301,6 +305,7 @@ export default function MainLayout() {
                         onPause={(id) => console.log('Pause', id)} 
                         onDelete={deleteStep}
                         onMinimize={() => collapseStep(step.id)}
+                        onMaximize={() => toggleMaximizeStep(step.id)}
                     />
                 </div>
               );

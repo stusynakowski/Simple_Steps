@@ -9,14 +9,9 @@ interface StepToolbarProps {
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onFormulaChange?: (id: string, formula: string) => void;
-  // Toggle handlers
-  onToggleData?: () => void;
-  onToggleConfig?: () => void;
-  onToggleSummary?: () => void;
-  // State for toggles
-  showSummary?: boolean;
-  showConfig?: boolean;
-  showData?: boolean;
+  // Tab handlers
+  activeTab: 'summary' | 'details' | 'data';
+  onTabChange: (tab: 'summary' | 'details' | 'data') => void;
 }
 
 export default function StepToolbar({ 
@@ -25,12 +20,8 @@ export default function StepToolbar({
   onRun, 
   onDelete, 
   onFormulaChange,
-  onToggleData,
-  onToggleConfig,
-  onToggleSummary,
-  showSummary,
-  showConfig,
-  showData,
+  activeTab,
+  onTabChange,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const [formula, setFormula] = useState(step.operation || '');
@@ -101,54 +92,91 @@ export default function StepToolbar({
 
         <div className="divider-vertical" style={{ width: 1, height: 16, background: '#eee', margin: '0 4px' }} />
 
-        {/* View Toggles - Subtle by default, colored when active */}
-        <button 
-          className={`btn-icon toggle ${showConfig ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onToggleConfig?.(); }}
-          title="Toggle Configuration"
-          style={{ 
-            color: showConfig ? '#3498db' : '#95a5a6',
-            background: showConfig ? '#ebf5fb' : 'transparent',
+        {/* Tab Buttons as Icons - Beside Run Button */}
+        <button
+          className={`btn-icon tab-icon ${activeTab === 'summary' ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTabChange('summary'); }}
+          title="Summary"
+          style={{
+            position: 'relative',
+            color: activeTab === 'summary' ? '#f39c12' : '#95a5a6',
+            background: activeTab === 'summary' ? '#fef9e7' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-          </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            {activeTab === 'summary' && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '-4px', // Connect to content below
+                    left: 0, 
+                    right: 0,
+                    height: '2px',
+                    background: '#f39c12',
+                    zIndex: 10
+                }}/>
+            )}
         </button>
 
-        <button 
-          className={`btn-icon toggle ${showData ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onToggleData?.(); }}
-          title="Toggle Data View"
-          style={{ 
-            color: showData ? '#9b59b6' : '#95a5a6',
-            background: showData ? '#f4ecf7' : 'transparent',
+        <button
+          className={`btn-icon tab-icon ${activeTab === 'details' ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
+          title="Operation Details"
+          style={{
+            position: 'relative',
+            color: activeTab === 'details' ? '#3498db' : '#95a5a6',
+            background: activeTab === 'details' ? '#ebf5fb' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="3" y1="9" x2="21" y2="9"></line>
-            <line x1="9" y1="21" x2="9" y2="9"></line>
-          </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            {activeTab === 'details' && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '-4px', 
+                    left: 0, 
+                    right: 0,
+                    height: '2px',
+                    background: '#3498db',
+                    zIndex: 10
+                }}/>
+            )}
         </button>
 
-        <button 
-          className={`btn-icon toggle ${showSummary ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onToggleSummary?.(); }}
-          title="Toggle Summary View"
-          style={{ 
-            color: showSummary ? '#f39c12' : '#95a5a6',
-            background: showSummary ? '#fef9e7' : 'transparent',
+        <button
+          className={`btn-icon tab-icon ${activeTab === 'data' ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTabChange('data'); }}
+          title="Data View"
+          style={{
+            position: 'relative',
+            color: activeTab === 'data' ? '#9b59b6' : '#95a5a6',
+            background: activeTab === 'data' ? '#f4ecf7' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"></line>
-            <line x1="12" y1="20" x2="12" y2="4"></line>
-            <line x1="6" y1="20" x2="6" y2="14"></line>
-          </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            </svg>
+            {activeTab === 'data' && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '-4px', 
+                    left: 0, 
+                    right: 0,
+                    height: '2px',
+                    background: '#9b59b6',
+                    zIndex: 10
+                }}/>
+            )}
         </button>
 
         <div style={{ flex: 1 }} />
@@ -167,6 +195,9 @@ export default function StepToolbar({
           </svg>
         </button>
       </div>
+
+      {/* Tabs Bar Removed */}
+      <div style={{ display: 'none' }}></div>
     </div>
   );
 }

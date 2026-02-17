@@ -20,6 +20,8 @@ export default function useWorkflow() {
     new Set(initialWorkflow.steps.length > 0 ? [initialWorkflow.steps[0].id] : [])
   );
   
+  const [maximizedStepId, setMaximizedStepId] = useState<string | null>(null);
+  
   const [pipelineStatus, setPipelineStatus] = useState<'idle' | 'running' | 'paused'>('idle');
   const pipelineStatusRef = useRef<'idle' | 'running' | 'paused'>('idle');
 
@@ -51,6 +53,7 @@ export default function useWorkflow() {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
+        if (maximizedStepId === id) setMaximizedStepId(null);
       } else {
         next.add(id);
       }
@@ -58,8 +61,13 @@ export default function useWorkflow() {
     });
   }
 
-  function expandStep(id: string) {
-    setExpandedStepIds(prev => new Set(prev).add(id));
+  function toggleMaximizeStep(id: string) {
+    if (maximizedStepId === id) {
+      setMaximizedStepId(null);
+    } else {
+      setExpandedStepIds(prev => new Set(prev).add(id));
+      setMaximizedStepId(id);
+    }
   }
 
   function collapseStep(id: string) {
@@ -68,6 +76,7 @@ export default function useWorkflow() {
       next.delete(id);
       return next;
     });
+    if (maximizedStepId === id) setMaximizedStepId(null);
   }
 
   const runStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
@@ -301,9 +310,10 @@ export default function useWorkflow() {
     availableOperations,
     expandedStepIds, 
     pipelineStatus,
+    maximizedStepId,
     addStepAt, 
     toggleStep, 
-    expandStep, 
+    toggleMaximizeStep,
     collapseStep, 
     updateStep,
     runStep, 

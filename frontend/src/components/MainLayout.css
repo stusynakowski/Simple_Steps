@@ -215,6 +215,12 @@
     width: 450px;
 }
 
+.column-wrapper.maximized {
+    flex: 0 0 calc(100vw - 100px);
+    width: calc(100vw - 100px);
+    max-width: 1200px; /* Optional cap */
+}
+
 .column-wrapper.collapsed {
     flex: 0 0 150px; /* Matched min-width */
     width: 150px;
@@ -228,7 +234,7 @@
    
    /* We need to clear the protrusion of the last arrow tip */
    /* Last column margin-right is -28px, so its body stops at X. Its tip extends to X+28. */
-   /* The container follows naturally. But to look flush, we might want to start "inside" the tip? */
+   /* The container follows naturally. But to make it look flush, we might want to start "inside" the tip? */
    /* Or just placing it after is fine? */
    /* To make it look like a continuation: */
    margin-left: -5px; /* Slight visual nudge so it doesn't look detached */

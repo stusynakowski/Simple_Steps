@@ -11,6 +11,7 @@ interface OperationColumnProps {
   color?: string;
   isActive: boolean;
   isSqueezed?: boolean;
+  isMaximized?: boolean; // New prop
   zIndex?: number;
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
@@ -19,6 +20,7 @@ interface OperationColumnProps {
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
   onMinimize?: () => void;
+  onMaximize?: () => void; // New callback
 }
 
 export default function OperationColumn({
@@ -27,6 +29,7 @@ export default function OperationColumn({
   color = '#444', 
   isActive,
   isSqueezed = false,
+  isMaximized = false,
   zIndex = 1,
   onActivate,
   onUpdate,
@@ -34,18 +37,11 @@ export default function OperationColumn({
   onPreview,
   onDelete,
   onMinimize,
+  onMaximize,
 }: OperationColumnProps) {
-  // Toggle Visibility ("Is it enabled/added to view?")
-  const [detailsVisible, setDetailsVisible] = useState(false); // Hidden by default
-  const [statusVisible, setStatusVisible] = useState(true); // Shown by default
-  const [summaryVisible, setSummaryVisible] = useState(false); // Hidden by default
-
-  // Expander State ("Is it collapsed/minimized?")
-  const [detailsExpanded, setDetailsExpanded] = useState(true);
-  const [statusExpanded, setStatusExpanded] = useState(true);
-  const [summaryExpanded, setSummaryExpanded] = useState(true);
-  
-  const [isEditMode] = useState(true); // Always true since toggle removed
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data'>('data');
+  const [isEditMode] = useState(true);
 
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
@@ -68,7 +64,7 @@ export default function OperationColumn({
 
   return (
     <div
-      className={`operation-column ${isActive ? 'active' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
       style={{ 
         '--step-color': color,
         zIndex: zIndex 
@@ -87,6 +83,33 @@ export default function OperationColumn({
                         <h3 className="op-name">{step.label}</h3>
                         <span className="op-status-indicator">{step.status}</span>
                     </div>
+                    {isActive && onMaximize && (
+                        <button 
+                            className="btn-maximize square-btn"
+                            onClick={(e) => { e.stopPropagation(); onMaximize(); }}
+                            title={isMaximized ? "Restore" : "Maximize"}
+                            style={{ 
+                                width: 24, height: 24, 
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                border: '1px solid rgba(0,0,0,0.2)', borderRadius: 4,
+                                background: 'rgba(255,255,255,0.2)', cursor: 'pointer',
+                                marginRight: 4
+                            }}
+                        >
+                            {isMaximized ? (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+                                </svg>
+                            ) : (
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                    <polyline points="9 21 3 21 3 15"></polyline>
+                                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                                    <line x1="3" y1="21" x2="10" y2="14"></line>
+                                </svg>
+                            )}
+                        </button>
+                    )}
                     {isActive && onMinimize && (
                         <button 
                             className="btn-minimize square-btn"
@@ -118,39 +141,26 @@ export default function OperationColumn({
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
               onDelete={() => onDelete(step.id)}
-              // Toggle Handlers (Toggle Visibility)
-              onToggleConfig={() => setDetailsVisible(!detailsVisible)}
-              onToggleData={() => setStatusVisible(!statusVisible)}
-              onToggleSummary={() => setSummaryVisible(!summaryVisible)}
-              // State (For Toolbar button active state)
-              showConfig={detailsVisible}
-              showData={statusVisible}
-              showSummary={summaryVisible}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
               onFormulaChange={(id, formula) => onUpdate?.(id, { operation: formula })}
             />
           )}
 
           {isActive && (
-            <div className="op-expander-section">
-              {/* Summary Section */}
-              {summaryVisible && (
-                <>
-                  <div
-                    className="expander-header clickable-header"
-                    onClick={(e) => { e.stopPropagation(); setSummaryExpanded(!summaryExpanded); }}
-                    style={{ display: 'flex', alignItems: 'center' }}
-                  >
-                     {summaryExpanded ? '▼' : '▶'} 
-                     <span style={{ margin: '0 4px 0 8px', display: 'flex', alignItems: 'center', color: '#f39c12' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="20" x2="18" y2="10"></line>
-                            <line x1="12" y1="20" x2="12" y2="4"></line>
-                            <line x1="6" y1="20" x2="6" y2="14"></line>
-                        </svg>
-                     </span>
-                     Summary
-                  </div>
-                  <div className={`expander-content summary-content ${summaryExpanded ? 'expanded' : ''}`}>
+            <div className={`op-content-section ${activeTab}`} style={{ 
+                background: activeTab === 'summary' ? '#fef9e7' : 
+                            activeTab === 'details' ? '#ebf5fb' : 
+                            activeTab === 'data' ? '#f4ecf7' : '#fff',
+                border: '1px solid #ddd', 
+                borderTop: 'none',
+                marginTop: 0, 
+                maxHeight: isMaximized ? 'calc(100vh - 200px)' : '400px', 
+                overflowY: 'auto' 
+            }}>
+              {/* Summary Tab Content */}
+              {activeTab === 'summary' && (
+                  <div className="tab-content summary-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                        <div className="config-item">
                           <label>Step Name</label>
@@ -175,27 +185,11 @@ export default function OperationColumn({
                        </div>
                     </div>
                   </div>
-                </>
               )}
 
-              {/* Operation Details Section */}
-              {detailsVisible && isEditMode && (
-                <>
-                  <div
-                    className="expander-header clickable-header"
-                    onClick={(e) => { e.stopPropagation(); setDetailsExpanded(!detailsExpanded); }}
-                    style={{ display: 'flex', alignItems: 'center' }}
-                  >
-                     {detailsExpanded ? '▼' : '▶'}
-                     <span style={{ margin: '0 4px 0 8px', display: 'flex', alignItems: 'center' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                        </svg>
-                     </span>
-                     Operation Details
-                  </div>
-                  <div className={`expander-content details-content ${detailsExpanded ? 'expanded' : ''}`}>
+              {/* Details Tab Content */}
+              {activeTab === 'details' && isEditMode && (
+                  <div className="tab-content details-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                       <div className="config-item">
                         <label>Type:</label>
@@ -250,28 +244,11 @@ export default function OperationColumn({
                       ))}
                     </div>
                   </div>
-                </>
               )}
 
-              {/* Data Section */}
-              {statusVisible && (
-                <>
-                  <div
-                    className="expander-header clickable-header"
-                    onClick={(e) => { e.stopPropagation(); setStatusExpanded(!statusExpanded); }}
-                    style={{ display: 'flex', alignItems: 'center' }}
-                  >
-                     {statusExpanded ? '▼' : '▶'}
-                     <span style={{ margin: '0 4px 0 8px', display: 'flex', alignItems: 'center' }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-                        </svg>
-                     </span>
-                     Data
-                  </div>
-                  <div className={`expander-content status-content ${statusExpanded ? 'expanded' : ''}`}>
+              {/* Data Tab Content */}
+              {activeTab === 'data' && (
+                  <div className="tab-content status-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                       <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#666' }}>
                         Execution ID: {step.id.substring(0, 8)}
@@ -283,7 +260,6 @@ export default function OperationColumn({
                       />
                     </div>
                   </div>
-                </>
               )}
             </div>
           )}
