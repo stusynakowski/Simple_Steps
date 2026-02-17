@@ -5,7 +5,7 @@ import uuid
 # --- 1. Dynamic Discovery ---
 class OperationParam(BaseModel):
     name: str
-    type: Literal['string', 'number', 'boolean', 'list']
+    type: Literal['string', 'number', 'boolean', 'list', 'object', 'dataframe']
     description: str
     default: Optional[Any] = None
 
@@ -32,6 +32,8 @@ class StepRunRequest(BaseModel):
     operation_id: str
     config: Dict[str, Any]
     input_ref_id: Optional[str] = None
+    step_map: Optional[Dict[str, str]] = None # Maps Step Label -> Output Ref ID
+    is_preview: bool = False
 
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']

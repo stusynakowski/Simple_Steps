@@ -13,6 +13,7 @@ from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
 # Import custom modules to register their operations
 from . import youtube_ops 
+from . import youtube_adapter # Register the new adapter
 
 # --- App Initialize ---
 app = FastAPI(
@@ -44,7 +45,7 @@ async def list_operations():
 async def execute_step(payload: StepRunRequest):
     """
     Executes a single step.
-    Receives: Config + Input Reference ID
+    Receives: Config + Input Reference ID + Reference Map
     Returns: New Output Reference ID
     """
     try:
@@ -53,7 +54,9 @@ async def execute_step(payload: StepRunRequest):
         out_ref, metrics = run_operation(
             payload.operation_id,
             payload.config,
-            payload.input_ref_id
+            payload.input_ref_id,
+            payload.step_map,
+            payload.is_preview
         )
         
         return StepRunResponse(

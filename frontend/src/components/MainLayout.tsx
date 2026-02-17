@@ -42,6 +42,7 @@ export default function MainLayout() {
     runPipeline,
     pausePipeline,
     stopPipeline,
+    previewStep,
     deleteStep 
   } = useWorkflow();
 
@@ -96,7 +97,6 @@ export default function MainLayout() {
     // We only update if the current size is "expanded" (greater than minimal collapse)
     // This prevents overwriting the "restored" size with the "collapsed" size if a drag event fires accidentally?
     // Actually, dragging normally implies user intent to set size.
-    // If I drag while collapsed, I should probably expand?
   }, []);
   // Note: we update refs in resize/stopResizing usually, but with state it's tricky to get "previous" if we snap.
   // actually 'resize' updates the state. The 'ref' should be updated when we invoke the collapse logic?
@@ -297,6 +297,7 @@ export default function MainLayout() {
                         onActivate={() => toggleStep(step.id)}
                         onUpdate={(id, updates) => updateStep(id, updates)}
                         onRun={runStep}
+                        onPreview={previewStep}
                         onPause={(id) => console.log('Pause', id)} 
                         onDelete={deleteStep}
                         onMinimize={() => collapseStep(step.id)}

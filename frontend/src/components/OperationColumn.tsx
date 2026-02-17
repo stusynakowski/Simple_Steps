@@ -14,6 +14,7 @@ interface OperationColumnProps {
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
   onRun: (id: string) => void;
+  onPreview?: (id: string) => void;
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
   onMinimize?: () => void;
@@ -29,6 +30,7 @@ export default function OperationColumn({
   onActivate,
   onUpdate,
   onRun,
+  onPreview,
   onPause,
   onDelete,
   onMinimize,
@@ -187,13 +189,27 @@ export default function OperationColumn({
                     <div key={param.name} className="config-item">
                       <label>{param.name}:</label>
                       <input 
-                          type={param.type === 'number' ? 'number' : 'text'}
+                          type="text"
                           value={String(step.configuration[param.name] ?? (param.default || ''))}
                           onChange={(e) => {
-                              const val = param.type === 'number' ? Number(e.target.value) : e.target.value;
+                              const val = e.target.value;
+                              // Allow Excel-like syntax starting with = to be stored as string
+                              // irrespective of the expected parameter type.
+                              const isFormula = val.startsWith('=');
+                              const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
+                              
                               onUpdate?.(step.id, {
-                                  configuration: { ...step.configuration, [param.name]: val }
+                                  configuration: { ...step.configuration, [param.name]: updateVal }
                               });
+                          }}
+                          onBlur={() => {
+                              // Trigger preview on blur if available
+                              onPreview?.(step.id);
+                          }}
+                          onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                  onPreview?.(step.id);
+                              }
                           }}
                           title={param.description}
                           placeholder={String(param.default || '')}

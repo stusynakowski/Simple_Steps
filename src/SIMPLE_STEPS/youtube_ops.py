@@ -1,163 +1,106 @@
 from typing import List, Dict, Any, Optional
 import pandas as pd
-from .operations import register_operation, OperationParam
-
+from .decorators import simple_step
 
 # --- 1. Fetch Videos ---
-@register_operation(
+@simple_step(
     id="yt_fetch_videos",
-    label="Fetch Channel Videos",
-    description="Get all video URLs from a YouTube channel",
-    params=[
-        OperationParam(name="channel_url", type="string", description="URL of the channel to scrape")
-    ]
+    name="Fetch Channel Videos", 
+    category="YouTube", 
+    operation_type="source"
 )
-def op_fetch_videos(df: Optional[pd.DataFrame], config: dict) -> pd.DataFrame:
-    channel_url = config.get("channel_url", "https://youtube.com/mock_channel")
+def fetch_videos(channel_url: str = "https://youtube.com/mock_channel") -> List[str]:
+    """Get all video URLs from a YouTube channel"""
     print(f"[Mock] Fetching videos for channel: {channel_url}")
-    
-    # Simulate fetching
-    videos = [
+    # Return list of strings - automatically converted to DataFrame column "output"
+    return [
        f"{channel_url}/video/1",
        f"{channel_url}/video/2", 
-       f"{channel_url}/video/3",
-       f"{channel_url}/video/4",
+       f"{channel_url}/video/3", 
+       f"{channel_url}/video/4", 
        f"{channel_url}/video/5"
     ]
-    
-    # Return as DataFrame
-    return pd.DataFrame({"video_url": videos})
-
 
 # --- 2. Extract Metadata (Enrichment) ---
-@register_operation(
+@simple_step(
     id="yt_extract_metadata",
-    label="Extract Video Metadata",
-    description="Get title, views, and author for video URLs",
-    params=[
-        OperationParam(name="url_column", type="string", description="Column containing video URLs", default="video_url")
-    ]
+    name="Extract Video Metadata", 
+    category="YouTube", 
+    operation_type="map"
 )
-def op_extract_metadata(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    if df is None: raise ValueError("No input data")
-    
-    url_col = config.get("url_column", "video_url")
-    if url_col not in df.columns:
-        raise ValueError(f"Column '{url_col}' not found")
-
-    # Apply mock logic row by row
-    def _get_meta(url):
-        return {
-            "title": f"Video Title for {str(url).split('/')[-1]}",
-            "views": len(str(url)) * 100,
-            "author": "Mock Channel"
-        }
-
-    # Apply and expand result into new columns
-    meta_df = df[url_col].apply(_get_meta).apply(pd.Series)
-    return pd.concat([df, meta_df], axis=1)
-
+def extract_metadata(url: str) -> dict:
+    """Get title, views, and author for video URLs"""
+    # Simply return a dict. The decorator will expand keys into columns.
+    return {
+        "title": f"Video Title for {str(url).split('/')[-1]}",
+        "views": len(str(url)) * 100,
+        "author": "Mock Channel"
+    }
 
 # --- 3. Transcribe (Enrichment - Slow Operation) ---
-@register_operation(
+@simple_step(
     id="yt_transcribe",
-    label="Transcribe Videos",
-    description="Generate text transcripts for videos",
-    params=[
-        OperationParam(name="url_column", type="string", description="Column containing video URLs", default="video_url")
-    ]
+    name="Transcribe Videos", 
+    category="AI Analysis", 
+    operation_type="map"
 )
-def op_transcribe(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    if df is None: raise ValueError("No input data")
-    
-    url_col = config.get("url_column", "video_url")
-    
-    def _transcribe(url):
-        # In real life, this is slow!
-        return f"This is the fake transcript content for {url}. It contains some words."
-
-    df["transcript"] = df[url_col].apply(_transcribe)
-    return df
-
+def transcribe(url: str) -> str:
+    """Generate text transcripts for videos"""
+    return f"This is the fake transcript content for {url}. It contains some words."
 
 # --- 4. Segment Conversations (Explosion/One-to-Many) ---
-@register_operation(
+@simple_step(
     id="yt_segment",
-    label="Segment Conversations",
-    description="Split transcripts into individual conversation segments",
-    params=[
-        OperationParam(name="transcript_column", type="string", description="Column to segment", default="transcript")
-    ]
+    name="Segment Conversations", 
+    category="AI Analysis", 
+    operation_type="expand"
 )
-def op_segment(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    if df is None: raise ValueError("No input data")
-    
-    # This operation takes 1 row and turns it into N rows
-    # We'll use 'explode'
-    
-    def _generate_segments(text):
-        return [
-            {"segment_id": 1, "text": "Hello world", "sentiment_score": 0.8},
-            {"segment_id": 2, "text": "This is a segment", "sentiment_score": 0.5},
-            {"segment_id": 3, "text": "Goodbye", "sentiment_score": 0.2}
-        ]
+def segment(transcript: str) -> List[dict]:
+    """Split transcripts into individual conversation segments"""
+    # This operation takes 1 row (transcript) and turns it into N rows (segments)
+    return [
+        {"segment_id": 1, "text": "Hello world", "sentiment_score": 0.8},
+        {"segment_id": 2, "text": "This is a segment", "sentiment_score": 0.5},
+        {"segment_id": 3, "text": "Goodbye", "sentiment_score": 0.2}
+    ]
 
-    # Create a list of lists of dicts
-    segments_col = df["transcript"].apply(_generate_segments)
-    
-    # Assign to temp column
-    df_temp = df.copy()
-    df_temp["_segments"] = segments_col
-    
-    # Explode the list
-    df_exploded = df_temp.explode("_segments")
-    
-    # Extract dict keys to columns
-    segments_df = df_exploded["_segments"].apply(pd.Series)
-    
-    # Reset index to avoid duplicates
-    result = pd.concat([df_exploded.drop(columns=["_segments", "transcript"]), segments_df], axis=1)
-    return result.reset_index(drop=True)
-
-
-# --- 4.5 Analyze Sentiment (Row-by-Row) ---
-@register_operation(
+# --- 5. Analyze Sentiment (Row-by-Row) ---
+@simple_step(
     id="yt_analyze_sentiment",
-    label="Analyze Sentiment",
-    description="Calculate sentiment score for text",
-    params=[
-        OperationParam(name="text_column", type="string", description="Column containing text", default="text")
-    ]
+    name="Analyze Sentiment",
+    category="AI Analysis",
+    operation_type="map"
 )
-def op_analyze_sentiment(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    if df is None: raise ValueError("No input data")
-    
-    col = config.get("text_column", "text")
-    if col not in df.columns:
-         return df # Or raise error
+def analyze_sentiment(text: str) -> float:
+    """Calculate sentiment score for text"""
+    # Mock logic: length of text determines fake sentiment
+    return float(len(str(text)) % 10) / 10.0
 
-    def _analyze(text):
-        # Mock logic: length of text determines fake sentiment
-        return float(len(str(text)) % 10) / 10.0
-
-    df["sentiment_score"] = df[col].apply(_analyze)
-    return df
-
-
-# --- 5. Analyze/Aggregate ---
-@register_operation(
+# --- 6. Generate Report (Aggregation) ---
+@simple_step(
     id="yt_report",
-    label="Generate Report",
-    description="Calculate average sentiment stats",
-    params=[]
+    name="Generate Report",
+    category="Reporting",
+    operation_type="dataframe"
 )
-def op_report(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    if df is None: raise ValueError("No input data")
+def generate_report(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate average sentiment stats"""
+    if df is None: return pd.DataFrame()
     
-    if "sentiment_score" not in df.columns:
-         return pd.DataFrame({"error": ["No sentiment_score column found"]})
+    # Check for sentiment column
+    # The previous step stores output in 'yt_analyze_sentiment_output' or similar
+    # But user might have mapped it.
+    
+    # Try to find a float column? Or just look for specific columns?
+    # For robust mock, let's look for known columns or just the last column?
+    
+    sent_cols = [c for c in df.columns if "sentiment" in c.lower() or "score" in c.lower()]
+    target_col = sent_cols[0] if sent_cols else None
+    
+    if not target_col:
+         return pd.DataFrame({"error": ["No sentiment/score column found to aggregate"]})
 
-    avg = df["sentiment_score"].mean()
+    avg = df[target_col].mean()
     count = len(df)
     
     return pd.DataFrame([{

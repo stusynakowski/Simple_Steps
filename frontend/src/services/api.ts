@@ -55,14 +55,18 @@ export async function runStep(
     stepId: string, 
     operationId: string,
     configuration: StepConfiguration,
-    inputRefId: string | null
+    inputRefId: string | null,
+    stepMap?: Record<string, string>,
+    isPreview: boolean = false
 ): Promise<StepRunResponse> {
   
   const payload = {
       step_id: stepId,
       operation_id: operationId,
       config: configuration,
-      input_ref_id: inputRefId
+      input_ref_id: inputRefId,
+      step_map: stepMap || {},
+      is_preview: isPreview
   };
 
   const response = await fetch(`${API_BASE}/run`, {

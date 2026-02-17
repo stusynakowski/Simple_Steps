@@ -72,12 +72,21 @@ export default function useWorkflow() {
 
   const runStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
     // Locate the step in the current state to get parameters
-    const step = workflow.steps.find((s) => s.id === id);
+    const currentSteps = workflow.steps; // Access latest state
+    const step = currentSteps.find((s) => s.id === id);
     if (!step) return;
 
     // Identify dependency (previous step)
-    const stepIndex = workflow.steps.indexOf(step);
-    const prevStep = stepIndex > 0 ? workflow.steps[stepIndex - 1] : undefined;
+    const stepIndex = currentSteps.indexOf(step);
+    const prevStep = stepIndex > 0 ? currentSteps[stepIndex - 1] : undefined;
+    
+    // Build Step Map (Label -> Output Ref ID)
+    const stepMap: Record<string, string> = {};
+    for (const s of currentSteps) {
+        if (s.outputRefId) {
+            stepMap[s.label] = s.outputRefId;
+        }
+    }
 
     setWorkflow((prev) => {
       const next = prev.steps.map((s) => (s.id === id ? { ...s, status: 'running' as const } : s));
@@ -90,7 +99,8 @@ export default function useWorkflow() {
           id, 
           step.process_type, 
           config ?? step.configuration, 
-          prevStep?.outputRefId ?? null
+          prevStep?.outputRefId ?? null,
+          stepMap
       );
       
       // Fetch preview
@@ -129,10 +139,73 @@ export default function useWorkflow() {
     }
   }, [workflow.steps]);
 
+  const previewStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
+     // Similar to runStep but with isPreview=true
+    const currentSteps = workflow.steps;
+    const step = currentSteps.find((s) => s.id === id);
+    if (!step) return;
+
+    const stepIndex = currentSteps.indexOf(step);
+    const prevStep = stepIndex > 0 ? currentSteps[stepIndex - 1] : undefined;
+    
+    const stepMap: Record<string, string> = {};
+    for (const s of currentSteps) {
+        if (s.outputRefId) {
+            stepMap[s.label] = s.outputRefId;
+        }
+    }
+    
+    // We don't set status to 'running' to avoid full UI lock, 
+    // maybe just a subtle indicator if needed. 
+    // For now, let's just run it "silently" and update the preview.
+
+    try {
+      const res = await runStepApi(
+          id, 
+          step.process_type, 
+          config ?? step.configuration, 
+          prevStep?.outputRefId ?? null,
+          stepMap,
+          true // isPreview
+      );
+      
+      const rawData = await fetchDataView(res.output_ref_id);
+      
+      const previewCells = rawData.flatMap((row: any, rowIndex: number) => 
+        Object.entries(row).map(([colName, val]) => ({
+            row_id: rowIndex,
+            column_id: colName,
+            value: val,
+            display_value: String(val)
+        }))
+      );
+
+      setWorkflow((prev) => {
+        const next = prev.steps.map((s) => {
+          if (s.id !== id) return s;
+          return {
+            ...s,
+            // We do NOT mark it as completed status, as it's just a preview/staged state.
+            // But we DO update the outputRefId so that subsequent steps can preview off this one.
+            outputRefId: res.output_ref_id,
+            output_preview: previewCells,
+          };
+        });
+        return { ...prev, steps: next };
+      });
+    } catch (error) {
+       console.error("Preview failed", error);
+       // Don't change status to error on preview failure?
+    }
+  }, [workflow.steps]);
+
   const workflowRef = useRef(workflow);
   useEffect(() => {
     workflowRef.current = workflow;
   }, [workflow]);
+
+  // Use a ref to access the latest runSequence function to avoid dependency cycles
+  const runSequenceRef = useRef<(index: number) => Promise<void>>();
 
   const runSequence = useCallback(async (startIndex: number) => {
     // Check status at start of each iteration
@@ -142,23 +215,32 @@ export default function useWorkflow() {
 
     const currentWorkflow = workflowRef.current;
     if (startIndex >= currentWorkflow.steps.length) {
-        setPipelineStatus('idle');
+        setPipelineStatus('idle'); // Finished
         return;
     }
 
     const step = currentWorkflow.steps[startIndex];
     
     try {
+        // We must pass the LATEST configuration from the ref, just in case
         await runStep(step.id, step.configuration);
         
         // After step finishes, check status again before creating next promise
         if (pipelineStatusRef.current === 'running') {
-            await runSequence(startIndex + 1);
+            // Recursive call using the ref
+            if (runSequenceRef.current) {
+                await runSequenceRef.current(startIndex + 1);
+            }
         }
     } catch (e) {
         setPipelineStatus('idle'); // Stop on error
     }
-  }, [runStep]);
+  }, [runStep]); // Re-create when runStep changes
+
+  // Update the ref whenever runSequence changes
+  useEffect(() => {
+    runSequenceRef.current = runSequence;
+  }, [runSequence]);
 
   const runPipeline = useCallback(() => {
     if (pipelineStatusRef.current === 'running') return;
@@ -225,6 +307,7 @@ export default function useWorkflow() {
     collapseStep, 
     updateStep,
     runStep, 
+    previewStep,
     runPipeline,
     pausePipeline,
     stopPipeline,
