@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
+import StepToolbar from './StepToolbar';
 import './OperationColumn.css';
 
 interface OperationColumnProps {
@@ -31,7 +32,6 @@ export default function OperationColumn({
   onUpdate,
   onRun,
   onPreview,
-  onPause,
   onDelete,
   onMinimize,
 }: OperationColumnProps) {
@@ -94,30 +94,24 @@ export default function OperationColumn({
 
       <div className={`op-body ${isSqueezed ? 'squeezed' : ''}`}>
         <div className="op-body-inner">
-          <div className={`op-toolbar ${isActive ? 'visible' : 'hidden'}`}>
-            <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onRun(step.id); }} title="Run">
-              ▶
-            </button>
-            <button className="btn-icon" onClick={(e) => { e.stopPropagation(); onPause(step.id); }} title="Pause">
-              ⏸
-            </button>
-            
-            <div style={{ flex: 1 }} /> {/* Spacer */}
-
-            <button 
-                className={`btn-pill-toggle ${isEditMode ? 'active' : ''}`}
-                onClick={(e) => { e.stopPropagation(); setIsEditMode(!isEditMode); }}
-                title="Toggle Edit Mode"
-            >
-                Edit Step
-            </button>
-
-            {isEditMode && (
-                <button className="btn-icon danger" onClick={(e) => { e.stopPropagation(); onDelete(step.id); }} title="Delete">
-                🗑
-                </button>
-            )}
-          </div>
+          <StepToolbar 
+            step={step}
+            availableOperations={availableOperations}
+            onRun={() => onRun(step.id)}
+            onDelete={() => onDelete(step.id)}
+            onUpdate={onUpdate}
+            // Toggle Handlers
+            onToggleFormula={() => setIsEditMode(!isEditMode)} // Re-using edit mode for now, or add specific state
+            onToggleConfig={() => setDetailsExpanded(!detailsExpanded)}
+            onToggleData={() => setStatusExpanded(!statusExpanded)}
+            onToggleSummary={() => setSummaryExpanded(!summaryExpanded)}
+            // States
+            showFormula={isEditMode}
+            showConfig={detailsExpanded}
+            showData={statusExpanded}
+            showSummary={summaryExpanded}
+            onFormulaChange={(id, formula) => onUpdate?.(id, { operation: formula })}
+          />
 
           {isActive && (
             <div className="op-expander-section">

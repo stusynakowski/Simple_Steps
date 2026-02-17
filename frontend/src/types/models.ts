@@ -17,6 +17,7 @@ export interface Step {
   process_type: string;
   configuration: StepConfiguration;
   status: StepStatus;
+  operation?: string;
   outputRefId?: string; // The backend reference ID for the result DataFrame
   output_preview?: Cell[]; 
   // For glide datagrid, we might eventually need specific GridCell types, 

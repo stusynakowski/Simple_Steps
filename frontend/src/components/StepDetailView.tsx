@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import type { Step, Cell } from '../types/models';
+import type { OperationDefinition } from '../services/api';
 import './StepDetailView.css';
 import StepToolbar from './StepToolbar';
 import DataOutputGrid from './DataOutputGrid';
 
 interface StepDetailViewProps {
   step: Step | null;
+  availableOperations?: OperationDefinition[];
   onRun?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onCellClick?: (cell: Cell) => void;
+  onFormulaChange?: (id: string, formula: string) => void;
 }
 
-export default function StepDetailView({ step, onRun, onDelete, onEdit, onCellClick }: StepDetailViewProps) {
+export default function StepDetailView({ step, availableOperations, onRun, onDelete, onEdit, onCellClick, onFormulaChange }: StepDetailViewProps) {
   const [activeTab, setActiveTab] = useState<'output' | 'summary'>('output');
 
   if (!step) {
@@ -31,7 +34,14 @@ export default function StepDetailView({ step, onRun, onDelete, onEdit, onCellCl
         </div>
       </div>
 
-      <StepToolbar step={step} onRun={onRun} onDelete={onDelete} onEdit={() => onEdit?.(step.id)} />
+      <StepToolbar 
+        step={step} 
+        availableOperations={availableOperations}
+        onRun={onRun} 
+        onDelete={onDelete} 
+        onEdit={() => onEdit?.(step.id)} 
+        onFormulaChange={onFormulaChange}
+      />
 
       <div className="step-tabs">
         <button 
