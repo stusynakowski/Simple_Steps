@@ -13,7 +13,7 @@ from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
 # Import custom modules to register their operations
 from . import youtube_ops 
-from . import youtube_adapter # Register the new adapter
+
 
 # --- App Initialize ---
 app = FastAPI(

@@ -1,7 +1,7 @@
 import pandas as pd
 import uuid
 from typing import Dict, Optional, Any
-from .operations import REGISTRY
+from .decorators import OPERATION_REGISTRY
 import re
 
 # --- The "Reference Passing" Store ---
@@ -69,9 +69,10 @@ def run_operation(
             raise ValueError(f"Input reference {input_ref_id} not found/expired")
 
     # 2. Find Operation
-    func = REGISTRY.get(op_id)
-    if not func:
+    op_def = OPERATION_REGISTRY.get(op_id)
+    if not op_def:
         raise ValueError(f"Operation {op_id} not registered")
+    func = op_def['func']
 
     # 3. Execute (with basic error handling)
     try:

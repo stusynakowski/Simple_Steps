@@ -41,7 +41,13 @@ def simple_step(name: str = None, category: str = "General", operation_type: str
             elif py_type == dict or py_type == Dict: ui_type = "object"
             elif py_type == pd.DataFrame: ui_type = "dataframe"
             
-            params.append(OperationParam(name=param_name, type=ui_type))
+            default_val = param.default if param.default is not inspect.Parameter.empty else None
+            params.append(OperationParam(
+                name=param_name, 
+                type=ui_type, 
+                description="No description provided",
+                default=default_val
+            ))
             
         # 2. Wrap Logic for DataFrame Processing
         @functools.wraps(func)

@@ -1,37 +1,35 @@
 import pytest
 import pandas as pd
-from SIMPLE_STEPS.engine import run_operation, save_dataframe, get_dataframe, resolve_reference, DATA_STORE, REGISTRY
-from SIMPLE_STEPS.operations import register_operation, OperationParam
-from typing import Optional, Any
+from SIMPLE_STEPS.engine import run_operation, save_dataframe, get_dataframe, resolve_reference, DATA_STORE
+from SIMPLE_STEPS.decorators import simple_step, OPERATION_REGISTRY
+from typing import Optional, Any, List
 
 # Mock operations for testing reference resolution
-@register_operation(
+@simple_step(
     id="test_generate_data",
-    label="Test Generator",
-    description="Generate a dataframe",
-    params=[]
+    name="Test Generator",
+    operation_type="source"
 )
-def op_test_generate(df: Optional[pd.DataFrame], config: dict) -> pd.DataFrame:
+def op_test_generate() -> pd.DataFrame:
     return pd.DataFrame({
         "A": [1, 2, 3],
         "B": ["x", "y", "z"]
     })
 
-@register_operation(
+@simple_step(
     id="test_consume_ref",
-    label="Test Consumer",
-    description="Consume data via reference",
-    params=[
-        OperationParam(name="input_values", type="list", description="List of values")
-    ]
+    name="Test Consumer",
+    operation_type="source" 
 )
-def op_test_consume(df: Optional[pd.DataFrame], config: dict) -> pd.DataFrame:
-    values = config.get("input_values")
+def op_test_consume(input_values: List[Any]) -> pd.DataFrame:
     # Verify values are resolved to list, not string
-    if isinstance(values, str) and values.startswith('='):
+    if isinstance(input_values, str) and input_values.startswith('='):
         raise ValueError("Reference not resolved")
-    
-    return pd.DataFrame({"Result": values})
+    return pd.DataFrame({"Result": input_values})
+
+# We need to manually register if we want to use them in run_operation,
+# but simple_step does that automatically.
+
 
 def test_step_reference_resolution():
     # 1. Simulate Step 1 Output
