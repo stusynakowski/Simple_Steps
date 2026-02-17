@@ -36,7 +36,7 @@ class StepRunRequest(BaseModel):
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']
     output_ref_id: str
-    metrics: Dict[str, float]  # e.g., {"rows": 100, "duration_ms": 150}
+    metrics: Dict[str, Any]  # Changed to Any to allow lists
     error: Optional[str] = None
 
 # --- 4. Global Control Responses ---

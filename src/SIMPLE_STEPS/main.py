@@ -81,12 +81,37 @@ async def get_data_view(
         raise HTTPException(status_code=404, detail="Data reference expired")
     
     # Slice the dataframe safely
-    # Handling potential out-of-bounds with python slicing
     subset = df.iloc[offset : offset + limit]
     
-    # Convert to JSON-friendly dict
-    # orient='records' -> [{col1: val, col2: val}, ...]
-    return subset.to_dict(orient="records")
+    cells = []
+    
+    if subset.empty:
+        return []
+
+    # Reset index to ensure we iterate cleanly 0..N within this page
+    # In a real app, we might want to keep the original index
+    subset_reset = subset.reset_index(drop=True)
+
+    for i, row in subset_reset.iterrows():
+        # The absolute row index (for pagination context)
+        current_row_idx = offset + int(i)
+
+        for col_name, val in row.items():
+            if pd.isna(val):
+                display_val = ""
+                actual_val = None
+            else:
+                display_val = str(val)
+                actual_val = val if not pd.isna(val) else None
+
+            cells.append({
+                "row_id": current_row_idx,
+                "column_id": str(col_name),
+                "value": actual_val,
+                "display_value": display_val
+            })
+
+    return cells
 
 if __name__ == "__main__":
     import uvicorn

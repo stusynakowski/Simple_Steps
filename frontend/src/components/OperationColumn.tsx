@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
+import DataOutputGrid from './DataOutputGrid';
 import './OperationColumn.css';
 
 interface OperationColumnProps {
@@ -217,17 +218,10 @@ export default function OperationColumn({
                     Execution ID: {step.id.substring(0, 8)}
                   </p>
                   
-                   {step.output_preview && step.output_preview.length > 0 ? (
-                      <div className="data-list">
-                        {step.output_preview.map((cell) => (
-                          <div key={`${cell.row_id}-${cell.column_id}`} className="data-cell-item">
-                            {cell.display_value}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="no-data-placeholder">No Data</div>
-                    )}
+                  <DataOutputGrid 
+                    cells={step.output_preview} 
+                    onCellClick={(cell) => console.log('Cell clicked:', cell)}
+                  />
                 </div>
               </div>
             </div>

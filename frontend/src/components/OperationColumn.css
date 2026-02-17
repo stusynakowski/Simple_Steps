@@ -455,74 +455,110 @@
   font-style: italic;
 }
 
-/* Summary Section Styles */
-.summary-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 0.85rem;
+/* --- DATA OUTPUT GRID STYLES --- */
+
+/* The Container for the "Excel" view */
+.op-data-grid {
+    display: grid;
+    /* dynamic columns will be set via inline style: grid-template-columns: repeat(N, 1fr) */
+    width: 100%;
+    font-size: 0.8rem;
+    border: 1px solid #eee;
+    background: #fff;
 }
 
-.summary-item .label {
+/* Header Row */
+.grid-header-cell {
+    background: #f3f3f3;
+    font-weight: 700;
+    color: #555;
+    padding: 6px 8px;
+    border-bottom: 2px solid #ddd;
+    border-right: 1px solid #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.row-index-header {
+  border-right: 2px solid #ddd;
+  background: #eaeaea;
+}
+
+/* Data Rows */
+.grid-row {
+    display: contents; /* Allows children to participate in the parent grid */
+}
+
+.grid-cell {
+    padding: 6px 8px;
+    border-bottom: 1px solid #f0f0f0;
+    border-right: 1px solid #f0f0f0;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    background: white;
+}
+
+.grid-cell.row-index {
+  background: #f9f9f9;
   font-weight: 600;
-  margin-right: 8px;
-  color: #333;
-  width: 100px;
-  flex-shrink: 0;
+  color: #888;
+  border-right: 2px solid #ddd;
+  text-align: center;
 }
 
-.summary-item .value {
-  color: #555;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1; /* Take up remaining space */
-  min-width: 0;
+/* zebra striping logic requires specificity or JS, 
+   but simplistic hover effects help readability */
+.grid-cell:hover {
+    background-color: #e6f7ff;
+    overflow: visible;
+    z-index: 10;
+    position: relative;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    white-space: normal;
+    word-break: break-word; /* Allows long words to break */
+    min-width: max-content; /* Expand to fit content on hover */
+    max-width: 300px;
 }
 
-.summary-info {
-  margin-top: 8px;
-  background-color: #f9fafb;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  color: #555;
-  border: 1px solid #eee;
+/* Special Case: Single Value "Hero" Cell */
+.output-container.single {
+  padding: 10px;
+  display: flex;
+  justify-content: center;
 }
 
-.summary-info p {
-  margin: 0;
+.single-value-display {
+    padding: 20px;
+    text-align: center;
+    font-size: 1.2rem;
+    color: #0078d4;
+    background: #f9f9f9;
+    border: 1px dashed #ccc;
+    border-radius: 4px;
+    margin: 0;
+    width: 100%;
+    word-break: break-all;
 }
 
-.status-badge {
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  text-transform: capitalize;
-  font-weight: 500;
+.single-value-display.empty .placeholder-text {
+  color: #aaa;
+  font-style: italic;
+  font-size: 0.9rem;
 }
 
-.status-badge.status-completed {
-  background-color: #e6fffa;
-  color: #047857;
-  border: 1px solid #b7eb8f;
+.grid-footer {
+  padding: 4px 8px;
+  background: #f9f9f9;
+  color: #888;
+  font-size: 0.7rem;
+  border-top: 1px solid #eee;
+  text-align: right;
 }
 
-.status-badge.status-running {
-  background-color: #ebf8ff;
-  color: #0078d4;
-  border: 1px solid #91d5ff;
-}
-
-.status-badge.status-error {
-  background-color: #fff1f0;
-  color: #cf1322;
-  border: 1px solid #ffa39e;
-}
-
-.status-badge.status-pending {
-  background-color: #f5f5f5; 
-  color: #8c8c8c;
-  border: 1px solid #d9d9d9;
+.output-container.grid-wrapper {
+  overflow-x: auto;
 }
