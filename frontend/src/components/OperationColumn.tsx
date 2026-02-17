@@ -40,6 +40,14 @@ export default function OperationColumn({
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
 
+  // Calculate display name for the operation summary
+  const getOperationDisplayName = () => {
+    if (!step.process_type || step.process_type === 'noop') return 'None';
+    if (currentOp) return currentOp.label;
+    return step.process_type; // Fallback to ID
+  };
+  const opDisplayName = getOperationDisplayName();
+
   const handleColumnClick = () => {
     // Toggling behavior handled by parent's onActivate = toggleStep
     onActivate(step.id);
@@ -132,7 +140,9 @@ export default function OperationColumn({
                    </div>
                    <div className="summary-item">
                       <span className="label">Operation:</span>
-                      <span>{currentOp?.label || step.process_type}</span>
+                      <span className="value" title={opDisplayName}>
+                        {opDisplayName}
+                      </span>
                    </div>
                    <div className="summary-item">
                       <span className="label">Status:</span>

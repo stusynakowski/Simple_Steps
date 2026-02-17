@@ -468,6 +468,17 @@
   margin-right: 8px;
   color: #333;
   width: 100px;
+  flex-shrink: 0;
+}
+
+.summary-item .value {
+  color: #555;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1; /* Take up remaining space */
+  min-width: 0;
 }
 
 .summary-info {
