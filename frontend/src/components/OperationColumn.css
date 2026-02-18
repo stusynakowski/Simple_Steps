@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   padding: 0; 
-  cursor: pointer;
+  cursor: pointer; /* Ensure cursor is pointer */
   /* Shadow for depth */
   filter: drop-shadow(-2px 0 2px rgba(0,0,0,0.1));
 }

@@ -37,7 +37,6 @@ export default function OperationColumn({
   onPreview,
   onDelete,
   onMinimize,
-  onMaximize,
 }: OperationColumnProps) {
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data'>('data');
@@ -55,10 +54,10 @@ export default function OperationColumn({
   const opDisplayName = getOperationDisplayName();
 
   const handleColumnClick = () => {
-    // Only activate if not currently active (squeezed).
-    // If active, do nothing. Minimization must happen via the minimize button.
-    if (!isActive) {
-        onActivate(step.id);
+    if (isActive) {
+      if (onMinimize) onMinimize();
+    } else {
+      onActivate(step.id);
     }
   };
 
@@ -69,10 +68,9 @@ export default function OperationColumn({
         '--step-color': color,
         zIndex: zIndex 
       } as React.CSSProperties}
-      onClick={handleColumnClick}
       data-testid={`operation-column-${step.id}`}
     >
-      <div className="op-header">
+      <div className="op-header" onClick={handleColumnClick} style={{ cursor: 'pointer' }}>
         <div className="arrow-background" />
         <div className="arrow-content">
             {isSqueezed ? (
@@ -83,50 +81,6 @@ export default function OperationColumn({
                         <h3 className="op-name">{step.label}</h3>
                         <span className="op-status-indicator">{step.status}</span>
                     </div>
-                    {isActive && onMaximize && (
-                        <button 
-                            className="btn-maximize square-btn"
-                            onClick={(e) => { e.stopPropagation(); onMaximize(); }}
-                            title={isMaximized ? "Restore" : "Maximize"}
-                            style={{ 
-                                width: 24, height: 24, 
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: '1px solid rgba(0,0,0,0.2)', borderRadius: 4,
-                                background: 'rgba(255,255,255,0.2)', cursor: 'pointer',
-                                marginRight: 4
-                            }}
-                        >
-                            {isMaximized ? (
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
-                                </svg>
-                            ) : (
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="15 3 21 3 21 9"></polyline>
-                                    <polyline points="9 21 3 21 3 15"></polyline>
-                                    <line x1="21" y1="3" x2="14" y2="10"></line>
-                                    <line x1="3" y1="21" x2="10" y2="14"></line>
-                                </svg>
-                            )}
-                        </button>
-                    )}
-                    {isActive && onMinimize && (
-                        <button 
-                            className="btn-minimize square-btn"
-                            onClick={(e) => { e.stopPropagation(); onMinimize(); }}
-                            title="Minimize"
-                            style={{ 
-                                width: 24, height: 24, 
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: '1px solid rgba(0,0,0,0.2)', borderRadius: 4,
-                                background: 'rgba(255,255,255,0.2)', cursor: 'pointer'
-                            }}
-                        >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                        </button>
-                    )}
                 </>
             )}
         </div>

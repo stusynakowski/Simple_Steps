@@ -27,13 +27,6 @@ export default function WorkflowSequence({ steps, selectedStepId, onSelect, onAd
 
           <div className="step-wrapper">
             <StepIcon step={step} selected={selectedStepId === step.id} onClick={onSelect} />
-            <span
-              className="step-label"
-              onClick={() => onSelect?.(step.id)}
-              title={step.label}
-            >
-              {step.label}
-            </span>
           </div>
         </div>
       ))}

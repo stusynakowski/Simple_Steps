@@ -14,14 +14,6 @@
   box-sizing: border-box;
 }
 
-.step-icon .chevron {
-  margin-left: 8px;
-  width: 18px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-}
-
 .step-icon::after {
   content: '';
   position: absolute;
