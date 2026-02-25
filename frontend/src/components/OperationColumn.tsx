@@ -37,6 +37,7 @@ export default function OperationColumn({
   onPreview,
   onDelete,
   onMinimize,
+  onMaximize,
 }: OperationColumnProps) {
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data'>('data');
@@ -98,6 +99,8 @@ export default function OperationColumn({
               activeTab={activeTab}
               onTabChange={setActiveTab}
               onFormulaChange={(id, formula) => onUpdate?.(id, { operation: formula })}
+              onMaximize={onMaximize}
+              isMaximized={isMaximized}
             />
           )}
 

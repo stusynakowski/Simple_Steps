@@ -12,6 +12,8 @@ interface StepToolbarProps {
   // Tab handlers
   activeTab: 'summary' | 'details' | 'data';
   onTabChange: (tab: 'summary' | 'details' | 'data') => void;
+  onMaximize?: () => void;
+  isMaximized?: boolean;
 }
 
 export default function StepToolbar({ 
@@ -20,8 +22,10 @@ export default function StepToolbar({
   onRun, 
   onDelete, 
   onFormulaChange,
-  activeTab,
-  onTabChange,
+  activeTab, 
+  onTabChange, 
+  onMaximize, 
+  isMaximized 
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const [formula, setFormula] = useState(step.operation || '');
@@ -42,31 +46,6 @@ export default function StepToolbar({
 
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', borderBottom: '1px solid #eee' }}>
-      {/* Formula Bar Section - Now on Top */}
-      <div className="formula-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
-        <span style={{ color: '#666', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
-        <input
-          type="text"
-          value={formula}
-          onChange={handleInputChange}
-          placeholder={availableOperations?.length ? `Try =${availableOperations[0].id}(...)` : "=OPERATION(StepName!A:B)"}
-          list={`operations-list-${step.id}`}
-          style={{
-            flex: 1,
-            padding: '4px 8px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            fontFamily: 'monospace'
-          }}
-          data-testid="formula-input"
-        />
-        <datalist id={`operations-list-${step.id}`}>
-          {availableOperations?.map(op => (
-            <option key={op.id} value={`=${op.id}(`} />
-          ))}
-        </datalist>
-      </div>
-
       <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         {/* Run/Stop Button - Always prominent */}
         <button 
@@ -179,6 +158,32 @@ export default function StepToolbar({
             )}
         </button>
 
+        {/* Maximize/Restore Button */}
+        {onMaximize && (
+            <button
+                className="btn-icon"
+                onClick={(e) => { e.stopPropagation(); onMaximize(); }}
+                title={isMaximized ? "Restore Size" : "Maximize"}
+                style={{
+                  color: '#666',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+            >
+                {isMaximized ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
+                    </svg>
+                ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <polyline points="9 21 3 21 3 15"></polyline>
+                        <line x1="21" y1="3" x2="14" y2="10"></line>
+                        <line x1="3" y1="21" x2="10" y2="14"></line>
+                    </svg>
+                )}
+            </button>
+        )}
+
         <div style={{ flex: 1 }} />
 
         {/* Delete Action - Subtle until hovered (handled by CSS usually, but setting base here) */}
@@ -194,6 +199,31 @@ export default function StepToolbar({
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
         </button>
+      </div>
+
+      {/* Formula Bar Section - Now on Top */}
+      <div className="formula-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+        <span style={{ color: '#666', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
+        <input
+          type="text"
+          value={formula}
+          onChange={handleInputChange}
+          placeholder={availableOperations?.length ? `Try =${availableOperations[0].id}(...)` : "=OPERATION(StepName!A:B)"}
+          list={`operations-list-${step.id}`}
+          style={{
+            flex: 1,
+            padding: '4px 8px',
+            border: '1px solid #ccc',
+            borderRadius: '4px',
+            fontFamily: 'monospace'
+          }}
+          data-testid="formula-input"
+        />
+        <datalist id={`operations-list-${step.id}`}>
+          {availableOperations?.map(op => (
+            <option key={op.id} value={`=${op.id}(`} />
+          ))}
+        </datalist>
       </div>
 
       {/* Tabs Bar Removed */}
