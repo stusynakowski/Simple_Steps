@@ -14,6 +14,9 @@ interface StepToolbarProps {
   onTabChange: (tab: 'summary' | 'details' | 'data') => void;
   onMaximize?: () => void;
   isMaximized?: boolean;
+  onLock?: (id: string) => void;
+  isLocked?: boolean;
+  onConfigure?: (id: string) => void;
 }
 
 export default function StepToolbar({ 
@@ -25,7 +28,10 @@ export default function StepToolbar({
   activeTab, 
   onTabChange, 
   onMaximize, 
-  isMaximized 
+  isMaximized,
+  onLock,
+  isLocked,
+  onConfigure
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const [formula, setFormula] = useState(step.operation || '');
@@ -47,30 +53,7 @@ export default function StepToolbar({
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', borderBottom: '1px solid #eee' }}>
       <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-        {/* Run/Stop Button - Always prominent */}
-        <button 
-          className="btn-icon" 
-          onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }} 
-          title={step.status === 'running' ? 'Stop' : 'Run'}
-          data-testid="btn-run"
-          style={{ 
-            color: step.status === 'running' ? '#e74c3c' : '#2ecc71',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-          {step.status === 'running' ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            </svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-          )}
-        </button>
-
-        <div className="divider-vertical" style={{ width: 1, height: 16, background: '#eee', margin: '0 4px' }} />
-
+        
         {/* Tab Buttons as Icons - Beside Run Button */}
         <button
           className={`btn-icon tab-icon ${activeTab === 'summary' ? 'active' : ''}`}
@@ -158,7 +141,22 @@ export default function StepToolbar({
             )}
         </button>
 
-        {/* Maximize/Restore Button */}
+        {/* Configure (Function) Button - Now on the Left */}
+        <button 
+          className="btn-icon" 
+          onClick={(e) => { e.stopPropagation(); onConfigure?.(step.id); }}
+          title="Configure Operation"
+          style={{ 
+              color: '#666', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+            <span style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        {/* Maximize/Restore Button - Now on the Right */}
         {onMaximize && (
             <button
                 className="btn-icon"
@@ -166,7 +164,8 @@ export default function StepToolbar({
                 title={isMaximized ? "Restore Size" : "Maximize"}
                 style={{
                   color: '#666',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  marginRight: 4
                 }}
             >
                 {isMaximized ? (
@@ -184,25 +183,73 @@ export default function StepToolbar({
             </button>
         )}
 
-        <div style={{ flex: 1 }} />
+        {/* Lock Button */}
+        <button 
+          className="btn-icon" 
+          onClick={(e) => { e.stopPropagation(); onLock?.(step.id); }}
+          title={isLocked ? "Unlock Step" : "Lock Step"}
+          style={{ 
+              color: isLocked ? '#f39c12' : '#ccc', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginRight: 4
+          }}
+        >
+          {isLocked ? (
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+             </svg>
+          ) : (
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+             </svg>
+          )}
+        </button>
 
         {/* Delete Action - Subtle until hovered (handled by CSS usually, but setting base here) */}
-        <button 
-          className="btn-icon danger" 
-          onClick={(e) => { e.stopPropagation(); onDelete?.(step.id); }}
-          title="Delete Step"
-          data-testid="btn-delete"
-          style={{ color: '#e74c3c', opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-        </button>
+        {!isLocked && (
+            <button 
+            className="btn-icon danger" 
+            onClick={(e) => { e.stopPropagation(); onDelete?.(step.id); }}
+            title="Delete Step"
+            data-testid="btn-delete"
+            style={{ color: '#e74c3c', opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            </button>
+        )}
       </div>
 
       {/* Formula Bar Section - Now on Top */}
       <div className="formula-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+        
+        {/* Run/Stop Button - Moved Next to Formula Bar */}
+        <button 
+          className="btn-icon" 
+          onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }} 
+          title={step.status === 'running' ? 'Stop' : 'Run'}
+          data-testid="btn-run"
+          style={{ 
+            color: step.status === 'running' ? '#e74c3c' : '#2ecc71',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 4 // slightly smaller padding for inline feel?
+          }}
+        >
+          {step.status === 'running' ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+          )}
+        </button>
+
         <span style={{ color: '#666', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
         <input
           type="text"

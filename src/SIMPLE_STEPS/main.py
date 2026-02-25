@@ -11,8 +11,59 @@ from .models import (
 )
 from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
-# Import custom modules to register their operations
-from . import youtube_ops 
+import sys
+import os
+import importlib.util
+
+# --- USER CONFIGURATION ---
+# Add any folder path here. The system will recursively find all _ops.py files.
+PLUGIN_PATHS = [
+    # 1. Built-in sibling directories (relative to this file)
+    os.path.join(os.path.dirname(__file__), "../youtube_operations"),
+    os.path.join(os.path.dirname(__file__), "../llm_operations"),
+    os.path.join(os.path.dirname(__file__), "../webscraping_operations"),
+    
+    # 2. Add your custom absolute paths here:
+    # "/Users/myname/projets/my_custom_ops"
+]
+
+# --- Plugin Discovery Logic ---
+def register_plugins(paths: List[str]):
+    """
+    Crawls provided paths for python files ending in '_ops.py' 
+    and imports them to trigger registrations.
+    """
+    for folder_path in paths:
+        # Resolve absolute path
+        abs_path = os.path.abspath(folder_path)
+        
+        if not os.path.exists(abs_path):
+            continue # Skip missing optional folders
+            
+        print(f"📂 Scanning: {abs_path}")
+        
+        # Add to sys.path to allow internal relative imports within those plugins
+        if abs_path not in sys.path:
+            sys.path.append(abs_path)
+
+        # Walk through the directory (in case they are nested)
+        for root, dirs, files in os.walk(abs_path):
+            for file in files:
+                if file.endswith("_ops.py") or file.startswith("ops_"):
+                    full_path = os.path.join(root, file)
+                    module_name = file[:-3]
+                    
+                    try:
+                        spec = importlib.util.spec_from_file_location(module_name, full_path)
+                        if spec and spec.loader:
+                            module = importlib.util.module_from_spec(spec)
+                            spec.loader.exec_module(module)
+                            print(f"  ✅ Registered: {module_name}")
+                    except Exception as e:
+                        print(f"  ❌ Error loading {file}: {e}")
+
+# Run registration immediately
+register_plugins(PLUGIN_PATHS)
 
 
 # --- App Initialize ---

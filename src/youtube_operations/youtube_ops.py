@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 import pandas as pd
-from .decorators import simple_step
+from SIMPLE_STEPS.decorators import simple_step
 
 # --- 1. Fetch Videos ---
 @simple_step(
