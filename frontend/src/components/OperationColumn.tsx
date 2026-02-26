@@ -40,8 +40,9 @@ export default function OperationColumn({
   onMaximize,
 }: OperationColumnProps) {
   // Tab State
-  const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data'>('data');
+  const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data' | 'settings'>('data');
   const [isEditMode] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
 
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
@@ -101,6 +102,8 @@ export default function OperationColumn({
               onFormulaChange={(id, formula) => onUpdate?.(id, { operation: formula })}
               onMaximize={onMaximize}
               isMaximized={isMaximized}
+              isLocked={isLocked}
+              onLock={() => setIsLocked(!isLocked)}
             />
           )}
 
@@ -115,36 +118,46 @@ export default function OperationColumn({
                 maxHeight: isMaximized ? 'calc(100vh - 200px)' : '400px', 
                 overflowY: 'auto' 
             }}>
-              {/* Summary Tab Content */}
+              {/* Summary Tab Content - Read-Only Overview */}
               {activeTab === 'summary' && (
                   <div className="tab-content summary-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
-                       <div className="config-item">
-                          <label>Step Name</label>
-                          <input 
-                            type="text" 
-                            value={step.label} 
-                            onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
-                            placeholder="Enter step name..."
-                            disabled={!isEditMode}
-                            style={{ opacity: isEditMode ? 1 : 0.8, cursor: isEditMode ? 'text' : 'default'  }}
-                          />
+                       <div className="summary-item">
+                          <span className="label">Step:</span>
+                          <span className="value">{step.label}</span>
                        </div>
                        <div className="summary-item">
                           <span className="label">Operation:</span>
-                          <span className="value" title={opDisplayName}>
-                            {opDisplayName}
-                          </span>
+                          <span className="value">{opDisplayName}</span>
                        </div>
                        <div className="summary-item">
                           <span className="label">Status:</span>
                           <span className={`status-badge status-${step.status}`}>{step.status}</span>
                        </div>
+                       <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#666' }}>
+                          {hasParams ? 'Configured with parameters.' : 'No parameters configured.'}
+                       </div>
                     </div>
                   </div>
               )}
 
-              {/* Details Tab Content */}
+              {/* Data Tab Content */}
+              {activeTab === 'data' && (
+                  <div className="tab-content status-content">
+                    <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#666' }}>
+                        Execution ID: {step.id.substring(0, 8)}
+                      </p>
+                      
+                      <DataOutputGrid 
+                        cells={step.output_preview} 
+                        onCellClick={(cell) => console.log('Cell clicked:', cell)}
+                      />
+                    </div>
+                  </div>
+              )}
+
+              {/* Details (Function) Tab Content - Edit Functionality */}
               {activeTab === 'details' && isEditMode && (
                   <div className="tab-content details-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
@@ -176,8 +189,6 @@ export default function OperationColumn({
                               value={String(step.configuration[param.name] ?? (param.default || ''))}
                               onChange={(e) => {
                                   const val = e.target.value;
-                                  // Allow Excel-like syntax starting with = to be stored as string
-                                  // irrespective of the expected parameter type.
                                   const isFormula = val.startsWith('=');
                                   const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
                                   
@@ -185,15 +196,8 @@ export default function OperationColumn({
                                       configuration: { ...step.configuration, [param.name]: updateVal }
                                   });
                               }}
-                              onBlur={() => {
-                                  // Trigger preview on blur if available
-                                  onPreview?.(step.id);
-                              }}
-                              onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                      onPreview?.(step.id);
-                                  }
-                              }}
+                              onBlur={() => onPreview?.(step.id)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') onPreview?.(step.id); }}
                               title={param.description}
                               placeholder={String(param.default || '')}
                           />
@@ -203,18 +207,29 @@ export default function OperationColumn({
                   </div>
               )}
 
-              {/* Data Tab Content */}
-              {activeTab === 'data' && (
-                  <div className="tab-content status-content">
+              {/* Settings Tab Content - Miscellaneous Editing */}
+              {activeTab === 'settings' && isEditMode && (
+                  <div className="tab-content settings-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
-                      <p style={{ margin: '0 0 10px 0', fontSize: '0.75rem', color: '#666' }}>
-                        Execution ID: {step.id.substring(0, 8)}
-                      </p>
-                      
-                      <DataOutputGrid 
-                        cells={step.output_preview} 
-                        onCellClick={(cell) => console.log('Cell clicked:', cell)}
-                      />
+                       <div className="config-item">
+                          <label>Step Name</label>
+                          <input 
+                            type="text" 
+                            value={step.label} 
+                            onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
+                            placeholder="Enter step name..."
+                            disabled={!isEditMode}
+                            style={{ opacity: isEditMode ? 1 : 0.8, cursor: isEditMode ? 'text' : 'default'  }}
+                          />
+                       </div>
+                       <div className="summary-item">
+                          <span className="label">Step ID:</span>
+                          <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
+                       </div>
+                       <div className="summary-item">
+                          <span className="label">Status:</span>
+                          <span className={`status-badge status-${step.status}`}>{step.status}</span>
+                       </div>
                     </div>
                   </div>
               )}

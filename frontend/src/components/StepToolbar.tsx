@@ -10,8 +10,8 @@ interface StepToolbarProps {
   onEdit?: (id: string) => void;
   onFormulaChange?: (id: string, formula: string) => void;
   // Tab handlers
-  activeTab: 'summary' | 'details' | 'data';
-  onTabChange: (tab: 'summary' | 'details' | 'data') => void;
+  activeTab: 'summary' | 'details' | 'data' | 'settings';
+  onTabChange: (tab: 'summary' | 'details' | 'data' | 'settings') => void;
   onMaximize?: () => void;
   isMaximized?: boolean;
   onLock?: (id: string) => void;
@@ -54,11 +54,11 @@ export default function StepToolbar({
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', borderBottom: '1px solid #eee' }}>
       <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         
-        {/* Tab Buttons as Icons - Beside Run Button */}
+        {/* Summary Button (Levels Icon) */}
         <button
           className={`btn-icon tab-icon ${activeTab === 'summary' ? 'active' : ''}`}
           onClick={(e) => { e.stopPropagation(); onTabChange('summary'); }}
-          title="Summary"
+          title="Step Summary"
           style={{
             position: 'relative',
             color: activeTab === 'summary' ? '#f39c12' : '#95a5a6',
@@ -84,34 +84,7 @@ export default function StepToolbar({
             )}
         </button>
 
-        <button
-          className={`btn-icon tab-icon ${activeTab === 'details' ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
-          title="Operation Details"
-          style={{
-            position: 'relative',
-            color: activeTab === 'details' ? '#3498db' : '#95a5a6',
-            background: activeTab === 'details' ? '#ebf5fb' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            {activeTab === 'details' && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '-4px', 
-                    left: 0, 
-                    right: 0,
-                    height: '2px',
-                    background: '#3498db',
-                    zIndex: 10
-                }}/>
-            )}
-        </button>
-
+        {/* Data Button (Database Icon) */}
         <button
           className={`btn-icon tab-icon ${activeTab === 'data' ? 'active' : ''}`}
           onClick={(e) => { e.stopPropagation(); onTabChange('data'); }}
@@ -141,18 +114,50 @@ export default function StepToolbar({
             )}
         </button>
 
-        {/* Configure (Function) Button - Now on the Left */}
+        {/* Function Button (Fx Icon) - Activated Details */}
         <button 
-          className="btn-icon" 
-          onClick={(e) => { e.stopPropagation(); onConfigure?.(step.id); }}
-          title="Configure Operation"
+          className={`btn-icon tab-icon ${activeTab === 'details' ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
+          title="Operation Functionality"
           style={{ 
-              color: '#666', 
+              color: activeTab === 'details' ? '#3498db' : '#666', 
+              background: activeTab === 'details' ? '#ebf5fb' : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
             <span style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
         </button>
+
+         {/* Settings Button (Gear Icon) - Activated Settings */}
+         <button
+          className={`btn-icon tab-icon ${activeTab === 'settings' ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTabChange('settings'); }}
+          title="Miscellaneous Settings"
+          style={{
+            position: 'relative',
+            color: activeTab === 'settings' ? '#7f8c8d' : '#95a5a6',
+            background: activeTab === 'settings' ? '#f0f3f4' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}
+        >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            {activeTab === 'settings' && (
+                <div style={{
+                    position: 'absolute',
+                    bottom: '-4px', // Connect to content below
+                    left: 0, 
+                    right: 0,
+                    height: '2px',
+                    background: '#7f8c8d',
+                    zIndex: 10
+                }}/>
+            )}
+        </button>
+
+
 
         <div style={{ flex: 1 }} />
 
@@ -207,21 +212,31 @@ export default function StepToolbar({
           )}
         </button>
 
-        {/* Delete Action - Subtle until hovered (handled by CSS usually, but setting base here) */}
-        {!isLocked && (
-            <button 
+        {/* Delete Action - Always visible but behaves differently based on lock state */}
+        <button 
             className="btn-icon danger" 
-            onClick={(e) => { e.stopPropagation(); onDelete?.(step.id); }}
-            title="Delete Step"
+            onClick={(e) => { 
+                e.stopPropagation(); 
+                if (isLocked) {
+                    alert("This operation is locked. Please unlock it to delete.");
+                } else {
+                    onDelete?.(step.id); 
+                }
+            }}
+            title={isLocked ? "Operation is locked" : "Delete Step"}
             data-testid="btn-delete"
-            style={{ color: '#e74c3c', opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
+            style={{ 
+                color: '#e74c3c', 
+                opacity: isLocked ? 0.3 : 1, 
+                cursor: isLocked ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center' 
+            }}
+        >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
-            </button>
-        )}
+        </button>
       </div>
 
       {/* Formula Bar Section - Now on Top */}
