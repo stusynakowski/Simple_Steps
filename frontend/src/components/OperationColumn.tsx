@@ -47,6 +47,89 @@ export default function OperationColumn({
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
 
+  // -- Synchronization Logic --
+
+  // 1. Build Formula from Config
+  const buildFormula = (opId: string, config: Record<string, any>) => {
+    if (!opId || opId === 'noop') return '';
+    const args = Object.entries(config)
+      .map(([k, v]) => {
+        // Simple quoting for strings, raw for numbers/bools
+        const valStr = typeof v === 'string' && !v.startsWith('=') ? `"${v}"` : String(v);
+        return `${k}=${valStr}`;
+      })
+      .join(', ');
+    return `=${opId}(${args})`;
+  };
+
+  // 2. Parse Formula to Config
+  const parseFormula = (formula: string) => {
+    if (!formula.startsWith('=')) return null;
+    
+    const match = formula.match(/^=([a-zA-Z0-9_]+)\((.*)\)$/);
+    if (!match) return null;
+
+    const opId = match[1];
+    const argsStr = match[2];
+    const config: Record<string, any> = {};
+
+    // Basic CSV parser that respects quotes could be better, but simple split for now
+    // TODO: Improve regex to handle commas inside quotes
+    argsStr.split(',').forEach(arg => {
+      const parts = arg.split('=');
+      if (parts.length === 2) {
+        const key = parts[0].trim();
+        let val = parts[1].trim();
+        
+        // Remove quotes if string
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        } else if (!isNaN(Number(val))) {
+          val = Number(val);
+        }
+        
+        config[key] = val;
+      }
+    });
+
+    return { opId, config };
+  };
+
+  // Handler for UI-based updates (Dropdowns/Inputs)
+  const handleUiUpdate = (updates: Partial<Step>) => {
+    // We need to merge the incoming updates with current step state to build the full new state
+    const mergedStep = { ...step, ...updates };
+    
+    // Specifically look at process_type and configuration
+    const newOpId = updates.process_type !== undefined ? updates.process_type : step.process_type;
+    const newConfig = updates.configuration !== undefined ? updates.configuration : step.configuration;
+
+    // Generate the corresponding formula
+    const newFormula = buildFormula(newOpId, newConfig);
+
+    // Call the parent update with ALL changes
+    onUpdate?.(step.id, {
+      ...updates,
+      operation: newFormula
+    });
+  };
+
+  // Handler for Formula-based updates (Toolbar Input)
+  const handleFormulaUpdate = (id: string, formula: string) => {
+    const parsed = parseFormula(formula);
+    if (parsed) {
+      // Valid formula, update structure
+      onUpdate?.(id, {
+        operation: formula,
+        process_type: parsed.opId,
+        configuration: parsed.config
+      });
+    } else {
+      // Invalid or incomplete formula, just update the string so user can keep typing
+      onUpdate?.(id, { operation: formula });
+    }
+  };
+
   // Calculate display name for the operation summary
   const getOperationDisplayName = () => {
     if (!step.process_type || step.process_type === 'noop') return 'None';
@@ -99,7 +182,7 @@ export default function OperationColumn({
               onDelete={() => onDelete(step.id)}
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              onFormulaChange={(id, formula) => onUpdate?.(id, { operation: formula })}
+              onFormulaChange={handleFormulaUpdate}
               onMaximize={onMaximize}
               isMaximized={isMaximized}
               isLocked={isLocked}
@@ -167,9 +250,9 @@ export default function OperationColumn({
                             value={step.process_type} 
                             onChange={(e) => {
                                 const newOpId = e.target.value;
-                                onUpdate?.(step.id, { 
+                                handleUiUpdate({ 
                                     process_type: newOpId,
-                                    configuration: {} // Reset config on change
+                                    configuration: {} 
                                 });
                             }}
                             disabled={!isActive}
@@ -192,7 +275,7 @@ export default function OperationColumn({
                                   const isFormula = val.startsWith('=');
                                   const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
                                   
-                                  onUpdate?.(step.id, {
+                                  handleUiUpdate({
                                       configuration: { ...step.configuration, [param.name]: updateVal }
                                   });
                               }}

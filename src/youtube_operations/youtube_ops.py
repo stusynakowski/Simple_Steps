@@ -9,17 +9,22 @@ from SIMPLE_STEPS.decorators import simple_step
     category="YouTube", 
     operation_type="source"
 )
-def fetch_videos(channel_url: str = "https://youtube.com/mock_channel") -> List[str]:
+def fetch_videos(channel_url: str = None) -> List[str]:
     """Get all video URLs from a YouTube channel"""
+    if channel_url is None:
+        channel_url = None
+    
     print(f"[Mock] Fetching videos for channel: {channel_url}")
+    if "https://youtube.com/mock_channel"==channel_url:
+        #print("[Mock] Using default channel URL since none provided.")
     # Return list of strings - automatically converted to DataFrame column "output"
-    return [
-       f"{channel_url}/video/1",
-       f"{channel_url}/video/2", 
-       f"{channel_url}/video/3", 
-       f"{channel_url}/video/4", 
-       f"{channel_url}/video/5"
-    ]
+        return [
+        f"{channel_url}/video/1",
+        f"{channel_url}/video/2", 
+        f"{channel_url}/video/3", 
+        f"{channel_url}/video/4", 
+        f"{channel_url}/video/5"
+        ]
 
 # --- 2. Extract Metadata (Enrichment) ---
 @simple_step(
