@@ -244,8 +244,9 @@ export default function OperationColumn({
               {activeTab === 'details' && isEditMode && (
                   <div className="tab-content details-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
+                      {/* Operation Selector */}
                       <div className="config-item">
-                        <label>Type:</label>
+                        <label>Operation:</label>
                         <select 
                             value={step.process_type} 
                             onChange={(e) => {
@@ -259,33 +260,69 @@ export default function OperationColumn({
                         >
                             <option value="noop">Select Operation...</option>
                             {availableOperations.map(op => (
-                                <option key={op.id} value={op.id}>{op.label}</option>
+                                <option key={op.id} value={op.id}>
+                                  {op.category ? `[${op.category}] ` : ''}{op.label}
+                                </option>
                             ))}
                         </select>
                       </div>
-                      
-                      {hasParams && currentOp?.params.map(param => (
-                        <div key={param.name} className="config-item">
-                          <label>{param.name}:</label>
-                          <input 
-                              type="text"
-                              value={String(step.configuration[param.name] ?? (param.default || ''))}
-                              onChange={(e) => {
-                                  const val = e.target.value;
-                                  const isFormula = val.startsWith('=');
-                                  const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
-                                  
-                                  handleUiUpdate({
-                                      configuration: { ...step.configuration, [param.name]: updateVal }
-                                  });
-                              }}
-                              onBlur={() => onPreview?.(step.id)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') onPreview?.(step.id); }}
-                              title={param.description}
-                              placeholder={String(param.default || '')}
-                          />
+
+                      {/* Orchestration Strategy Override */}
+                      {currentOp && (
+                        <div className="config-item" style={{ borderTop: '1px solid #eee', paddingTop: '8px', marginTop: '8px' }}>
+                          <label title="How this function is applied to the data">
+                            Orchestration ({currentOp.type || 'dataframe'}):
+                          </label>
+                          <select
+                            value={String(step.configuration._orchestrator || '')}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const newConfig = { ...step.configuration };
+                              if (val) newConfig._orchestrator = val;
+                              else delete newConfig._orchestrator;
+                              
+                              handleUiUpdate({ configuration: newConfig });
+                            }}
+                            style={{ fontSize: '0.85em', color: '#555' }}
+                          >
+                             <option value="">Default ({currentOp.type || 'dataframe'})</option>
+                             <option value="map">Row Map (Apply to each row)</option>
+                             <option value="filter">Filter (Keep rows where True)</option>
+                             <option value="expand">Expand (Explode list results)</option>
+                             <option value="source">Source (Generate DataFrame)</option>
+                             <option value="dataframe">DataFrame (Raw Transformation)</option>
+                          </select>
                         </div>
-                      ))}
+                      )}
+                      
+                      {/* Parameters */}
+                      {hasParams && (
+                        <div style={{ marginTop: '12px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Parameters</span>
+                          {currentOp?.params.map(param => (
+                            <div key={param.name} className="config-item">
+                              <label>{param.name}:</label>
+                              <input 
+                                  type="text"
+                                  value={String(step.configuration[param.name] ?? (param.default || ''))}
+                                  onChange={(e) => {
+                                      const val = e.target.value;
+                                      const isFormula = val.startsWith('=');
+                                      const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
+                                      
+                                      handleUiUpdate({
+                                          configuration: { ...step.configuration, [param.name]: updateVal }
+                                      });
+                                  }}
+                                  onBlur={() => onPreview?.(step.id)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') onPreview?.(step.id); }}
+                                  title={param.description}
+                                  placeholder={String(param.default || '')}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
               )}

@@ -91,9 +91,10 @@ export default function useWorkflow() {
     
     // Build Step Map (Label -> Output Ref ID)
     const stepMap: Record<string, string> = {};
-    for (const s of currentSteps) {
+    for (const [index, s] of currentSteps.entries()) {
         if (s.outputRefId) {
             stepMap[s.label] = s.outputRefId;
+            stepMap[`step${index + 1}`] = s.outputRefId;
         }
     }
 
@@ -158,9 +159,10 @@ export default function useWorkflow() {
     const prevStep = stepIndex > 0 ? currentSteps[stepIndex - 1] : undefined;
     
     const stepMap: Record<string, string> = {};
-    for (const s of currentSteps) {
+    for (const [index, s] of currentSteps.entries()) {
         if (s.outputRefId) {
             stepMap[s.label] = s.outputRefId;
+            stepMap[`step${index + 1}`] = s.outputRefId;
         }
     }
     

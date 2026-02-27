@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import pandas as pd
+import numpy as np
 
 from .models import (
     OperationDefinition, 
@@ -151,12 +152,16 @@ async def get_data_view(
         current_row_idx = offset + int(i)
 
         for col_name, val in row.items():
-            if pd.isna(val):
+            # Handle list/array values correctly to avoid ValueError
+            if isinstance(val, (list, tuple, np.ndarray)):
+                display_val = str(val)
+                actual_val = val
+            elif pd.isna(val):
                 display_val = ""
                 actual_val = None
             else:
                 display_val = str(val)
-                actual_val = val if not pd.isna(val) else None
+                actual_val = val
 
             cells.append({
                 "row_id": current_row_idx,

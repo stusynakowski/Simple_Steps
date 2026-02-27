@@ -13,6 +13,8 @@ class OperationDefinition(BaseModel):
     id: str
     label: str
     description: str
+    type: Literal['source', 'map', 'filter', 'expand', 'dataframe'] = 'dataframe'
+    category: str = 'General'
     params: List[OperationParam]
 
 # --- 2. Blueprint / Execution ---

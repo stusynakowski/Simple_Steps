@@ -54,89 +54,87 @@ def run_operation(
     is_preview: bool = False
 ) -> tuple[str, dict]:
     """
-    Orchestrates the running of a single step.
-    1. Fetches input data (if any).
-    2. Runs the registered python function.
-    3. Saves result.
-    4. Returns new Ref ID + Metrics.
+    Orchestrates the running of a single step with dynamic wrappers.
     """
     
     # 1. Resolve Input
     df_in = None
     if input_ref_id:
         df_in = get_dataframe(input_ref_id)
-        if df_in is None:
-            raise ValueError(f"Input reference {input_ref_id} not found/expired")
+        # We don't error out if df_in is None immediately, maybe source step
 
     # 2. Find Operation
     op_def = OPERATION_REGISTRY.get(op_id)
     if not op_def:
         raise ValueError(f"Operation {op_id} not registered")
+    
+    # Extract function and metadata from registry
+    # NOTE: The registry structure depends on decorators.py. 
+    # Assuming op_def is the dict we stored: {"definition": def, "func": func}
     func = op_def['func']
+    # Get suggested op type from definition
+    definition = op_def.get('definition')
+    # Default to 'dataframe' if not found or if the decorator logic is complex
+    suggested_op_type = 'dataframe' 
+    # TODO: We need to pull `operation_type` from the metadata. 
+    # Currently `OperationDefinition` likely doesn't have it explicitly stored?
+    # Let's assume we can pass it or it defaults to 'dataframe'
+    
+    # Allow config override: { "_orchestrator": "map" }
+    # Use underscore to avoid collision with function args
+    orchestrator_type = config.get('_orchestrator', suggested_op_type)
+    
+    # If the user specifically decorated it with a type, we might want to respect that *unless* overridden
+    # But for now, we rely on the override or default.
+    
+    from .orchestrators import ORCHESTRATORS
+    wrapper = ORCHESTRATORS.get(orchestrator_type)
+    
+    # 3. Resolve Arguments / Config
+    resolved_config = {}
+    
+    # Simple reference resolution (can be expanded)
+    for k, v in config.items():
+        if k.startswith('_'): continue 
+        resolved_config[k] = v
 
-    # 3. Execute (with basic error handling)
+    # Inject input dataframe
+    # The wrappers in orchestrators.py often look for a DataFrame in kwargs
+    if df_in is not None:
+        resolved_config['_input_df'] = df_in
+    
+    if not wrapper:
+        # If no wrapper found (or none requested), use raw function
+        executable_func = func
+    else:
+        # Wrap the raw function with the chosen logic
+        executable_func = wrapper(func)
+    
+    # Execute
+    print(f"Running '{op_id}' with orchestrator '{orchestrator_type}'")
     try:
-        # Resolve config references
-        resolved_config = {}
-        for k, v in config.items():
-            if isinstance(v, str) and v.startswith('='):
-                 # Simple parsing for =StepName!Column
-                 # This requires us to have access to previous steps' outputs.
-                 # In this isolated function, we only have one input_ref_id.
-                 # To support arbitrary step references, the engine needs access to all previous outputs.
+        # The wrapper handles pulling the right column, applying the function, etc.
+        result_df = executable_func(**resolved_config)
+        
+        # Ensure result is a DataFrame (wrappers usually guarantee this, but to be safe)
+        if not isinstance(result_df, pd.DataFrame):
+             print(f"Warning: Operation {op_id} returned {type(result_df)}, expected DataFrame")
+             if isinstance(result_df, list):
+                 result_df = pd.DataFrame(result_df)
+             else:
+                 result_df = pd.DataFrame([result_df])
                  
-                 # PARSING LOGIC:
-                 parts = v[1:].split('!')
-                 if len(parts) == 2 and step_label_map:
-                     step_name, col_name = parts
-                     if step_name in step_label_map:
-                         ref_id = step_label_map[step_name]
-                         step_df = get_dataframe(ref_id)
-                         if step_df is not None and col_name in step_df.columns:
-                             # For now, let's return the first value or the series depending on need.
-                             # If the operation expects a scalar, we might need a specific cell ref like !A1
-                             # If it expects a list, we accept the column.
-                             resolved_config[k] = step_df[col_name].tolist()
-                         else:
-                             resolved_config[k] = v # Could not resolve
-                     else:
-                         resolved_config[k] = v # Step not found
-                 else:
-                     resolved_config[k] = v
-            else:
-                resolved_config[k] = v
-
-        # Pass the DataFrame + Config to the developer's function
-        # Note: We abstract away the ID management from the developer.
-        # They just write: (df, config) -> df
-        
-        # If the function accepts 'is_preview', pass it. 
-        # Otherwise, just call it (most simple ops won't care).
-        # For this PoC, we just pass df and config.
-        # Future improvement: inspect signature.
-        
-        # If is_preview is True, we could potentially pass a subset of df_in 
-        # to make it faster (e.g. head(5)).
-        if is_preview and df_in is not None:
-             # Create a lightweight copy for preview
-             df_in_run = df_in.head(10).copy()
-        else:
-             df_in_run = df_in
-
-        df_out = func(df_in_run, resolved_config)
     except Exception as e:
-        raise RuntimeError(f"Operation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise ValueError(f"Error executing step {op_id}: {str(e)}")
 
-    if not isinstance(df_out, pd.DataFrame):
-        raise RuntimeError("Operation did not return a DataFrame")
-
-    # 4. Save Output Reference
-    out_ref = save_dataframe(df_out)
-
-    # 5. Metrics
+    # 4. Save Result
+    out_ref = save_dataframe(result_df)
+    
     metrics = {
-        "rows": len(df_out),
-        "columns": list(df_out.columns)
+        "rows": len(result_df),
+        "columns": list(result_df.columns)
     }
-
+    
     return out_ref, metrics

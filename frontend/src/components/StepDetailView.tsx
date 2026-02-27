@@ -73,6 +73,12 @@ export default function StepDetailView({ step, availableOperations, onRun, onDel
                <span className="label">Step Type:</span>
                <span>{step.process_type}</span>
             </div>
+            {typeof step.configuration._orchestrator === 'string' && (
+              <div className="summary-item">
+                 <span className="label">Orchestration Override:</span>
+                 <span className="status-badge status-execution">{step.configuration._orchestrator}</span>
+              </div>
+            )}
             <div className="summary-item">
                <span className="label">Step ID:</span>
                <span>{step.id}</span>

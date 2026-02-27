@@ -23,6 +23,8 @@ export interface OperationDefinition {
   id: string;
   label: string;
   description: string;
+  type: string;
+  category: string;
   params: OperationParam[];
 }
 
