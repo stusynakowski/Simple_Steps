@@ -115,18 +115,11 @@ def rowmap_wrapper(func: Callable) -> Callable:
             # Construct Result
             result_df = input_df.copy()
             
-            # If the function returns a dict (multiple new columns), expand it
-            first_valid = applied.dropna().iloc[0] if not applied.dropna().empty else None
-
-            if isinstance(first_valid, dict):
-                new_cols = applied.apply(pd.Series)
-                result_df = pd.concat([result_df, new_cols], axis=1)
-            else:
-                # Scalar return
-                # Check if we should merge it into an existing column? No, usually new column.
-                # Use function name as default output column
-                new_col_name = f"{func.__name__}_output"
-                result_df[new_col_name] = applied
+            # Scalar return (store dicts/lists/strings in one cell)
+            # We explicitly DO NOT expand dictionaries into multiple columns.
+            # This keeps alignment 100% predictable and puts the dict in one cell.
+            new_col_name = f"{func.__name__}_output"
+            result_df[new_col_name] = applied
                 
             return result_df
             
