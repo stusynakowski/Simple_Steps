@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import TopBar from './TopBar';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import GlobalControls from './GlobalControls';
 import OperationColumn from './OperationColumn';
@@ -9,36 +8,44 @@ import Sidebar from './Sidebar';
 import ChatSidebar from './ChatSidebar';
 import ActivityBar from './ActivityBar';
 import type { ActivityView } from './ActivityBar';
+import type { Workflow } from '../types/models';
+import { initialWorkflow } from '../mocks/initialData';
 import './MainLayout.css';
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface OpenTab extends WorkflowTab {
+  projectId?: string;   // undefined = unsaved / demo
+  pipelineId?: string;
+  workflow: Workflow;
+}
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export default function MainLayout() {
-  const [headerHeight, setHeaderHeight] = useState(240); // Increased default height
+  const [headerHeight, setHeaderHeight] = useState(200);
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
-  
-  // Track dragging state to disable transitions
   const [isDragging, setIsDragging] = useState(false);
 
   const isResizingHeader = useRef(false);
   const isResizingSidebar = useRef(false);
   const isResizingRightSidebar = useRef(false);
-
-  // Store previous widths for restoring after collapse
   const lastRightSidebarWidth = useRef(300);
   const lastSidebarWidth = useRef(250);
-  const lastHeaderHeight = useRef(240); // Increased ref height
+  const lastHeaderHeight = useRef(200);
 
-  const { 
-    workflow, 
+  const {
+    workflow,
     availableOperations,
-    expandedStepIds, 
+    expandedStepIds,
     pipelineStatus,
     maximizedStepId,
-    addStepAt, 
-    toggleStep, 
+    addStepAt,
+    toggleStep,
     toggleMaximizeStep,
-    collapseStep, 
+    collapseStep,
     updateStep,
     runStep,
     runPipeline,
@@ -47,7 +54,7 @@ export default function MainLayout() {
     previewStep,
     deleteStep,
     saveWorkflow,
-    loadWorkflow,
+    fetchWorkflow,
     loadWorkflowObject,
     listSavedProjects,
     createNewProject,
@@ -56,41 +63,138 @@ export default function MainLayout() {
     removePipeline,
   } = useWorkflow();
 
+  // ── Tab state ────────────────────────────────────────────────────────────
+  // Start with the initial workflow as the first tab
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([
+    { id: 'initial', title: initialWorkflow.name, isActive: true, workflow: initialWorkflow },
+  ]);
+
+  const activeTab = openTabs.find(t => t.isActive) ?? openTabs[0];
+  const projectName = activeTab?.projectId
+    ? (activeTab.title.replace(/\.json$/, ''))
+    : '';
+
+  /** Open or focus a pipeline tab, loading the workflow into the hook. */
+  const openPipelineTab = useCallback(async (projectId: string, pipelineId: string) => {
+    const tabKey = `${projectId}::${pipelineId}`;
+    const existing = openTabs.find(t => t.id === tabKey);
+    if (existing) {
+      // Just focus it
+      setOpenTabs(prev => prev.map(t => ({ ...t, isActive: t.id === tabKey })));
+      loadWorkflowObject(existing.workflow);
+      return;
+    }
+    // Fetch and open new tab
+    const wf = await fetchWorkflow(projectId, pipelineId);
+    const newTab: OpenTab = {
+      id: tabKey,
+      title: `${wf.name}.json`,
+      isActive: true,
+      projectId,
+      pipelineId,
+      workflow: wf,
+    };
+    setOpenTabs(prev => [
+      ...prev.map(t => ({ ...t, isActive: false })),
+      newTab,
+    ]);
+    loadWorkflowObject(wf);
+  }, [openTabs, fetchWorkflow, loadWorkflowObject]);
+
+  /** Open a demo / in-memory workflow as a tab. */
+  const openWorkflowObjectTab = useCallback((wf: Workflow) => {
+    const tabKey = `demo::${wf.id}`;
+    const existing = openTabs.find(t => t.id === tabKey);
+    if (existing) {
+      setOpenTabs(prev => prev.map(t => ({ ...t, isActive: t.id === tabKey })));
+      loadWorkflowObject(existing.workflow);
+      return;
+    }
+    const newTab: OpenTab = {
+      id: tabKey,
+      title: `${wf.name}.json`,
+      isActive: true,
+      workflow: wf,
+    };
+    setOpenTabs(prev => [
+      ...prev.map(t => ({ ...t, isActive: false })),
+      newTab,
+    ]);
+    loadWorkflowObject(wf);
+  }, [openTabs, loadWorkflowObject]);
+
+  const handleTabClick = useCallback((id: string) => {
+    const tab = openTabs.find(t => t.id === id);
+    if (!tab) return;
+    setOpenTabs(prev => prev.map(t => ({ ...t, isActive: t.id === id })));
+    loadWorkflowObject(tab.workflow);
+  }, [openTabs, loadWorkflowObject]);
+
+  const handleTabClose = useCallback((id: string) => {
+    if (openTabs.length <= 1) return;
+    const closingActive = openTabs.find(t => t.id === id)?.isActive;
+    const next = openTabs.filter(t => t.id !== id);
+    if (closingActive) {
+      next[next.length - 1].isActive = true;
+      loadWorkflowObject(next[next.length - 1].workflow);
+    }
+    setOpenTabs(next);
+  }, [openTabs, loadWorkflowObject]);
+
+  const handleNewTab = useCallback(() => {
+    const blank: Workflow = {
+      id: `new-${Date.now()}`,
+      name: 'Untitled',
+      created_at: new Date().toISOString(),
+      steps: [],
+    };
+    const newTab: OpenTab = {
+      id: blank.id,
+      title: 'Untitled.json',
+      isActive: true,
+      workflow: blank,
+    };
+    setOpenTabs(prev => [
+      ...prev.map(t => ({ ...t, isActive: false })),
+      newTab,
+    ]);
+    loadWorkflowObject(blank);
+  }, [loadWorkflowObject]);
+
+  // Keep the active tab's workflow snapshot in sync when the hook's workflow changes
+  // (e.g. after a step edit or run)
+  useEffect(() => {
+    setOpenTabs(prev => prev.map(t =>
+      t.isActive ? { ...t, workflow, isModified: true } : t
+    ));
+  }, [workflow]);
+
+  // ── Resize logic ─────────────────────────────────────────────────────────
+
   const startResizingHeader = useCallback(() => {
-    isResizingHeader.current = true;
-    setIsDragging(true);
+    isResizingHeader.current = true; setIsDragging(true);
     document.body.style.cursor = 'row-resize';
     document.body.style.userSelect = 'none';
   }, []);
-  
+
   const toggleHeader = useCallback(() => {
-      if (headerHeight > 60) {
-          lastHeaderHeight.current = headerHeight;
-          setHeaderHeight(50); // Collapse to just TopBar
-      } else {
-          setHeaderHeight(lastHeaderHeight.current > 60 ? lastHeaderHeight.current : 240);
-      }
+    if (headerHeight > 60) { lastHeaderHeight.current = headerHeight; setHeaderHeight(44); }
+    else setHeaderHeight(lastHeaderHeight.current > 60 ? lastHeaderHeight.current : 200);
   }, [headerHeight]);
 
   const startResizingSidebar = useCallback(() => {
-    isResizingSidebar.current = true;
-    setIsDragging(true);
+    isResizingSidebar.current = true; setIsDragging(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
-  
+
   const toggleSidebar = useCallback(() => {
-     if (sidebarWidth > 20) {
-         lastSidebarWidth.current = sidebarWidth;
-         setSidebarWidth(0); // Fully collapse
-     } else {
-         setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
-     }
+    if (sidebarWidth > 20) { lastSidebarWidth.current = sidebarWidth; setSidebarWidth(0); }
+    else setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
   }, [sidebarWidth]);
 
   const startResizingRightSidebar = useCallback(() => {
-    isResizingRightSidebar.current = true;
-    setIsDragging(true);
+    isResizingRightSidebar.current = true; setIsDragging(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
@@ -102,33 +206,23 @@ export default function MainLayout() {
     setIsDragging(false);
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-        
-    // Update last known sizes if we were resizing
-    // We only update if the current size is "expanded" (greater than minimal collapse)
-    // This prevents overwriting the "restored" size with the "collapsed" size if a drag event fires accidentally?
-    // Actually, dragging normally implies user intent to set size.
   }, []);
-  // Note: we update refs in resize/stopResizing usually, but with state it's tricky to get "previous" if we snap.
-  // actually 'resize' updates the state. The 'ref' should be updated when we invoke the collapse logic?
-  // Or just update the ref whenever we have a "good" size?
-  // Let's just trust that manual resize sets the state, and we use the ref only for restoration.
-  // But usage of 'resize' callback might need to update refs? No, manual resize is manual.
-  
-  const resize = useCallback((mouseMoveEvent: any) => {
+
+  const resize = useCallback((e: MouseEvent) => {
     if (isResizingHeader.current) {
-        const newHeight = Math.max(50, Math.min(mouseMoveEvent.clientY, 600)); 
-        setHeaderHeight(newHeight);
-        if (newHeight > 60) lastHeaderHeight.current = newHeight;
+      const h = Math.max(44, Math.min(e.clientY, 600));
+      setHeaderHeight(h);
+      if (h > 60) lastHeaderHeight.current = h;
     }
     if (isResizingSidebar.current) {
-        const newWidth = Math.max(0, Math.min(mouseMoveEvent.clientX, 500));
-        setSidebarWidth(newWidth);
-        if (newWidth > 50) lastSidebarWidth.current = newWidth;
+      const w = Math.max(0, Math.min(e.clientX, 500));
+      setSidebarWidth(w);
+      if (w > 50) lastSidebarWidth.current = w;
     }
     if (isResizingRightSidebar.current) {
-        const newWidth = Math.max(0, Math.min(window.innerWidth - mouseMoveEvent.clientX, 600));
-        setRightSidebarWidth(newWidth);
-        if (newWidth > 50) lastRightSidebarWidth.current = newWidth;
+      const w = Math.max(0, Math.min(window.innerWidth - e.clientX, 600));
+      setRightSidebarWidth(w);
+      if (w > 50) lastRightSidebarWidth.current = w;
     }
   }, []);
 
@@ -142,231 +236,172 @@ export default function MainLayout() {
   }, [resize, stopResizing]);
 
   const handleViewChange = (view: ActivityView) => {
-      if (view === activeActivityView) {
-          // Toggle sidebar visibility
-          if (sidebarWidth > 0) {
-              lastSidebarWidth.current = sidebarWidth;
-              setSidebarWidth(0);
-          } else {
-              setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
-          }
-      } else {
-          // Switch view and ensure open
-          setActiveActivityView(view);
-          if (sidebarWidth === 0) {
-               setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
-          }
-      }
-  };
-
-  const handleRunAll = () => {
-    runPipeline();
-  };
-  
-  const handlePauseAll = () => {
-    pausePipeline();
-  };
-
-  const handleStopAll = () => {
-      stopPipeline();
+    if (view === activeActivityView) {
+      if (sidebarWidth > 0) { lastSidebarWidth.current = sidebarWidth; setSidebarWidth(0); }
+      else setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
+    } else {
+      setActiveActivityView(view);
+      if (sidebarWidth === 0) setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
+    }
   };
 
   const toggleChat = () => {
-      if (rightSidebarWidth > 20) {
-          // Collapse
-          lastRightSidebarWidth.current = rightSidebarWidth;
-          setRightSidebarWidth(0);
-      } else {
-          // Expand
-          setRightSidebarWidth(lastRightSidebarWidth.current > 20 ? lastRightSidebarWidth.current : 300);
-      }
-  };
-  
-  // Transition style
-  const transitionStyle = isDragging ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-
-  // Workflow Tabs State
-  const [tabs, setTabs] = useState<WorkflowTab[]>([
-    { id: '1', title: 'Data Processing 1.json', isActive: true, isModified: false },
-    { id: '2', title: 'User Onboarding.json', isActive: false, isModified: true },
-    { id: '3', title: 'Draft Workflow', isActive: false }
-  ]);
-
-  const handleTabClick = (id: string) => {
-    setTabs(tabs.map(t => ({ ...t, isActive: t.id === id })));
+    if (rightSidebarWidth > 20) { lastRightSidebarWidth.current = rightSidebarWidth; setRightSidebarWidth(0); }
+    else setRightSidebarWidth(lastRightSidebarWidth.current > 20 ? lastRightSidebarWidth.current : 300);
   };
 
-  const handleTabClose = (id: string) => {
-    // Prevent closing the last tab for now
-    if (tabs.length <= 1) return;
-    
-    const newTabs = tabs.filter(t => t.id !== id);
-    // If we closed the active tab, activate the last remaining one
-    if (tabs.find(t => t.id === id)?.isActive) {
-        newTabs[newTabs.length - 1].isActive = true;
-    }
-    setTabs(newTabs);
-  };
+  const transitionStyle = isDragging ? 'none'
+    : 'width 0.3s cubic-bezier(0.4,0,0.2,1), height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s cubic-bezier(0.4,0,0.2,1)';
 
-  const handleNewTab = () => {
-    const newId = Date.now().toString();
-    const newTabs = tabs.map(t => ({ ...t, isActive: false }));
-    newTabs.push({ 
-        id: newId, 
-        title: `Untitled-${newId.slice(-4)}.json`, 
-        isActive: true, 
-        isModified: false 
-    });
-    setTabs(newTabs);
-  };
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="main-layout" data-testid="main-layout">
-        <ActivityBar activeView={activeActivityView} onViewChange={handleViewChange} />
-        
-        <div style={{ 
-            width: sidebarWidth, 
-            flexShrink: 0, 
-            display: 'flex', 
-            flexDirection: 'column',
-            transition: transitionStyle,
-            overflow: 'hidden',
-            borderRight: sidebarWidth > 0 ? '1px solid #333' : 'none' // Add border here if needed, or rely on sidebar's internal styles
-        }}>
-            <Sidebar
-              isVisible={true}
-              currentView={activeActivityView}
-              onListProjects={listSavedProjects}
-              onCreateProject={createNewProject}
-              onDeleteProject={removeProject}
-              onListPipelines={listProjectPipelines}
-              onLoadPipeline={loadWorkflow}
-              onSavePipeline={saveWorkflow}
-              onDeletePipeline={removePipeline}
-              onLoadWorkflowObject={loadWorkflowObject}
-            />
-        </div>
-        
-        <div className="sidebar-resize-handle" onMouseDown={startResizingSidebar} onDoubleClick={toggleSidebar} title="Double-click to verify size">
-            <div className="sidebar-resize-line" />
-            <button 
-                className="resize-toggle-btn"
-                onClick={(e) => { e.stopPropagation(); toggleSidebar(); }}
-                onMouseDown={(e) => e.stopPropagation()}
-                title={sidebarWidth > 20 ? "Collapse Sidebar" : "Expand Sidebar"}
-            >
-                {sidebarWidth > 20 ? '◀' : '▶'}
-            </button>
-        </div>
+      <ActivityBar activeView={activeActivityView} onViewChange={handleViewChange} />
+
+      {/* Left sidebar */}
+      <div style={{
+        width: sidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        transition: transitionStyle, overflow: 'hidden',
+        borderRight: sidebarWidth > 0 ? '1px solid #333' : 'none',
+      }}>
+        <Sidebar
+          isVisible={true}
+          currentView={activeActivityView}
+          onListProjects={listSavedProjects}
+          onCreateProject={createNewProject}
+          onDeleteProject={removeProject}
+          onListPipelines={listProjectPipelines}
+          onLoadPipeline={openPipelineTab}
+          onSavePipeline={saveWorkflow}
+          onDeletePipeline={removePipeline}
+          onLoadWorkflowObject={openWorkflowObjectTab}
+        />
+      </div>
+
+      <div className="sidebar-resize-handle" onMouseDown={startResizingSidebar} onDoubleClick={toggleSidebar}>
+        <div className="sidebar-resize-line" />
+        <button className="resize-toggle-btn"
+          onClick={e => { e.stopPropagation(); toggleSidebar(); }}
+          onMouseDown={e => e.stopPropagation()}
+          title={sidebarWidth > 20 ? 'Collapse Sidebar' : 'Expand Sidebar'}>
+          {sidebarWidth > 20 ? '◀' : '▶'}
+        </button>
+      </div>
 
       <div className="content-area">
-      <header className="header-container" style={{ 
-          height: headerHeight,
-          transition: transitionStyle
-      }}>
-        <div className="system-tools-row">
-            <TopBar 
-               onAddStep={() => addStepAt(workflow.steps.length)} 
-               showAddStep={false} 
-            />
-        </div>
-        <div className="tabs-row">
-            <WorkflowTabs 
-                tabs={tabs}
-                onTabClick={handleTabClick}
-                onTabClose={handleTabClose}
-                onNewTab={handleNewTab}
-            />
-        </div>
-        <div className="workflow-tools-row">
-            <div className="workflow-controls-wrapper">
-                <GlobalControls 
-                    onRunAll={handleRunAll} 
-                    onPauseAll={handlePauseAll} 
-                    onStopAll={handleStopAll}
-                    pipelineStatus={pipelineStatus}
-                    workflowName={workflow.name}
-                />
-            </div>
-        </div>
-      </header>
+        {/* ── Header (resizable) ─────────────────────────────────────────── */}
+        <header className="header-container" style={{ height: headerHeight, transition: transitionStyle }}>
 
-      <div className="resize-handle" onMouseDown={startResizingHeader} onDoubleClick={toggleHeader} title="Double-click to minimize/expand">
-         <div className="resize-line" />
-         <button 
-            className="resize-toggle-btn"
-            onClick={(e) => { e.stopPropagation(); toggleHeader(); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            title={headerHeight > 60 ? "Collapse Header" : "Expand Header"}
-         >
+          {/* Row 1: project name + toolbar */}
+          <div className="topbar-row">
+            {projectName && (
+              <span className="topbar-project-name" title="Active project">
+                {projectName}
+              </span>
+            )}
+            {projectName && <span className="topbar-sep">/</span>}
+            <span className="topbar-pipeline-name">{workflow.name || 'Untitled'}</span>
+            <div className="topbar-spacer" />
+            <div className="topbar-actions">
+              <button className="topbar-btn" title="Search" onClick={() => { setActiveActivityView('search'); setSidebarWidth(w => w > 0 ? w : 250); }}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                  <path fillRule="evenodd" d="M10.68 11.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.75.75 0 1 1-1.06 1.06l-3.04-3.04zm-4.18.76a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9z"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: file tabs */}
+          <div className="tabs-row">
+            <WorkflowTabs
+              tabs={openTabs}
+              onTabClick={handleTabClick}
+              onTabClose={handleTabClose}
+              onNewTab={handleNewTab}
+            />
+          </div>
+
+          {/* Row 3: pipeline controls */}
+          <div className="workflow-tools-row">
+            <div className="workflow-controls-wrapper">
+              <GlobalControls
+                onRunAll={runPipeline}
+                onPauseAll={pausePipeline}
+                onStopAll={stopPipeline}
+                pipelineStatus={pipelineStatus}
+                workflowName={workflow.name}
+              />
+            </div>
+          </div>
+        </header>
+
+        <div className="resize-handle" onMouseDown={startResizingHeader} onDoubleClick={toggleHeader}>
+          <div className="resize-line" />
+          <button className="resize-toggle-btn"
+            onClick={e => { e.stopPropagation(); toggleHeader(); }}
+            onMouseDown={e => e.stopPropagation()}
+            title={headerHeight > 60 ? 'Collapse Header' : 'Expand Header'}>
             {headerHeight > 60 ? '▲' : '▼'}
-         </button>
-      </div>
-      
-      <main className={`main-content horizontal-scroll-area`}>
-        <div className="columns-container" data-testid="columns-container">
+          </button>
+        </div>
+
+        {/* ── Pipeline canvas ────────────────────────────────────────────── */}
+        <main className="main-content horizontal-scroll-area">
+          <div className="columns-container" data-testid="columns-container">
             {workflow.steps.map((step, index) => {
               const isExpanded = expandedStepIds.has(step.id);
               const isMaximized = maximizedStepId === step.id;
               return (
                 <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
-                    <OperationColumn
-                        step={step}
-                        color={getStepColor(index)}
-                        isActive={isExpanded}
-                        isSqueezed={!isExpanded}
-                        isMaximized={isMaximized}
-                        zIndex={workflow.steps.length - index}
-                        availableOperations={availableOperations}
-                        onActivate={() => toggleStep(step.id)}
-                        onUpdate={(id, updates) => updateStep(id, updates)}
-                        onRun={runStep}
-                        onPreview={previewStep}
-                        onPause={(id) => console.log('Pause', id)} 
-                        onDelete={deleteStep}
-                        onMinimize={() => collapseStep(step.id)}
-                        onMaximize={() => toggleMaximizeStep(step.id)}
-                    />
+                  <OperationColumn
+                    step={step}
+                    color={getStepColor(index)}
+                    isActive={isExpanded}
+                    isSqueezed={!isExpanded}
+                    isMaximized={isMaximized}
+                    zIndex={workflow.steps.length - index}
+                    availableOperations={availableOperations}
+                    onActivate={() => toggleStep(step.id)}
+                    onUpdate={(id, updates) => updateStep(id, updates)}
+                    onRun={runStep}
+                    onPreview={previewStep}
+                    onPause={id => console.log('Pause', id)}
+                    onDelete={deleteStep}
+                    onMinimize={() => collapseStep(step.id)}
+                    onMaximize={() => toggleMaximizeStep(step.id)}
+                  />
                 </div>
               );
             })}
-            
             <div className="add-step-container">
-                <button 
-                  className="rectangular-add-btn" 
-                  onClick={() => addStepAt(workflow.steps.length)}
-                  title="Add New Step"
-                >
-                  + Add Step
-                </button>
+              <button className="rectangular-add-btn" onClick={() => addStepAt(workflow.steps.length)} title="Add New Step">
+                + Add Step
+              </button>
             </div>
-        </div>
-      </main>
-      </div> 
+          </div>
+        </main>
+      </div>
 
-      
-        <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar} title="Double-click to verify size" onDoubleClick={toggleChat}>
-            <div className="sidebar-resize-line" />
-            <button 
-                className="resize-toggle-btn"
-                onClick={(e) => { e.stopPropagation(); toggleChat(); }}
-                onMouseDown={(e) => e.stopPropagation()}
-                title={rightSidebarWidth > 20 ? "Close Chat" : "Open Chat"}
-            >
-                {rightSidebarWidth > 20 ? '▶' : '◀'}
-            </button>
-        </div>
-        <div style={{ 
-            width: rightSidebarWidth, 
-            flexShrink: 0, 
-            display: 'flex', 
-            flexDirection: 'column',
-            overflow: 'hidden',
-            transition: transitionStyle,
-            opacity: rightSidebarWidth > 20 ? 1 : 0 // Fade out content as well
-        }}>
-            <ChatSidebar isVisible={true /* Always rendered, hiding controlled by parent width */} onClose={toggleChat} />
-        </div>
+      {/* Right sidebar resize handle */}
+      <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar} onDoubleClick={toggleChat}>
+        <div className="sidebar-resize-line" />
+        <button className="resize-toggle-btn"
+          onClick={e => { e.stopPropagation(); toggleChat(); }}
+          onMouseDown={e => e.stopPropagation()}
+          title={rightSidebarWidth > 20 ? 'Close Chat' : 'Open Chat'}>
+          {rightSidebarWidth > 20 ? '▶' : '◀'}
+        </button>
+      </div>
+
+      {/* Right chat sidebar */}
+      <div style={{
+        width: rightSidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        overflow: 'hidden', transition: transitionStyle,
+        opacity: rightSidebarWidth > 20 ? 1 : 0,
+      }}>
+        <ChatSidebar isVisible={true} onClose={toggleChat} />
+      </div>
     </div>
   );
 }

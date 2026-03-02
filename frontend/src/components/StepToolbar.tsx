@@ -31,7 +31,6 @@ export default function StepToolbar({
   isMaximized,
   onLock,
   isLocked,
-  onConfigure
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const [formula, setFormula] = useState(step.operation || '');

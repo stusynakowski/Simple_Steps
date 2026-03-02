@@ -16,7 +16,7 @@ interface StepDetailViewProps {
 }
 
 export default function StepDetailView({ step, availableOperations, onRun, onDelete, onEdit, onCellClick, onFormulaChange }: StepDetailViewProps) {
-  const [activeTab, setActiveTab] = useState<'output' | 'summary'>('output');
+  const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data' | 'settings'>('summary');
 
   if (!step) {
     return <div data-testid="step-detail-empty">No step selected</div>;
@@ -41,12 +41,14 @@ export default function StepDetailView({ step, availableOperations, onRun, onDel
         onDelete={onDelete} 
         onEdit={() => onEdit?.(step.id)} 
         onFormulaChange={onFormulaChange}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       <div className="step-tabs">
         <button 
-          className={`step-tab ${activeTab === 'output' ? 'active' : ''}`}
-          onClick={() => setActiveTab('output')}
+          className={`step-tab ${activeTab === 'data' ? 'active' : ''}`}
+          onClick={() => setActiveTab('data')}
         >
           Output
         </button>
@@ -59,7 +61,7 @@ export default function StepDetailView({ step, availableOperations, onRun, onDel
       </div>
 
       <div className="step-tab-content">
-        {activeTab === 'output' && (
+        {activeTab === 'data' && (
           <DataOutputGrid cells={preview} onCellClick={onCellClick} />
         )}
         {activeTab === 'summary' && (

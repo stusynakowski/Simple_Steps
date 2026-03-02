@@ -18,7 +18,8 @@ describe('StepToolbar', () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();
 
-    render(<StepToolbar step={sampleStep} onRun={onRun} onEdit={onEdit} onDelete={onDelete} />);
+    render(<StepToolbar step={sampleStep} onRun={onRun} onEdit={onEdit} onDelete={onDelete}
+      activeTab="summary" onTabChange={() => {}} />);
 
     expect(screen.getByTestId('step-toolbar')).toBeInTheDocument();
     const runBtn = screen.getByTestId('btn-run');

@@ -85,7 +85,7 @@ export default function OperationColumn({
         if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
           val = val.slice(1, -1);
         } else if (!isNaN(Number(val))) {
-          val = Number(val);
+          val = String(Number(val));
         }
         
         config[key] = val;
@@ -97,21 +97,10 @@ export default function OperationColumn({
 
   // Handler for UI-based updates (Dropdowns/Inputs)
   const handleUiUpdate = (updates: Partial<Step>) => {
-    // We need to merge the incoming updates with current step state to build the full new state
-    const mergedStep = { ...step, ...updates };
-    
-    // Specifically look at process_type and configuration
     const newOpId = updates.process_type !== undefined ? updates.process_type : step.process_type;
     const newConfig = updates.configuration !== undefined ? updates.configuration : step.configuration;
-
-    // Generate the corresponding formula
     const newFormula = buildFormula(newOpId, newConfig);
-
-    // Call the parent update with ALL changes
-    onUpdate?.(step.id, {
-      ...updates,
-      operation: newFormula
-    });
+    onUpdate?.(step.id, { ...updates, operation: newFormula });
   };
 
   // Handler for Formula-based updates (Toolbar Input)

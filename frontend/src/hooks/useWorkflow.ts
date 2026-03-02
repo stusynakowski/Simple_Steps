@@ -374,6 +374,20 @@ export default function useWorkflow() {
     setPipelineStatus('idle');
   }, []);
 
+  /** Fetch a pipeline as a Workflow object WITHOUT changing hook state. */
+  const fetchWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<Workflow> => {
+    const pipeline = await loadPipeline(projectId, pipelineId);
+    const steps: Step[] = pipeline.steps.map((s: PipelineFile['steps'][number], i: number) => ({
+      id: s.step_id,
+      sequence_index: i,
+      label: s.label || `Step ${i + 1}`,
+      process_type: s.operation_id,
+      configuration: s.config as Record<string, unknown>,
+      status: 'pending' as StepStatus,
+    }));
+    return { id: pipeline.id, name: pipeline.name, created_at: pipeline.created_at, steps };
+  }, []);
+
   const listSavedProjects = useCallback(() => listProjects(), []);
   const createNewProject  = useCallback((name: string) => createProject(name), []);
   const removeProject     = useCallback((id: string)   => deleteProject(id), []);
@@ -400,6 +414,7 @@ export default function useWorkflow() {
     // persistence
     saveWorkflow,
     loadWorkflow,
+    fetchWorkflow,
     loadWorkflowObject,
     listSavedProjects,
     createNewProject,
