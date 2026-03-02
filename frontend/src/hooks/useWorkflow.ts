@@ -115,18 +115,19 @@ export default function useWorkflow() {
           stepMap
       );
       
-      // Fetch preview
-      const rawData = await fetchDataView(res.output_ref_id);
-      
-      // Transform raw JSON rows into Cell format for the UI
-      const previewCells = rawData.flatMap((row: any, rowIndex: number) => 
-        Object.entries(row).map(([colName, val]) => ({
-            row_id: rowIndex,
-            column_id: colName,
-            value: val,
-            display_value: String(val)
-        }))
-      );
+      // Fetch preview — backend returns Cell[] directly ({row_id, column_id, value, display_value})
+      const rawData: any[] = await fetchDataView(res.output_ref_id);
+
+      // Determine which columns are NEW to this step.
+      // Use prevStep.outputColumns (full accumulated column list), not output_preview (filtered).
+      const inputCols = new Set(prevStep?.outputColumns ?? []);
+      const outputCols: string[] = res.metrics.columns ?? [];
+      const newCols = outputCols.filter((c) => !inputCols.has(c));
+      // Fall back to all output columns for source steps (no previous step)
+      const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
+
+      // rawData is already Cell[] — just filter to this step's own columns
+      const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
 
       setWorkflow((prev) => {
         const next = prev.steps.map((s) => {
@@ -135,6 +136,7 @@ export default function useWorkflow() {
             ...s,
             status: 'completed' as StepStatus,
             outputRefId: res.output_ref_id,
+            outputColumns: outputCols,
             output_preview: previewCells,
           };
         });
@@ -182,16 +184,16 @@ export default function useWorkflow() {
           true // isPreview
       );
       
-      const rawData = await fetchDataView(res.output_ref_id);
-      
-      const previewCells = rawData.flatMap((row: any, rowIndex: number) => 
-        Object.entries(row).map(([colName, val]) => ({
-            row_id: rowIndex,
-            column_id: colName,
-            value: val,
-            display_value: String(val)
-        }))
-      );
+      const rawData: any[] = await fetchDataView(res.output_ref_id);
+
+      // Same column-diff logic as runStep — use outputColumns (full list), not output_preview
+      const inputCols = new Set(prevStep?.outputColumns ?? []);
+      const outputCols: string[] = res.metrics.columns ?? [];
+      const newCols = outputCols.filter((c) => !inputCols.has(c));
+      const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
+
+      // rawData is already Cell[] — just filter to this step's own columns
+      const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
 
       setWorkflow((prev) => {
         const next = prev.steps.map((s) => {
@@ -201,6 +203,7 @@ export default function useWorkflow() {
             // We do NOT mark it as completed status, as it's just a preview/staged state.
             // But we DO update the outputRefId so that subsequent steps can preview off this one.
             outputRefId: res.output_ref_id,
+            outputColumns: outputCols,
             output_preview: previewCells,
           };
         });
@@ -334,11 +337,20 @@ export default function useWorkflow() {
   /**
    * Save the current workflow as a pipeline file inside a project folder.
    * Only the operation definitions and configs are persisted — no runtime data.
+   * The pipeline id is derived from the name so the filename on disk always
+   * matches the id we store in the tab (no UUID/slug mismatch).
    */
   const saveWorkflow = useCallback(async (projectId: string, pipelineName: string): Promise<PipelineFile> => {
     const current = workflowRef.current;
+    // Derive a stable slug from the name so filename === id
+    const pipelineId = pipelineName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'pipeline';
+
     const pipeline: PipelineFile = {
-      id: current.id,
+      id: pipelineId,
       name: pipelineName,
       created_at: current.created_at ?? new Date().toISOString(),
       updated_at: new Date().toISOString(),

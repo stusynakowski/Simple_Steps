@@ -19,6 +19,7 @@ export interface Step {
   status: StepStatus;
   operation?: string;
   outputRefId?: string; // The backend reference ID for the result DataFrame
+  outputColumns?: string[]; // Full list of columns in the output DataFrame (for step diffing)
   output_preview?: Cell[]; 
   // For glide datagrid, we might eventually need specific GridCell types, 
   // but for now we stick to the project spec `Cell` abstraction.

@@ -113,13 +113,18 @@ def rowmap_wrapper(func: Callable) -> Callable:
             applied = input_df[target_col].apply(apply_func)
             
             # Construct Result
-            result_df = input_df.copy()
+            result_df = input_df.copy().reset_index(drop=True)
             
-            # Scalar return (store dicts/lists/strings in one cell)
-            # We explicitly DO NOT expand dictionaries into multiple columns.
-            # This keeps alignment 100% predictable and puts the dict in one cell.
-            new_col_name = f"{func.__name__}_output"
-            result_df[new_col_name] = applied
+            # If every returned value is a dict, expand keys into separate columns so
+            # that the new fields align 1-to-1 with the original rows.
+            # This prevents metadata misalignment when a map function returns a dict.
+            first_val = applied.iloc[0] if len(applied) > 0 else None
+            if isinstance(first_val, dict):
+                expanded = applied.apply(pd.Series).reset_index(drop=True)
+                result_df = pd.concat([result_df, expanded], axis=1)
+            else:
+                new_col_name = f"{func.__name__}_output"
+                result_df[new_col_name] = applied.reset_index(drop=True)
                 
             return result_df
             

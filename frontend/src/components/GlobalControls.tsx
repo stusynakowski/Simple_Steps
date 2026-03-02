@@ -6,11 +6,11 @@ interface GlobalControlsProps {
   onPauseAll: () => void;
   onStopAll: () => void;
   pipelineStatus: 'idle' | 'running' | 'paused';
-  workflowName: string;
+  workflowName?: string;
 }
 
 export default function GlobalControls({
-  onRunAll, onPauseAll, onStopAll, pipelineStatus, workflowName,
+  onRunAll, onPauseAll, onStopAll, pipelineStatus,
 }: GlobalControlsProps) {
   const [computeTarget, setComputeTarget] = useState('Local');
   const [pythonEnv, setPythonEnv] = useState('simple-steps-env');
@@ -20,12 +20,6 @@ export default function GlobalControls({
   return (
     <div className="global-controls">
       <div className="metadata-row">
-        <div className="control-item pipeline-name-item" title="Current pipeline">
-          <span className="pipeline-name-label">{workflowName || 'Untitled Pipeline'}</span>
-        </div>
-
-        <div className="separator"></div>
-
         <div className="control-item" title="Where the pipeline is executed">
           <label>Compute:</label>
           <select value={computeTarget} onChange={(e) => setComputeTarget(e.target.value)} className="control-select">
@@ -64,16 +58,14 @@ export default function GlobalControls({
            </div>
         </div>
 
-        <div className="right-align-group">
-          <div className="status-widget">
-            <span className={`status-dot ${pipelineStatus === 'running' ? 'running' : 'online'}`}></span>
-            <span className="status-text">Backend: {pipelineStatus === 'running' ? 'Running' : 'Online'}</span>
-          </div>
-        </div>
       </div>
 
       <div className="execution-row">
         <div className="control-group main-controls">
+            <div className="status-widget">
+              <span className={`status-dot ${pipelineStatus === 'running' ? 'running' : 'online'}`}></span>
+              <span className="status-text">Backend: {pipelineStatus === 'running' ? 'Running' : 'Online'}</span>
+            </div>
             {pipelineStatus === 'running' ? (
                 <button className="control-btn pause-btn" onClick={onPauseAll} title="Pause Workflow">
                     <span className="icon">⏸</span> Pause

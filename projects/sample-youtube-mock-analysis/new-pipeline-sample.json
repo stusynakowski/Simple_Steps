@@ -1,0 +1,32 @@
+{
+  "id": "new-pipeline-sample",
+  "name": "new-pipeline_sample",
+  "created_at": "2026-03-02T04:47:04.988Z",
+  "updated_at": "2026-03-02T00:04:54.424996",
+  "steps": [
+    {
+      "step_id": "step-02iqkl5",
+      "operation_id": "yt_fetch_videos",
+      "label": "Step 0",
+      "config": {
+        "channel_url": "https://youtube.com/mock_channel",
+        "_orchestrator": "source"
+      }
+    },
+    {
+      "step_id": "step-dxzodwi",
+      "operation_id": "yt_extract_metadata",
+      "label": "Step 1",
+      "config": {
+        "_orchestrator": "map",
+        "url": "Step1"
+      }
+    },
+    {
+      "step_id": "step-xoerp8v",
+      "operation_id": "noop",
+      "label": "Step 2",
+      "config": {}
+    }
+  ]
+}

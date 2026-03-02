@@ -8,13 +8,16 @@ import './Sidebar.css';
 interface SidebarProps {
   isVisible: boolean;
   currentView: ActivityView;
+  /** Increment to force the explorer to re-fetch projects/pipelines after a save */
+  refreshTrigger?: number;
   // Project / pipeline persistence
   onListProjects?: () => Promise<ProjectInfo[]>;
   onCreateProject?: (name: string) => Promise<ProjectInfo>;
   onDeleteProject?: (projectId: string) => Promise<void>;
   onListPipelines?: (projectId: string) => Promise<PipelineFile[]>;
   onLoadPipeline?: (projectId: string, pipelineId: string) => Promise<void>;
-  onSavePipeline?: (projectId: string, pipelineName: string) => Promise<PipelineFile>;
+  /** Called when user clicks 💾 on a project folder — opens SaveModal in MainLayout */
+  onRequestSave?: (projectId: string, projectDisplayName: string) => void;
   onDeletePipeline?: (projectId: string, pipelineId: string) => Promise<void>;
   onLoadWorkflowObject?: (wf: Workflow) => void;
 }
@@ -62,15 +65,16 @@ interface ProjectTreeProps {
   onDeleteProject?: (id: string) => Promise<void>;
   onListPipelines?: (projectId: string) => Promise<PipelineFile[]>;
   onLoadPipeline?: (projectId: string, pipelineId: string) => Promise<void>;
-  onSavePipeline?: (projectId: string, name: string) => Promise<PipelineFile>;
+  onRequestSave?: (projectId: string, projectDisplayName: string) => void;
   onDeletePipeline?: (projectId: string, pipelineId: string) => Promise<void>;
   onLoadWorkflowObject?: (wf: Workflow) => void;
+  refreshTrigger?: number;
 }
 
 const ProjectTree: React.FC<ProjectTreeProps> = ({
   onListProjects, onCreateProject, onDeleteProject,
-  onListPipelines, onLoadPipeline, onSavePipeline, onDeletePipeline,
-  onLoadWorkflowObject,
+  onListPipelines, onLoadPipeline, onRequestSave, onDeletePipeline,
+  onLoadWorkflowObject, refreshTrigger,
 }) => {
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +105,16 @@ const ProjectTree: React.FC<ProjectTreeProps> = ({
   }, [onListProjects]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Re-fetch when parent signals a save has happened
+  useEffect(() => {
+    if (refreshTrigger === undefined || refreshTrigger === 0) return;
+    refresh().then(() => {
+      // Also refresh any currently-open project folders
+      openProjects.forEach(projectId => loadPipelinesForProject(projectId));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTrigger]);
 
   const loadPipelinesForProject = useCallback(async (projectId: string) => {
     if (!onListPipelines) return;
@@ -142,12 +156,8 @@ const ProjectTree: React.FC<ProjectTreeProps> = ({
     await refresh();
   };
 
-  const handleSavePipeline = async (projectId: string) => {
-    if (!onSavePipeline) return;
-    const name = prompt('Save pipeline as:', 'my-pipeline');
-    if (!name?.trim()) return;
-    await onSavePipeline(projectId, name.trim());
-    await loadPipelinesForProject(projectId);
+  const handleSavePipeline = (projectId: string, projectDisplayName: string) => {
+    onRequestSave?.(projectId, projectDisplayName);
   };
 
   const handleLoadPipeline = async (projectId: string, pipelineId: string) => {
@@ -213,7 +223,7 @@ const ProjectTree: React.FC<ProjectTreeProps> = ({
                     <span className="file-label">{proj.name}</span>
                     <div className="section-actions">
                       <button className="section-action-btn" title="Save current pipeline here"
-                        onClick={e => { e.stopPropagation(); handleSavePipeline(proj.id); }}>💾</button>
+                        onClick={e => { e.stopPropagation(); handleSavePipeline(proj.id, proj.name); }}>💾</button>
                       <button
                         className={`file-delete-btn ${confirmKey === projConfirmKey ? 'confirm' : ''}`}
                         title={confirmKey === projConfirmKey ? 'Click again to confirm' : 'Delete project'}

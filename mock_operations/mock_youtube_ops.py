@@ -49,15 +49,22 @@ def fetch_channel_videos(channel_url: str) -> pd.DataFrame:
 @simple_step(
     name="Extract Video Metadata",
     category="YouTube",
-    operation_type="map",
+    operation_type="dataframe",
     id="extract_metadata",
 )
 def extract_metadata(df: pd.DataFrame, url_column: str = "video_url") -> pd.DataFrame:
-    """Fetch title, views and author for each video URL (mock)."""
+    """Fetch title, views and author for each video URL (mock).
+
+    Operates on the full DataFrame so that the new metadata columns
+    (title, views, author) are correctly aligned row-for-row with the
+    original video_url / video_id columns.
+    """
     if df is None or df.empty:
         raise ValueError("No input data")
     if url_column not in df.columns:
-        raise ValueError(f"Column '{url_column}' not found. Available: {list(df.columns)}")
+        raise ValueError(
+            f"Column '{url_column}' not found. Available: {list(df.columns)}"
+        )
 
     def _mock_meta(url: str) -> dict:
         vid_id = url.split("/")[-1]
@@ -67,8 +74,10 @@ def extract_metadata(df: pd.DataFrame, url_column: str = "video_url") -> pd.Data
             "author": "Mock Channel",
         }
 
+    # Apply row-by-row and expand the returned dict into separate columns.
+    # pd.Series expansion ensures title/views/author align 1-to-1 with each URL row.
     meta_df = df[url_column].apply(_mock_meta).apply(pd.Series)
-    return pd.concat([df.reset_index(drop=True), meta_df], axis=1)
+    return pd.concat([df.reset_index(drop=True), meta_df.reset_index(drop=True)], axis=1)
 
 
 # ---------------------------------------------------------------------------
@@ -78,11 +87,16 @@ def extract_metadata(df: pd.DataFrame, url_column: str = "video_url") -> pd.Data
 @simple_step(
     name="Transcribe Videos",
     category="YouTube",
-    operation_type="map",
+    operation_type="dataframe",
     id="transcribe_video",
 )
 def transcribe_video(df: pd.DataFrame, url_column: str = "video_url") -> pd.DataFrame:
-    """Generate a mock transcript for each video URL."""
+    """Generate a mock transcript for each video URL.
+
+    Marked as 'dataframe' so the engine passes the full DataFrame directly
+    rather than iterating row-by-row, keeping the 'transcript' column
+    correctly aligned with all other columns.
+    """
     if df is None or df.empty:
         raise ValueError("No input data")
 
@@ -137,13 +151,18 @@ def segment_conversations(
 @simple_step(
     name="Analyze Sentiment",
     category="YouTube",
-    operation_type="map",
+    operation_type="dataframe",
     id="analyze_sentiment",
 )
 def analyze_sentiment(
     df: pd.DataFrame, text_column: str = "segment_text"
 ) -> pd.DataFrame:
-    """Score sentiment for each conversation segment (mock 0–1 score)."""
+    """Score sentiment for each conversation segment (mock 0–1 score).
+
+    Marked as 'dataframe' so the engine passes the full DataFrame directly,
+    keeping sentiment_score / sentiment_label columns aligned row-for-row
+    with source_title and segment_text.
+    """
     if df is None or df.empty:
         raise ValueError("No input data")
     if text_column not in df.columns:

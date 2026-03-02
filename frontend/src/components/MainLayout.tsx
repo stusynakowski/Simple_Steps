@@ -7,6 +7,9 @@ import { getStepColor } from '../styles/theme';
 import Sidebar from './Sidebar';
 import ChatSidebar from './ChatSidebar';
 import ActivityBar from './ActivityBar';
+import MenuBar from './MenuBar';
+import SaveModal from './SaveModal';
+import RenameModal from './RenameModal';
 import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
@@ -15,7 +18,8 @@ import './MainLayout.css';
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface OpenTab extends WorkflowTab {
-  projectId?: string;   // undefined = unsaved / demo
+  projectId?: string;          // undefined = unsaved / demo
+  projectDisplayName?: string; // human-readable project name for breadcrumb
   pipelineId?: string;
   workflow: Workflow;
 }
@@ -70,27 +74,110 @@ export default function MainLayout() {
   ]);
 
   const activeTab = openTabs.find(t => t.isActive) ?? openTabs[0];
-  const projectName = activeTab?.projectId
-    ? (activeTab.title.replace(/\.json$/, ''))
-    : '';
+  const projectName = activeTab?.projectDisplayName ?? activeTab?.projectId ?? '';
+
+  // Suppress isModified when we're switching tabs / loading (not user edits)
+  const suppressModified = useRef(false);
+
+  // ── Save / Rename modal state ─────────────────────────────────────────
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [saveAsMode, setSaveAsMode] = useState(false); // true = always show picker
+  const [renameModalOpen, setRenameModalOpen] = useState(false);
+
+  /** Save: if the tab already has a project+pipeline, overwrite silently; otherwise open modal. */
+  const handleSave = useCallback(async () => {
+    if (activeTab?.projectId && activeTab?.pipelineId) {
+      try {
+        // Re-save using the existing pipeline name (id == slug == name-derived)
+        suppressModified.current = true;
+        await saveWorkflow(activeTab.projectId, activeTab.workflow.name || activeTab.pipelineId);
+        setOpenTabs(prev => prev.map(t => t.isActive ? { ...t, isModified: false } : t));
+      } catch (e) {
+        console.error('Save failed', e);
+        setSaveAsMode(false);
+        setSaveModalOpen(true);
+      } finally {
+        suppressModified.current = false;
+      }
+    } else {
+      setSaveAsMode(false);
+      setSaveModalOpen(true);
+    }
+  }, [activeTab, saveWorkflow]);
+
+  const handleSaveAs = useCallback(() => {
+    setSaveAsMode(true);
+    setSaveModalOpen(true);
+  }, []);
+
+  const handleModalSave = useCallback(async (projectId: string, pipelineName: string, projectDisplayName?: string) => {
+    suppressModified.current = true;
+    try {
+      const saved = await saveWorkflow(projectId, pipelineName);
+      // saved.id is now the slug derived from pipelineName, matching the filename on disk
+      setOpenTabs(prev => prev.map(t => {
+        if (!t.isActive) return t;
+        return {
+          ...t,
+          id: `${projectId}::${saved.id}`,
+          title: `${pipelineName}.json`,
+          projectId,
+          projectDisplayName: projectDisplayName ?? projectId,
+          pipelineId: saved.id,
+          isModified: false,
+          workflow: { ...t.workflow, name: pipelineName },
+        };
+      }));
+      // Tell sidebar to refresh so the new file appears
+      setSidebarRefreshTrigger(n => n + 1);
+    } finally {
+      suppressModified.current = false;
+    }
+  }, [saveWorkflow]);
+
+  const handleRename = useCallback((newName: string) => {
+    // Update workflow name in state + mark tab title
+    setOpenTabs(prev => prev.map(t => {
+      if (!t.isActive) return t;
+      return { ...t, title: `${newName}.json`, isModified: true };
+    }));
+    // Also update the in-memory workflow name via loadWorkflowObject with new name
+    loadWorkflowObject({ ...workflow, name: newName });
+  }, [workflow, loadWorkflowObject]);
+
+  // ── Cmd/Ctrl+S shortcut ───────────────────────────────────────────────
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (e.shiftKey) handleSaveAs();
+        else handleSave();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleSave, handleSaveAs]);
 
   /** Open or focus a pipeline tab, loading the workflow into the hook. */
   const openPipelineTab = useCallback(async (projectId: string, pipelineId: string) => {
     const tabKey = `${projectId}::${pipelineId}`;
     const existing = openTabs.find(t => t.id === tabKey);
     if (existing) {
-      // Just focus it
       setOpenTabs(prev => prev.map(t => ({ ...t, isActive: t.id === tabKey })));
+      suppressModified.current = true;
       loadWorkflowObject(existing.workflow);
+      setTimeout(() => { suppressModified.current = false; }, 0);
       return;
     }
     // Fetch and open new tab
     const wf = await fetchWorkflow(projectId, pipelineId);
+    // Get project display name from existing projects list
     const newTab: OpenTab = {
       id: tabKey,
       title: `${wf.name}.json`,
       isActive: true,
       projectId,
+      projectDisplayName: projectId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
       pipelineId,
       workflow: wf,
     };
@@ -98,7 +185,9 @@ export default function MainLayout() {
       ...prev.map(t => ({ ...t, isActive: false })),
       newTab,
     ]);
+    suppressModified.current = true;
     loadWorkflowObject(wf);
+    setTimeout(() => { suppressModified.current = false; }, 0);
   }, [openTabs, fetchWorkflow, loadWorkflowObject]);
 
   /** Open a demo / in-memory workflow as a tab. */
@@ -127,7 +216,9 @@ export default function MainLayout() {
     const tab = openTabs.find(t => t.id === id);
     if (!tab) return;
     setOpenTabs(prev => prev.map(t => ({ ...t, isActive: t.id === id })));
+    suppressModified.current = true;
     loadWorkflowObject(tab.workflow);
+    setTimeout(() => { suppressModified.current = false; }, 0);
   }, [openTabs, loadWorkflowObject]);
 
   const handleTabClose = useCallback((id: string) => {
@@ -162,8 +253,9 @@ export default function MainLayout() {
   }, [loadWorkflowObject]);
 
   // Keep the active tab's workflow snapshot in sync when the hook's workflow changes
-  // (e.g. after a step edit or run)
+  // (e.g. after a step edit or run) — but don't mark dirty during tab switches/saves
   useEffect(() => {
+    if (suppressModified.current) return;
     setOpenTabs(prev => prev.map(t =>
       t.isActive ? { ...t, workflow, isModified: true } : t
     ));
@@ -253,6 +345,20 @@ export default function MainLayout() {
   const transitionStyle = isDragging ? 'none'
     : 'width 0.3s cubic-bezier(0.4,0,0.2,1), height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s cubic-bezier(0.4,0,0.2,1)';
 
+  // ── Sidebar refresh trigger ────────────────────────────────────────────
+  const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
+
+  // Pre-selected project when opening SaveModal from sidebar's 💾 button
+  const [preselectProjectId, setPreselectProjectId] = useState<string | undefined>();
+  const [preselectProjectName, setPreselectProjectName] = useState<string | undefined>();
+
+  const handleRequestSaveFromSidebar = useCallback((projectId: string, projectDisplayName: string) => {
+    setPreselectProjectId(projectId);
+    setPreselectProjectName(projectDisplayName);
+    setSaveAsMode(false);
+    setSaveModalOpen(true);
+  }, []);
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -268,12 +374,13 @@ export default function MainLayout() {
         <Sidebar
           isVisible={true}
           currentView={activeActivityView}
+          refreshTrigger={sidebarRefreshTrigger}
           onListProjects={listSavedProjects}
           onCreateProject={createNewProject}
           onDeleteProject={removeProject}
           onListPipelines={listProjectPipelines}
           onLoadPipeline={openPipelineTab}
-          onSavePipeline={saveWorkflow}
+          onRequestSave={handleRequestSaveFromSidebar}
           onDeletePipeline={removePipeline}
           onLoadWorkflowObject={openWorkflowObjectTab}
         />
@@ -293,24 +400,16 @@ export default function MainLayout() {
         {/* ── Header (resizable) ─────────────────────────────────────────── */}
         <header className="header-container" style={{ height: headerHeight, transition: transitionStyle }}>
 
-          {/* Row 1: project name + toolbar */}
-          <div className="topbar-row">
-            {projectName && (
-              <span className="topbar-project-name" title="Active project">
-                {projectName}
-              </span>
-            )}
-            {projectName && <span className="topbar-sep">/</span>}
-            <span className="topbar-pipeline-name">{workflow.name || 'Untitled'}</span>
-            <div className="topbar-spacer" />
-            <div className="topbar-actions">
-              <button className="topbar-btn" title="Search" onClick={() => { setActiveActivityView('search'); setSidebarWidth(w => w > 0 ? w : 250); }}>
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                  <path fillRule="evenodd" d="M10.68 11.74a6 6 0 1 1 1.06-1.06l3.04 3.04a.75.75 0 1 1-1.06 1.06l-3.04-3.04zm-4.18.76a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9z"/>
-                </svg>
-              </button>
-            </div>
-          </div>
+          {/* Row 1: menu bar (File menu + breadcrumb) */}
+          <MenuBar
+            workflowName={workflow.name || 'Untitled'}
+            projectName={projectName || undefined}
+            isModified={activeTab?.isModified}
+            onNew={handleNewTab}
+            onSave={handleSave}
+            onSaveAs={handleSaveAs}
+            onRename={() => setRenameModalOpen(true)}
+          />
 
           {/* Row 2: file tabs */}
           <div className="tabs-row">
@@ -402,6 +501,31 @@ export default function MainLayout() {
       }}>
         <ChatSidebar isVisible={true} onClose={toggleChat} />
       </div>
+
+      {/* ── Save modal ──────────────────────────────────────────────────── */}
+      <SaveModal
+        isOpen={saveModalOpen}
+        title={saveAsMode ? 'Save Pipeline As…' : 'Save Pipeline'}
+        defaultName={workflow.name || 'my-pipeline'}
+        preselectProjectId={preselectProjectId}
+        onClose={() => { setSaveModalOpen(false); setPreselectProjectId(undefined); setPreselectProjectName(undefined); }}
+        onSave={async (projectId, pipelineName, projectDisplayName) => {
+          await handleModalSave(projectId, pipelineName, projectDisplayName ?? preselectProjectName);
+          setSaveModalOpen(false);
+          setPreselectProjectId(undefined);
+          setPreselectProjectName(undefined);
+        }}
+        onCreateProject={createNewProject}
+        onListProjects={listSavedProjects}
+      />
+
+      {/* ── Rename modal ─────────────────────────────────────────────────── */}
+      <RenameModal
+        isOpen={renameModalOpen}
+        currentName={workflow.name || 'Untitled'}
+        onClose={() => setRenameModalOpen(false)}
+        onRename={handleRename}
+      />
     </div>
   );
 }

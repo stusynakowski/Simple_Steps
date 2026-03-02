@@ -414,6 +414,11 @@
   padding: 10px;
 }
 
+/* No padding around the data grid so it looks like one seamless spreadsheet */
+.expander-inner.data-grid-expander {
+  padding: 0;
+}
+
 .json-preview {
   font-family: monospace;
   white-space: pre-wrap;
