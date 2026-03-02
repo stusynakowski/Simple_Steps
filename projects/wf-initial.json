@@ -1,0 +1,40 @@
+{
+  "metadata": {
+    "id": "wf-initial",
+    "name": "sample_test_pipeline",
+    "description": "",
+    "updated_at": "2026-03-01T18:54:06.993965"
+  },
+  "workflow": {
+    "id": "wf-initial",
+    "name": "sample_test_pipeline",
+    "steps": [
+      {
+        "step_id": "step-000",
+        "operation_id": "yt_fetch_videos",
+        "config": {
+          "channel_url": "https://youtube.com/mock_channel",
+          "_orchestrator": "source"
+        }
+      },
+      {
+        "step_id": "step-hrmh0bu",
+        "operation_id": "yt_extract_metadata",
+        "config": {
+          "_orchestrator": "map",
+          "url": "Step1"
+        }
+      },
+      {
+        "step_id": "step-9esxiee",
+        "operation_id": "noop",
+        "config": {}
+      },
+      {
+        "step_id": "step-yyi92q1",
+        "operation_id": "noop",
+        "config": {}
+      }
+    ]
+  }
+}

@@ -21,29 +21,43 @@ class OperationDefinition(BaseModel):
 class StepConfig(BaseModel):
     step_id: str
     operation_id: str
+    label: str = ""
     config: Dict[str, Any] = Field(default_factory=dict)
 
-class WorkflowDefinition(BaseModel):
+class PipelineFile(BaseModel):
+    """
+    A single pipeline definition stored as <project_dir>/<name>.json.
+    Contains only the workflow blueprint — no runtime data.
+    """
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    created_at: str = ""
+    updated_at: str = ""
     steps: List[StepConfig]
 
-# --- 3. Reference Passing (Run Single Step) ---
+# --- 3. Project (folder) ---
+class ProjectInfo(BaseModel):
+    """Lightweight descriptor returned by GET /api/projects."""
+    id: str          # folder name (safe slug)
+    name: str        # display name  (= folder name for now)
+    pipelines: List[str]  # list of pipeline filenames inside the folder
+
+# --- 4. Reference Passing (Run Single Step) ---
 class StepRunRequest(BaseModel):
     step_id: str
     operation_id: str
     config: Dict[str, Any]
     input_ref_id: Optional[str] = None
-    step_map: Optional[Dict[str, str]] = None # Maps Step Label -> Output Ref ID
+    step_map: Optional[Dict[str, str]] = None
     is_preview: bool = False
 
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']
     output_ref_id: str
-    metrics: Dict[str, Any]  # Changed to Any to allow lists
+    metrics: Dict[str, Any]
     error: Optional[str] = None
 
-# --- 4. Global Control Responses ---
+# --- 5. Global Control Responses ---
 class PipelineRunResponse(BaseModel):
     run_id: str
 
@@ -53,7 +67,26 @@ class PipelineStatusResponse(BaseModel):
     current_step_index: int
     step_statuses: Dict[str, Literal['pending', 'running', 'completed', 'failed']]
 
-# --- 5. Data View ---
+# --- 6. Data View ---
 class DataViewRequest(BaseModel):
     offset: int = 0
     limit: int = 50
+
+# ── Legacy shims (kept so existing file_manager.py compiles) ──────────────
+class ProjectMetadata(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = ""
+    updated_at: str
+
+class WorkflowDefinition(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    steps: List[StepConfig]
+
+class Project(BaseModel):
+    metadata: ProjectMetadata
+    workflow: WorkflowDefinition
+
+class ProjectListResponse(BaseModel):
+    projects: List[ProjectMetadata]

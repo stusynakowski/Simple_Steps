@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Workflow, Step, StepStatus } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
-import { runStep as runStepApi, fetchDataView, getOperations } from '../services/api';
-import type { OperationDefinition } from '../services/api';
+import { runStep as runStepApi, fetchDataView, getOperations,
+  listProjects, createProject, deleteProject,
+  listPipelines, loadPipeline, savePipeline, deletePipeline,
+} from '../services/api';
+import type { OperationDefinition, PipelineFile } from '../services/api';
 
 function genId(prefix = 'step') {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
-
 export default function useWorkflow() {
   const [workflow, setWorkflow] = useState<Workflow>(initialWorkflow);
   const [availableOperations, setAvailableOperations] = useState<OperationDefinition[]>([]);
@@ -307,6 +309,77 @@ export default function useWorkflow() {
     });
   }
 
+  // --- Persistence ---
+
+  /**
+   * Replaces the current workflow with any Workflow object (e.g. a demo pipeline).
+   * Steps are reset to 'pending' — no runtime data is carried over.
+   */
+  const loadWorkflowObject = useCallback((wf: Workflow) => {
+    const reset: Workflow = {
+      ...wf,
+      steps: wf.steps.map((s) => ({
+        ...s,
+        status: 'pending' as StepStatus,
+        outputRefId: undefined,
+        output_preview: undefined,
+      })),
+    };
+    setWorkflow(reset);
+    setExpandedStepIds(new Set(reset.steps.length > 0 ? [reset.steps[0].id] : []));
+    setMaximizedStepId(null);
+    setPipelineStatus('idle');
+  }, []);
+
+  /**
+   * Save the current workflow as a pipeline file inside a project folder.
+   * Only the operation definitions and configs are persisted — no runtime data.
+   */
+  const saveWorkflow = useCallback(async (projectId: string, pipelineName: string): Promise<PipelineFile> => {
+    const current = workflowRef.current;
+    const pipeline: PipelineFile = {
+      id: current.id,
+      name: pipelineName,
+      created_at: current.created_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      steps: current.steps.map((s) => ({
+        step_id: s.id,
+        operation_id: s.process_type,
+        label: s.label,
+        config: s.configuration,
+      })),
+    };
+    return savePipeline(projectId, pipeline);
+  }, []);
+
+  /** Load a pipeline from a project and replace the current workflow. */
+  const loadWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<void> => {
+    const pipeline = await loadPipeline(projectId, pipelineId);
+    const restoredSteps: Step[] = pipeline.steps.map((s: PipelineFile['steps'][number], i: number) => ({
+      id: s.step_id,
+      sequence_index: i,
+      label: s.label || `Step ${i + 1}`,
+      process_type: s.operation_id,
+      configuration: s.config as Record<string, unknown>,
+      status: 'pending' as StepStatus,
+    }));
+    setWorkflow({
+      id: pipeline.id,
+      name: pipeline.name,
+      created_at: pipeline.created_at,
+      steps: restoredSteps,
+    });
+    setExpandedStepIds(new Set(restoredSteps.length > 0 ? [restoredSteps[0].id] : []));
+    setMaximizedStepId(null);
+    setPipelineStatus('idle');
+  }, []);
+
+  const listSavedProjects = useCallback(() => listProjects(), []);
+  const createNewProject  = useCallback((name: string) => createProject(name), []);
+  const removeProject     = useCallback((id: string)   => deleteProject(id), []);
+  const listProjectPipelines = useCallback((projectId: string) => listPipelines(projectId), []);
+  const removePipeline    = useCallback((projectId: string, pipelineId: string) => deletePipeline(projectId, pipelineId), []);
+
   return { 
     workflow, 
     availableOperations,
@@ -323,6 +396,15 @@ export default function useWorkflow() {
     runPipeline,
     pausePipeline,
     stopPipeline,
-    deleteStep 
+    deleteStep,
+    // persistence
+    saveWorkflow,
+    loadWorkflow,
+    loadWorkflowObject,
+    listSavedProjects,
+    createNewProject,
+    removeProject,
+    listProjectPipelines,
+    removePipeline,
   };
 }

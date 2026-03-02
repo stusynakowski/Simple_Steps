@@ -45,7 +45,15 @@ export default function MainLayout() {
     pausePipeline,
     stopPipeline,
     previewStep,
-    deleteStep 
+    deleteStep,
+    saveWorkflow,
+    loadWorkflow,
+    loadWorkflowObject,
+    listSavedProjects,
+    createNewProject,
+    removeProject,
+    listProjectPipelines,
+    removePipeline,
   } = useWorkflow();
 
   const startResizingHeader = useCallback(() => {
@@ -225,7 +233,18 @@ export default function MainLayout() {
             overflow: 'hidden',
             borderRight: sidebarWidth > 0 ? '1px solid #333' : 'none' // Add border here if needed, or rely on sidebar's internal styles
         }}>
-            <Sidebar isVisible={true} currentView={activeActivityView} />
+            <Sidebar
+              isVisible={true}
+              currentView={activeActivityView}
+              onListProjects={listSavedProjects}
+              onCreateProject={createNewProject}
+              onDeleteProject={removeProject}
+              onListPipelines={listProjectPipelines}
+              onLoadPipeline={loadWorkflow}
+              onSavePipeline={saveWorkflow}
+              onDeletePipeline={removePipeline}
+              onLoadWorkflowObject={loadWorkflowObject}
+            />
         </div>
         
         <div className="sidebar-resize-handle" onMouseDown={startResizingSidebar} onDoubleClick={toggleSidebar} title="Double-click to verify size">
@@ -266,6 +285,7 @@ export default function MainLayout() {
                     onPauseAll={handlePauseAll} 
                     onStopAll={handleStopAll}
                     pipelineStatus={pipelineStatus}
+                    workflowName={workflow.name}
                 />
             </div>
         </div>

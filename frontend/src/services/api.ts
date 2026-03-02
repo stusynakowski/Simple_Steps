@@ -100,3 +100,85 @@ export async function fetchDataView(
     return response.json();
 }
 
+// --- Project / Pipeline Persistence ---
+
+/** A project is a folder that contains pipeline files. */
+export interface ProjectInfo {
+    id: string;       // folder slug
+    name: string;     // display name
+    pipelines: string[];  // pipeline id slugs present in the folder
+}
+
+/** A single step inside a pipeline file. */
+export interface StepConfig {
+    step_id: string;
+    operation_id: string;
+    label: string;
+    config: Record<string, unknown>;
+}
+
+/** The pipeline definition written to disk — no runtime data. */
+export interface PipelineFile {
+    id: string;
+    name: string;
+    created_at: string;
+    updated_at: string;
+    steps: StepConfig[];
+}
+
+// ── Projects (folders) ────────────────────────────────────────────────────
+
+export async function listProjects(): Promise<ProjectInfo[]> {
+    const r = await fetch(`${API_BASE}/projects`);
+    if (!r.ok) throw new Error('Failed to list projects');
+    return r.json();
+}
+
+export async function createProject(name: string): Promise<ProjectInfo> {
+    const r = await fetch(`${API_BASE}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+    });
+    if (!r.ok) throw new Error('Failed to create project');
+    return r.json();
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+    const r = await fetch(`${API_BASE}/projects/${projectId}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed to delete project');
+}
+
+// ── Pipelines (files inside a project) ───────────────────────────────────
+
+export async function listPipelines(projectId: string): Promise<PipelineFile[]> {
+    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines`);
+    if (!r.ok) throw new Error('Failed to list pipelines');
+    return r.json();
+}
+
+export async function loadPipeline(projectId: string, pipelineId: string): Promise<PipelineFile> {
+    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines/${pipelineId}`);
+    if (!r.ok) throw new Error('Pipeline not found');
+    return r.json();
+}
+
+export async function savePipeline(projectId: string, pipeline: PipelineFile): Promise<PipelineFile> {
+    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pipeline),
+    });
+    if (!r.ok) throw new Error('Failed to save pipeline');
+    return r.json();
+}
+
+export async function deletePipeline(projectId: string, pipelineId: string): Promise<void> {
+    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines/${pipelineId}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed to delete pipeline');
+}
+
+// Legacy re-exports so old callers don't immediately break
+export type ProjectMetadata = ProjectInfo;
+export const listProjects_legacy = listProjects;
+export const deleteProject_legacy = deleteProject;

@@ -5,13 +5,19 @@ import pandas as pd
 import numpy as np
 
 from .models import (
-    OperationDefinition, 
-    StepRunRequest, 
+    OperationDefinition,
+    StepRunRequest,
     StepRunResponse,
-    DataViewRequest
+    DataViewRequest,
+    ProjectInfo,
+    PipelineFile,
 )
 from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
+from .file_manager import (
+    list_projects, create_project, delete_project,
+    list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
+)
 import sys
 import os
 import importlib.util
@@ -24,7 +30,10 @@ PLUGIN_PATHS = [
     os.path.join(os.path.dirname(__file__), "../llm_operations"),
     os.path.join(os.path.dirname(__file__), "../webscraping_operations"),
     
-    # 2. Add your custom absolute paths here:
+    # 2. Mock operations (for development / demo)
+    os.path.join(os.path.dirname(__file__), "../../mock_operations"),
+    
+    # 3. Add your custom absolute paths here:
     # "/Users/myname/projets/my_custom_ops"
 ]
 
@@ -91,6 +100,56 @@ async def list_operations():
     Run on app startup or when developer adds new functions.
     """
     return OPERATIONS
+
+# --- 1.5 Project / Pipeline Management ---
+
+# Projects (folders)
+@app.get("/api/projects", response_model=List[ProjectInfo])
+async def get_projects():
+    """List all project folders with their pipeline filenames."""
+    return list_projects()
+
+@app.post("/api/projects", response_model=ProjectInfo)
+async def create_new_project(body: dict = Body(...)):
+    """Create a new project folder."""
+    name = body.get("name", "").strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="name is required")
+    return create_project(name)
+
+@app.delete("/api/projects/{project_id}")
+async def remove_project(project_id: str):
+    """Delete an entire project folder and all its pipelines."""
+    if not delete_project(project_id):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"status": "deleted"}
+
+# Pipelines (files inside a project folder)
+@app.get("/api/projects/{project_id}/pipelines", response_model=List[PipelineFile])
+async def get_pipelines(project_id: str):
+    """List all pipeline definitions in a project."""
+    return list_pipelines(project_id)
+
+@app.get("/api/projects/{project_id}/pipelines/{pipeline_id}", response_model=PipelineFile)
+async def get_pipeline(project_id: str, pipeline_id: str):
+    """Load a single pipeline definition."""
+    pipeline = load_pipeline(project_id, pipeline_id)
+    if not pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    return pipeline
+
+@app.post("/api/projects/{project_id}/pipelines", response_model=PipelineFile)
+async def upsert_pipeline(project_id: str, pipeline: PipelineFile):
+    """Create or overwrite a pipeline file inside a project."""
+    return save_pipeline(project_id, pipeline)
+
+@app.delete("/api/projects/{project_id}/pipelines/{pipeline_id}")
+async def remove_pipeline(project_id: str, pipeline_id: str):
+    """Delete a single pipeline file."""
+    if not delete_pipeline(project_id, pipeline_id):
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    return {"status": "deleted"}
+
 
 # --- 2. Step Execution (Command) ---
 @app.post("/api/run", response_model=StepRunResponse)

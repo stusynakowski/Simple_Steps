@@ -6,9 +6,12 @@ interface GlobalControlsProps {
   onPauseAll: () => void;
   onStopAll: () => void;
   pipelineStatus: 'idle' | 'running' | 'paused';
+  workflowName: string;
 }
 
-export default function GlobalControls({ onRunAll, onPauseAll, onStopAll, pipelineStatus }: GlobalControlsProps) {
+export default function GlobalControls({
+  onRunAll, onPauseAll, onStopAll, pipelineStatus, workflowName,
+}: GlobalControlsProps) {
   const [computeTarget, setComputeTarget] = useState('Local');
   const [pythonEnv, setPythonEnv] = useState('simple-steps-env');
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -17,6 +20,12 @@ export default function GlobalControls({ onRunAll, onPauseAll, onStopAll, pipeli
   return (
     <div className="global-controls">
       <div className="metadata-row">
+        <div className="control-item pipeline-name-item" title="Current pipeline">
+          <span className="pipeline-name-label">{workflowName || 'Untitled Pipeline'}</span>
+        </div>
+
+        <div className="separator"></div>
+
         <div className="control-item" title="Where the pipeline is executed">
           <label>Compute:</label>
           <select value={computeTarget} onChange={(e) => setComputeTarget(e.target.value)} className="control-select">
@@ -45,8 +54,8 @@ export default function GlobalControls({ onRunAll, onPauseAll, onStopAll, pipeli
               {resources.map(r => (
                   <span key={r} className="resource-tag">{r}</span>
               ))}
-              <button 
-                className="resource-add" 
+              <button
+                className="resource-add"
                 onClick={() => {
                     const newRes = prompt("Add resource (e.g. 'AWS S3')");
                     if (newRes) setResources([...resources, newRes]);
@@ -70,18 +79,17 @@ export default function GlobalControls({ onRunAll, onPauseAll, onStopAll, pipeli
                     <span className="icon">⏸</span> Pause
                 </button>
             ) : (
-                <button 
-                  className={`control-btn run-btn ${pipelineStatus === 'paused' ? 'resume-btn' : ''}`} 
-                  onClick={onRunAll} 
+                <button
+                  className={`control-btn run-btn ${pipelineStatus === 'paused' ? 'resume-btn' : ''}`}
+                  onClick={onRunAll}
                   title={pipelineStatus === 'paused' ? "Resume Workflow" : "Run Workflow"}
                 >
                     <span className="icon">▶</span> {pipelineStatus === 'paused' ? "Resume" : "Run Pipeline"}
                 </button>
             )}
-            
-            <button 
-              className="control-btn stop-btn" 
-              onClick={onStopAll} 
+            <button
+              className="control-btn stop-btn"
+              onClick={onStopAll}
               title="Stop Workflow"
               disabled={pipelineStatus === 'idle'}
             >
