@@ -1,27 +1,62 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { Cell } from '../types/models';
 import './OperationColumn.css'; // Ensure grid styles are available
 
 interface DataOutputGridProps {
   cells?: Cell[];
   onCellClick?: (cell: Cell) => void;
+  /** When true, the grid renders in "wiring source" mode — columns and cells
+   *  are highlighted and clickable as formula arguments. */
+  wiringMode?: boolean;
+  /** Step id used to build a reference token, e.g. "step-abc123" */
+  sourceStepId?: string;
+  /** Called when the user picks a column header as an argument. Token: `stepId.colName` */
+  onWireColumn?: (token: string) => void;
+  /** Called when the user picks a specific cell. Token: `stepId[row=R, col=C]` */
+  onWireCell?: (token: string) => void;
 }
 
-export default function DataOutputGrid({ cells = [], onCellClick }: DataOutputGridProps) {
+// Wiring banner styles
+const WIRING_BANNER: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  padding: '4px 8px',
+  background: 'linear-gradient(90deg, #fff3cd 0%, #fff8e1 100%)',
+  borderBottom: '1px solid #ffc107',
+  fontSize: '0.72rem',
+  color: '#856404',
+  fontWeight: 600,
+  letterSpacing: '0.02em',
+};
+
+export default function DataOutputGrid({
+  cells = [],
+  onCellClick,
+  wiringMode = false,
+  sourceStepId = '',
+  onWireColumn,
+  onWireCell,
+}: DataOutputGridProps) {
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  const [hoveredCell, setHoveredCell] = useState<string | null>(null);
+
   // Memoize grid structure calculation
   const { cols, rows, gridData, structureType } = useMemo(() => {
     const safeCells = cells ?? [];
-    
+
     if (safeCells.length === 0) {
       return { cols: [], rows: [], gridData: {}, structureType: 'empty' };
     }
 
     const uniqueCols = Array.from(new Set(safeCells.map((c) => c.column_id)));
-    const uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort((a, b) => a - b);
-    
+    const uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort(
+      (a, b) => a - b
+    );
+
     // Create a lookup map for faster access: "rowId:colId" -> Cell
     const dataMap: Record<string, Cell> = {};
-    safeCells.forEach(c => {
+    safeCells.forEach((c) => {
       dataMap[`${c.row_id}:${c.column_id}`] = c;
     });
 
@@ -33,33 +68,112 @@ export default function DataOutputGrid({ cells = [], onCellClick }: DataOutputGr
       type = 'list';
     }
 
-    return { 
-      cols: uniqueCols, 
-      rows: uniqueRows, 
+    return {
+      cols: uniqueCols,
+      rows: uniqueRows,
       gridData: dataMap,
-      structureType: type
+      structureType: type,
     };
   }, [cells]);
+
+  // ── Wiring helpers ──────────────────────────────────────────────────────
+
+  const handleColumnClick = (col: string) => {
+    if (wiringMode && onWireColumn) {
+      onWireColumn(`${sourceStepId}.${col}`);
+      return;
+    }
+  };
+
+  const handleCellWireClick = (cell: Cell) => {
+    if (wiringMode && onWireCell) {
+      onWireCell(`${sourceStepId}[row=${cell.row_id}, col=${cell.column_id}]`);
+      return;
+    }
+    onCellClick?.(cell);
+  };
+
+  // ── Wiring overlay styles ───────────────────────────────────────────────
+
+  const wiringColHeaderStyle = (col: string): React.CSSProperties => {
+    if (!wiringMode) return {};
+    const isHovered = hoveredCol === col;
+    return {
+      cursor: 'crosshair',
+      background: isHovered
+        ? 'linear-gradient(135deg, #ffc107 0%, #ffecb3 100%)'
+        : 'linear-gradient(135deg, #fff8e1 0%, #fffde7 100%)',
+      color: isHovered ? '#5d4037' : '#7b5e00',
+      borderBottom: isHovered ? '2px solid #ffa000' : '2px solid #ffd54f',
+      fontWeight: 700,
+      transition: 'all 0.1s ease',
+      userSelect: 'none',
+    };
+  };
+
+  const wiringCellStyle = (key: string, col: string): React.CSSProperties => {
+    if (!wiringMode) return {};
+    const colHovered = hoveredCol === col;
+    const cellHovered = hoveredCell === key;
+    return {
+      cursor: 'crosshair',
+      background: cellHovered
+        ? '#fff3cd'
+        : colHovered
+        ? 'rgba(255, 224, 102, 0.25)'
+        : 'transparent',
+      outline: cellHovered ? '1px dashed #ffa000' : 'none',
+      transition: 'background 0.1s ease',
+    };
+  };
+
+  // ── Empty state ─────────────────────────────────────────────────────────
 
   if (structureType === 'empty') {
     return (
       <div className="output-container empty">
+        {wiringMode && (
+          <div style={WIRING_BANNER}>
+            <span>⚡</span> No data yet — run this step first to wire its output
+          </div>
+        )}
         <div className="single-value-display empty">
-           <span className="placeholder-text">Empty</span>
+          <span className="placeholder-text">Empty</span>
         </div>
       </div>
     );
   }
 
-  // SCENARIO 1: Single Value (Hero Cell)
+  // ── SCENARIO 1: Single Value (Hero Cell) ───────────────────────────────
+
   if (structureType === 'single-value') {
     const cell = gridData[`${rows[0]}:${cols[0]}`];
     return (
       <div className="output-container single">
-        <div 
+        {wiringMode && (
+          <div style={WIRING_BANNER}>
+            <span>⚡</span> Click value to use as argument
+          </div>
+        )}
+        <div
           className="single-value-display"
-          onClick={() => cell && onCellClick?.(cell)}
-          title="Click to inspect"
+          onClick={() => {
+            if (wiringMode && cell && onWireCell) {
+              onWireCell(`${sourceStepId}[row=${cell.row_id}, col=${cell.column_id}]`);
+            } else if (cell) {
+              onCellClick?.(cell);
+            }
+          }}
+          title={
+            wiringMode
+              ? `Insert reference: ${sourceStepId}[row=${rows[0]}, col=${cols[0]}]`
+              : 'Click to inspect'
+          }
+          style={
+            wiringMode
+              ? { cursor: 'crosshair', outline: '2px dashed #ffc107', background: '#fffde7' }
+              : {}
+          }
         >
           {cell ? cell.display_value : ''}
         </div>
@@ -67,20 +181,83 @@ export default function DataOutputGrid({ cells = [], onCellClick }: DataOutputGr
     );
   }
 
-  // SCENARIO 2 & 3: List or Grid
+  // ── SCENARIO 2 & 3: List or Grid ──────────────────────────────────────
+
   return (
     <div className="output-container grid-wrapper">
-      <div 
-        className="op-data-grid"
-        style={{ 
-          gridTemplateColumns: `50px repeat(${cols.length}, minmax(100px, 1fr))`
+      {/* Wiring mode banner */}
+      {wiringMode && (
+        <div style={WIRING_BANNER}>
+          <span>⚡</span> Click a{' '}
+          <span
+            style={{
+              background: '#ffc107',
+              color: '#5d4037',
+              borderRadius: 3,
+              padding: '0 4px',
+              fontWeight: 700,
+            }}
+          >
+            column header
+          </span>{' '}
+          to reference the whole column, or a{' '}
+          <span
+            style={{
+              background: '#ffe082',
+              color: '#5d4037',
+              borderRadius: 3,
+              padding: '0 4px',
+              fontWeight: 700,
+            }}
+          >
+            cell
+          </span>{' '}
+          for a specific value
+        </div>
+      )}
+
+      <div
+        className={`op-data-grid${wiringMode ? ' wiring-source' : ''}`}
+        style={{
+          gridTemplateColumns: `50px repeat(${cols.length}, minmax(100px, 1fr))`,
+          ...(wiringMode
+            ? {
+                outline: '2px dashed #ffc107',
+                outlineOffset: -2,
+                borderRadius: 4,
+              }
+            : {}),
         }}
         role="grid"
       >
         {/* Header Row */}
         <div className="grid-header-cell row-index-header">#</div>
         {cols.map((col) => (
-          <div key={col} className="grid-header-cell" role="columnheader" title={col}>
+          <div
+            key={col}
+            className="grid-header-cell"
+            role="columnheader"
+            title={
+              wiringMode
+                ? `⚡ Insert column reference: ${sourceStepId}.${col}`
+                : col
+            }
+            style={wiringColHeaderStyle(col)}
+            onClick={() => handleColumnClick(col)}
+            onMouseEnter={() => wiringMode && setHoveredCol(col)}
+            onMouseLeave={() => wiringMode && setHoveredCol(null)}
+          >
+            {wiringMode && (
+              <span
+                style={{
+                  fontSize: '0.6rem',
+                  marginRight: 3,
+                  opacity: hoveredCol === col ? 1 : 0.6,
+                }}
+              >
+                ⚡
+              </span>
+            )}
             {col}
           </div>
         ))}
@@ -90,17 +267,35 @@ export default function DataOutputGrid({ cells = [], onCellClick }: DataOutputGr
           <div key={r} className="grid-row" role="row">
             {/* Row Number */}
             <div className="grid-cell row-index">{r + 1}</div>
-            
+
             {/* Cells */}
             {cols.map((c) => {
               const cell = gridData[`${r}:${c}`];
+              const cellKey = `${r}:${c}`;
               return (
                 <div
-                  key={`${r}-${c}`}
+                  key={cellKey}
                   className={`grid-cell ${cell ? 'has-value' : 'empty'}`}
                   role="gridcell"
-                  onClick={() => cell && onCellClick?.(cell)}
-                  title={cell ? cell.display_value : ''}
+                  onClick={() => cell && handleCellWireClick(cell)}
+                  title={
+                    wiringMode && cell
+                      ? `⚡ Insert: ${sourceStepId}[row=${r}, col=${c}]`
+                      : cell?.display_value ?? ''
+                  }
+                  style={wiringCellStyle(cellKey, c)}
+                  onMouseEnter={() => {
+                    if (wiringMode) {
+                      setHoveredCell(cellKey);
+                      setHoveredCol(c);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (wiringMode) {
+                      setHoveredCell(null);
+                      setHoveredCol(null);
+                    }
+                  }}
                 >
                   {cell ? cell.display_value : ''}
                 </div>
@@ -110,7 +305,13 @@ export default function DataOutputGrid({ cells = [], onCellClick }: DataOutputGr
         ))}
       </div>
       <div className="grid-footer">
-        {rows.length} row{rows.length !== 1 ? 's' : ''}, {cols.length} column{cols.length !== 1 ? 's' : ''}
+        {rows.length} row{rows.length !== 1 ? 's' : ''}, {cols.length} column
+        {cols.length !== 1 ? 's' : ''}
+        {wiringMode && (
+          <span style={{ marginLeft: 8, color: '#ffa000', fontSize: '0.7rem' }}>
+            ⚡ wiring active
+          </span>
+        )}
       </div>
     </div>
   );

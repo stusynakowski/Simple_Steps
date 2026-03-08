@@ -13,6 +13,7 @@ import RenameModal from './RenameModal';
 import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
+import { StepWiringProvider } from '../context/StepWiringContext';
 import './MainLayout.css';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -447,6 +448,7 @@ export default function MainLayout() {
 
         {/* ── Pipeline canvas ────────────────────────────────────────────── */}
         <main className="main-content horizontal-scroll-area">
+          <StepWiringProvider>
           <div className="columns-container" data-testid="columns-container">
             {workflow.steps.map((step, index) => {
               const isExpanded = expandedStepIds.has(step.id);
@@ -455,6 +457,7 @@ export default function MainLayout() {
                 <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
                   <OperationColumn
                     step={step}
+                    stepIndex={index}
                     color={getStepColor(index)}
                     isActive={isExpanded}
                     isSqueezed={!isExpanded}
@@ -479,6 +482,7 @@ export default function MainLayout() {
               </button>
             </div>
           </div>
+          </StepWiringProvider>
         </main>
       </div>
 

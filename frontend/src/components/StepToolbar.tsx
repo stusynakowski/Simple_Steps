@@ -1,14 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Step } from '../types/models';
-import type { OperationDefinition } from '../services/api'; // Import OperationDefinition
+import type { OperationDefinition } from '../services/api';
+import { parseFormula } from '../utils/formulaParser';
+import type { ParsedFormula } from '../utils/formulaParser';
+import { useStepWiring } from '../context/StepWiringContext';
 
 interface StepToolbarProps {
   step: Step;
+  /** Index of this step in the pipeline (0-based) — used for wiring eligibility */
+  stepIndex?: number;
   availableOperations?: OperationDefinition[];
   onRun?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
-  onFormulaChange?: (id: string, formula: string) => void;
+  onFormulaChange?: (id: string, formula: string, parsed: ParsedFormula) => void;
+  // Allow parent to push a formula update (from UI config changes → formula bar)
+  externalFormula?: string;
   // Tab handlers
   activeTab: 'summary' | 'details' | 'data' | 'settings';
   onTabChange: (tab: 'summary' | 'details' | 'data' | 'settings') => void;
@@ -20,11 +27,13 @@ interface StepToolbarProps {
 }
 
 export default function StepToolbar({ 
-  step, 
-  availableOperations, 
+  step,
+  stepIndex = 0,
+  availableOperations = [], 
   onRun, 
   onDelete, 
   onFormulaChange,
+  externalFormula,
   activeTab, 
   onTabChange, 
   onMaximize, 
@@ -34,6 +43,20 @@ export default function StepToolbar({
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const [formula, setFormula] = useState(step.operation || '');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Wiring context — lets prior-step grids inject references into this formula bar
+  const { activateWiring, deactivateWiring } = useStepWiring();
+
+  // Sync from external formula updates (UI config → formula bar)
+  useEffect(() => {
+    if (externalFormula !== undefined && externalFormula !== formula) {
+      setFormula(externalFormula);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalFormula]);
 
   // Sync with prop if the step data changes externally
   useEffect(() => {
@@ -43,10 +66,63 @@ export default function StepToolbar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.operation]);
 
+  const computeSuggestions = (value: string): OperationDefinition[] => {
+    const raw = value.trim();
+    // Show suggestions when user has typed '=' but hasn't opened parenthesis yet
+    if (raw.startsWith('=') && !raw.includes('(')) {
+      const partial = raw.slice(1).toUpperCase();
+      return availableOperations.filter(op =>
+        op.id.toUpperCase().startsWith(partial) || op.label.toUpperCase().startsWith(partial)
+      );
+    }
+    return [];
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVal = e.target.value;
     setFormula(newVal);
-    onFormulaChange?.(step.id, newVal);
+
+    const sugg = computeSuggestions(newVal);
+    setSuggestions(sugg);
+    setShowSuggestions(sugg.length > 0);
+
+    const parsed = parseFormula(newVal);
+    onFormulaChange?.(step.id, newVal, parsed);
+  };
+
+  // Also respond to the native 'input' event fired by injectReference (context)
+  // so that reference tokens inserted via pointer clicks also propagate up.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const onNativeInput = (e: Event) => {
+      const newVal = (e.target as HTMLInputElement).value;
+      setFormula(newVal);
+      const sugg = computeSuggestions(newVal);
+      setSuggestions(sugg);
+      setShowSuggestions(sugg.length > 0);
+      const parsed = parseFormula(newVal);
+      onFormulaChange?.(step.id, newVal, parsed);
+    };
+    el.addEventListener('input', onNativeInput);
+    return () => el.removeEventListener('input', onNativeInput);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step.id]);
+
+  const handleSuggestionClick = (op: OperationDefinition) => {
+    const newFormula = `=${op.id}(`;
+    setFormula(newFormula);
+    setShowSuggestions(false);
+    const parsed = parseFormula(newFormula);
+    onFormulaChange?.(step.id, newFormula, parsed);
+    // Re-focus and move cursor to end
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const len = newFormula.length;
+        inputRef.current.setSelectionRange(len, len);
+      }
+    }, 0);
   };
 
   return (
@@ -238,7 +314,7 @@ export default function StepToolbar({
           style={{ 
             color: step.status === 'running' ? '#e74c3c' : '#2ecc71',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 4 // slightly smaller padding for inline feel?
+            padding: 4
           }}
         >
           {step.status === 'running' ? (
@@ -266,26 +342,81 @@ export default function StepToolbar({
         >
           fx
         </button>
-        <input
-          type="text"
-          value={formula}
-          onChange={handleInputChange}
-          placeholder={availableOperations?.length ? `Try =${availableOperations[0].id}(...)` : "=OPERATION(StepName!A:B)"}
-          list={`operations-list-${step.id}`}
-          style={{
-            flex: 1,
-            padding: '4px 8px',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            fontFamily: 'monospace'
-          }}
-          data-testid="formula-input"
-        />
-        <datalist id={`operations-list-${step.id}`}>
-          {availableOperations?.map(op => (
-            <option key={op.id} value={`=${op.id}(`} />
-          ))}
-        </datalist>
+
+        {/* Formula Input + Autocomplete Dropdown */}
+        <div style={{ flex: 1, position: 'relative' }}>
+          <input
+            ref={inputRef}
+            type="text"
+            value={formula}
+            onChange={handleInputChange}
+            onBlur={() => {
+              setTimeout(() => setShowSuggestions(false), 150);
+              deactivateWiring();
+            }}
+            onFocus={() => {
+              const sugg = computeSuggestions(formula);
+              setSuggestions(sugg);
+              setShowSuggestions(sugg.length > 0);
+              // Register this input as the current wiring target so prior-step
+              // grids can inject references into it.
+              if (inputRef.current) {
+                activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLInputElement>);
+              }
+            }}
+            placeholder={availableOperations?.length ? `Try =${availableOperations[0].id}(...)` : "=OPERATION(key=value)"}
+            style={{
+              width: '100%',
+              padding: '4px 8px',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              fontFamily: 'monospace',
+              boxSizing: 'border-box',
+            }}
+            data-testid="formula-input"
+          />
+
+          {/* Autocomplete Dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              background: '#fff',
+              border: '1px solid #ccc',
+              borderRadius: '0 0 4px 4px',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.12)',
+              zIndex: 1000,
+              maxHeight: '180px',
+              overflowY: 'auto',
+            }}>
+              {suggestions.map(op => (
+                <div
+                  key={op.id}
+                  onMouseDown={() => handleSuggestionClick(op)}
+                  style={{
+                    padding: '6px 10px',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    fontSize: '13px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    borderBottom: '1px solid #f0f0f0',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#f0f7ff')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span style={{ fontWeight: 600, color: '#3498db' }}>{op.id}</span>
+                  {op.label && op.label !== op.id && (
+                    <span style={{ fontSize: '11px', color: '#888' }}>{op.label}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabs Bar Removed */}

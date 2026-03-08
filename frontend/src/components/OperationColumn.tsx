@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
+import { buildFormula } from '../utils/formulaParser';
+import type { ParsedFormula } from '../utils/formulaParser';
+import { useStepWiring } from '../context/StepWiringContext';
 import './OperationColumn.css';
 
 interface OperationColumnProps {
   step: Step;
+  /** Zero-based position in the pipeline, used for wiring eligibility */
+  stepIndex?: number;
   availableOperations?: OperationDefinition[];
   color?: string;
   isActive: boolean;
@@ -25,6 +30,7 @@ interface OperationColumnProps {
 
 export default function OperationColumn({
   step,
+  stepIndex = 0,
   availableOperations = [],
   color = '#444', 
   isActive,
@@ -44,56 +50,32 @@ export default function OperationColumn({
   const [isEditMode] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
 
+  // Wiring context — this column is a wiring SOURCE when a later step's formula is focused
+  const { wiringState, injectReference, activateWiring, deactivateWiring } = useStepWiring();
+  const isWiringSource =
+    wiringState.receivingStepId !== null &&
+    wiringState.receivingStepId !== step.id &&
+    wiringState.receivingStepIndex !== null &&
+    stepIndex < wiringState.receivingStepIndex;
+
+  // When this column becomes a wiring source, automatically switch to the data
+  // tab so the user can see the output grid without extra clicks.
+  const prevWiringSource = useRef(false);
+  useEffect(() => {
+    if (isWiringSource && !prevWiringSource.current) {
+      setActiveTab('data');
+    }
+    prevWiringSource.current = isWiringSource;
+  }, [isWiringSource]);
+
+  // Refs for parameter inputs so they can also participate in wiring
+  const paramInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Formula derived from step — kept in sync so StepToolbar reflects config changes
+  const derivedFormula = buildFormula(step.process_type, step.configuration);
+
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
-
-  // -- Synchronization Logic --
-
-  // 1. Build Formula from Config
-  const buildFormula = (opId: string, config: Record<string, any>) => {
-    if (!opId || opId === 'noop') return '';
-    const args = Object.entries(config)
-      .map(([k, v]) => {
-        // Simple quoting for strings, raw for numbers/bools
-        const valStr = typeof v === 'string' && !v.startsWith('=') ? `"${v}"` : String(v);
-        return `${k}=${valStr}`;
-      })
-      .join(', ');
-    return `=${opId}(${args})`;
-  };
-
-  // 2. Parse Formula to Config
-  const parseFormula = (formula: string) => {
-    if (!formula.startsWith('=')) return null;
-    
-    const match = formula.match(/^=([a-zA-Z0-9_]+)\((.*)\)$/);
-    if (!match) return null;
-
-    const opId = match[1];
-    const argsStr = match[2];
-    const config: Record<string, any> = {};
-
-    // Basic CSV parser that respects quotes could be better, but simple split for now
-    // TODO: Improve regex to handle commas inside quotes
-    argsStr.split(',').forEach(arg => {
-      const parts = arg.split('=');
-      if (parts.length === 2) {
-        const key = parts[0].trim();
-        let val = parts[1].trim();
-        
-        // Remove quotes if string
-        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
-          val = val.slice(1, -1);
-        } else if (!isNaN(Number(val))) {
-          val = String(Number(val));
-        }
-        
-        config[key] = val;
-      }
-    });
-
-    return { opId, config };
-  };
 
   // Handler for UI-based updates (Dropdowns/Inputs)
   const handleUiUpdate = (updates: Partial<Step>) => {
@@ -104,18 +86,27 @@ export default function OperationColumn({
   };
 
   // Handler for Formula-based updates (Toolbar Input)
-  const handleFormulaUpdate = (id: string, formula: string) => {
-    const parsed = parseFormula(formula);
-    if (parsed) {
-      // Valid formula, update structure
-      onUpdate?.(id, {
+  const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
+    if (parsed.isValid && parsed.operationId) {
+      // Preserve internal keys (e.g. _orchestrator) that aren't in the formula
+      const internalKeys = Object.fromEntries(
+        Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
+      );
+      onUpdate?.(step.id, {
         operation: formula,
-        process_type: parsed.opId,
-        configuration: parsed.config
+        process_type: parsed.operationId,
+        configuration: { ...internalKeys, ...parsed.args },
+      });
+    } else if (parsed.operationId && !parsed.isValid) {
+      // Partial formula (user is still typing) — update process_type so the
+      // details panel switches to the right operation, but don't overwrite config
+      onUpdate?.(step.id, {
+        operation: formula,
+        process_type: parsed.operationId,
       });
     } else {
-      // Invalid or incomplete formula, just update the string so user can keep typing
-      onUpdate?.(id, { operation: formula });
+      // Incomplete / plain text — just keep the raw string
+      onUpdate?.(step.id, { operation: formula });
     }
   };
 
@@ -137,14 +128,15 @@ export default function OperationColumn({
 
   return (
     <div
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isWiringSource ? 'wiring-source-column' : ''} status-${step.status}`}
       style={{ 
         '--step-color': color,
-        zIndex: zIndex 
+        zIndex: zIndex,
+        ...(isWiringSource ? { outline: '2px solid #ffc107', outlineOffset: -2 } : {}),
       } as React.CSSProperties}
       data-testid={`operation-column-${step.id}`}
     >
-      <div className="op-header" onClick={handleColumnClick} style={{ cursor: 'pointer' }}>
+      <div className="op-header" onClick={handleColumnClick} style={{ cursor: 'pointer', position: 'relative' }}>
         <div className="arrow-background" />
         <div className="arrow-content">
             {isSqueezed ? (
@@ -158,6 +150,27 @@ export default function OperationColumn({
                 </>
             )}
         </div>
+        {/* Wiring source badge */}
+        {isWiringSource && (
+          <span
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: isSqueezed ? 4 : 8,
+              background: '#ffc107',
+              color: '#5d4037',
+              borderRadius: 3,
+              padding: '1px 5px',
+              fontSize: '0.62rem',
+              fontWeight: 700,
+              letterSpacing: '0.04em',
+              zIndex: 10,
+              pointerEvents: 'none',
+            }}
+          >
+            ⚡ source
+          </span>
+        )}
       </div>
 
 
@@ -166,12 +179,14 @@ export default function OperationColumn({
           {!isSqueezed && (
             <StepToolbar 
               step={step}
+              stepIndex={stepIndex}
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
               onDelete={() => onDelete(step.id)}
               activeTab={activeTab}
               onTabChange={setActiveTab}
               onFormulaChange={handleFormulaUpdate}
+              externalFormula={derivedFormula}
               onMaximize={onMaximize}
               isMaximized={isMaximized}
               isLocked={isLocked}
@@ -224,6 +239,10 @@ export default function OperationColumn({
                       <DataOutputGrid 
                         cells={step.output_preview} 
                         onCellClick={(cell) => console.log('Cell clicked:', cell)}
+                        wiringMode={isWiringSource}
+                        sourceStepId={step.id}
+                        onWireColumn={(token) => injectReference(token)}
+                        onWireCell={(token) => injectReference(token)}
                       />
                     </div>
                   </div>
@@ -312,28 +331,72 @@ export default function OperationColumn({
                       {hasParams && (
                         <div style={{ marginTop: '12px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Parameters</span>
-                          {currentOp?.params.map(param => (
+                          {currentOp?.params.map(param => {
+                            const paramVal = String(step.configuration[param.name] ?? (param.default || ''));
+                            const isWiredValue = paramVal.includes('.');
+                            return (
                             <div key={param.name} className="config-item">
-                              <label>{param.name}:</label>
-                              <input 
-                                  type="text"
-                                  value={String(step.configuration[param.name] ?? (param.default || ''))}
-                                  onChange={(e) => {
-                                      const val = e.target.value;
-                                      const isFormula = val.startsWith('=');
-                                      const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
-                                      
-                                      handleUiUpdate({
-                                          configuration: { ...step.configuration, [param.name]: updateVal }
-                                      });
-                                  }}
-                                  onBlur={() => onPreview?.(step.id)}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') onPreview?.(step.id); }}
-                                  title={param.description}
-                                  placeholder={String(param.default || '')}
-                              />
+                              <label title={param.description}>{param.name}:</label>
+                              <div style={{ position: 'relative', flex: 1 }}>
+                                <input 
+                                    ref={(el) => { paramInputRefs.current[param.name] = el; }}
+                                    type="text"
+                                    value={paramVal}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        const isFormula = val.startsWith('=');
+                                        const updateVal = (param.type === 'number' && !isFormula) ? Number(val) : val;
+                                        handleUiUpdate({
+                                            configuration: { ...step.configuration, [param.name]: updateVal }
+                                        });
+                                    }}
+                                    onFocus={() => {
+                                      const el = paramInputRefs.current[param.name];
+                                      if (el) {
+                                        activateWiring(
+                                          step.id,
+                                          stepIndex,
+                                          { current: el } as React.RefObject<HTMLInputElement>
+                                        );
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      deactivateWiring();
+                                      onPreview?.(step.id);
+                                    }}
+                                    onKeyDown={(e) => { if (e.key === 'Enter') onPreview?.(step.id); }}
+                                    title={param.description}
+                                    placeholder={String(param.default || '')}
+                                    style={{
+                                      width: '100%',
+                                      boxSizing: 'border-box',
+                                      ...(isWiredValue ? {
+                                        background: '#fffde7',
+                                        borderColor: '#ffc107',
+                                        color: '#856404',
+                                      } : {}),
+                                    }}
+                                />
+                                {isWiredValue && (
+                                  <span
+                                    title="This parameter references another step's output"
+                                    style={{
+                                      position: 'absolute',
+                                      right: 4,
+                                      top: '50%',
+                                      transform: 'translateY(-50%)',
+                                      fontSize: '0.65rem',
+                                      color: '#ffa000',
+                                      pointerEvents: 'none',
+                                    }}
+                                  >
+                                    ⚡
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

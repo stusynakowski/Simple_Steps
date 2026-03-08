@@ -567,3 +567,32 @@
 .output-container.grid-wrapper {
   overflow-x: auto;
 }
+
+/* ── Wiring mode styles ──────────────────────────────────────────────────── */
+
+@keyframes wiring-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.45); }
+  50%  { box-shadow: 0 0 0 6px rgba(255, 193, 7, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+}
+
+/* Column-level wiring glow — applied when this column is a selectable source */
+.operation-column.wiring-source-column {
+  animation: wiring-pulse 1.6s ease-in-out infinite;
+}
+
+/* Grid wiring source overlay */
+.op-data-grid.wiring-source .grid-header-cell:not(.row-index-header) {
+  position: relative;
+}
+
+.op-data-grid.wiring-source .grid-header-cell:not(.row-index-header)::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #ffc107;
+  border-radius: 1px;
+}

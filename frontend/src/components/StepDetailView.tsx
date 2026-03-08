@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Step, Cell } from '../types/models';
 import type { OperationDefinition } from '../services/api';
+import type { ParsedFormula } from '../utils/formulaParser';
 import './StepDetailView.css';
 import StepToolbar from './StepToolbar';
 import DataOutputGrid from './DataOutputGrid';
@@ -12,7 +13,7 @@ interface StepDetailViewProps {
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onCellClick?: (cell: Cell) => void;
-  onFormulaChange?: (id: string, formula: string) => void;
+  onFormulaChange?: (id: string, formula: string, parsed: ParsedFormula) => void;
 }
 
 export default function StepDetailView({ step, availableOperations, onRun, onDelete, onEdit, onCellClick, onFormulaChange }: StepDetailViewProps) {
