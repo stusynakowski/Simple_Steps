@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import GlobalControls from './GlobalControls';
 import OperationColumn from './OperationColumn';
+import DetachedStepWindow from './DetachedStepWindow';
 import useWorkflow from '../hooks/useWorkflow';
 import { getStepColor } from '../styles/theme';
 import Sidebar from './Sidebar';
@@ -346,6 +347,25 @@ export default function MainLayout() {
   const transitionStyle = isDragging ? 'none'
     : 'width 0.3s cubic-bezier(0.4,0,0.2,1), height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s cubic-bezier(0.4,0,0.2,1)';
 
+  // ── Detached step windows ──────────────────────────────────────────────
+  interface DetachedWindow {
+    id: string;          // unique window id (not step id — same step can detach multiple times)
+    stepId: string;
+    position: { x: number; y: number };
+  }
+  const [detachedWindows, setDetachedWindows] = useState<DetachedWindow[]>([]);
+
+  const handleDetach = useCallback((stepId: string, position: { x: number; y: number }) => {
+    setDetachedWindows(prev => [
+      ...prev,
+      { id: `dw-${Date.now()}-${stepId}`, stepId, position },
+    ]);
+  }, []);
+
+  const closeDetachedWindow = useCallback((windowId: string) => {
+    setDetachedWindows(prev => prev.filter(w => w.id !== windowId));
+  }, []);
+
   // ── Sidebar refresh trigger ────────────────────────────────────────────
   const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
 
@@ -453,11 +473,13 @@ export default function MainLayout() {
             {workflow.steps.map((step, index) => {
               const isExpanded = expandedStepIds.has(step.id);
               const isMaximized = maximizedStepId === step.id;
+              const previousSteps = workflow.steps.slice(0, index);
               return (
                 <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
                   <OperationColumn
                     step={step}
                     stepIndex={index}
+                    previousSteps={previousSteps}
                     color={getStepColor(index)}
                     isActive={isExpanded}
                     isSqueezed={!isExpanded}
@@ -472,6 +494,7 @@ export default function MainLayout() {
                     onDelete={deleteStep}
                     onMinimize={() => collapseStep(step.id)}
                     onMaximize={() => toggleMaximizeStep(step.id)}
+                    onDetach={(pos) => handleDetach(step.id, pos)}
                   />
                 </div>
               );
@@ -485,6 +508,32 @@ export default function MainLayout() {
           </StepWiringProvider>
         </main>
       </div>
+
+      {/* ── Detached step windows (floating, fixed-position) ───────────── */}
+      <StepWiringProvider>
+        {detachedWindows.map(dw => {
+          const step = workflow.steps.find(s => s.id === dw.stepId);
+          if (!step) return null;
+          const stepIndex = workflow.steps.findIndex(s => s.id === dw.stepId);
+          const previousSteps = workflow.steps.slice(0, stepIndex);
+          return (
+            <DetachedStepWindow
+              key={dw.id}
+              step={step}
+              stepIndex={stepIndex}
+              previousSteps={previousSteps}
+              availableOperations={availableOperations}
+              color={getStepColor(stepIndex)}
+              initialPosition={dw.position}
+              onClose={() => closeDetachedWindow(dw.id)}
+              onUpdate={(id, updates) => updateStep(id, updates)}
+              onRun={runStep}
+              onPreview={previewStep}
+              onDelete={deleteStep}
+            />
+          );
+        })}
+      </StepWiringProvider>
 
       {/* Right sidebar resize handle */}
       <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar} onDoubleClick={toggleChat}>

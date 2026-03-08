@@ -91,12 +91,15 @@ export default function useWorkflow() {
     const stepIndex = currentSteps.indexOf(step);
     const prevStep = stepIndex > 0 ? currentSteps[stepIndex - 1] : undefined;
     
-    // Build Step Map (Label -> Output Ref ID)
+    // Build Step Map — keyed by step ID, label, and positional alias (step1, step2…)
+    // This is sent to the backend so resolve_reference() can look up any token
+    // the wiring UI inserts (e.g. "step-abc123.url" or "Step 0.url").
     const stepMap: Record<string, string> = {};
     for (const [index, s] of currentSteps.entries()) {
         if (s.outputRefId) {
-            stepMap[s.label] = s.outputRefId;
-            stepMap[`step${index + 1}`] = s.outputRefId;
+            stepMap[s.id] = s.outputRefId;           // exact step ID  (primary key for wiring)
+            stepMap[s.label] = s.outputRefId;         // human label
+            stepMap[`step${index + 1}`] = s.outputRefId; // positional alias
         }
     }
 
@@ -165,6 +168,7 @@ export default function useWorkflow() {
     const stepMap: Record<string, string> = {};
     for (const [index, s] of currentSteps.entries()) {
         if (s.outputRefId) {
+            stepMap[s.id] = s.outputRefId;
             stepMap[s.label] = s.outputRefId;
             stepMap[`step${index + 1}`] = s.outputRefId;
         }

@@ -3,6 +3,7 @@ import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
+import PreviousStepDataPicker from './PreviousStepDataPicker';
 import { buildFormula } from '../utils/formulaParser';
 import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
@@ -12,6 +13,8 @@ interface OperationColumnProps {
   step: Step;
   /** Zero-based position in the pipeline, used for wiring eligibility */
   stepIndex?: number;
+  /** All steps before this one — used for the Previous Step Data picker */
+  previousSteps?: Step[];
   availableOperations?: OperationDefinition[];
   color?: string;
   isActive: boolean;
@@ -26,11 +29,14 @@ interface OperationColumnProps {
   onDelete: (id: string) => void;
   onMinimize?: () => void;
   onMaximize?: () => void; // New callback
+  /** Called with the pointer position when the user drags the header far enough to detach */
+  onDetach?: (position: { x: number; y: number }) => void;
 }
 
 export default function OperationColumn({
   step,
   stepIndex = 0,
+  previousSteps = [],
   availableOperations = [],
   color = '#444', 
   isActive,
@@ -44,6 +50,7 @@ export default function OperationColumn({
   onDelete,
   onMinimize,
   onMaximize,
+  onDetach,
 }: OperationColumnProps) {
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data' | 'settings'>('data');
@@ -70,6 +77,56 @@ export default function OperationColumn({
 
   // Refs for parameter inputs so they can also participate in wiring
   const paramInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Ref to the formula bar input — forwarded from StepToolbar so the
+  // PreviousStepDataPicker can focus + activate wiring without losing context.
+  const formulaBarRef = useRef<HTMLInputElement | null>(null);
+
+  /** Called by PreviousStepDataPicker when a column/cell badge is clicked.
+   *  Directly injects the reference token into the formula bar without relying
+   *  on async wiring state — uses the formulaBarRef we already hold. */
+  const handlePickerTokenSelect = (token: string) => {
+    const el = formulaBarRef.current;
+    if (!el) return;
+
+    // Activate wiring so context state is consistent for other interactions
+    activateWiring(step.id, stepIndex, { current: el } as React.RefObject<HTMLInputElement>);
+
+    // Splice the token at the current cursor position (or append)
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const before = el.value.slice(0, start);
+    const after = el.value.slice(end);
+    const newValue = before + token + after;
+
+    // Use native setter so React's synthetic onChange fires
+    const nativeInputSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    nativeInputSetter?.call(el, newValue);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+
+    // If no operation is defined yet and the new value is a bare reference,
+    // immediately register it as a passthrough so the step can be run right away.
+    if (!newValue.startsWith('=') && (step.process_type === 'noop' || step.process_type === 'passthrough' || !step.process_type)) {
+      const internalKeys = Object.fromEntries(
+        Object.entries(step.configuration).filter(([k]) => k.startsWith('_') && k !== '_ref')
+      );
+      onUpdate?.(step.id, {
+        operation: newValue,
+        process_type: 'passthrough',
+        configuration: { ...internalKeys, _ref: newValue },
+      });
+    }
+
+    // Focus and move cursor to after the token
+    const newCursor = start + token.length;
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(newCursor, newCursor);
+    }, 0);
+  };
 
   // Formula derived from step — kept in sync so StepToolbar reflects config changes
   const derivedFormula = buildFormula(step.process_type, step.configuration);
@@ -104,6 +161,20 @@ export default function OperationColumn({
         operation: formula,
         process_type: parsed.operationId,
       });
+    } else if (formula && !formula.startsWith('=')) {
+      // Bare reference token (e.g. "step-abc.url") with no operation specified.
+      // Treat as a pass-through / identity: resolve the reference on run and
+      // display that data as this step's output.
+      // This branch fires for ANY non-formula text so the user can freely edit
+      // the token — _ref always stays in sync with what's in the bar.
+      const internalKeys = Object.fromEntries(
+        Object.entries(step.configuration).filter(([k]) => k.startsWith('_') && k !== '_ref')
+      );
+      onUpdate?.(step.id, {
+        operation: formula,
+        process_type: 'passthrough',
+        configuration: { ...internalKeys, _ref: formula },
+      });
     } else {
       // Incomplete / plain text — just keep the raw string
       onUpdate?.(step.id, { operation: formula });
@@ -113,6 +184,10 @@ export default function OperationColumn({
   // Calculate display name for the operation summary
   const getOperationDisplayName = () => {
     if (!step.process_type || step.process_type === 'noop') return 'None';
+    if (step.process_type === 'passthrough') {
+      const ref = String(step.configuration._ref || step.operation || '');
+      return ref ? `↳ ${ref}` : 'Pass-through';
+    }
     if (currentOp) return currentOp.label;
     return step.process_type; // Fallback to ID
   };
@@ -126,6 +201,50 @@ export default function OperationColumn({
     }
   };
 
+  // ── Drag-to-detach on header ──────────────────────────────────────────────
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const dragTriggered = useRef(false);
+  const [isDragHinting, setIsDragHinting] = useState(false);
+  const DETACH_THRESHOLD = 18; // px of movement before detach fires
+
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    // Only on left-button drags, and only if onDetach is wired up
+    if (e.button !== 0 || !onDetach) return;
+    // Ignore clicks on any interactive child (buttons, etc.)
+    if ((e.target as HTMLElement).closest('button, select, input, a')) return;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    dragTriggered.current = false;
+
+    const onMove = (me: MouseEvent) => {
+      if (!dragStart.current) return;
+      const dx = me.clientX - dragStart.current.x;
+      const dy = me.clientY - dragStart.current.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 4) setIsDragHinting(true);
+      if (!dragTriggered.current && dist > DETACH_THRESHOLD) {
+        dragTriggered.current = true;
+        dragStart.current = null;
+        setIsDragHinting(false);
+        cleanup();
+        onDetach({ x: me.clientX - 20, y: me.clientY - 18 });
+      }
+    };
+
+    const onUp = () => {
+      dragStart.current = null;
+      setIsDragHinting(false);
+      cleanup();
+    };
+
+    const cleanup = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   return (
     <div
       className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isWiringSource ? 'wiring-source-column' : ''} status-${step.status}`}
@@ -136,7 +255,7 @@ export default function OperationColumn({
       } as React.CSSProperties}
       data-testid={`operation-column-${step.id}`}
     >
-      <div className="op-header" onClick={handleColumnClick} style={{ cursor: 'pointer', position: 'relative' }}>
+      <div className={`op-header${isDragHinting ? ' drag-detach-hint' : ''}`} onClick={handleColumnClick} onMouseDown={handleHeaderMouseDown} style={{ cursor: 'pointer', position: 'relative' }}>
         <div className="arrow-background" />
         <div className="arrow-content">
             {isSqueezed ? (
@@ -191,6 +310,7 @@ export default function OperationColumn({
               isMaximized={isMaximized}
               isLocked={isLocked}
               onLock={() => setIsLocked(!isLocked)}
+              onFormulaBarRef={(el) => { formulaBarRef.current = el; }}
             />
           )}
 
@@ -267,6 +387,9 @@ export default function OperationColumn({
                             disabled={!isActive}
                         >
                             <option value="noop">Select Operation...</option>
+                            <option value="passthrough" disabled style={{ color: '#aaa' }}>
+                              ↳ Pass-through (reference selected)
+                            </option>
                             {availableOperations.map(op => (
                                 <option key={op.id} value={op.id}>
                                   {op.category ? `[${op.category}] ` : ''}{op.label}
@@ -274,6 +397,16 @@ export default function OperationColumn({
                             ))}
                         </select>
                       </div>
+
+                      {/* Previous Step Data Picker — always visible in details tab when
+                          prior steps exist. Lets the user click a column/cell reference
+                          before or during operation configuration. */}
+                      {previousSteps.length > 0 && (
+                        <PreviousStepDataPicker
+                          previousSteps={previousSteps}
+                          onTokenSelect={handlePickerTokenSelect}
+                        />
+                      )}
 
                       {/* Orchestration Strategy Override */}
                       {currentOp && (

@@ -24,6 +24,8 @@ interface StepToolbarProps {
   onLock?: (id: string) => void;
   isLocked?: boolean;
   onConfigure?: (id: string) => void;
+  /** Called once with a ref to the formula bar input so parents can focus it. */
+  onFormulaBarRef?: (ref: HTMLInputElement | null) => void;
 }
 
 export default function StepToolbar({ 
@@ -40,6 +42,7 @@ export default function StepToolbar({
   isMaximized,
   onLock,
   isLocked,
+  onFormulaBarRef,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const [formula, setFormula] = useState(step.operation || '');
@@ -346,7 +349,10 @@ export default function StepToolbar({
         {/* Formula Input + Autocomplete Dropdown */}
         <div style={{ flex: 1, position: 'relative' }}>
           <input
-            ref={inputRef}
+            ref={(el) => {
+              (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+              onFormulaBarRef?.(el);
+            }}
             type="text"
             value={formula}
             onChange={handleInputChange}
@@ -364,7 +370,7 @@ export default function StepToolbar({
                 activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLInputElement>);
               }
             }}
-            placeholder={availableOperations?.length ? `Try =${availableOperations[0].id}(...)` : "=OPERATION(key=value)"}
+            placeholder={availableOperations?.length ? `=OPERATION(param=${availableOperations[0].id}.column)` : "=OPERATION(param=stepId.column)"}
             style={{
               width: '100%',
               padding: '4px 8px',
@@ -375,6 +381,59 @@ export default function StepToolbar({
             }}
             data-testid="formula-input"
           />
+
+          {/* Reference-misuse hint: user typed a bare step reference as a full formula
+              but the step already has a real operation selected (not noop/passthrough).
+              In noop/passthrough mode the reference IS valid — no hint needed. */}
+          {/^[\w-]+\.\w+/.test(formula) && !formula.startsWith('=')
+            && step.process_type !== 'passthrough'
+            && step.process_type !== 'noop'
+            && step.process_type !== '' && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              background: '#fff8e1',
+              border: '1px solid #ffc107',
+              borderRadius: '0 0 4px 4px',
+              padding: '6px 10px',
+              fontSize: '0.72rem',
+              color: '#7b5e00',
+              zIndex: 1000,
+              lineHeight: 1.4,
+            }}>
+              💡 <strong>Step references go inside an operation's argument.</strong>
+              <br />
+              e.g. <code style={{ background: '#fffde7', padding: '1px 4px', borderRadius: 3 }}>
+                =MY_OP(col=<strong>{formula}</strong>)
+              </code>
+              <br />
+              Use the <strong>fx</strong> tab → parameters, or type a full formula above.
+            </div>
+          )}
+
+          {/* Pass-through confirmation: reference token set, ready to run */}
+          {step.process_type === 'passthrough' && formula && !formula.startsWith('=') && (
+            <div style={{
+              position: 'absolute',
+              top: '100%',
+              left: 0,
+              right: 0,
+              background: '#e8f5e9',
+              border: '1px solid #66bb6a',
+              borderRadius: '0 0 4px 4px',
+              padding: '4px 10px',
+              fontSize: '0.72rem',
+              color: '#2e7d32',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+            }}>
+              ✓ Pass-through — hit ▶ to load this data into the step
+            </div>
+          )}
 
           {/* Autocomplete Dropdown */}
           {showSuggestions && suggestions.length > 0 && (

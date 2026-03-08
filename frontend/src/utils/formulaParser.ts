@@ -77,6 +77,11 @@ export function buildFormula(
   config: Record<string, any>
 ): string {
   if (!operationId || operationId === 'noop') return '';
+  // Pass-through steps store their bare reference token in _ref — display it
+  // as-is so the formula bar shows e.g. "step-abc.url" not "=passthrough()"
+  if (operationId === 'passthrough') {
+    return String(config._ref ?? '');
+  }
   const args = Object.entries(config)
     .filter(([k]) => !k.startsWith('_') || k === '_orchestrator') // skip internal keys except _orchestrator
     .map(([k, v]) => {

@@ -18,33 +18,95 @@ def save_dataframe(df: pd.DataFrame) -> str:
     DATA_STORE[ref_id] = df
     return ref_id
 
-def resolve_reference(value: Any, dataset_store: Dict[str, pd.DataFrame], step_id_map: Dict[str, str]) -> Any:
+def resolve_reference(value: Any, step_map: Dict[str, str]) -> Any:
     """
-    Resolves Excel-like references in the format =Step Label!Column
-    Example: =Step 1!COLA
+    Resolves a step-data reference token injected by the frontend wiring UI.
+
+    Supported formats (all produced by PreviousStepDataPicker / DataOutputGrid):
+      stepId.columnName          → pd.Series (whole column)
+      stepId[row=R, col=C]       → scalar cell value
+      stepId                     → pd.DataFrame (whole output)
+
+    `step_map` maps step IDs (and labels / positional aliases) to their
+    output ref IDs in DATA_STORE.
     """
-    if isinstance(value, str) and value.startswith('='):
-        # Parse syntax: =StepName!ColumnName
-        match = re.match(r'=([^!]+)!(.+)', value[1:])
-        if match:
-            step_label = match.group(1).strip()
-            col_name = match.group(2).strip()
-            
-            # Find the step ID from the label (this requires passing a mapping of labels to IDs)
-            # For this quick implementation, we might need to adjust how we find the dataframe.
-            # Assuming we can find the dataframe by label or some lookup.
-            # But the current engine works with ref_ids.
-            
-            # NOTE: To fully implement label-based lookup, we need access to the workflow state 
-            # or a mapping. Here is a placeholder logic.
-            
-            # For now, let's assume the user might actually pass an ID or we need a way 
-            # to lookup the ref_id from the step label during the engine execution.
-            # Since this function is called inside run_operation, it might be tricky 
-            # without the full context.
-            pass
-            
+    if not isinstance(value, str):
+        return value
+
+    # ── dot syntax: stepId.columnName ────────────────────────────────────
+    dot_match = re.match(r'^([\w-]+)\.(\w+)$', value)
+    if dot_match:
+        step_key = dot_match.group(1)
+        col_name = dot_match.group(2)
+        ref_id = step_map.get(step_key)
+        if ref_id:
+            df = get_dataframe(ref_id)
+            if df is not None and col_name in df.columns:
+                print(f"  ↳ Resolved '{value}' → column '{col_name}' from step '{step_key}'")
+                return df[col_name]
+        print(f"  ⚠ Could not resolve column reference '{value}' (step_map keys: {list(step_map.keys())})")
+        return value
+
+    # ── bracket syntax: stepId[row=R, col=C] ────────────────────────────
+    bracket_match = re.match(r'^([\w-]+)\[row=(\d+),\s*col=(\w+)\]$', value)
+    if bracket_match:
+        step_key = bracket_match.group(1)
+        row_idx = int(bracket_match.group(2))
+        col_name = bracket_match.group(3)
+        ref_id = step_map.get(step_key)
+        if ref_id:
+            df = get_dataframe(ref_id)
+            if df is not None and col_name in df.columns and row_idx < len(df):
+                cell_val = df.iloc[row_idx][col_name]
+                print(f"  ↳ Resolved '{value}' → cell [{row_idx},{col_name}] = {cell_val!r}")
+                return cell_val
+        print(f"  ⚠ Could not resolve cell reference '{value}'")
+        return value
+
+    # ── bare step ID: stepId ─────────────────────────────────────────────
+    if value in step_map:
+        ref_id = step_map[value]
+        df = get_dataframe(ref_id)
+        if df is not None:
+            print(f"  ↳ Resolved '{value}' → full DataFrame ({len(df)} rows)")
+            return df
+
     return value
+
+
+def _passthrough(
+    op_id: str,
+    config: Any,
+    df_in: Optional[pd.DataFrame],
+    step_map: Dict[str, str],
+) -> pd.DataFrame:
+    """
+    Identity / pass-through operation used when no operation is defined.
+
+    Resolution order:
+      1. If config contains a '_ref' key, resolve it as a step reference.
+         - column ref  (stepId.col)  → wrap Series as single-column DataFrame
+         - cell ref    (stepId[...]) → wrap scalar as 1×1 DataFrame
+         - full DF ref (stepId)      → return that DataFrame directly
+      2. Otherwise fall back to df_in (the previous step's full output).
+      3. If neither is available, return an empty DataFrame.
+    """
+    ref_token = config.get('_ref', '').strip()
+    if ref_token:
+        resolved = resolve_reference(ref_token, step_map)
+        if isinstance(resolved, pd.DataFrame):
+            return resolved
+        if isinstance(resolved, pd.Series):
+            return resolved.to_frame()
+        if resolved != ref_token:          # scalar — not the same string back
+            return pd.DataFrame([{ref_token.split('.')[-1].split(',')[0]: resolved}])
+        # Could not resolve — fall through to df_in
+
+    if df_in is not None:
+        return df_in
+
+    return pd.DataFrame()
+
 
 def run_operation(
     op_id: str, 
@@ -57,66 +119,51 @@ def run_operation(
     Orchestrates the running of a single step with dynamic wrappers.
     """
     
+    step_map = step_label_map or {}
+
     # 1. Resolve Input
     df_in = None
     if input_ref_id:
         df_in = get_dataframe(input_ref_id)
-        # We don't error out if df_in is None immediately, maybe source step
 
-    # 2. Find Operation
+    # 2. Identity / pass-through: noop or passthrough op_id
+    if op_id in ('noop', 'passthrough', '', None):
+        print(f"Running '{op_id}' as pass-through / identity")
+        result_df = _passthrough(op_id, config, df_in, step_map)
+        out_ref = save_dataframe(result_df)
+        return out_ref, {"rows": len(result_df), "columns": list(result_df.columns)}
+
+    # 3. Find Operation
     op_def = OPERATION_REGISTRY.get(op_id)
     if not op_def:
-        raise ValueError(f"Operation {op_id} not registered")
+        raise ValueError(f"Operation '{op_id}' not registered")
     
-    # Extract function and metadata from registry
-    # NOTE: The registry structure depends on decorators.py. 
-    # Assuming op_def is the dict we stored: {"definition": def, "func": func}
     func = op_def['func']
-    # Get suggested op type from definition
-    definition = op_def.get('definition')
-    # Default to 'dataframe' if not found or if the decorator logic is complex
     suggested_op_type = 'dataframe' 
-    # TODO: We need to pull `operation_type` from the metadata. 
-    # Currently `OperationDefinition` likely doesn't have it explicitly stored?
-    # Let's assume we can pass it or it defaults to 'dataframe'
     
     # Allow config override: { "_orchestrator": "map" }
-    # Use underscore to avoid collision with function args
     orchestrator_type = config.get('_orchestrator', suggested_op_type)
-    
-    # If the user specifically decorated it with a type, we might want to respect that *unless* overridden
-    # But for now, we rely on the override or default.
     
     from .orchestrators import ORCHESTRATORS
     wrapper = ORCHESTRATORS.get(orchestrator_type)
     
-    # 3. Resolve Arguments / Config
+    # 4. Resolve Arguments / Config
     resolved_config = {}
-    
-    # Simple reference resolution (can be expanded)
     for k, v in config.items():
-        if k.startswith('_'): continue 
-        resolved_config[k] = v
+        if k.startswith('_'):
+            continue
+        resolved_config[k] = resolve_reference(v, step_map)
 
-    # Inject input dataframe
-    # The wrappers in orchestrators.py often look for a DataFrame in kwargs
     if df_in is not None:
         resolved_config['_input_df'] = df_in
     
-    if not wrapper:
-        # If no wrapper found (or none requested), use raw function
-        executable_func = func
-    else:
-        # Wrap the raw function with the chosen logic
-        executable_func = wrapper(func)
+    executable_func = func if not wrapper else wrapper(func)
     
-    # Execute
+    # 5. Execute
     print(f"Running '{op_id}' with orchestrator '{orchestrator_type}'")
     try:
-        # The wrapper handles pulling the right column, applying the function, etc.
         result_df = executable_func(**resolved_config)
         
-        # Ensure result is a DataFrame (wrappers usually guarantee this, but to be safe)
         if not isinstance(result_df, pd.DataFrame):
              print(f"Warning: Operation {op_id} returned {type(result_df)}, expected DataFrame")
              if isinstance(result_df, list):
@@ -129,12 +176,7 @@ def run_operation(
         traceback.print_exc()
         raise ValueError(f"Error executing step {op_id}: {str(e)}")
 
-    # 4. Save Result
+    # 6. Save Result
     out_ref = save_dataframe(result_df)
     
-    metrics = {
-        "rows": len(result_df),
-        "columns": list(result_df.columns)
-    }
-    
-    return out_ref, metrics
+    return out_ref, {"rows": len(result_df), "columns": list(result_df.columns)}

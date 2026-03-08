@@ -1,0 +1,278 @@
+/* ── Detached Step Window ─────────────────────────────────────────────────── */
+
+.detached-step-window {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  border: 1px solid #555;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  min-width: 320px;
+  min-height: 60px;
+  /* Prevent text selection while dragging */
+  user-select: none;
+}
+
+/* ── Title bar ─────────────────────────────────────────────────────────────── */
+
+.dsw-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 8px 0 12px;
+  background: color-mix(in srgb, var(--step-color, #444) 85%, #1a1a1a);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.dsw-titlebar:active {
+  cursor: grabbing;
+}
+
+.dsw-titlebar-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.dsw-step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  flex-shrink: 0;
+}
+
+.dsw-step-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.dsw-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.dsw-titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.dsw-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  transition: background 0.15s;
+}
+
+.dsw-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.dsw-btn-close:hover {
+  background: #c0392b;
+  color: #fff;
+}
+
+/* ── Body ──────────────────────────────────────────────────────────────────── */
+
+.dsw-body {
+  flex: 1;
+  overflow: auto;
+  background: #2a2a2a;
+  /* Remove the arrow-chevron overlapping margins that make sense in the pipeline
+     but look wrong in a floating window */
+}
+
+/* Inside the floating window the OperationColumn should not use the pipeline
+   arrow/overlap layout — override the margin that creates the chain overlap. */
+.dsw-body .operation-column {
+  margin-right: 0 !important;
+  border-radius: 0;
+  /* Make the header non-clickable for collapse since we always keep it active */
+  pointer-events: auto;
+}
+
+.dsw-body .operation-column .op-header {
+  cursor: default;
+}
+
+/* ── Resize handles ────────────────────────────────────────────────────────── */
+
+.dsw-resize {
+  position: absolute;
+  z-index: 10;
+}
+
+/* Edge handles */
+.dsw-resize-e  { right: 0;  top: 8px;  bottom: 8px;  width: 5px;  cursor: e-resize; }
+.dsw-resize-w  { left: 0;   top: 8px;  bottom: 8px;  width: 5px;  cursor: w-resize; }
+.dsw-resize-s  { bottom: 0; left: 8px; right: 8px;   height: 5px; cursor: s-resize; }
+.dsw-resize-n  { top: 0;    left: 8px; right: 8px;   height: 5px; cursor: n-resize; }
+
+/* Corner handles */
+.dsw-resize-se { right: 0;  bottom: 0; width: 12px; height: 12px; cursor: se-resize; }
+.dsw-resize-sw { left: 0;   bottom: 0; width: 12px; height: 12px; cursor: sw-resize; }
+.dsw-resize-ne { right: 0;  top: 0;    width: 12px; height: 12px; cursor: ne-resize; }
+.dsw-resize-nw { left: 0;   top: 0;    width: 12px; height: 12px; cursor: nw-resize; }
+
+/* SE corner visual grip dots */
+.dsw-resize-se::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid rgba(255,255,255,0.25);
+  border-bottom: 2px solid rgba(255,255,255,0.25);
+}
+
+/* ── Maximized state ───────────────────────────────────────────────────────── */
+
+.detached-step-window.dsw-maximized {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* When maximized/snapped, give the data grid much more vertical room */
+.detached-step-window.dsw-maximized .dsw-body .op-content-section,
+.detached-step-window.dsw-snapped   .dsw-body .op-content-section {
+  max-height: calc(100vh - 160px) !important;
+}
+
+/* Titlebar cursor hint: not draggable when maximized */
+.detached-step-window.dsw-maximized .dsw-titlebar {
+  cursor: default;
+}
+
+/* ── Snapped states ────────────────────────────────────────────────────────── */
+
+.detached-step-window.dsw-snapped {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  transition: left 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              top  0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              width  0.18s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detached-step-window.dsw-snapped-left {
+  left: 0 !important;
+  top: 0 !important;
+  width: 50vw !important;
+  height: 100vh !important;
+}
+
+.detached-step-window.dsw-snapped-right {
+  left: 50vw !important;
+  top: 0 !important;
+  width: 50vw !important;
+  height: 100vh !important;
+}
+
+.detached-step-window.dsw-snapped-top {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 50vh !important;
+}
+
+/* Badge tint when snapped */
+.dsw-badge.dsw-badge-snapped {
+  background: rgba(99, 102, 241, 0.4);
+  color: #c7d2fe;
+}
+
+/* ── Snap preview overlay ──────────────────────────────────────────────────── */
+
+.dsw-snap-preview {
+  position: fixed;
+  background: rgba(99, 102, 241, 0.18);
+  border: 2px solid rgba(99, 102, 241, 0.55);
+  border-radius: 6px;
+  pointer-events: none;
+  transition: opacity 0.1s;
+  animation: dsw-snap-fade-in 0.12s ease;
+}
+
+@keyframes dsw-snap-fade-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.dsw-snap-preview-left {
+  left: 4px;
+  top: 4px;
+  width: calc(50vw - 8px);
+  height: calc(100vh - 8px);
+}
+
+.dsw-snap-preview-right {
+  left: calc(50vw + 4px);
+  top: 4px;
+  width: calc(50vw - 8px);
+  height: calc(100vh - 8px);
+}
+
+.dsw-snap-preview-top {
+  left: 4px;
+  top: 4px;
+  width: calc(100vw - 8px);
+  height: calc(50vh - 8px);
+}
+
+/* ── Drag-hint on OperationColumn header ──────────────────────────────────── */
+
+/* Applied to the op-header when the drag-to-detach hint should be visible */
+.op-header.drag-detach-hint::before {
+  content: '⠿ drag to detach';
+  position: absolute;
+  top: 50%;
+  right: 44px;  /* leave space before any buttons */
+  transform: translateY(-50%);
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.45);
+  pointer-events: none;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  z-index: 10;
+}
