@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
+import StagedDataGrid from './StagedDataGrid';
 import StepToolbar from './StepToolbar';
 import PreviousStepDataPicker from './PreviousStepDataPicker';
-import { buildFormula } from '../utils/formulaParser';
+import { buildFormula, parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
+import { useStagedPreview } from '../hooks/useStagedPreview';
 import './OperationColumn.css';
 
 interface OperationColumnProps {
@@ -134,16 +136,76 @@ export default function OperationColumn({
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
 
+  // ── Staged preview state ───────────────────────────────────────────────────
+  // Track what the user is typing live — separate from committed step.operation
+  const [liveFormula, setLiveFormula] = useState<string>(step.operation ?? '');
+
+  // Keep liveFormula in sync when the step is updated externally
+  useEffect(() => {
+    setLiveFormula(step.operation ?? '');
+  }, [step.operation]);
+
+  // Parse the live formula so the staged preview hook gets a typed ParsedFormula
+  const liveParsed = useMemo(
+    () => (liveFormula ? parseFormula(liveFormula) : null),
+    [liveFormula]
+  );
+
+  // Derive upstream rows/columns from the last previous step's output_preview
+  const upstreamRows = useMemo<Record<string, unknown>[]>(() => {
+    const lastStep = previousSteps[previousSteps.length - 1];
+    if (!lastStep?.output_preview || lastStep.output_preview.length === 0) return [];
+    const colIds = Array.from(new Set(lastStep.output_preview.map((c) => c.column_id)));
+    const rowIds = Array.from(new Set(lastStep.output_preview.map((c) => c.row_id))).sort(
+      (a, b) => a - b
+    );
+    return rowIds.map((rowId) =>
+      Object.fromEntries(
+        colIds.map((colId) => {
+          const cell = lastStep.output_preview!.find(
+            (c) => c.row_id === rowId && c.column_id === colId
+          );
+          return [colId, cell?.value ?? null];
+        })
+      )
+    );
+  }, [previousSteps]);
+
+  const upstreamColumns = useMemo(() => {
+    const lastStep = previousSteps[previousSteps.length - 1];
+    if (!lastStep?.output_preview) return [];
+    return Array.from(new Set(lastStep.output_preview.map((c) => c.column_id)));
+  }, [previousSteps]);
+
+  const stagedPreview = useStagedPreview({
+    step,
+    parsed: liveParsed,
+    availableOperations,
+    upstreamRows,
+    upstreamColumns,
+    previewRowCount: 6,
+  });
+
+  // Show staged preview when the formula has been touched but step hasn't been
+  // (re-)run — or when the live formula differs from what was last executed
+  const hasUncommittedFormula =
+    liveFormula !== '' &&
+    (step.status === 'pending' ||
+      step.status === 'stopped' ||
+      liveFormula !== (step.operation ?? ''));
+
   // Handler for UI-based updates (Dropdowns/Inputs)
   const handleUiUpdate = (updates: Partial<Step>) => {
     const newOpId = updates.process_type !== undefined ? updates.process_type : step.process_type;
     const newConfig = updates.configuration !== undefined ? updates.configuration : step.configuration;
     const newFormula = buildFormula(newOpId, newConfig);
+    setLiveFormula(newFormula); // keep staged preview in sync
     onUpdate?.(step.id, { ...updates, operation: newFormula });
   };
 
   // Handler for Formula-based updates (Toolbar Input)
   const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
+    setLiveFormula(formula); // immediately drive staged preview
     if (parsed.isValid && parsed.operationId) {
       // Preserve internal keys (e.g. _orchestrator) that aren't in the formula
       const internalKeys = Object.fromEntries(
@@ -356,14 +418,59 @@ export default function OperationColumn({
               {activeTab === 'data' && (
                   <div className="tab-content status-content">
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
-                      <DataOutputGrid 
-                        cells={step.output_preview} 
-                        onCellClick={(cell) => console.log('Cell clicked:', cell)}
-                        wiringMode={isWiringSource}
-                        sourceStepId={step.id}
-                        onWireColumn={(token) => injectReference(token)}
-                        onWireCell={(token) => injectReference(token)}
-                      />
+
+                      {/* ── Staged preview — shown when formula is uncommitted ── */}
+                      {hasUncommittedFormula && (stagedPreview.columns.length > 0 || stagedPreview.globalErrors.length > 0) && (
+                        <div className="staged-preview-container">
+                          <div className="staged-preview-header">
+                            <span className="staged-preview-label">
+                              {stagedPreview.globalErrors.length > 0
+                                ? '⚠ Formula has errors'
+                                : stagedPreview.isReady
+                                ? '⚡ Staged Preview — press ▶ Run to execute'
+                                : '… Building preview'}
+                            </span>
+                            <button
+                              className="staged-preview-run-btn"
+                              onClick={() => onRun(step.id)}
+                              title="Execute this step now"
+                              disabled={!stagedPreview.isReady}
+                            >
+                              ▶ Run
+                            </button>
+                          </div>
+                          <StagedDataGrid
+                            preview={stagedPreview}
+                            showFormulas={true}
+                          />
+                        </div>
+                      )}
+
+                      {/* ── Actual committed output ── */}
+                      {/* Always show actual output when step has run, as a collapsible if staged preview is also visible */}
+                      {step.status === 'completed' && hasUncommittedFormula && stagedPreview.columns.length > 0 ? (
+                        <details className="staged-prev-output-toggle">
+                          <summary>Previous execution output</summary>
+                          <DataOutputGrid
+                            cells={step.output_preview}
+                            onCellClick={(cell) => console.log('Cell clicked:', cell)}
+                            wiringMode={isWiringSource}
+                            sourceStepId={step.id}
+                            onWireColumn={(token) => injectReference(token)}
+                            onWireCell={(token) => injectReference(token)}
+                          />
+                        </details>
+                      ) : (
+                        <DataOutputGrid
+                          cells={step.output_preview}
+                          onCellClick={(cell) => console.log('Cell clicked:', cell)}
+                          wiringMode={isWiringSource}
+                          sourceStepId={step.id}
+                          onWireColumn={(token) => injectReference(token)}
+                          onWireCell={(token) => injectReference(token)}
+                        />
+                      )}
+
                     </div>
                   </div>
               )}
