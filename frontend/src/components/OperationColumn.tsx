@@ -410,53 +410,27 @@ export default function OperationColumn({
 
                       {/* Orchestration Strategy Override */}
                       {currentOp && (
-                        <div style={{ borderTop: '1px solid #eee', paddingTop: '10px', marginTop: '10px' }}>
-                          <div style={{ fontSize: '0.7rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', marginBottom: '6px', letterSpacing: '0.05em' }}>
-                            Orchestration
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
-                            {([
-                              { value: '',             icon: '⚙️', label: 'Default',    desc: `Use the operation's built-in mode (${currentOp.type || 'dataframe'})` },
-                              { value: 'source',       icon: '🌱', label: 'Source',     desc: 'Generate a brand-new DataFrame from scratch (no input needed)' },
-                              { value: 'dataframe',    icon: '🗂️', label: 'DataFrame',  desc: 'Pass the entire DataFrame directly into the function' },
-                              { value: 'map',          icon: '🔁', label: 'Row Map',    desc: 'Run the function once per row, adding results as new columns' },
-                              { value: 'filter',       icon: '🔍', label: 'Filter',     desc: 'Keep only rows where the function returns True' },
-                              { value: 'expand',       icon: '↕️', label: 'Expand',     desc: 'Explode list results so each item becomes its own row' },
-                              { value: 'raw_output',   icon: '🔬', label: 'Raw Output', desc: 'Call the function directly with no orchestration — visualize its raw return value' },
-                            ] as const).map(({ value, icon, label, desc }) => {
-                              const current = String(step.configuration._orchestrator || '');
-                              const isSelected = current === value;
-                              return (
-                                <button
-                                  key={value}
-                                  title={desc}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const newConfig = { ...step.configuration };
-                                    if (value) newConfig._orchestrator = value;
-                                    else delete newConfig._orchestrator;
-                                    handleUiUpdate({ configuration: newConfig });
-                                  }}
-                                  style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    alignItems: 'flex-start',
-                                    gap: '2px',
-                                    padding: '6px 8px',
-                                    border: isSelected ? '2px solid var(--step-color, #0078d4)' : '1px solid #ddd',
-                                    borderRadius: '5px',
-                                    background: isSelected ? 'color-mix(in srgb, var(--step-color, #0078d4) 10%, white)' : '#fafafa',
-                                    cursor: 'pointer',
-                                    textAlign: 'left',
-                                    transition: 'all 0.15s',
-                                  }}
-                                >
-                                  <span style={{ fontSize: '0.85rem' }}>{icon} <strong style={{ fontSize: '0.78rem', color: '#333' }}>{label}</strong></span>
-                                  <span style={{ fontSize: '0.67rem', color: '#777', lineHeight: 1.3 }}>{desc}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
+                        <div className="config-item" style={{ borderTop: '1px solid #eee', paddingTop: '10px', marginTop: '10px' }}>
+                          <label>Orchestration:</label>
+                          <select
+                            value={String(step.configuration._orchestrator || '')}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              const newConfig = { ...step.configuration };
+                              if (e.target.value) newConfig._orchestrator = e.target.value;
+                              else delete newConfig._orchestrator;
+                              handleUiUpdate({ configuration: newConfig });
+                            }}
+                          >
+                            <option value="">⚙️ Default — Use the operation's built-in mode ({currentOp.type || 'dataframe'})</option>
+                            <option value="source">🌱 Source — Generate a brand-new DataFrame from scratch (no input needed)</option>
+                            <option value="dataframe">🗂️ DataFrame — Pass the entire DataFrame directly into the function</option>
+                            <option value="map">🔁 Row Map — Run the function once per row, adding results as new columns</option>
+                            <option value="filter">🔍 Filter — Keep only rows where the function returns True</option>
+                            <option value="expand">↕️ Expand — Explode list results so each item becomes its own row</option>
+                            <option value="raw_output">🔬 Raw Output — Call the function directly with no orchestration</option>
+                          </select>
                         </div>
                       )}
                       
