@@ -3,7 +3,6 @@ import './StagedDataGrid.css';
 
 interface StagedDataGridProps {
   preview: StagedPreview;
-  showFormulas?: boolean;
 }
 
 function CellBadge({ cell }: { cell: StagedCell }) {
@@ -12,26 +11,12 @@ function CellBadge({ cell }: { cell: StagedCell }) {
       className={`staged-cell staged-cell--${cell.state}`}
       title={cell.errorMessage ?? cell.formula}
     >
-      <div className="staged-cell-value">
-        {cell.state === 'error' && (
-          <span className="staged-cell-icon staged-cell-icon--error" title={cell.errorMessage}>⚠</span>
-        )}
-        {cell.state === 'pending' && (
-          <span className="staged-cell-icon staged-cell-icon--pending">…</span>
-        )}
-        {cell.state === 'passthrough' && (
-          <span className="staged-cell-icon staged-cell-icon--passthrough">↳</span>
-        )}
-        {cell.state === 'valid' && (
-          <span className="staged-cell-icon staged-cell-icon--valid">✓</span>
-        )}
-        <span className="staged-cell-text">{cell.displayValue}</span>
-      </div>
+      <span className="staged-cell-text">{cell.displayValue}</span>
     </td>
   );
 }
 
-export default function StagedDataGrid({ preview, showFormulas = false }: StagedDataGridProps) {
+export default function StagedDataGrid({ preview }: StagedDataGridProps) {
   if (!preview.columns.length && !preview.globalErrors.length) {
     return (
       <div className="staged-grid-empty">
@@ -105,34 +90,6 @@ export default function StagedDataGrid({ preview, showFormulas = false }: Staged
               ))}
             </tbody>
           </table>
-
-          {showFormulas && (
-            <details className="staged-formula-detail">
-              <summary>Cell formulas</summary>
-              <table className="staged-table staged-table--formulas">
-                <thead>
-                  <tr>
-                    <th className="staged-row-index">#</th>
-                    {preview.columns.map((c) => (
-                      <th key={c.name}>{c.name}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Array.from({ length: rowCount }, (_, rowIdx) => (
-                    <tr key={rowIdx}>
-                      <td className="staged-row-index">{rowIdx + 1}</td>
-                      {preview.columns.map((col) => (
-                        <td key={col.name} className="staged-formula-cell">
-                          <code>{col.cells[rowIdx].formula}</code>
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </details>
-          )}
         </div>
       )}
     </div>

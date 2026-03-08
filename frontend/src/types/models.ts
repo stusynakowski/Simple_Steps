@@ -14,15 +14,28 @@ export interface Step {
   id: string;
   sequence_index: number;
   label: string;
+  /**
+   * The canonical formula string, e.g. `=filter_rows(column="score", value="5")`.
+   * This is the single source of truth for what the step executes.
+   * `process_type` and `configuration` are always derived FROM this.
+   */
+  formula: string;
+  /**
+   * Derived from `formula` — the operation function name. Never set directly;
+   * always updated alongside `formula` via `parseFormula`.
+   */
   process_type: string;
+  /**
+   * Derived from `formula` — the parsed args dict plus any extra metadata keys
+   * (prefixed `_`, e.g. `_orchestrator`) that are not part of the formula syntax.
+   */
   configuration: StepConfiguration;
   status: StepStatus;
+  /** @deprecated Use `formula` instead. Kept for backward-compat during migration. */
   operation?: string;
   outputRefId?: string; // The backend reference ID for the result DataFrame
   outputColumns?: string[]; // Full list of columns in the output DataFrame (for step diffing)
   output_preview?: Cell[]; 
-  // For glide datagrid, we might eventually need specific GridCell types, 
-  // but for now we stick to the project spec `Cell` abstraction.
 }
 
 export interface Workflow {

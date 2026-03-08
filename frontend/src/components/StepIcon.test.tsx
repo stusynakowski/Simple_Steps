@@ -6,6 +6,7 @@ const sampleStep = {
   id: 'test-step-1',
   sequence_index: 0,
   label: 'Test Step',
+  formula: '',
   process_type: 'noop',
   configuration: {},
   status: 'completed' as const,

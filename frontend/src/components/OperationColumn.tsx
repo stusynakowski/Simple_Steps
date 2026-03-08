@@ -116,6 +116,7 @@ export default function OperationColumn({
         Object.entries(step.configuration).filter(([k]) => k.startsWith('_') && k !== '_ref')
       );
       onUpdate?.(step.id, {
+        formula: newValue,
         operation: newValue,
         process_type: 'passthrough',
         configuration: { ...internalKeys, _ref: newValue },
@@ -130,20 +131,22 @@ export default function OperationColumn({
     }, 0);
   };
 
-  // Formula derived from step — kept in sync so StepToolbar reflects config changes
-  const derivedFormula = buildFormula(step.process_type, step.configuration);
+  // The formula bar always reflects step.formula (the canonical field).
+  // buildFormula is only used as a fallback for legacy steps that predate
+  // the formula field (i.e. loaded from old save files without a formula).
+  const derivedFormula = step.formula || buildFormula(step.process_type, step.configuration);
 
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
 
   // ── Staged preview state ───────────────────────────────────────────────────
-  // Track what the user is typing live — separate from committed step.operation
-  const [liveFormula, setLiveFormula] = useState<string>(step.operation ?? '');
+  // Track what the user is typing live — separate from committed step.formula
+  const [liveFormula, setLiveFormula] = useState<string>(step.formula ?? step.operation ?? '');
 
   // Keep liveFormula in sync when the step is updated externally
   useEffect(() => {
-    setLiveFormula(step.operation ?? '');
-  }, [step.operation]);
+    setLiveFormula(step.formula ?? step.operation ?? '');
+  }, [step.formula, step.operation]);
 
   // Parse the live formula so the staged preview hook gets a typed ParsedFormula
   const liveParsed = useMemo(
@@ -192,18 +195,21 @@ export default function OperationColumn({
     liveFormula !== '' &&
     (step.status === 'pending' ||
       step.status === 'stopped' ||
-      liveFormula !== (step.operation ?? ''));
+      liveFormula !== (step.formula ?? step.operation ?? ''));
 
-  // Handler for UI-based updates (Dropdowns/Inputs)
+  // Handler for UI-based updates (Dropdowns/Inputs in the Details tab)
+  // The UI form writes to the formula FIRST; process_type and configuration
+  // are derived from the formula and kept in sync.
   const handleUiUpdate = (updates: Partial<Step>) => {
     const newOpId = updates.process_type !== undefined ? updates.process_type : step.process_type;
     const newConfig = updates.configuration !== undefined ? updates.configuration : step.configuration;
     const newFormula = buildFormula(newOpId, newConfig);
     setLiveFormula(newFormula); // keep staged preview in sync
-    onUpdate?.(step.id, { ...updates, operation: newFormula });
+    onUpdate?.(step.id, { ...updates, formula: newFormula, operation: newFormula });
   };
 
   // Handler for Formula-based updates (Toolbar Input)
+  // The formula bar is the canonical write path. Everything else is derived from it.
   const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
     setLiveFormula(formula); // immediately drive staged preview
     if (parsed.isValid && parsed.operationId) {
@@ -212,7 +218,8 @@ export default function OperationColumn({
         Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
       );
       onUpdate?.(step.id, {
-        operation: formula,
+        formula,
+        operation: formula,   // keep legacy field in sync during migration
         process_type: parsed.operationId,
         configuration: { ...internalKeys, ...parsed.args },
       });
@@ -220,26 +227,24 @@ export default function OperationColumn({
       // Partial formula (user is still typing) — update process_type so the
       // details panel switches to the right operation, but don't overwrite config
       onUpdate?.(step.id, {
+        formula,
         operation: formula,
         process_type: parsed.operationId,
       });
     } else if (formula && !formula.startsWith('=')) {
-      // Bare reference token (e.g. "step-abc.url") with no operation specified.
-      // Treat as a pass-through / identity: resolve the reference on run and
-      // display that data as this step's output.
-      // This branch fires for ANY non-formula text so the user can freely edit
-      // the token — _ref always stays in sync with what's in the bar.
+      // Bare reference token (e.g. "step-abc.url") — pass-through mode.
       const internalKeys = Object.fromEntries(
         Object.entries(step.configuration).filter(([k]) => k.startsWith('_') && k !== '_ref')
       );
       onUpdate?.(step.id, {
+        formula,
         operation: formula,
         process_type: 'passthrough',
         configuration: { ...internalKeys, _ref: formula },
       });
     } else {
       // Incomplete / plain text — just keep the raw string
-      onUpdate?.(step.id, { operation: formula });
+      onUpdate?.(step.id, { formula, operation: formula });
     }
   };
 
@@ -441,7 +446,6 @@ export default function OperationColumn({
                           </div>
                           <StagedDataGrid
                             preview={stagedPreview}
-                            showFormulas={true}
                           />
                         </div>
                       )}

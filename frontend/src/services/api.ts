@@ -115,6 +115,8 @@ export interface StepConfig {
     operation_id: string;
     label: string;
     config: Record<string, unknown>;
+    /** Canonical formula string — the single source of truth for what this step executes. */
+    formula?: string;
 }
 
 /** The pipeline definition written to disk — no runtime data. */

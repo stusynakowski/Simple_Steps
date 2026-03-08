@@ -25,12 +25,12 @@
   color: #2e7d32;
 }
 .staged-description.pending {
-  background: #fff8e1;
-  color: #f57f17;
+  background: #e3f0ff;
+  color: #1565c0;
 }
 .staged-description.error {
-  background: #fce4ec;
-  color: #b71c1c;
+  background: #fffde7;
+  color: #e65100;
 }
 .staged-description-icon {
   font-size: 0.9rem;
@@ -39,15 +39,15 @@
 
 /* ── Global errors ────────────────────────────────────────────────────────── */
 .staged-global-errors {
-  background: #fce4ec;
-  border-bottom: 1px solid #f8bbd0;
+  background: #fffde7;
+  border-bottom: 1px solid #ffe082;
   padding: 4px 10px;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 .staged-global-error {
-  color: #c62828;
+  color: #e65100;
   font-size: 0.73rem;
   display: flex;
   align-items: center;
@@ -146,36 +146,42 @@
 
 /* State variants */
 .staged-cell--valid {
-  background: #f1f8e9;
+  background: #e3f0ff;
 }
 .staged-cell-icon--valid {
-  color: #558b2f;
+  color: #1565c0;
+}
+.staged-cell--valid .staged-cell-text {
+  color: #1565c0;
 }
 .staged-cell--pending {
-  background: #fffde7;
+  background: #fff8e1;
 }
 .staged-cell-icon--pending {
   color: #f9a825;
   font-weight: 700;
 }
+.staged-cell--pending .staged-cell-text {
+  color: #e65100;
+}
 .staged-cell--error {
-  background: #fff3f3;
+  background: #fffde7;
 }
 .staged-cell-icon--error {
-  color: #d32f2f;
+  color: #f9a825;
 }
 .staged-cell--error .staged-cell-text {
-  color: #b71c1c;
+  color: #e65100;
   font-style: italic;
 }
 .staged-cell--passthrough {
-  background: #fdf4ff;
+  background: #e8f5e9;
 }
 .staged-cell-icon--passthrough {
-  color: #9c4dcc;
+  color: #2e7d32;
 }
 .staged-cell--passthrough .staged-cell-text {
-  color: #6a1b9a;
+  color: #1b5e20;
 }
 
 /* ── Empty state ──────────────────────────────────────────────────────────── */

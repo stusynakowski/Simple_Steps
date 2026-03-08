@@ -23,6 +23,10 @@ class StepConfig(BaseModel):
     operation_id: str
     label: str = ""
     config: Dict[str, Any] = Field(default_factory=dict)
+    # Canonical formula — the single source of truth for what this step executes.
+    # operation_id and config are derived from this on load.
+    # e.g. "=filter_rows(column=\"score\", value=\"5\", mode=\"equals\")"
+    formula: str = ""
 
 class PipelineFile(BaseModel):
     """

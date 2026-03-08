@@ -6,6 +6,45 @@ import { runStep as runStepApi, fetchDataView, getOperations,
   listPipelines, loadPipeline, savePipeline, deletePipeline,
 } from '../services/api';
 import type { OperationDefinition, PipelineFile } from '../services/api';
+import { parseFormula, buildFormula } from '../utils/formulaParser';
+
+/**
+ * Hydrate a saved StepConfig into a runtime Step.
+ * The formula is the canonical field; process_type and configuration
+ * are always re-derived from it so they stay in sync.
+ */
+function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
+  const savedFormula = s.formula ?? '';
+  const parsed = savedFormula ? parseFormula(savedFormula) : null;
+
+  // If the saved file has a valid formula, derive everything from it.
+  // Fall back to the legacy operation_id/config fields for old saves.
+  const processType = (parsed?.isValid && parsed.operationId)
+    ? parsed.operationId
+    : (s.operation_id ?? 'noop');
+
+  const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
+
+  // Preserve internal (_-prefixed) keys from the saved config (e.g. _orchestrator)
+  // that are not part of the formula syntax, then layer formula args on top.
+  const internalKeys = Object.fromEntries(
+    Object.entries(s.config ?? {}).filter(([k]) => k.startsWith('_'))
+  );
+  const configuration = { ...internalKeys, ...formulaArgs };
+
+  // If no formula was saved, reconstruct it from the legacy fields so we have one.
+  const formula = savedFormula || buildFormula(processType, configuration);
+
+  return {
+    id: s.step_id,
+    sequence_index: i,
+    label: s.label || `Step ${i + 1}`,
+    formula,
+    process_type: processType,
+    configuration: configuration as Record<string, unknown>,
+    status: 'pending' as StepStatus,
+  };
+}
 
 function genId(prefix = 'step') {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
@@ -37,6 +76,7 @@ export default function useWorkflow() {
       id: genId('step'),
       sequence_index: index,
       label: `Step ${index}`,
+      formula: '',
       process_type: 'noop',
       configuration: {},
       status: 'pending',
@@ -87,6 +127,22 @@ export default function useWorkflow() {
     const step = currentSteps.find((s) => s.id === id);
     if (!step) return;
 
+    // ── Derive operation_id and args from the formula (the canonical source) ──
+    // If a config override is explicitly passed (e.g. from runPipeline), use it
+    // as-is. Otherwise, always parse the formula to get the authoritative args.
+    const parsed = step.formula ? parseFormula(step.formula) : null;
+    const operationId = (parsed?.isValid && parsed.operationId)
+      ? parsed.operationId
+      : step.process_type;
+
+    // Internal (_-prefixed) keys like _orchestrator are not in the formula —
+    // carry them from configuration. Formula args override everything else.
+    const internalKeys = Object.fromEntries(
+      Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
+    );
+    const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
+    const resolvedConfig: Record<string, unknown> = config ?? { ...internalKeys, ...formulaArgs };
+
     // Identify dependency (previous step)
     const stepIndex = currentSteps.indexOf(step);
     const prevStep = stepIndex > 0 ? currentSteps[stepIndex - 1] : undefined;
@@ -109,11 +165,11 @@ export default function useWorkflow() {
     });
 
     try {
-      // Execute the step using the step's process_type and configuration
+      // Execute the step — use operationId and resolvedConfig derived from the formula
       const res = await runStepApi(
           id, 
-          step.process_type, 
-          config ?? step.configuration, 
+          operationId, 
+          resolvedConfig, 
           prevStep?.outputRefId ?? null,
           stepMap
       );
@@ -173,16 +229,23 @@ export default function useWorkflow() {
             stepMap[`step${index + 1}`] = s.outputRefId;
         }
     }
-    
-    // We don't set status to 'running' to avoid full UI lock, 
-    // maybe just a subtle indicator if needed. 
-    // For now, let's just run it "silently" and update the preview.
 
+    // Derive operation_id and args from the formula (the canonical source)
+    const parsed = step.formula ? parseFormula(step.formula) : null;
+    const previewOperationId = (parsed?.isValid && parsed.operationId)
+      ? parsed.operationId
+      : step.process_type;
+    const internalKeys = Object.fromEntries(
+      Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
+    );
+    const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
+    const previewConfig: Record<string, unknown> = config ?? { ...internalKeys, ...formulaArgs };
+    
     try {
       const res = await runStepApi(
           id, 
-          step.process_type, 
-          config ?? step.configuration, 
+          previewOperationId, 
+          previewConfig, 
           prevStep?.outputRefId ?? null,
           stepMap,
           true // isPreview
@@ -363,6 +426,8 @@ export default function useWorkflow() {
         operation_id: s.process_type,
         label: s.label,
         config: s.configuration,
+        // formula is the canonical field — always persisted
+        formula: s.formula ?? s.operation ?? '',
       })),
     };
     return savePipeline(projectId, pipeline);
@@ -371,14 +436,7 @@ export default function useWorkflow() {
   /** Load a pipeline from a project and replace the current workflow. */
   const loadWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<void> => {
     const pipeline = await loadPipeline(projectId, pipelineId);
-    const restoredSteps: Step[] = pipeline.steps.map((s: PipelineFile['steps'][number], i: number) => ({
-      id: s.step_id,
-      sequence_index: i,
-      label: s.label || `Step ${i + 1}`,
-      process_type: s.operation_id,
-      configuration: s.config as Record<string, unknown>,
-      status: 'pending' as StepStatus,
-    }));
+    const restoredSteps: Step[] = pipeline.steps.map(hydrateStep);
     setWorkflow({
       id: pipeline.id,
       name: pipeline.name,
@@ -393,14 +451,7 @@ export default function useWorkflow() {
   /** Fetch a pipeline as a Workflow object WITHOUT changing hook state. */
   const fetchWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<Workflow> => {
     const pipeline = await loadPipeline(projectId, pipelineId);
-    const steps: Step[] = pipeline.steps.map((s: PipelineFile['steps'][number], i: number) => ({
-      id: s.step_id,
-      sequence_index: i,
-      label: s.label || `Step ${i + 1}`,
-      process_type: s.operation_id,
-      configuration: s.config as Record<string, unknown>,
-      status: 'pending' as StepStatus,
-    }));
+    const steps: Step[] = pipeline.steps.map(hydrateStep);
     return { id: pipeline.id, name: pipeline.name, created_at: pipeline.created_at, steps };
   }, []);
 
