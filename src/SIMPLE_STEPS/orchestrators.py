@@ -223,6 +223,38 @@ def dataframe_op_wrapper(func: Callable) -> Callable:
         return res
     return wrapper
 
+def raw_output_wrapper(func: Callable) -> Callable:
+    """
+    Calls the function with no orchestration — no DataFrame injection, no row mapping.
+    Whatever the function returns is normalized into a DataFrame for visualization:
+      - DataFrame  → returned as-is
+      - list of dicts → DataFrame with dict keys as columns
+      - list of scalars → single-column DataFrame ('output')
+      - dict → single-row DataFrame
+      - scalar → single-cell DataFrame ('output')
+    This lets the user inspect the raw return value of a function before any
+    orchestration decorator is applied.
+    """
+    def wrapper(*args, **kwargs) -> pd.DataFrame:
+        # Strip internal plumbing keys before calling the raw function
+        clean_kwargs = {k: v for k, v in kwargs.items() if not k.startswith('_')}
+        print(f"[Orchestrator:RawOutput] Executing {func.__name__} with no orchestration...")
+        result = func(*clean_kwargs) if not clean_kwargs else func(**clean_kwargs)
+
+        if isinstance(result, pd.DataFrame):
+            return result
+        if isinstance(result, list):
+            if not result:
+                return pd.DataFrame(columns=['output'])
+            if isinstance(result[0], dict):
+                return pd.DataFrame(result)
+            return pd.DataFrame({'output': result})
+        if isinstance(result, dict):
+            return pd.DataFrame([result])
+        # Scalar fallback
+        return pd.DataFrame({'output': [result]})
+    return wrapper
+
 # Wrapper Registry
 ORCHESTRATORS = {
     "source": source_wrapper,
@@ -230,5 +262,6 @@ ORCHESTRATORS = {
     "rowmap": rowmap_wrapper,
     "filter": filter_wrapper,
     "expand": expand_wrapper,
-    "dataframe": dataframe_op_wrapper
+    "dataframe": dataframe_op_wrapper,
+    "raw_output": raw_output_wrapper,
 }

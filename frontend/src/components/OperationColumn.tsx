@@ -264,12 +264,13 @@ export default function OperationColumn({
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' }}>
                             {([
-                              { value: '',          icon: '⚙️', label: 'Default',   desc: `Use the operation's built-in mode (${currentOp.type || 'dataframe'})` },
-                              { value: 'source',    icon: '🌱', label: 'Source',    desc: 'Generate a brand-new DataFrame from scratch (no input needed)' },
-                              { value: 'dataframe', icon: '🗂️', label: 'DataFrame', desc: 'Pass the entire DataFrame directly into the function' },
-                              { value: 'map',       icon: '🔁', label: 'Row Map',   desc: 'Run the function once per row, adding results as new columns' },
-                              { value: 'filter',    icon: '🔍', label: 'Filter',    desc: 'Keep only rows where the function returns True' },
-                              { value: 'expand',    icon: '↕️', label: 'Expand',    desc: 'Explode list results so each item becomes its own row' },
+                              { value: '',             icon: '⚙️', label: 'Default',    desc: `Use the operation's built-in mode (${currentOp.type || 'dataframe'})` },
+                              { value: 'source',       icon: '🌱', label: 'Source',     desc: 'Generate a brand-new DataFrame from scratch (no input needed)' },
+                              { value: 'dataframe',    icon: '🗂️', label: 'DataFrame',  desc: 'Pass the entire DataFrame directly into the function' },
+                              { value: 'map',          icon: '🔁', label: 'Row Map',    desc: 'Run the function once per row, adding results as new columns' },
+                              { value: 'filter',       icon: '🔍', label: 'Filter',     desc: 'Keep only rows where the function returns True' },
+                              { value: 'expand',       icon: '↕️', label: 'Expand',     desc: 'Explode list results so each item becomes its own row' },
+                              { value: 'raw_output',   icon: '🔬', label: 'Raw Output', desc: 'Call the function directly with no orchestration — visualize its raw return value' },
                             ] as const).map(({ value, icon, label, desc }) => {
                               const current = String(step.configuration._orchestrator || '');
                               const isSelected = current === value;

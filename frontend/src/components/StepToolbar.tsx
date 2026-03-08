@@ -113,19 +113,7 @@ export default function StepToolbar({
             )}
         </button>
 
-        {/* Function Button (Fx Icon) - Activated Details */}
-        <button 
-          className={`btn-icon tab-icon ${activeTab === 'details' ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
-          title="Operation Functionality"
-          style={{ 
-              color: activeTab === 'details' ? '#3498db' : '#666', 
-              background: activeTab === 'details' ? '#ebf5fb' : 'transparent',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-            <span style={{ fontSize: '12px', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
-        </button>
+
 
          {/* Settings Button (Gear Icon) - Activated Settings */}
          <button
@@ -264,7 +252,20 @@ export default function StepToolbar({
           )}
         </button>
 
-        <span style={{ color: '#666', fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic' }}>fx</span>
+        {/* Function Button (Fx Icon) - Activated Details */}
+        <button
+          className={`btn-icon tab-icon ${activeTab === 'details' ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
+          title="Operation Functionality"
+          style={{
+            color: activeTab === 'details' ? '#3498db' : '#666',
+            background: activeTab === 'details' ? '#ebf5fb' : 'transparent',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic', fontSize: '12px',
+          }}
+        >
+          fx
+        </button>
         <input
           type="text"
           value={formula}
