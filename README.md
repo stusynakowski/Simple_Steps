@@ -1,214 +1,266 @@
-Agent-Guardrailed Development Framework (Python + pytest)
+# Simple Steps
 
-This repository defines a phase-based development workflow designed to work with
-AI coding agents (Copilot, Claude Code, Cursor, etc.) while remaining agent-agnostic.
+A visual workflow tool that lets non-technical users build and run multi-step data pipelines — backed by plain Python functions.
 
-The goal of this framework is to:
-- reduce repeated context
-- enforce clear development stages
-- prevent agents from editing the wrong files
-- produce persistent, auditable artifacts
-- make progress verifiable via tests and CI
+Think of it as a spreadsheet where every cell is a Python operation, every column is a pipeline step, and every row is a piece of data flowing through it.
 
-This is not application documentation.
-This file describes how to use the development framework itself.
+---
 
-----------------------------------------------------------------
+## What It Does
 
-CORE PRINCIPLES
+You define operations as ordinary Python functions. Simple Steps wraps them in a React UI where users can:
 
-1. Phased development
-   Work proceeds in explicit phases:
-   IDEA -> SPEC -> TESTS -> IMPLEMENTATION
+- **Build pipelines** by chaining steps in a visual canvas
+- **Wire data** between steps using a formula bar (`=extract_metadata.map(url=step1.output)`)
+- **Run steps** individually or as a full pipeline, seeing live row-by-row output
+- **Save and reload** workflows as portable JSON files
+- **Export** any workflow as a plain Python script — the formula syntax is valid Python
 
-   Each phase has a clearly defined purpose and output.
+The formula bar is the single source of truth. The UI controls (dropdowns, parameter fields) just edit the formula — they never hold independent state.
 
-2. Hard edit boundaries
-   In each phase, the agent is only allowed to edit specific directories.
-   Violations are blocked locally and in CI using guardrail scripts.
+---
 
-3. Requirements as contracts
-   Specifications define stable requirement IDs (REQ-*).
-   Tests reference those IDs.
-   Code implements those IDs.
-   Nothing is considered complete unless it is traceable.
+## Architecture
 
-4. Minimal context by default
-   Agents read a single entry point: docs/context.md.
-   Additional context must be explicitly linked, not assumed.
+```
+┌─────────────────────────────────┐     HTTP/REST      ┌──────────────────────────────┐
+│  React Frontend  (Vite + TS)    │ ◄────────────────► │  FastAPI Backend  (Python)   │
+│                                 │                     │                              │
+│  • Step canvas (arrow icons)    │                     │  • Operation Registry        │
+│  • Formula bar                  │                     │  • Orchestration Engine      │
+│  • Data grid (Glide)            │                     │  • Plugin auto-scanner       │
+│  • Autocomplete                 │                     │  • Workflow file manager     │
+└─────────────────────────────────┘                     └──────────────────────────────┘
+```
 
-----------------------------------------------------------------
+**Frontend:** React 18, TypeScript, Vite, Glide Data Grid, Lucide icons  
+**Backend:** FastAPI, Pydantic v2, pandas, uvicorn  
+**Python:** 3.10+
 
-REPOSITORY STRUCTURE
+---
 
-docs/
-  introduction.md   Application overview (what is being built)
-  context.md        Agent entry point and current phase
-  spec/             Formal requirements (REQ IDs live here)
-  testplan/         Mapping from REQ IDs to tests
-  adr/              Architecture Decision Records (design rationale)
+## Quick Start
 
-prompts/
-  Reusable agent prompts for each phase
+### Prerequisites
 
-src/
-  Application code (implementation only)
+- Python 3.10+
+- Node.js 18+
 
-tests/
-  pytest tests that reference REQ IDs
+### 1. Clone
 
-scripts/
-  Guardrails that enforce phase rules
+```bash
+git clone https://github.com/stusynakowski/Simple_Steps.git
+cd Simple_Steps
+```
 
-.github/
-  CI configuration and optional agent instructions
+### 2. Backend
 
-----------------------------------------------------------------
+```bash
+# Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
 
-DEVELOPMENT PHASES
+# Install dependencies
+pip install -e ".[dev]"
 
-PHASE 1: IDEA
-Purpose:
-  Describe the problem, users, and constraints.
+# Start the server (runs on http://localhost:8000)
+./start_backend.sh
+```
 
-Allowed edits:
-  - docs/introduction.md
-  - docs/context.md
+Or manually:
 
-Output:
-  - Clear problem statement
-  - Use cases and non-goals
-  - Success criteria
+```bash
+python -m uvicorn SIMPLE_STEPS.main:app --reload --port 8000 --app-dir src
+```
 
-No specs, no tests, no code.
+### 3. Frontend
 
-----------------
+```bash
+cd frontend
+npm install
+npm run dev        # runs on http://localhost:5173
+```
 
-PHASE 2: SPEC
-Purpose:
-  Define what must be built, precisely and unambiguously.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-Allowed edits:
-  - docs/spec/**
-  - docs/adr/**
-  - docs/context.md
+---
 
-Output:
-  - Requirements with stable IDs (REQ-CORE-001, etc.)
-  - Interfaces and acceptance criteria
-  - Edge cases and error handling
+## How Operations Work
 
-Specs should be detailed enough that a contractor could implement them.
+An **operation** is a plain Python function registered into the backend. Once registered, it:
 
-----------------
+- Appears in the formula bar autocomplete
+- Shows its parameters in the UI parameter panel
+- Can be wired to the output of any previous step
 
-PHASE 3: TESTS
-Purpose:
-  Define how correctness is measured.
+### Define and register a function
 
-Allowed edits:
-  - tests/**
-  - docs/testplan/**
-  - docs/context.md
+```python
+# src/my_ops/video_ops.py
 
-Output:
-  - pytest test cases
-  - Explicit mapping from REQ IDs to TEST IDs
-
-Every requirement must be covered by at least one test.
-
-----------------
-
-PHASE 4: IMPLEMENTATION
-Purpose:
-  Write code until tests pass.
-
-Allowed edits:
-  - src/**
-  - docs/context.md
-
-Output:
-  - Minimal implementation that satisfies specs
-  - Passing test suite
-
-Implementation is iterative but bounded.
-Stop when tests pass or when the iteration limit is reached.
-
-----------------------------------------------------------------
-
-REQUIREMENT ID (REQ ID) CONVENTION
-
-All requirements use the following format:
-
-  REQ-<DOMAIN>-<NUMBER>
-
-Examples:
-  REQ-CORE-001   Core functionality
-  REQ-API-002    Public API behavior
-  REQ-ERR-001    Error handling
-  REQ-PERF-001   Performance constraints
-
-Rules:
-  - IDs are never renumbered or reused
-  - Deprecated requirements remain documented
-  - Tests must reference REQ IDs explicitly
-  - Code should reference REQ IDs in docstrings or comments
-
-----------------------------------------------------------------
-
-GUARDRAIL ENFORCEMENT
-
-Local enforcement:
-  Run the guardrails before committing:
-
-    PHASE=spec ./scripts/verify_phase.sh
-
-  If files outside the allowed directories were modified, the command fails.
-
-CI enforcement:
-  Continuous integration runs the test suite automatically.
-  Phase guardrails can optionally be enforced in CI using branch naming rules.
-
-Agents cannot silently violate the workflow.
-
-----------------------------------------------------------------
-
-USING THIS FRAMEWORK WITH AI AGENTS
-
-1. Set the current phase in docs/context.md
-2. Choose the corresponding prompt from the prompts/ directory
-3. Start the agent session with:
-   - Read docs/context.md
-   - Only edit files allowed for the current phase
-4. After changes, run:
-   - PHASE=<phase> ./scripts/verify_phase.sh
-   - pytest
-
-If guardrails or tests fail, the work is not accepted.
-
-----------------------------------------------------------------
-
-WHAT THIS FRAMEWORK DOES NOT DO
-
-- It does not auto-generate specs or tests for you
-- It does not assume a specific AI agent or editor
-- It does not optimize for speed over correctness
-- It does not remove the developer from decision-making
-
-This framework exists to amplify developer judgment,
-not replace it.
-
-----------------------------------------------------------------
-
-EXPECTED MINDSET
-
-Treat specifications as contracts.
-Treat tests as law.
-Treat agents as powerful but untrusted collaborators.
-
-If something feels ambiguous, fix the specification,
-not the prompt.
-
-----------------------------------------------------------------
-
-END OF DOCUMENT
+from SIMPLE_STEPS.decorators import simple_step
+
+@simple_step(
+    id="extract_metadata",
+    name="Extract Video Metadata",
+    category="YouTube",
+    operation_type="map",        # called once per row
+)
+def extract_metadata(url: str) -> dict:
+    """Fetch title, views, and author for a video URL."""
+    return {"title": "...", "views": 9000, "author": "..."}
+```
+
+The file name ends in `_ops.py` — the backend finds and imports it automatically on startup. No config needed.
+
+### Or register without a decorator
+
+```python
+# src/my_ops/analysis.py
+
+from SIMPLE_STEPS.decorators import register_operation
+
+def sentiment_score(text: str, model: str = "default") -> float:
+    return 0.87
+
+register_operation(sentiment_score, "sentiment", "Sentiment Score", "AI", "map")
+```
+
+Any file containing `register_operation` is auto-imported regardless of its name.
+
+### Use it in the formula bar
+
+```
+=extract_metadata.map(url=step1.output)
+=sentiment.map(text=step2.transcript, model="fast")
+```
+
+---
+
+## Operation Types
+
+| Type | Engine behaviour | Your function signature |
+|---|---|---|
+| `source` | No input — starts a pipeline | `def fn(param=val) -> list \| DataFrame` |
+| `map` | Called once per row | `def fn(col1, col2, ...) -> dict \| scalar` |
+| `filter` | Keep rows where fn returns `True` | `def fn(col1, col2, ...) -> bool` |
+| `expand` | Explode list results into new rows | `def fn(col1, ...) -> list[dict]` |
+| `dataframe` | Receives the full DataFrame | `def fn(df: pd.DataFrame) -> pd.DataFrame` |
+| `raw_output` | Receives the full DataFrame, returns anything | `def fn(df: pd.DataFrame) -> Any` |
+
+---
+
+## Built-in Orchestration Operations
+
+Four built-in `ss_*` operations let you compose other registered functions dynamically:
+
+| Formula | What it does |
+|---|---|
+| `=ss_map(fn="my_op", url=step1.url)` | Apply `my_op` row-by-row |
+| `=ss_filter(fn="my_filter", views=step2.views)` | Keep rows where `my_filter` is `True` |
+| `=ss_expand(fn="my_expander", text=step2.body)` | Explode list results into new rows |
+| `=ss_reduce(fn="my_summary")` | Pass the full DataFrame to `my_summary` |
+
+---
+
+## Workflow Files
+
+Workflows are saved as plain JSON in `projects/`:
+
+```json
+{
+  "id": "wf-abc123",
+  "name": "YouTube Analysis",
+  "steps": [
+    {
+      "step_id": "step-1",
+      "operation_id": "yt_fetch_videos",
+      "label": "Fetch Videos",
+      "formula": "=yt_fetch_videos.source(channel_url=\"https://youtube.com/@mkbhd\")",
+      "config": {}
+    },
+    {
+      "step_id": "step-2",
+      "operation_id": "yt_extract_metadata",
+      "label": "Extract Metadata",
+      "formula": "=yt_extract_metadata.map(url=step-1.output)",
+      "config": {}
+    }
+  ]
+}
+```
+
+The `formula` field is the canonical source of truth — `operation_id` and `config` are derived from it on load.
+
+---
+
+## Project Structure
+
+```
+Simple_Steps/
+├── src/
+│   ├── SIMPLE_STEPS/          # Core framework
+│   │   ├── main.py            # FastAPI app + plugin auto-scanner
+│   │   ├── engine.py          # Orchestration engine
+│   │   ├── decorators.py      # @simple_step + register_operation
+│   │   ├── orchestrators.py   # map / filter / expand / dataframe wrappers
+│   │   ├── orchestration_ops.py # Built-in ss_map, ss_filter, ss_expand, ss_reduce
+│   │   ├── models.py          # Pydantic models
+│   │   └── file_manager.py    # Workflow JSON persistence
+│   ├── youtube_operations/    # Example domain operations
+│   ├── llm_operations/
+│   └── webscraping_operations/
+├── frontend/                  # React + TypeScript app
+│   └── src/
+│       ├── components/        # StepToolbar, OperationColumn, StepDetailView …
+│       ├── hooks/             # useWorkflow (central state)
+│       ├── services/          # api.ts (REST client)
+│       └── utils/             # formulaParser.ts
+├── projects/                  # Saved workflow JSON files
+├── tests/                     # pytest tests
+├── usage_docs/                # Developer documentation
+│   └── developers/
+│       └── adding-operations.md
+└── pyproject.toml
+```
+
+---
+
+## Development
+
+### Run tests
+
+```bash
+pytest -q
+```
+
+### Type-check the frontend
+
+```bash
+cd frontend
+npx tsc --noEmit
+```
+
+### Run the frontend test suite
+
+```bash
+cd frontend
+npm test
+```
+
+---
+
+## Documentation
+
+| Doc | Description |
+|---|---|
+| [`usage_docs/developers/adding-operations.md`](usage_docs/developers/adding-operations.md) | Full guide: how to define and register operations |
+| [`docs/introduction.md`](docs/introduction.md) | Product overview and problem statement |
+| [`docs/spec/`](docs/spec/) | Feature specifications |
+| [`docs/adr/`](docs/adr/) | Architecture decision records |
+
+---
+
+## License
+
+MIT
