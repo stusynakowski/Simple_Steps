@@ -23,7 +23,8 @@ export interface OperationDefinition {
   id: string;
   label: string;
   description: string;
-  type: string;
+  /** The default orchestration mode registered by the @simple_step decorator. */
+  type: 'source' | 'map' | 'filter' | 'dataframe' | 'expand' | 'raw_output' | 'orchestrator';
   category: string;
   params: OperationParam[];
 }

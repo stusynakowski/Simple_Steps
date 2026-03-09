@@ -6,7 +6,7 @@ import StagedDataGrid from './StagedDataGrid';
 import StepToolbar from './StepToolbar';
 import PreviousStepDataPicker from './PreviousStepDataPicker';
 import { buildFormula, parseFormula } from '../utils/formulaParser';
-import type { ParsedFormula } from '../utils/formulaParser';
+import type { ParsedFormula, OrchestrationMode } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useStagedPreview } from '../hooks/useStagedPreview';
 import './OperationColumn.css';
@@ -134,10 +134,16 @@ export default function OperationColumn({
   // The formula bar always reflects step.formula (the canonical field).
   // buildFormula is only used as a fallback for legacy steps that predate
   // the formula field (i.e. loaded from old save files without a formula).
-  const derivedFormula = step.formula || buildFormula(step.process_type, step.configuration);
-
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
+
+  const derivedFormula = step.formula || buildFormula(
+    step.process_type,
+    step.configuration,
+    (step.configuration._orchestrator as OrchestrationMode | undefined)
+      ?? (currentOp?.type as OrchestrationMode | undefined)
+      ?? null,
+  );
 
   // ── Staged preview state ───────────────────────────────────────────────────
   // Track what the user is typing live — separate from committed step.formula
@@ -203,7 +209,13 @@ export default function OperationColumn({
   const handleUiUpdate = (updates: Partial<Step>) => {
     const newOpId = updates.process_type !== undefined ? updates.process_type : step.process_type;
     const newConfig = updates.configuration !== undefined ? updates.configuration : step.configuration;
-    const newFormula = buildFormula(newOpId, newConfig);
+    // Preserve the orchestration modifier already in the formula if no config override
+    const existingParsed = step.formula ? parseFormula(step.formula) : null;
+    const orchMode = (newConfig._orchestrator as import('../utils/formulaParser').OrchestrationMode | undefined)
+      ?? existingParsed?.orchestration
+      ?? currentOp?.type as import('../utils/formulaParser').OrchestrationMode | undefined
+      ?? null;
+    const newFormula = buildFormula(newOpId, newConfig, orchMode);
     setLiveFormula(newFormula); // keep staged preview in sync
     onUpdate?.(step.id, { ...updates, formula: newFormula, operation: newFormula });
   };
@@ -213,15 +225,20 @@ export default function OperationColumn({
   const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
     setLiveFormula(formula); // immediately drive staged preview
     if (parsed.isValid && parsed.operationId) {
-      // Preserve internal keys (e.g. _orchestrator) that aren't in the formula
+      // Preserve internal keys (e.g. _orchestrator) that aren't in the formula.
+      // The orchestration modifier in the formula takes precedence; store it as
+      // _orchestrator in config so the engine and orchestration dropdown stay in sync.
       const internalKeys = Object.fromEntries(
         Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
       );
+      const orchConfig = parsed.orchestration
+        ? { ...internalKeys, _orchestrator: parsed.orchestration, ...parsed.args }
+        : { ...internalKeys, ...parsed.args };
       onUpdate?.(step.id, {
         formula,
         operation: formula,   // keep legacy field in sync during migration
         process_type: parsed.operationId,
-        configuration: { ...internalKeys, ...parsed.args },
+        configuration: orchConfig,
       });
     } else if (parsed.operationId && !parsed.isValid) {
       // Partial formula (user is still typing) — update process_type so the

@@ -13,7 +13,7 @@ class OperationDefinition(BaseModel):
     id: str
     label: str
     description: str
-    type: Literal['source', 'map', 'filter', 'expand', 'dataframe'] = 'dataframe'
+    type: Literal['source', 'map', 'filter', 'expand', 'dataframe', 'raw_output', 'orchestrator'] = 'dataframe'
     category: str = 'General'
     params: List[OperationParam]
 

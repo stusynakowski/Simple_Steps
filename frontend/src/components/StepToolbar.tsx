@@ -5,6 +5,17 @@ import { parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 
+/** Visual colour coding for each orchestration mode — used in the autocomplete dropdown. */
+const ORCHESTRATION_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
+  source:       { bg: '#e8f5e9', fg: '#2e7d32' },
+  map:          { bg: '#e3f2fd', fg: '#1565c0' },
+  filter:       { bg: '#fff3e0', fg: '#e65100' },
+  dataframe:    { bg: '#f3e5f5', fg: '#6a1b9a' },
+  expand:       { bg: '#fce4ec', fg: '#880e4f' },
+  raw_output:   { bg: '#f5f5f5', fg: '#424242' },
+  orchestrator: { bg: '#e8eaf6', fg: '#283593' }, // built-in ss_* ops
+};
+
 interface StepToolbarProps {
   step: Step;
   /** Index of this step in the pipeline (0-based) — used for wiring eligibility */
@@ -113,7 +124,11 @@ export default function StepToolbar({
   }, [step.id]);
 
   const handleSuggestionClick = (op: OperationDefinition) => {
-    const newFormula = `=${op.id}(`;
+    // Stamp the operation's default orchestration type as the modifier so it's
+    // immediately visible and editable in the formula bar.
+    // e.g. "source" → =fetch_videos.source(   "map" → =yt_extract_metadata.map(
+    const modifier = op.type ? `.${op.type}` : '';
+    const newFormula = `=${op.id}${modifier}(`;
     setFormula(newFormula);
     setShowSuggestions(false);
     const parsed = parseFormula(newFormula);
@@ -370,7 +385,9 @@ export default function StepToolbar({
                 activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLInputElement>);
               }
             }}
-            placeholder={availableOperations?.length ? `=OPERATION(param=${availableOperations[0].id}.column)` : "=OPERATION(param=stepId.column)"}
+            placeholder={availableOperations?.length
+              ? `=operation.source(param="value") or =operation.map(col=step1.col)`
+              : '=OPERATION.mode(param="value")'}
             style={{
               width: '100%',
               padding: '4px 8px',
@@ -467,9 +484,28 @@ export default function StepToolbar({
                   onMouseEnter={e => (e.currentTarget.style.background = '#f0f7ff')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span style={{ fontWeight: 600, color: '#3498db' }}>{op.id}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontWeight: 600, color: '#3498db' }}>{op.id}</span>
+                    {op.type && (
+                      <span style={{
+                        fontSize: '10px',
+                        fontFamily: 'monospace',
+                        fontWeight: 700,
+                        padding: '1px 5px',
+                        borderRadius: 3,
+                        background: ORCHESTRATION_BADGE_COLORS[op.type]?.bg ?? '#eee',
+                        color: ORCHESTRATION_BADGE_COLORS[op.type]?.fg ?? '#333',
+                        letterSpacing: '0.03em',
+                      }}>
+                        .{op.type}
+                      </span>
+                    )}
+                  </div>
                   {op.label && op.label !== op.id && (
-                    <span style={{ fontSize: '11px', color: '#888' }}>{op.label}</span>
+                    <span style={{ fontSize: '11px', color: '#888', fontFamily: 'sans-serif' }}>{op.label}</span>
+                  )}
+                  {op.description && (
+                    <span style={{ fontSize: '10px', color: '#aaa', fontFamily: 'sans-serif', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{op.description}</span>
                   )}
                 </div>
               ))}

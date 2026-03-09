@@ -139,18 +139,31 @@ def run_operation(
         raise ValueError(f"Operation '{op_id}' not registered")
     
     func = op_def['func']
-    suggested_op_type = 'dataframe' 
-    
+    suggested_op_type = op_def.get('type', 'dataframe')
+
+    # Orchestration ops (ss_map, ss_filter, etc.) take a full DataFrame directly.
+    # They manage their own row/column iteration, so use the 'dataframe' wrapper
+    # (which just calls func(df=df_in, **config)).
+    if suggested_op_type == 'orchestrator':
+        suggested_op_type = 'dataframe'
+
     # Allow config override: { "_orchestrator": "map" }
     orchestrator_type = config.get('_orchestrator', suggested_op_type)
-    
+
     from .orchestrators import ORCHESTRATORS
     wrapper = ORCHESTRATORS.get(orchestrator_type)
-    
+
     # 4. Resolve Arguments / Config
+    # Special params that must NOT be treated as step references:
+    #   fn  — an operation-ID string used by ss_map/ss_filter/ss_expand/ss_reduce
+    _PASSTHROUGH_PARAMS = {'fn'}
+
     resolved_config = {}
     for k, v in config.items():
         if k.startswith('_'):
+            continue
+        if k in _PASSTHROUGH_PARAMS:
+            resolved_config[k] = v  # keep as literal string
             continue
         resolved_config[k] = resolve_reference(v, step_map)
 

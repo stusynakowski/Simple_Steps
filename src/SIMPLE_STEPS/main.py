@@ -14,6 +14,7 @@ from .models import (
 )
 from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
+from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,

@@ -31,6 +31,9 @@ def simple_step(name: str = None, category: str = "General", operation_type: str
         params = []
         for param_name, param in sig.parameters.items():
             if param_name == 'return': continue
+            # Skip *args and **kwargs — they don't map to UI fields
+            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                continue
             # Map python types to UI types
             py_type = type_hints.get(param_name, Any)
             ui_type = "string"
