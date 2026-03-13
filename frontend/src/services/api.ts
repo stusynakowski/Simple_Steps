@@ -12,6 +12,15 @@ interface StepRunResponse {
   error?: string;
 }
 
+/** Structured error returned by the backend when a step execution fails. */
+export interface BackendError {
+  detail: string;
+  error_type?: string;
+  traceback?: string;
+  operation_id?: string;
+  step_id?: string;
+}
+
 export interface OperationParam {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'list';
@@ -79,7 +88,18 @@ export async function runStep(
   });
 
   if (!response.ok) {
-      throw new Error(`Backend Error: ${response.statusText}`);
+      // Try to parse structured error from backend
+      let errorInfo: BackendError | null = null;
+      try {
+        errorInfo = await response.json();
+      } catch {
+        // non-JSON response
+      }
+      const err = new Error(errorInfo?.detail || `Backend Error: ${response.statusText}`) as Error & { backendError?: BackendError };
+      if (errorInfo) {
+        err.backendError = errorInfo;
+      }
+      throw err;
   }
 
   return response.json();
@@ -185,3 +205,12 @@ export async function deletePipeline(projectId: string, pipelineId: string): Pro
 export type ProjectMetadata = ProjectInfo;
 export const listProjects_legacy = listProjects;
 export const deleteProject_legacy = deleteProject;
+
+// --- Debug / Diagnostics ---
+
+/** Fetch the raw operation registry from the backend for debugging. */
+export async function fetchDebugRegistry(): Promise<Record<string, unknown>> {
+    const r = await fetch(`${API_BASE}/debug/registry`);
+    if (!r.ok) return { error: 'Failed to fetch registry' };
+    return r.json();
+}

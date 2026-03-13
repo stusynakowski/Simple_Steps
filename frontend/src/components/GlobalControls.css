@@ -173,3 +173,56 @@
     display: flex;
     align-items: center;
 }
+
+/* ── Log Toggle Button (inline with run controls) ──────────────────── */
+
+.log-toggle-btn {
+  margin-left: 16px;  /* small gap after the Stop button */
+  gap: 6px;
+  font-size: 0.82rem;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: #1e1e2e;
+  border: 1px solid #444;
+  color: #ccc;
+  transition: all 0.15s ease;
+}
+
+.log-toggle-btn:hover {
+  background: #2a2a3e;
+  border-color: #666;
+  color: #fff;
+}
+
+.log-toggle-btn.log-active {
+  background: #16213e;
+  border-color: #5588cc;
+  color: #8ac4ff;
+}
+
+.log-toggle-btn.log-has-errors {
+  border-color: #ef5350;
+}
+
+.log-toggle-count {
+  background: rgba(255,255,255,0.1);
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  color: #999;
+  font-weight: 500;
+}
+
+.log-toggle-error-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ef5350;
+  flex-shrink: 0;
+  animation: log-error-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes log-error-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

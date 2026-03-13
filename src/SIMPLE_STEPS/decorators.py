@@ -77,4 +77,95 @@ def simple_step(name: str = None, category: str = "General", operation_type: str
         return func
 
     return decorator
-    return decorator
+
+
+def register_operation(
+    func,
+    op_id: str,
+    name: str,
+    category: str = "General",
+    operation_type: str = "dataframe",
+    params: Optional[list] = None,
+    description: Optional[str] = None,
+):
+    """
+    Register a plain Python function into the operation registry without
+    using the @simple_step decorator.
+
+    Parameters
+    ----------
+    func           : the callable to register
+    op_id          : unique operation ID used in formula bar  e.g. "yt_fetch_videos"
+    name           : human-readable label shown in the UI sidebar
+    category       : sidebar grouping  e.g. "YouTube"
+    operation_type : "source" | "map" | "filter" | "dataframe" | "expand" | "raw_output"
+    params         : explicit param list (dicts with name/type/default keys).
+                     If None, inferred from the function's type annotations.
+    description    : override docstring shown in the UI.
+
+    Usage (at the bottom of any .py file in the scanned src/ folders):
+
+        register_operation(my_func, "my_op", "My Operation", "MyCategory", "map")
+    """
+    if params is None:
+        params = _infer_params(func)
+
+    definition = OperationDefinition(
+        id=op_id,
+        label=name,
+        description=description or func.__doc__ or "",
+        type=operation_type,
+        category=category,
+        params=params,
+    )
+
+    OPERATION_REGISTRY[op_id] = {
+        "definition": definition,
+        "func":       func,
+        "category":   category,
+        "type":       operation_type,
+    }
+    DEFINITIONS_LIST.append(definition)
+    return func   # safe to use as a decorator if desired
+
+
+def _infer_params(func) -> list:
+    """Infer OperationParam objects from a function's signature and type annotations."""
+    sig = inspect.signature(func)
+    type_hints = {}
+    try:
+        type_hints = get_type_hints(func)
+    except Exception:
+        pass
+
+    params = []
+    for pname, p in sig.parameters.items():
+        if pname == "return":
+            continue
+        if p.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+            continue
+        if pname in ("df", "data", "_input_df"):
+            continue   # conventional DataFrame args — injected by engine, not UI params
+
+        py_type = type_hints.get(pname, Any)
+        if py_type in (int, float):
+            ui_type = "number"
+        elif py_type == bool:
+            ui_type = "boolean"
+        elif py_type in (list, List):
+            ui_type = "list"
+        elif py_type in (dict, Dict):
+            ui_type = "object"
+        elif py_type == pd.DataFrame:
+            ui_type = "dataframe"
+        else:
+            ui_type = "string"
+
+        default = None if p.default is inspect.Parameter.empty else p.default
+        params.append(OperationParam(
+            name=pname,
+            type=ui_type,
+            description="No description provided",
+            default=default,
+        ))
+    return params

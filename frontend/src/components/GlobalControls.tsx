@@ -7,10 +7,15 @@ interface GlobalControlsProps {
   onStopAll: () => void;
   pipelineStatus: 'idle' | 'running' | 'paused';
   workflowName?: string;
+  logCount?: number;
+  logErrorCount?: number;
+  isLogOpen?: boolean;
+  onToggleLogs?: () => void;
 }
 
 export default function GlobalControls({
   onRunAll, onPauseAll, onStopAll, pipelineStatus,
+  logCount = 0, logErrorCount = 0, isLogOpen = false, onToggleLogs,
 }: GlobalControlsProps) {
   const [computeTarget, setComputeTarget] = useState('Local');
   const [pythonEnv, setPythonEnv] = useState('simple-steps-env');
@@ -88,6 +93,20 @@ export default function GlobalControls({
               <span className="icon">⏹</span> Stop
             </button>
         </div>
+
+        {/* Log toggle button */}
+        {onToggleLogs && (
+          <button
+            className={`control-btn log-toggle-btn ${isLogOpen ? 'log-active' : ''} ${logErrorCount > 0 ? 'log-has-errors' : ''}`}
+            onClick={onToggleLogs}
+            title={isLogOpen ? 'Close Logs' : 'Open Logs'}
+          >
+            <span className="icon">📋</span>
+            Logs
+            {logCount > 0 && <span className="log-toggle-count">{logCount}</span>}
+            {logErrorCount > 0 && <span className="log-toggle-error-dot" />}
+          </button>
+        )}
       </div>
     </div>
   );

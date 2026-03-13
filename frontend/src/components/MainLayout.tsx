@@ -11,6 +11,7 @@ import ActivityBar from './ActivityBar';
 import MenuBar from './MenuBar';
 import SaveModal from './SaveModal';
 import RenameModal from './RenameModal';
+import ExecutionLog from './ExecutionLog';
 import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
@@ -34,6 +35,7 @@ export default function MainLayout() {
   const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
   const [isDragging, setIsDragging] = useState(false);
+  const [isLogOpen, setIsLogOpen] = useState(false);
 
   const isResizingHeader = useRef(false);
   const isResizingSidebar = useRef(false);
@@ -67,6 +69,8 @@ export default function MainLayout() {
     removeProject,
     listProjectPipelines,
     removePipeline,
+    executionLogs,
+    clearLogs,
   } = useWorkflow();
 
   // ── Tab state ────────────────────────────────────────────────────────────
@@ -451,6 +455,10 @@ export default function MainLayout() {
                 onStopAll={stopPipeline}
                 pipelineStatus={pipelineStatus}
                 workflowName={workflow.name}
+                logCount={executionLogs.length}
+                logErrorCount={executionLogs.filter(l => l.level === 'error').length}
+                isLogOpen={isLogOpen}
+                onToggleLogs={() => setIsLogOpen(prev => !prev)}
               />
             </div>
           </div>
@@ -507,6 +515,9 @@ export default function MainLayout() {
           </div>
           </StepWiringProvider>
         </main>
+
+        {/* ── Execution Log Panel (overlay) ──────────────────────────── */}
+        <ExecutionLog logs={executionLogs} onClear={clearLogs} isOpen={isLogOpen} onClose={() => setIsLogOpen(false)} rightOffset={rightSidebarWidth + 30} />
       </div>
 
       {/* ── Detached step windows (floating, fixed-position) ───────────── */}

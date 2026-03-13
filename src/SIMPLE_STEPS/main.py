@@ -1,8 +1,10 @@
 from fastapi import FastAPI, HTTPException, Body
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import pandas as pd
 import numpy as np
+import traceback as tb_module
 
 from .models import (
     OperationDefinition,
@@ -102,6 +104,32 @@ async def list_operations():
     """
     return OPERATIONS
 
+
+# --- 1.1 Diagnostics / Debug ---
+@app.get("/api/debug/registry")
+async def debug_registry():
+    """
+    Returns the raw registry state for debugging — shows every registered
+    operation ID, category, type, and the number of params.
+    Useful for diagnosing 'function not registered' errors.
+    """
+    from .decorators import OPERATION_REGISTRY, DEFINITIONS_LIST
+    return {
+        "registered_operations": {
+            op_id: {
+                "label": entry["definition"].label,
+                "category": entry["category"],
+                "type": entry["type"],
+                "params_count": len(entry["definition"].params),
+                "func_name": entry["func"].__name__,
+                "func_module": getattr(entry["func"], "__module__", "unknown"),
+            }
+            for op_id, entry in OPERATION_REGISTRY.items()
+        },
+        "definitions_count": len(DEFINITIONS_LIST),
+        "plugin_paths_scanned": [os.path.abspath(p) for p in PLUGIN_PATHS],
+    }
+
 # --- 1.5 Project / Pipeline Management ---
 
 # Projects (folders)
@@ -177,8 +205,20 @@ async def execute_step(payload: StepRunRequest):
             metrics=metrics
         )
     except Exception as e:
-        # In production, log error details
-        raise HTTPException(status_code=400, detail=str(e))
+        # Return structured error with traceback for frontend log panel
+        error_tb = tb_module.format_exc()
+        print(f"❌ Step execution failed: {e}")
+        print(error_tb)
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": str(e),
+                "error_type": type(e).__name__,
+                "traceback": error_tb,
+                "operation_id": payload.operation_id,
+                "step_id": payload.step_id,
+            }
+        )
 
 # --- 3. Data View (Query) ---
 @app.get("/api/data/{ref_id}")

@@ -5,8 +5,9 @@ import { runStep as runStepApi, fetchDataView, getOperations,
   listProjects, createProject, deleteProject,
   listPipelines, loadPipeline, savePipeline, deletePipeline,
 } from '../services/api';
-import type { OperationDefinition, PipelineFile } from '../services/api';
+import type { OperationDefinition, PipelineFile, BackendError } from '../services/api';
 import { parseFormula, buildFormula } from '../utils/formulaParser';
+import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 
 /**
  * Hydrate a saved StepConfig into a runtime Step.
@@ -56,6 +57,27 @@ export default function useWorkflow() {
   useEffect(() => {
     getOperations().then(setAvailableOperations).catch(console.error);
   }, []);
+
+  // ── Execution log state ──────────────────────────────────────────────────
+  const [executionLogs, setExecutionLogs] = useState<LogEntry[]>([]);
+  const logIdCounter = useRef(0);
+
+  const addLog = useCallback((
+    level: LogLevel,
+    message: string,
+    opts?: { stepId?: string; stepLabel?: string; operationId?: string; detail?: string; durationMs?: number }
+  ) => {
+    const entry: LogEntry = {
+      id: `log-${++logIdCounter.current}-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      ...opts,
+    };
+    setExecutionLogs(prev => [...prev, entry]);
+  }, []);
+
+  const clearLogs = useCallback(() => setExecutionLogs([]), []);
 
   const [expandedStepIds, setExpandedStepIds] = useState<Set<string>>(
     new Set(initialWorkflow.steps.length > 0 ? [initialWorkflow.steps[0].id] : [])
@@ -159,6 +181,15 @@ export default function useWorkflow() {
         }
     }
 
+    // ── Log: Step starting ──
+    const startTime = performance.now();
+    addLog('info', `Running step "${step.label}" with operation "${operationId}"`, {
+      stepId: id,
+      stepLabel: step.label,
+      operationId,
+      detail: `Config: ${JSON.stringify(resolvedConfig, null, 2)}\nInput Ref: ${prevStep?.outputRefId ?? '(none)'}\nStep Map keys: ${Object.keys(stepMap).join(', ') || '(empty)'}`,
+    });
+
     setWorkflow((prev) => {
       const next = prev.steps.map((s) => (s.id === id ? { ...s, status: 'running' as const } : s));
       return { ...prev, steps: next };
@@ -174,6 +205,8 @@ export default function useWorkflow() {
           stepMap
       );
       
+      const elapsed = Math.round(performance.now() - startTime);
+
       // Fetch preview — backend returns Cell[] directly ({row_id, column_id, value, display_value})
       const rawData: any[] = await fetchDataView(res.output_ref_id);
 
@@ -187,6 +220,15 @@ export default function useWorkflow() {
 
       // rawData is already Cell[] — just filter to this step's own columns
       const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
+
+      // ── Log: Step succeeded ──
+      addLog('success', `Step "${step.label}" completed — ${res.metrics.rows} rows, ${outputCols.length} columns`, {
+        stepId: id,
+        stepLabel: step.label,
+        operationId,
+        durationMs: elapsed,
+        detail: `Output Ref: ${res.output_ref_id}\nColumns: ${outputCols.join(', ')}\nNew columns: ${newCols.join(', ') || '(none)'}`,
+      });
 
       setWorkflow((prev) => {
         const next = prev.steps.map((s) => {
@@ -203,14 +245,34 @@ export default function useWorkflow() {
       });
       return 'completed';
     } catch (error) {
+      const elapsed = Math.round(performance.now() - startTime);
       console.error(error);
+
+      // ── Log: Step failed ──
+      const backendErr = (error as any)?.backendError as BackendError | undefined;
+      const errorMessage = backendErr?.detail || (error instanceof Error ? error.message : String(error));
+      const errorDetail = [
+        backendErr?.error_type ? `Error Type: ${backendErr.error_type}` : null,
+        `Message: ${errorMessage}`,
+        backendErr?.traceback ? `\nBackend Traceback:\n${backendErr.traceback}` : null,
+        `\nConfig sent: ${JSON.stringify(resolvedConfig, null, 2)}`,
+      ].filter(Boolean).join('\n');
+
+      addLog('error', `Step "${step.label}" failed: ${errorMessage}`, {
+        stepId: id,
+        stepLabel: step.label,
+        operationId,
+        durationMs: elapsed,
+        detail: errorDetail,
+      });
+
       setWorkflow((prev) => {
         const next = prev.steps.map((s) => (s.id === id ? { ...s, status: 'error' as const } : s));
         return { ...prev, steps: next };
       });
       throw error;
     }
-  }, [workflow.steps]);
+  }, [workflow.steps, addLog]);
 
   const previewStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
      // Similar to runStep but with isPreview=true
@@ -241,6 +303,12 @@ export default function useWorkflow() {
     const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
     const previewConfig: Record<string, unknown> = config ?? { ...internalKeys, ...formulaArgs };
     
+    addLog('debug', `Preview requested for "${step.label}" (${previewOperationId})`, {
+      stepId: id,
+      stepLabel: step.label,
+      operationId: previewOperationId,
+    });
+
     try {
       const res = await runStepApi(
           id, 
@@ -262,6 +330,12 @@ export default function useWorkflow() {
       // rawData is already Cell[] — just filter to this step's own columns
       const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
 
+      addLog('success', `Preview for "${step.label}" ready — ${res.metrics.rows} rows`, {
+        stepId: id,
+        stepLabel: step.label,
+        operationId: previewOperationId,
+      });
+
       setWorkflow((prev) => {
         const next = prev.steps.map((s) => {
           if (s.id !== id) return s;
@@ -277,10 +351,17 @@ export default function useWorkflow() {
         return { ...prev, steps: next };
       });
     } catch (error) {
+       const backendErr = (error as any)?.backendError as BackendError | undefined;
+       const errorMessage = backendErr?.detail || (error instanceof Error ? error.message : String(error));
+       addLog('warn', `Preview failed for "${step.label}": ${errorMessage}`, {
+         stepId: id,
+         stepLabel: step.label,
+         operationId: previewOperationId,
+         detail: backendErr?.traceback || undefined,
+       });
        console.error("Preview failed", error);
-       // Don't change status to error on preview failure?
     }
-  }, [workflow.steps]);
+  }, [workflow.steps, addLog]);
 
   const workflowRef = useRef(workflow);
   useEffect(() => {
@@ -338,8 +419,12 @@ export default function useWorkflow() {
         startIndex = firstIncomplete;
     }
 
+    addLog('info', `▶ Pipeline started — running ${steps.length - startIndex} step(s) from index ${startIndex}`, {
+      detail: `Steps: ${steps.slice(startIndex).map(s => s.label).join(' → ')}`,
+    });
+
     runSequence(startIndex);
-  }, [runSequence]);
+  }, [runSequence, addLog]);
 
   const pausePipeline = useCallback(() => {
     if (pipelineStatusRef.current !== 'running') return;
@@ -478,6 +563,9 @@ export default function useWorkflow() {
     pausePipeline,
     stopPipeline,
     deleteStep,
+    // execution log
+    executionLogs,
+    clearLogs,
     // persistence
     saveWorkflow,
     loadWorkflow,
