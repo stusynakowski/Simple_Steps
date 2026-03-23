@@ -35,53 +35,139 @@ The formula bar is the single source of truth. The UI controls (dropdowns, param
 
 **Frontend:** React 18, TypeScript, Vite, Glide Data Grid, Lucide icons  
 **Backend:** FastAPI, Pydantic v2, pandas, uvicorn  
-**Python:** 3.10+
+**Python:** 3.9+
 
 ---
 
-## Quick Start
+## Installation
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
+- **Python 3.9+**
+- **Node.js 18+** (only needed if you want to develop the frontend or rebuild the UI)
 
-### 1. Clone
+### Option A: pip install (recommended)
 
 ```bash
 git clone https://github.com/stusynakowski/Simple_Steps.git
 cd Simple_Steps
+
+python3 -m venv .venv
+source .venv/bin/activate   # macOS / Linux
+# .venv\Scripts\activate    # Windows
+
+pip install -e .
 ```
 
-### 2. Backend
+That's it. The package installs the `simple-steps` CLI command and bundles a pre-built copy of the frontend.
+
+### Option B: pip install with dev tools
 
 ```bash
-# Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
 pip install -e ".[dev]"
-
-# Start the server (runs on http://localhost:8000)
-./start_backend.sh
 ```
 
-Or manually:
+This adds `pytest` and `ruff` for running tests and linting.
+
+---
+
+## Running Simple Steps
+
+### One command
+
+```bash
+simple-steps
+```
+
+This starts the backend API **and** serves the frontend UI on a single port. Your browser opens automatically.
+
+```
+  ┌─────────────────────────────────────────┐
+  │         ⚡ Simple Steps v0.1.0 ⚡        │
+  ├─────────────────────────────────────────┤
+  │  Backend API: http://127.0.0.1:8000/api  │
+  │  Frontend UI: http://127.0.0.1:8000      │
+  │  Docs:        http://localhost:8000/docs  │
+  └─────────────────────────────────────────┘
+```
+
+Open [http://localhost:8000](http://localhost:8000) to use the UI, or [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API docs.
+
+### CLI options
+
+| Flag | Description | Default |
+|---|---|---|
+| `--port PORT` | Server port | `8000` |
+| `--host HOST` | Bind address (`0.0.0.0` for all interfaces) | `127.0.0.1` |
+| `--dev` | Enable auto-reload on Python file changes | off |
+| `--no-browser` | Don't auto-open the browser on start | off |
+| `--ops DIR [DIR ...]` | Extra directories to scan for `*_ops.py` plugins | none |
+| `--projects-dir DIR` | Directory for saved workflows | `./projects` |
+
+### Examples
+
+```bash
+# Custom port, don't open browser
+simple-steps --port 9000 --no-browser
+
+# Load extra operations from a custom folder
+simple-steps --ops ./my_custom_ops /shared/team_ops
+
+# Dev mode with auto-reload
+simple-steps --dev
+
+# Bind to all interfaces (e.g. for Docker or remote access)
+simple-steps --host 0.0.0.0 --port 8080
+
+# Store projects in a custom directory
+simple-steps --projects-dir ~/my_pipelines
+```
+
+### Environment variables
+
+| Variable | Description |
+|---|---|
+| `SIMPLE_STEPS_EXTRA_OPS` | Semicolon-separated list of extra plugin directories (alternative to `--ops`) |
+| `SIMPLE_STEPS_PROJECTS_DIR` | Override the project storage directory (alternative to `--projects-dir`) |
+
+---
+
+## Development Setup
+
+If you want to work on the frontend or run the backend and frontend separately:
+
+### Backend (dev mode)
+
+```bash
+pip install -e ".[dev]"
+simple-steps --dev --no-browser --port 8000
+```
+
+Or manually with uvicorn:
 
 ```bash
 python -m uvicorn SIMPLE_STEPS.main:app --reload --port 8000 --app-dir src
 ```
 
-### 3. Frontend
+### Frontend (dev mode)
 
 ```bash
 cd frontend
 npm install
-npm run dev        # runs on http://localhost:5173
+npm run dev        # Vite dev server on http://localhost:5173
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+The Vite dev server proxies API requests to `http://localhost:8000/api`. Both servers must be running during frontend development.
+
+### Rebuild the bundled frontend
+
+After making frontend changes, rebuild the production bundle that ships with the pip package:
+
+```bash
+simple-steps-build
+```
+
+This runs `npm run build`, patches the API URL for same-origin serving, and copies the output into `src/SIMPLE_STEPS/frontend_dist/`.
 
 ---
 
@@ -199,53 +285,50 @@ The `formula` field is the canonical source of truth — `operation_id` and `con
 ```
 Simple_Steps/
 ├── src/
-│   ├── SIMPLE_STEPS/          # Core framework
-│   │   ├── main.py            # FastAPI app + plugin auto-scanner
-│   │   ├── engine.py          # Orchestration engine
-│   │   ├── decorators.py      # @simple_step + register_operation
-│   │   ├── orchestrators.py   # map / filter / expand / dataframe wrappers
-│   │   ├── orchestration_ops.py # Built-in ss_map, ss_filter, ss_expand, ss_reduce
-│   │   ├── models.py          # Pydantic models
-│   │   └── file_manager.py    # Workflow JSON persistence
-│   ├── youtube_operations/    # Example domain operations
+│   ├── SIMPLE_STEPS/              # Core framework (pip-installable package)
+│   │   ├── cli.py                 # `simple-steps` CLI entry point
+│   │   ├── build_frontend.py      # `simple-steps-build` helper
+│   │   ├── main.py                # FastAPI app + plugin auto-scanner + SPA serving
+│   │   ├── engine.py              # Orchestration engine (reference passing)
+│   │   ├── decorators.py          # @simple_step + register_operation
+│   │   ├── orchestrators.py       # map / filter / expand / dataframe wrappers
+│   │   ├── orchestration_ops.py   # Built-in ss_map, ss_filter, ss_expand, ss_reduce
+│   │   ├── operation_pack.py      # OperationPack failsafe bundle system
+│   │   ├── models.py              # Pydantic models
+│   │   ├── file_manager.py        # Workflow JSON persistence
+│   │   └── frontend_dist/         # Bundled production frontend (auto-generated)
+│   ├── youtube_operations/        # Example domain operations
 │   ├── llm_operations/
 │   └── webscraping_operations/
-├── frontend/                  # React + TypeScript app
+├── mock_operations/               # Demo / development mock ops
+├── frontend/                      # React + TypeScript app (source)
 │   └── src/
-│       ├── components/        # StepToolbar, OperationColumn, StepDetailView …
-│       ├── hooks/             # useWorkflow (central state)
-│       ├── services/          # api.ts (REST client)
-│       └── utils/             # formulaParser.ts
-├── projects/                  # Saved workflow JSON files
-├── tests/                     # pytest tests
-├── usage_docs/                # Developer documentation
+│       ├── components/            # UnifiedToolbar, OperationColumn, StepDetailView …
+│       ├── hooks/                 # useWorkflow (central state)
+│       ├── services/              # api.ts (REST client)
+│       └── utils/                 # formulaParser.ts
+├── projects/                      # Saved workflow JSON files
+├── tests/                         # pytest tests
+├── usage_docs/                    # Developer documentation
 │   └── developers/
-│       └── adding-operations.md
-└── pyproject.toml
+│       ├── adding-operations.md
+│       └── creating-operation-packs.md
+└── pyproject.toml                 # Package config, dependencies, CLI entry points
 ```
 
 ---
 
-## Development
-
-### Run tests
+## Testing
 
 ```bash
+# Backend tests
 pytest -q
-```
 
-### Type-check the frontend
+# Frontend type-check
+cd frontend && npx tsc --noEmit
 
-```bash
-cd frontend
-npx tsc --noEmit
-```
-
-### Run the frontend test suite
-
-```bash
-cd frontend
-npm test
+# Frontend test suite
+cd frontend && npm test
 ```
 
 ---
@@ -254,10 +337,23 @@ npm test
 
 | Doc | Description |
 |---|---|
-| [`usage_docs/developers/adding-operations.md`](usage_docs/developers/adding-operations.md) | Full guide: how to define and register operations |
+| [`usage_docs/developers/adding-operations.md`](usage_docs/developers/adding-operations.md) | How to define and register operations |
+| [`usage_docs/developers/creating-operation-packs.md`](usage_docs/developers/creating-operation-packs.md) | How to create failsafe Operation Packs |
 | [`docs/introduction.md`](docs/introduction.md) | Product overview and problem statement |
 | [`docs/spec/`](docs/spec/) | Feature specifications |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `simple-steps: command not found` | Make sure your virtualenv is activated: `source .venv/bin/activate` |
+| Frontend shows "no frontend build found" JSON | Run `simple-steps-build` to compile the React app into the package |
+| Port already in use | Use `--port` to pick a different port, or `kill $(lsof -t -i:8000)` |
+| Operations not appearing in the UI | Ensure your file ends in `_ops.py` and is in a scanned directory (see `--ops`) |
+| Pack shows as unavailable | Check `http://localhost:8000/api/packs` for health details (missing packages, env vars) |
 
 ---
 
