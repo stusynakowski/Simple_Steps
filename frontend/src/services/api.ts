@@ -214,3 +214,41 @@ export async function fetchDebugRegistry(): Promise<Record<string, unknown>> {
     if (!r.ok) return { error: 'Failed to fetch registry' };
     return r.json();
 }
+
+// --- Developer Packs ---
+
+/** A developer pack directory with its loaded operations. */
+export interface DeveloperPack {
+    id: string;
+    name: string;
+    path: string;
+    operations: string[];
+    errors: string[];
+    enabled: boolean;
+}
+
+/** Fetch all known developer pack directories and their operations. */
+export async function fetchDeveloperPacks(): Promise<DeveloperPack[]> {
+    const r = await fetch(`${API_BASE}/developer-packs`);
+    if (!r.ok) return [];
+    return r.json();
+}
+
+/** Trigger on-demand loading of project operations (recursive scan). */
+export async function loadProjectOps(projectId: string): Promise<{
+    project_id: string;
+    files_scanned: number;
+    ops_registered: string[];
+    errors: { file: string; error: string }[];
+}> {
+    const r = await fetch(`${API_BASE}/projects/${projectId}/load-ops`, { method: 'POST' });
+    if (!r.ok) throw new Error('Failed to load project ops');
+    return r.json();
+}
+
+/** Fetch the three-tier pack loader status. */
+export async function fetchLoaderStatus(): Promise<Record<string, unknown>> {
+    const r = await fetch(`${API_BASE}/loader`);
+    if (!r.ok) return { error: 'Failed to fetch loader status' };
+    return r.json();
+}

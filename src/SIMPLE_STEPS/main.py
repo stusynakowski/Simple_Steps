@@ -19,71 +19,75 @@ from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
 from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
 from .operation_pack import PACK_REGISTRY
+from .pack_loader import PackLoader, OpTier, set_loader, get_loader
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
+    PROJECTS_DIR,
 )
 import sys
 import os
-import importlib.util
 
-# --- USER CONFIGURATION ---
-# Add any folder path here. The system will recursively find all _ops.py files.
-PLUGIN_PATHS = [
-    # 1. Built-in sibling directories (relative to this file)
+# ── Three-Tier Pack Discovery ───────────────────────────────────────────────
+#
+# Tier 1 — System ops: already imported above (operations.py, orchestration_ops.py)
+# Tier 2 — Developer packs: reusable across projects (packs/ directory)
+# Tier 3 — Project ops: per-project custom functions (projects/<name>/ops/)
+#
+# See pack_loader.py and packs/README.md for the full design.
+
+# Developer pack directories (Tier 2)
+_DEVELOPER_PACK_DIRS = [
+    # Default packs/ directory at repository root
+    os.path.join(os.path.dirname(__file__), "../../packs"),
+    # Legacy sibling directories (backwards compat — will migrate to packs/)
     os.path.join(os.path.dirname(__file__), "../youtube_operations"),
     os.path.join(os.path.dirname(__file__), "../llm_operations"),
     os.path.join(os.path.dirname(__file__), "../webscraping_operations"),
-    
-    # 2. Mock operations (for development / demo)
+    # Mock operations (for development / demo)
     os.path.join(os.path.dirname(__file__), "../../mock_operations"),
-    
-    # 3. Add your custom absolute paths here:
-    # "/Users/myname/projets/my_custom_ops"
 ]
 
-# Pick up additional plugin paths from environment (set by CLI --ops flag)
+# Pick up additional pack dirs from environment (set by CLI --packs flag)
+_extra_packs = os.environ.get("SIMPLE_STEPS_PACKS_DIR", "")
+if _extra_packs:
+    _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_packs.split(";") if p.strip())
+
+# Also support the legacy --ops flag
 _extra_ops = os.environ.get("SIMPLE_STEPS_EXTRA_OPS", "")
 if _extra_ops:
-    PLUGIN_PATHS.extend(p.strip() for p in _extra_ops.split(";") if p.strip())
+    _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_ops.split(";") if p.strip())
 
-# --- Plugin Discovery Logic ---
-def register_plugins(paths: List[str]):
-    """
-    Crawls provided paths for python files ending in '_ops.py' 
-    and imports them to trigger registrations.
-    """
-    for folder_path in paths:
-        # Resolve absolute path
-        abs_path = os.path.abspath(folder_path)
-        
-        if not os.path.exists(abs_path):
-            continue # Skip missing optional folders
-            
-        print(f"📂 Scanning: {abs_path}")
-        
-        # Add to sys.path to allow internal relative imports within those plugins
-        if abs_path not in sys.path:
-            sys.path.append(abs_path)
+# Discover all project directories for Tier 3
+def _discover_project_dirs() -> List[str]:
+    """Find all project folders that contain Python files anywhere in the tree."""
+    projects_root = os.path.abspath(PROJECTS_DIR)
+    if not os.path.isdir(projects_root):
+        return []
+    dirs = []
+    for entry in os.listdir(projects_root):
+        proj_path = os.path.join(projects_root, entry)
+        if not os.path.isdir(proj_path):
+            continue
+        # Walk the whole project tree looking for at least one .py file
+        has_py = False
+        for root, _subdirs, files in os.walk(proj_path):
+            # Skip __pycache__ and hidden dirs
+            _subdirs[:] = [d for d in _subdirs if not d.startswith(".") and d != "__pycache__"]
+            if any(f.endswith(".py") and not f.startswith("__") for f in files):
+                has_py = True
+                break
+        if has_py:
+            dirs.append(proj_path)
+    return dirs
 
-        # Walk through the directory (in case they are nested)
-        for root, dirs, files in os.walk(abs_path):
-            for file in files:
-                if file.endswith("_ops.py") or file.startswith("ops_"):
-                    full_path = os.path.join(root, file)
-                    module_name = file[:-3]
-                    
-                    try:
-                        spec = importlib.util.spec_from_file_location(module_name, full_path)
-                        if spec and spec.loader:
-                            module = importlib.util.module_from_spec(spec)
-                            spec.loader.exec_module(module)
-                            print(f"  ✅ Registered: {module_name}")
-                    except Exception as e:
-                        print(f"  ❌ Error loading {file}: {e}")
-
-# Run registration immediately
-register_plugins(PLUGIN_PATHS)
+# Initialize and run the Pack Loader
+_loader = PackLoader(
+    developer_pack_dirs=_DEVELOPER_PACK_DIRS,
+    project_dirs=_discover_project_dirs(),
+)
+_loader.load_all()
+set_loader(_loader)
 
 
 # --- App Initialize ---
@@ -126,12 +130,15 @@ async def debug_registry():
     Useful for diagnosing 'function not registered' errors.
     """
     from .decorators import OPERATION_REGISTRY, DEFINITIONS_LIST
+    loader = get_loader()
     return {
         "registered_operations": {
             op_id: {
                 "label": entry["definition"].label,
                 "category": entry["category"],
                 "type": entry["type"],
+                "tier": entry.get("tier", "system"),
+                "source_file": entry.get("source_file", "<built-in>"),
                 "params_count": len(entry["definition"].params),
                 "func_name": entry["func"].__name__,
                 "func_module": getattr(entry["func"], "__module__", "unknown"),
@@ -139,7 +146,8 @@ async def debug_registry():
             for op_id, entry in OPERATION_REGISTRY.items()
         },
         "definitions_count": len(DEFINITIONS_LIST),
-        "plugin_paths_scanned": [os.path.abspath(p) for p in PLUGIN_PATHS],
+        "ops_by_tier": loader.get_ops_by_tier() if loader else {},
+        "developer_pack_dirs": [os.path.abspath(p) for p in _DEVELOPER_PACK_DIRS],
     }
 
 
@@ -167,7 +175,107 @@ async def list_packs():
         })
     return result
 
-# --- 1.5 Project / Pipeline Management ---
+# --- 1.3 Pack Loader Status ---
+@app.get("/api/loader")
+async def loader_status():
+    """
+    Returns the three-tier pack loader state — what was loaded from
+    where, organized by tier (system / developer_pack / project).
+    """
+    loader = get_loader()
+    if not loader:
+        return {"error": "Pack loader not initialized"}
+
+    by_tier = loader.get_ops_by_tier()
+    results = loader.get_results()
+    return {
+        "ops_by_tier": by_tier,
+        "total_operations": sum(len(ops) for ops in by_tier.values()),
+        "load_results": [
+            {
+                "file": r.file_path,
+                "tier": r.tier.value,
+                "success": r.success,
+                "ops_registered": r.ops_registered,
+                "error": r.error,
+            }
+            for r in results
+        ],
+    }
+
+
+# --- 1.4 Load Project Ops On-Demand ---
+@app.post("/api/projects/{project_id}/load-ops")
+async def load_project_ops(project_id: str):
+    """
+    Scan a project's directory recursively and register any @simple_step
+    functions found.  Call this when switching projects or after adding
+    new .py files to a project.
+    """
+    loader = get_loader()
+    if not loader:
+        raise HTTPException(status_code=500, detail="Pack loader not initialized")
+
+    project_dir = os.path.join(os.path.abspath(PROJECTS_DIR), project_id)
+    if not os.path.isdir(project_dir):
+        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
+
+    results = loader.load_project(project_dir)
+    return {
+        "project_id": project_id,
+        "files_scanned": len(results),
+        "ops_registered": [op for r in results if r.success for op in r.ops_registered],
+        "errors": [{"file": r.file_path, "error": r.error} for r in results if not r.success],
+    }
+
+
+# --- 1.5 Developer Packs Directory Listing ---
+@app.get("/api/developer-packs")
+async def list_developer_packs():
+    """
+    Returns every known developer pack directory with the operations
+    it contributed.  The UI uses this to show which packs are available
+    and let users toggle them.
+    """
+    loader = get_loader()
+    if not loader:
+        return []
+
+    results = loader.get_results()
+    # Group load results by top-level developer-pack directory
+    pack_map: dict = {}
+    for r in results:
+        if r.tier != OpTier.DEVELOPER_PACK:
+            continue
+        # Identify which developer pack dir this file belongs to
+        abs_file = os.path.abspath(r.file_path) if r.file_path else ""
+        parent_pack_dir = None
+        for d in _DEVELOPER_PACK_DIRS:
+            abs_d = os.path.abspath(d)
+            if abs_file.startswith(abs_d):
+                parent_pack_dir = abs_d
+                break
+        if not parent_pack_dir:
+            parent_pack_dir = os.path.dirname(abs_file) if abs_file else "unknown"
+
+        if parent_pack_dir not in pack_map:
+            pack_map[parent_pack_dir] = {
+                "id": os.path.basename(parent_pack_dir),
+                "name": os.path.basename(parent_pack_dir).replace("_", " ").title(),
+                "path": parent_pack_dir,
+                "operations": [],
+                "errors": [],
+                "enabled": True,  # currently all discovered packs are auto-loaded
+            }
+        if r.success:
+            pack_map[parent_pack_dir]["operations"].extend(r.ops_registered)
+        if r.error:
+            pack_map[parent_pack_dir]["errors"].append(r.error)
+
+    return list(pack_map.values())
+
+
+# --- 1.6 Project / Pipeline Management ---
 
 # Projects (folders)
 @app.get("/api/projects", response_model=List[ProjectInfo])

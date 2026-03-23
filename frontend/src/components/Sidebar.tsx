@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import type { ActivityView } from './ActivityBar';
-import type { ProjectInfo, PipelineFile } from '../services/api';
+import type { ProjectInfo, PipelineFile, DeveloperPack } from '../services/api';
+import { fetchDeveloperPacks } from '../services/api';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -371,6 +372,139 @@ const DocsPanel: React.FC = () => {
   );
 };
 
+// ── Packs Panel ────────────────────────────────────────────────────────────
+
+const PackIcon = () => (
+  <svg className="file-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  </svg>
+);
+
+const FuncIcon = () => (
+  <svg className="file-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="16 18 22 12 16 6"/>
+    <polyline points="8 6 2 12 8 18"/>
+  </svg>
+);
+
+interface PacksPanelProps {
+  refreshTrigger?: number;
+}
+
+const PacksPanel: React.FC<PacksPanelProps> = ({ refreshTrigger }) => {
+  const [packs, setPacks] = useState<DeveloperPack[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedPacks, setExpandedPacks] = useState<Set<string>>(new Set());
+  const [devPacksOpen, setDevPacksOpen] = useState(true);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchDeveloperPacks();
+      setPacks(data);
+    } catch {
+      setError('Could not load packs from backend');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  useEffect(() => {
+    if (refreshTrigger === undefined || refreshTrigger === 0) return;
+    refresh();
+  }, [refreshTrigger, refresh]);
+
+  const togglePack = (id: string) => {
+    setExpandedPacks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const totalOps = packs.reduce((sum, p) => sum + p.operations.length, 0);
+
+  return (
+    <div className="project-explorer" style={{ overflowY: 'auto' }}>
+      {/* ── Developer Packs ──────────────────────────── */}
+      <div className="sidebar-section">
+        <div className={`sidebar-section-title ${!devPacksOpen ? 'collapsed' : ''}`}
+          onClick={() => setDevPacksOpen(o => !o)}>
+          <ChevronIcon collapsed={!devPacksOpen} />
+          <span>DEVELOPER PACKS</span>
+          <div className="section-actions">
+            <button className="section-action-btn" title="Refresh packs"
+              onClick={e => { e.stopPropagation(); refresh(); }}>↺</button>
+          </div>
+        </div>
+
+        {devPacksOpen && (
+          <div className="sidebar-content">
+            {loading && <div className="sidebar-status">Loading…</div>}
+            {error && <div className="sidebar-status sidebar-error">{error}</div>}
+            {!loading && !error && packs.length === 0 && (
+              <div className="sidebar-status sidebar-empty">
+                No developer packs found.
+                <span className="sidebar-hint">Place Python files in a packs/ directory.</span>
+              </div>
+            )}
+
+            {packs.filter(p => p.operations.length > 0).map(pack => {
+              const isOpen = expandedPacks.has(pack.id);
+              return (
+                <div key={pack.id} className="project-folder">
+                  <div className={`folder-row ${isOpen ? 'open' : ''}`}
+                    onClick={() => togglePack(pack.id)}>
+                    <span className={`chevron ${!isOpen ? 'collapsed' : ''}`} style={{ fontSize: '0.6rem' }}>▼</span>
+                    <PackIcon />
+                    <span className="file-label">{pack.name}</span>
+                    <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: '#888', paddingRight: 8 }}>
+                      {pack.operations.length} ops
+                    </span>
+                  </div>
+
+                  {isOpen && (
+                    <div className="pipeline-list">
+                      {pack.operations.map(opId => (
+                        <div key={opId} className="file-item" style={{ paddingLeft: 36, cursor: 'default' }}>
+                          <FuncIcon />
+                          <span className="file-label" style={{ fontSize: '0.8rem' }}>{opId}</span>
+                        </div>
+                      ))}
+                      {pack.errors.length > 0 && pack.errors.map((err, i) => (
+                        <div key={`err-${i}`} className="file-item" style={{ paddingLeft: 36, color: '#f44', fontSize: '0.75rem' }}>
+                          ⚠ {err}
+                        </div>
+                      ))}
+                      <div style={{ paddingLeft: 36, fontSize: '0.7rem', color: '#666', padding: '4px 8px 4px 36px' }}>
+                        {pack.path}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {!loading && !error && packs.length > 0 && (
+              <div style={{ padding: '8px 15px', fontSize: '0.72rem', color: '#666', borderTop: '1px solid #2a2a2a' }}>
+                {packs.filter(p => p.operations.length > 0).length} pack(s) · {totalOps} operations loaded
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Main Sidebar ───────────────────────────────────────────────────────────
 
 const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) => {
@@ -378,7 +512,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
 
   const titles: Record<string, string> = {
     explorer: 'Explorer', search: 'Search',
-    docs: 'User Docs',
+    docs: 'User Docs', packs: 'Operation Packs',
     settings: 'Settings', account: 'Account',
   };
 
@@ -402,6 +536,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
       )}
 
       {currentView === 'docs' && <DocsPanel />}
+
+      {currentView === 'packs' && <PacksPanel refreshTrigger={rest.refreshTrigger} />}
 
       {(currentView === 'settings' || currentView === 'account') && (
         <div className="sidebar-padding" style={{ color: '#888', fontStyle: 'italic', padding: 20 }}>

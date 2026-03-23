@@ -44,7 +44,11 @@ def main():
     )
     parser.add_argument(
         "--ops", nargs="*", default=[],
-        help="Additional directories to scan for *_ops.py plugins",
+        help="Additional directories to scan for *_ops.py plugins (legacy — prefer --packs)",
+    )
+    parser.add_argument(
+        "--packs", nargs="*", default=[],
+        help="Additional developer pack directories to scan for @simple_step functions",
     )
     parser.add_argument(
         "--projects-dir", type=str, default=None,
@@ -56,9 +60,15 @@ def main():
     # These are picked up by main.py and file_manager.py at import time
 
     if args.ops:
-        # Semicolon-separated list of extra plugin paths
+        # Semicolon-separated list of extra plugin paths (legacy)
         os.environ["SIMPLE_STEPS_EXTRA_OPS"] = ";".join(
             os.path.abspath(p) for p in args.ops
+        )
+
+    if args.packs:
+        # Semicolon-separated list of developer pack directories
+        os.environ["SIMPLE_STEPS_PACKS_DIR"] = ";".join(
+            os.path.abspath(p) for p in args.packs
         )
 
     if args.projects_dir:
@@ -87,6 +97,11 @@ def main():
     if args.ops:
         for p in args.ops:
             print(f"  📂 Extra ops: {os.path.abspath(p)}")
+        print()
+
+    if args.packs:
+        for p in args.packs:
+            print(f"  📦 Pack dir:  {os.path.abspath(p)}")
         print()
 
     # ── Start uvicorn ────────────────────────────────────────────────────
