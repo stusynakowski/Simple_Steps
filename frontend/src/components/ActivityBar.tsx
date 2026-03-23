@@ -1,7 +1,7 @@
 import React from 'react';
 import './ActivityBar.css';
 
-export type ActivityView = 'explorer' | 'search' | 'components' | 'settings' | 'account' | null;
+export type ActivityView = 'explorer' | 'search' | 'components' | 'demos' | 'settings' | 'account' | null;
 
 interface ActivityBarProps {
   activeView: ActivityView;
@@ -38,6 +38,14 @@ const ActivityBar: React.FC<ActivityBarProps> = ({ activeView, onViewChange }) =
     <svg className="activity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
         <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+    </svg>
+  );
+
+  const DemosIcon = () => (
+    <svg className="activity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
     </svg>
   );
 
@@ -78,6 +86,13 @@ const ActivityBar: React.FC<ActivityBarProps> = ({ activeView, onViewChange }) =
             title="Components"
         >
             <ComponentsIcon />
+        </div>
+        <div 
+            className={`activity-item ${activeView === 'demos' ? 'active' : ''}`}
+            onClick={() => handleItemClick('demos')}
+            title="Resources & Registry"
+        >
+            <DemosIcon />
         </div>
       </div>
       

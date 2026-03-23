@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
-import GlobalControls from './GlobalControls';
+import UnifiedToolbar from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
 import useWorkflow from '../hooks/useWorkflow';
@@ -30,7 +30,7 @@ interface OpenTab extends WorkflowTab {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function MainLayout() {
-  const [headerHeight, setHeaderHeight] = useState(200);
+  const [headerHeight, setHeaderHeight] = useState(110);
   const [sidebarWidth, setSidebarWidth] = useState(250);
   const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
@@ -42,7 +42,7 @@ export default function MainLayout() {
   const isResizingRightSidebar = useRef(false);
   const lastRightSidebarWidth = useRef(300);
   const lastSidebarWidth = useRef(250);
-  const lastHeaderHeight = useRef(200);
+  const lastHeaderHeight = useRef(110);
 
   const {
     workflow,
@@ -408,6 +408,7 @@ export default function MainLayout() {
           onRequestSave={handleRequestSaveFromSidebar}
           onDeletePipeline={removePipeline}
           onLoadWorkflowObject={openWorkflowObjectTab}
+          availableOperations={availableOperations}
         />
       </div>
 
@@ -447,21 +448,17 @@ export default function MainLayout() {
           </div>
 
           {/* Row 3: pipeline controls */}
-          <div className="workflow-tools-row">
-            <div className="workflow-controls-wrapper">
-              <GlobalControls
-                onRunAll={runPipeline}
-                onPauseAll={pausePipeline}
-                onStopAll={stopPipeline}
-                pipelineStatus={pipelineStatus}
-                workflowName={workflow.name}
-                logCount={executionLogs.length}
-                logErrorCount={executionLogs.filter(l => l.level === 'error').length}
-                isLogOpen={isLogOpen}
-                onToggleLogs={() => setIsLogOpen(prev => !prev)}
-              />
-            </div>
-          </div>
+          <UnifiedToolbar
+            onRunAll={runPipeline}
+            onPauseAll={pausePipeline}
+            onStopAll={stopPipeline}
+            pipelineStatus={pipelineStatus}
+            logCount={executionLogs.length}
+            logErrorCount={executionLogs.filter(l => l.level === 'error').length}
+            isLogOpen={isLogOpen}
+            onToggleLogs={() => setIsLogOpen(prev => !prev)}
+            onClearOutputs={clearLogs}
+          />
         </header>
 
         <div className="resize-handle" onMouseDown={startResizingHeader} onDoubleClick={toggleHeader}>

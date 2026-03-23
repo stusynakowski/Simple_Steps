@@ -249,3 +249,306 @@
 .folder-row:hover .section-actions {
   opacity: 1;
 }
+
+/* ── Demo Pipeline Cards ─────────────────────────────────────── */
+
+.demo-card {
+  margin: 8px 12px;
+  padding: 12px;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  cursor: default;
+  transition: border-color 0.15s;
+}
+
+.demo-card:hover {
+  border-color: #555;
+}
+
+.demo-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e0e0e0;
+  margin-bottom: 6px;
+}
+
+.demo-card-description {
+  font-size: 0.75rem;
+  color: #888;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.demo-load-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #0e639c;
+  color: #fff;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.demo-load-btn:hover {
+  background: #1177bb;
+}
+
+/* ── Resources Section ───────────────────────────────────────── */
+
+.resource-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 0.82rem;
+}
+
+.resource-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.resource-status-dot.online {
+  background: #4ec9b0;
+  box-shadow: 0 0 4px rgba(78, 201, 176, 0.5);
+}
+
+.resource-status-dot.offline {
+  background: #e57373;
+  box-shadow: 0 0 4px rgba(229, 115, 115, 0.4);
+}
+
+.resource-status-dot.checking {
+  background: #d7ba7d;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.resource-label {
+  flex: 1;
+  color: #ccc;
+}
+
+.resource-status-text {
+  font-size: 0.72rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.resource-empty-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px 2px;
+  font-size: 0.76rem;
+  color: #666;
+  line-height: 1.4;
+}
+
+.resource-empty-subhint {
+  padding: 2px 16px 10px 35px;
+  font-size: 0.7rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+/* ── Function Registry ───────────────────────────────────────── */
+
+.registry-count-badge {
+  font-size: 0.68rem;
+  background: #3c3c3c;
+  color: #aaa;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.registry-filter-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  gap: 4px;
+}
+
+.registry-filter-input {
+  flex: 1;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  color: #ccc;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  border-radius: 3px;
+  outline: none;
+}
+
+.registry-filter-input:focus {
+  border-color: #0e639c;
+}
+
+.registry-filter-clear {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.registry-filter-clear:hover {
+  color: #fff;
+}
+
+.registry-category {
+  border-bottom: 1px solid #252525;
+}
+
+.registry-category-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 16px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #ccc;
+}
+
+.registry-category-row:hover {
+  background: #2a2d2e;
+  color: #fff;
+}
+
+.registry-category-label {
+  flex: 1;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.3px;
+}
+
+.registry-category-count {
+  font-size: 0.68rem;
+  color: #777;
+}
+
+.registry-ops-list {
+  padding-bottom: 2px;
+}
+
+.registry-op {
+  /* wrapper for operation row + detail */
+  display: block;
+}
+
+.registry-op-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 32px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #bbb;
+}
+
+.registry-op-row:hover {
+  background: #2a2d2e;
+  color: #fff;
+}
+
+.registry-op-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registry-type-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: #1e1e1e;
+  flex-shrink: 0;
+}
+
+.registry-op-detail {
+  padding: 4px 12px 8px 44px;
+  border-left: 2px solid #333;
+  margin-left: 38px;
+}
+
+.registry-op-id {
+  margin-bottom: 4px;
+}
+
+.registry-op-id code {
+  font-size: 0.72rem;
+  color: #9cdcfe;
+  background: #1a1a2e;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.registry-op-desc {
+  font-size: 0.74rem;
+  color: #888;
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+
+.registry-op-params {
+  margin-top: 4px;
+}
+
+.registry-params-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 3px;
+}
+
+.registry-param-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 0.74rem;
+}
+
+.registry-param-name {
+  color: #dcdcaa;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.registry-param-type {
+  color: #4ec9b0;
+  font-size: 0.68rem;
+}
+
+.registry-param-default {
+  color: #666;
+  font-size: 0.68rem;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+}

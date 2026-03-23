@@ -1,0 +1,397 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   UnifiedToolbar — single-row Jupyter-style pipeline toolbar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.unified-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  background: #1e1e1e;
+  border-bottom: 1px solid #2d2d2d;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 150;   /* above canvas, below modals */
+}
+
+/* ── Groups ─────────────────────────────────────────────────────────────── */
+
+.ut-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  position: relative;   /* anchor for dropdown panels */
+}
+
+.ut-spacer {
+  flex: 1;
+}
+
+.ut-divider {
+  width: 1px;
+  height: 18px;
+  background: #444;
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ── Buttons (icon / icon+label) ────────────────────────────────────────── */
+
+.ut-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccc;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.ut-btn:hover {
+  background: #2a2a2a;
+  border-color: #555;
+  color: #fff;
+}
+
+.ut-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+.ut-icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.ut-label {
+  font-size: 0.78rem;
+}
+
+/* ── Run / Pause / Stop accent colors ───────────────────────────────────── */
+
+.ut-btn-run {
+  color: #4ade80;
+  border-color: #4ade8040;
+}
+.ut-btn-run:hover {
+  background: #4ade8018;
+  border-color: #4ade8080;
+  color: #6aff9a;
+}
+
+.ut-btn-resume {
+  color: #facc15;
+  border-color: #facc1540;
+}
+.ut-btn-resume:hover {
+  background: #facc1518;
+  border-color: #facc1580;
+  color: #fde047;
+}
+
+.ut-btn-pause {
+  color: #facc15;
+  border-color: #facc1540;
+}
+.ut-btn-pause:hover {
+  background: #facc1518;
+  border-color: #facc1580;
+}
+
+.ut-btn-stop {
+  color: #f87171;
+  border-color: #f8717140;
+}
+.ut-btn-stop:hover {
+  background: #f8717118;
+  border-color: #f8717180;
+  color: #fca5a5;
+}
+
+/* ── Dropdown trigger (Env / Resources) ─────────────────────────────────── */
+
+.ut-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #bbb;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  white-space: nowrap;
+}
+
+.ut-dropdown-trigger:hover {
+  background: #2a2a2a;
+  border-color: #555;
+  color: #fff;
+}
+
+.ut-dropdown-trigger.active {
+  background: #2a2a2a;
+  border-color: #646cff;
+  color: #fff;
+}
+
+.ut-caret {
+  font-size: 0.6rem;
+  color: #888;
+  margin-left: 2px;
+}
+
+.ut-badge {
+  background: rgba(100, 108, 255, 0.25);
+  color: #a5abff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+/* ── Dropdown panels ────────────────────────────────────────────────────── */
+
+.ut-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  background: #252526;
+  border: 1px solid #444;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 10px 12px;
+  z-index: 500;
+  animation: ut-dropdown-in 0.12s ease-out;
+}
+
+@keyframes ut-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ut-panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #888;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+/* ── Env panel fields ───────────────────────────────────────────────────── */
+
+.ut-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ut-field:last-child {
+  margin-bottom: 0;
+}
+
+.ut-field-label {
+  font-size: 0.75rem;
+  color: #999;
+  min-width: 70px;
+  font-weight: 500;
+}
+
+.ut-select {
+  flex: 1;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ut-select:hover {
+  border-color: #666;
+}
+
+.ut-select:focus {
+  border-color: #646cff;
+}
+
+.ut-select option {
+  background: #1e1e1e;
+  color: #eee;
+}
+
+/* ── Resources panel ────────────────────────────────────────────────────── */
+
+.ut-empty {
+  font-size: 0.78rem;
+  color: #666;
+  padding: 6px 0;
+}
+
+.ut-resource-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ut-resource-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.ut-resource-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ut-resource-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+
+.ut-resource-name {
+  flex: 1;
+  font-size: 0.8rem;
+  color: #ddd;
+}
+
+.ut-resource-remove {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 3px;
+  transition: all 0.1s;
+}
+
+.ut-resource-remove:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.ut-resource-add-btn {
+  width: 100%;
+  background: none;
+  border: 1px dashed #555;
+  border-radius: 4px;
+  color: #888;
+  font-size: 0.75rem;
+  padding: 5px 0;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.ut-resource-add-btn:hover {
+  border-color: #888;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ── Status pill ────────────────────────────────────────────────────────── */
+
+.ut-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #1a1a2e;
+  border: 1px solid #333;
+  font-size: 0.75rem;
+  color: #aaa;
+  white-space: nowrap;
+}
+
+.ut-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #666;
+  flex-shrink: 0;
+}
+
+.ut-status-dot.online {
+  background: #4ade80;
+  box-shadow: 0 0 4px #4ade80;
+}
+
+.ut-status-dot.running {
+  background: #facc15;
+  box-shadow: 0 0 4px #facc15;
+  animation: ut-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes ut-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+.ut-status-text {
+  color: #bbb;
+  font-weight: 500;
+}
+
+/* ── Logs button ────────────────────────────────────────────────────────── */
+
+.ut-btn-logs {
+  position: relative;
+}
+
+.ut-btn-logs.active {
+  background: #16213e;
+  border-color: #5588cc;
+  color: #8ac4ff;
+}
+
+.ut-btn-logs.has-errors {
+  border-color: #f87171;
+}
+
+.ut-log-count {
+  font-size: 0.65rem;
+  color: #888;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 5px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.ut-error-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef5350;
+  flex-shrink: 0;
+  animation: ut-pulse 1.5s ease-in-out infinite;
+}
