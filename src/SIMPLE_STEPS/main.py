@@ -17,6 +17,7 @@ from .models import (
 from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe
 from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
+from .operation_pack import PACK_REGISTRY
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
@@ -129,6 +130,31 @@ async def debug_registry():
         "definitions_count": len(DEFINITIONS_LIST),
         "plugin_paths_scanned": [os.path.abspath(p) for p in PLUGIN_PATHS],
     }
+
+
+# --- 1.2 Operation Packs Health ---
+@app.get("/api/packs")
+async def list_packs():
+    """
+    Returns status of all registered OperationPacks — useful for
+    the Resources dropdown or a developer diagnostics page.
+    """
+    result = []
+    for name, pack in PACK_REGISTRY.items():
+        health = pack.health()
+        result.append({
+            "name": pack.name,
+            "version": pack.version,
+            "description": pack.description,
+            "available": pack.is_available,
+            "operation_ids": pack.operation_ids,
+            "health": {
+                "ok": health.ok,
+                "checks": health.checks,
+                "errors": health.errors,
+            },
+        })
+    return result
 
 # --- 1.5 Project / Pipeline Management ---
 
