@@ -5,13 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "simple_steps"
 version = "0.1.0"
-description = "Agent-guardrailed development template"
-requires-python = ">=3.10"
+description = "Visual pipeline orchestrator for Python functions"
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
-    "pandas>=2.2.0"
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]
@@ -20,8 +23,18 @@ dev = [
   "ruff>=0.6",
 ]
 
+[project.scripts]
+simple-steps = "SIMPLE_STEPS.cli:main"
+simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+SIMPLE_STEPS = ["frontend_dist/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

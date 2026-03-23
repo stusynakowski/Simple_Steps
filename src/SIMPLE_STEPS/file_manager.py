@@ -21,7 +21,10 @@ from datetime import datetime
 
 from .models import PipelineFile, ProjectInfo
 
-PROJECTS_DIR = os.path.join(os.getcwd(), "projects")
+PROJECTS_DIR = os.environ.get(
+    "SIMPLE_STEPS_PROJECTS_DIR",
+    os.path.join(os.getcwd(), "projects"),
+)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────

@@ -18,10 +18,17 @@ import sys
 import os
 
 # Allow imports from src when loaded as a plugin
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import pandas as pd
-from src.SIMPLE_STEPS.operation_pack import OperationPack
+
+# Import from the installed package (not src.SIMPLE_STEPS) so we share
+# the same PACK_REGISTRY instance that main.py uses.
+try:
+    from SIMPLE_STEPS.operation_pack import OperationPack
+except ImportError:
+    # Fallback for direct execution outside the package
+    from src.SIMPLE_STEPS.operation_pack import OperationPack
 
 
 # ─────────────────────────────────────────────────────────────────────────────

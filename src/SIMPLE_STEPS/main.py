@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import pandas as pd
@@ -40,6 +41,11 @@ PLUGIN_PATHS = [
     # 3. Add your custom absolute paths here:
     # "/Users/myname/projets/my_custom_ops"
 ]
+
+# Pick up additional plugin paths from environment (set by CLI --ops flag)
+_extra_ops = os.environ.get("SIMPLE_STEPS_EXTRA_OPS", "")
+if _extra_ops:
+    PLUGIN_PATHS.extend(p.strip() for p in _extra_ops.split(";") if p.strip())
 
 # --- Plugin Discovery Logic ---
 def register_plugins(paths: List[str]):
@@ -89,7 +95,12 @@ app = FastAPI(
 # --- Middleware ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Frontend Port
+    allow_origins=[
+        "http://localhost:5173",  # Vite dev server
+        "http://localhost:8000",  # Same-origin when frontend is bundled
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -297,6 +308,48 @@ async def get_data_view(
             })
 
     return cells
+
+# ── Serve bundled frontend (SPA) ────────────────────────────────────────────
+# The built React app lives in the package at SIMPLE_STEPS/frontend_dist/.
+# When installed via pip, the dist is bundled into the package.
+# This MUST come after all /api/* routes so API takes precedence.
+
+_FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend_dist")
+
+if os.path.isdir(_FRONTEND_DIR):
+    from fastapi.responses import FileResponse
+
+    # Serve static assets (JS, CSS, images)
+    app.mount(
+        "/assets",
+        StaticFiles(directory=os.path.join(_FRONTEND_DIR, "assets")),
+        name="frontend-assets",
+    )
+
+    # Serve other static files at root level (vite.svg, etc.)
+    @app.get("/vite.svg")
+    async def vite_svg():
+        path = os.path.join(_FRONTEND_DIR, "vite.svg")
+        if os.path.exists(path):
+            return FileResponse(path, media_type="image/svg+xml")
+        raise HTTPException(status_code=404)
+
+    # SPA fallback: any non-API route serves index.html
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't intercept API routes (they're already mounted above)
+        if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("openapi"):
+            raise HTTPException(status_code=404)
+        return FileResponse(os.path.join(_FRONTEND_DIR, "index.html"))
+else:
+    @app.get("/")
+    async def no_frontend():
+        return {
+            "message": "Simple Steps API is running. Frontend not bundled.",
+            "hint": "Run 'simple-steps-build' to bundle the frontend, or use the Vite dev server at http://localhost:5173",
+            "docs": "/docs",
+        }
+
 
 if __name__ == "__main__":
     import uvicorn

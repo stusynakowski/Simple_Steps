@@ -11,10 +11,14 @@ import sys
 import os
 
 # Allow imports from src when loaded as a plugin
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import pandas as pd
-from src.SIMPLE_STEPS.decorators import simple_step
+
+try:
+    from SIMPLE_STEPS.decorators import simple_step
+except ImportError:
+    from src.SIMPLE_STEPS.decorators import simple_step
 
 # ---------------------------------------------------------------------------
 # Step 1 – Source: fetch a channel's video list

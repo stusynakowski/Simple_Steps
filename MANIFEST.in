@@ -1,0 +1,2 @@
+recursive-include src/SIMPLE_STEPS/frontend_dist *
+include src/SIMPLE_STEPS/frontend_dist/**/*
