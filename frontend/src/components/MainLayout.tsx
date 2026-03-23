@@ -458,6 +458,7 @@ export default function MainLayout() {
             isLogOpen={isLogOpen}
             onToggleLogs={() => setIsLogOpen(prev => !prev)}
             onClearOutputs={clearLogs}
+            availableOperations={availableOperations}
           />
         </header>
 

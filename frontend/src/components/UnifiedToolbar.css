@@ -395,3 +395,184 @@
   flex-shrink: 0;
   animation: ut-pulse 1.5s ease-in-out infinite;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Registry Dropdown (Resources → Function Registry)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ut-registry-panel {
+  min-width: 320px;
+  max-width: 420px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Filter input ───────────────────────────────────────────────────────── */
+
+.ut-registry-filter {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.ut-registry-filter-input {
+  width: 100%;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 0.8rem;
+  padding: 5px 26px 5px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ut-registry-filter-input:focus {
+  border-color: #646cff;
+}
+
+.ut-registry-filter-input::placeholder {
+  color: #666;
+}
+
+.ut-registry-filter-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.ut-registry-filter-clear:hover {
+  color: #fff;
+}
+
+/* ── Scrollable list ────────────────────────────────────────────────────── */
+
+.ut-registry-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.ut-registry-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ut-registry-list::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 3px;
+}
+
+.ut-registry-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ── Category row ───────────────────────────────────────────────────────── */
+
+.ut-registry-category {
+  margin-bottom: 2px;
+}
+
+.ut-registry-category-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background 0.1s;
+}
+
+.ut-registry-category-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ut-registry-chevron {
+  font-size: 0.55rem;
+  color: #888;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  width: 10px;
+  text-align: center;
+}
+
+.ut-registry-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.ut-registry-category-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ccc;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex: 1;
+}
+
+.ut-registry-category-count {
+  font-size: 0.65rem;
+  color: #888;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0 5px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* ── Operation rows ─────────────────────────────────────────────────────── */
+
+.ut-registry-ops {
+  padding-left: 16px;
+}
+
+.ut-registry-op-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 3px;
+  cursor: default;
+  transition: background 0.1s;
+}
+
+.ut-registry-op-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ut-registry-fn-icon {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #dcdcaa;
+  font-style: italic;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+.ut-registry-op-name {
+  flex: 1;
+  font-size: 0.78rem;
+  color: #ddd;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ut-registry-type-badge {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #1e1e1e;
+  padding: 1px 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}

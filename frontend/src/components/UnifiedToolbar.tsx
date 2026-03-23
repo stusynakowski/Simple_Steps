@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import type { OperationDefinition } from '../services/api';
 import './UnifiedToolbar.css';
 
 interface UnifiedToolbarProps {
@@ -12,6 +13,7 @@ interface UnifiedToolbarProps {
   onToggleLogs?: () => void;
   onClearOutputs?: () => void;
   onRestartBackend?: () => void;
+  availableOperations?: OperationDefinition[];
 }
 
 export default function UnifiedToolbar({
@@ -25,15 +27,17 @@ export default function UnifiedToolbar({
   onToggleLogs,
   onClearOutputs,
   onRestartBackend,
+  availableOperations = [],
 }: UnifiedToolbarProps) {
   /* ── Local state for environment & resources ───────────────────────── */
   const [computeTarget, setComputeTarget] = useState('Local');
   const [pythonEnv, setPythonEnv] = useState('simple-steps-env');
-  const [resources, setResources] = useState<string[]>(['OpenAI', 'Postgres']);
 
   /* ── Dropdown open state ───────────────────────────────────────────── */
   const [envOpen, setEnvOpen] = useState(false);
   const [resOpen, setResOpen] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const envRef = useRef<HTMLDivElement>(null);
   const resRef = useRef<HTMLDivElement>(null);
@@ -42,21 +46,55 @@ export default function UnifiedToolbar({
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (envRef.current && !envRef.current.contains(e.target as Node)) setEnvOpen(false);
-      if (resRef.current && !resRef.current.contains(e.target as Node)) setResOpen(false);
+      if (resRef.current && !resRef.current.contains(e.target as Node)) {
+        setResOpen(false);
+        setFilterText('');
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const removeResource = (name: string) => {
-    setResources(prev => prev.filter(r => r !== name));
+  /* ── Group operations by category ──────────────────────────────────── */
+  const filteredOps = useMemo(() => {
+    if (!filterText) return availableOperations;
+    const lower = filterText.toLowerCase();
+    return availableOperations.filter(op =>
+      op.id.toLowerCase().includes(lower) ||
+      op.label.toLowerCase().includes(lower) ||
+      op.category.toLowerCase().includes(lower)
+    );
+  }, [availableOperations, filterText]);
+
+  const groupedOps = useMemo(() => {
+    const acc: Record<string, OperationDefinition[]> = {};
+    for (const op of filteredOps) {
+      const cat = op.category || 'Uncategorized';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(op);
+    }
+    return acc;
+  }, [filteredOps]);
+
+  const sortedCategories = useMemo(() => Object.keys(groupedOps).sort(), [groupedOps]);
+
+  const toggleCategory = (cat: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
   };
 
-  const addResource = () => {
-    const newRes = prompt("Add resource (e.g. 'AWS S3', 'Redis')");
-    if (newRes && newRes.trim()) {
-      setResources(prev => [...prev, newRes.trim()]);
-    }
+  // Type badge colors
+  const typeBadgeColors: Record<string, string> = {
+    source: '#4ec9b0',
+    map: '#569cd6',
+    filter: '#ce9178',
+    dataframe: '#b5cea8',
+    expand: '#d7ba7d',
+    raw_output: '#c586c0',
+    orchestrator: '#9cdcfe',
   };
 
   /* ── Env label for collapsed state ─────────────────────────────────── */
@@ -152,48 +190,79 @@ export default function UnifiedToolbar({
         )}
       </div>
 
-      {/* ── Center: Resources dropdown ───────────────────────────────── */}
+      {/* ── Center: Resources dropdown (Function Registry) ────────────── */}
       <div className="ut-group ut-res-group" ref={resRef}>
         <button
           className={`ut-dropdown-trigger ${resOpen ? 'active' : ''}`}
-          onClick={() => { setResOpen(v => !v); setEnvOpen(false); }}
-          title="Connected Resources"
+          onClick={() => { setResOpen(v => !v); setEnvOpen(false); if (resOpen) setFilterText(''); }}
+          title="Function Registry — All registered operations"
         >
-          <span className="ut-icon">🔌</span>
+          <span className="ut-icon">�</span>
           <span className="ut-label">Resources</span>
-          {resources.length > 0 && (
-            <span className="ut-badge">{resources.length}</span>
+          {availableOperations.length > 0 && (
+            <span className="ut-badge">{availableOperations.length}</span>
           )}
           <span className="ut-caret">{resOpen ? '▴' : '▾'}</span>
         </button>
 
         {resOpen && (
-          <div className="ut-dropdown-panel ut-res-panel">
-            <div className="ut-panel-title">Connected Resources</div>
+          <div className="ut-dropdown-panel ut-res-panel ut-registry-panel">
+            <div className="ut-panel-title">Function Registry</div>
 
-            {resources.length === 0 && (
-              <div className="ut-empty">No resources configured</div>
-            )}
-
-            <div className="ut-resource-list">
-              {resources.map(r => (
-                <div key={r} className="ut-resource-row">
-                  <span className="ut-resource-dot" />
-                  <span className="ut-resource-name">{r}</span>
-                  <button
-                    className="ut-resource-remove"
-                    onClick={() => removeResource(r)}
-                    title={`Remove ${r}`}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+            {/* Filter input */}
+            <div className="ut-registry-filter">
+              <input
+                type="text"
+                className="ut-registry-filter-input"
+                placeholder="Filter functions…"
+                value={filterText}
+                onChange={e => setFilterText(e.target.value)}
+                autoFocus
+              />
+              {filterText && (
+                <button className="ut-registry-filter-clear" onClick={() => setFilterText('')}>×</button>
+              )}
             </div>
 
-            <button className="ut-resource-add-btn" onClick={addResource}>
-              + Add Resource
-            </button>
+            {availableOperations.length === 0 && (
+              <div className="ut-empty">No functions registered — is the backend running?</div>
+            )}
+
+            {filteredOps.length === 0 && availableOperations.length > 0 && (
+              <div className="ut-empty">No matches for "{filterText}"</div>
+            )}
+
+            <div className="ut-registry-list">
+              {sortedCategories.map(cat => {
+                const ops = groupedOps[cat];
+                const isCatOpen = expandedCategories.has(cat);
+                return (
+                  <div key={cat} className="ut-registry-category">
+                    <div className="ut-registry-category-row" onClick={() => toggleCategory(cat)}>
+                      <span className={`ut-registry-chevron ${!isCatOpen ? 'collapsed' : ''}`}>▼</span>
+                      <span className="ut-registry-category-label">{cat}</span>
+                      <span className="ut-registry-category-count">{ops.length}</span>
+                    </div>
+                    {isCatOpen && (
+                      <div className="ut-registry-ops">
+                        {ops.map(op => (
+                          <div key={op.id} className="ut-registry-op-row" title={op.description || op.id}>
+                            <span className="ut-registry-fn-icon">ƒ</span>
+                            <span className="ut-registry-op-name">{op.label}</span>
+                            <span
+                              className="ut-registry-type-badge"
+                              style={{ background: typeBadgeColors[op.type] || '#666' }}
+                            >
+                              {op.type}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
