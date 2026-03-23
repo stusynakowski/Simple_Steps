@@ -1,7 +1,7 @@
 import React from 'react';
 import './ActivityBar.css';
 
-export type ActivityView = 'explorer' | 'search' | 'components' | 'demos' | 'settings' | 'account' | null;
+export type ActivityView = 'explorer' | 'search' | 'docs' | 'settings' | 'account' | null;
 
 interface ActivityBarProps {
   activeView: ActivityView;
@@ -34,18 +34,10 @@ const ActivityBar: React.FC<ActivityBarProps> = ({ activeView, onViewChange }) =
     </svg>
   );
 
-  const ComponentsIcon = () => (
+  const DocsIcon = () => (
     <svg className="activity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-    </svg>
-  );
-
-  const DemosIcon = () => (
-    <svg className="activity-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
     </svg>
   );
 
@@ -81,18 +73,11 @@ const ActivityBar: React.FC<ActivityBarProps> = ({ activeView, onViewChange }) =
             <SearchIcon />
         </div>
         <div 
-            className={`activity-item ${activeView === 'components' ? 'active' : ''}`}
-            onClick={() => handleItemClick('components')}
-            title="Components"
+            className={`activity-item ${activeView === 'docs' ? 'active' : ''}`}
+            onClick={() => handleItemClick('docs')}
+            title="User Docs"
         >
-            <ComponentsIcon />
-        </div>
-        <div 
-            className={`activity-item ${activeView === 'demos' ? 'active' : ''}`}
-            onClick={() => handleItemClick('demos')}
-            title="Resources & Registry"
-        >
-            <DemosIcon />
+            <DocsIcon />
         </div>
       </div>
       

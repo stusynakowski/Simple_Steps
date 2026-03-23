@@ -407,8 +407,6 @@ export default function MainLayout() {
           onLoadPipeline={openPipelineTab}
           onRequestSave={handleRequestSaveFromSidebar}
           onDeletePipeline={removePipeline}
-          onLoadWorkflowObject={openWorkflowObjectTab}
-          availableOperations={availableOperations}
         />
       </div>
 
