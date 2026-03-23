@@ -25,6 +25,7 @@ dev = [
 
 [project.scripts]
 simple-steps = "SIMPLE_STEPS.cli:main"
+simple-steps-dev = "SIMPLE_STEPS.cli_dev:main"
 simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
 
 [tool.setuptools]
