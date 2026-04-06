@@ -12,3 +12,4 @@ Usage:
 __version__ = "0.1.0"
 
 from .decorators import simple_step, register_operation  # noqa: F401
+from .operation_pack import OperationPack  # noqa: F401

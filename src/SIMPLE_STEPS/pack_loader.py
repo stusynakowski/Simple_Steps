@@ -68,7 +68,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Set
 
+if sys.version_info >= (3, 10):
+    from importlib.metadata import entry_points
+else:
+    from importlib_metadata import entry_points  # type: ignore[no-redef]
+
 from .decorators import OPERATION_REGISTRY
+
+# Entry point group name — pip-installed packs advertise themselves here
+ENTRY_POINT_GROUP = "simple_steps.packs"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -143,7 +151,10 @@ class PackLoader:
         #   We just note them for the audit log.
         self._audit_system_ops()
 
-        # Tier 2: Developer packs
+        # Tier 2a: pip-installed packs (entry points)
+        self._load_installed_packs()
+
+        # Tier 2b: Developer packs (filesystem directories)
         for pack_dir in self.developer_pack_dirs:
             self._load_directory(pack_dir, OpTier.DEVELOPER_PACK)
 
@@ -233,7 +244,76 @@ class PackLoader:
         ))
         print(f"  🔧 System ops: {len(current_ids)} operations registered")
 
-    # ── Tier 2 & 3: File scanning ────────────────────────────────────────
+    # ── Tier 2a: pip-installed packs (entry points) ──────────────────────
+
+    def _load_installed_packs(self):
+        """
+        Discover packs installed via pip.
+
+        Any package that declares an entry point in the group
+        ``simple_steps.packs`` will be imported automatically.
+
+        Example in a pack's pyproject.toml::
+
+            [project.entry-points."simple_steps.packs"]
+            my_pack = "simple_steps_my_pack"
+
+        The value is the Python module to import. Importing it triggers
+        the ``@simple_step`` or ``@pack.step`` decorators, which
+        register the operations into the global OPERATION_REGISTRY.
+        """
+        try:
+            eps = entry_points(group=ENTRY_POINT_GROUP)
+        except TypeError:
+            # Python 3.9 compat: entry_points() doesn't support group= kwarg
+            all_eps = entry_points()
+            eps = all_eps.get(ENTRY_POINT_GROUP, [])
+
+        if not eps:
+            print("  📦 Installed packs: none found")
+            return
+
+        print(f"  📦 Installed packs: found {len(list(eps))} entry point(s)")
+
+        for ep in eps:
+            before_ids = set(OPERATION_REGISTRY.keys())
+            try:
+                ep.load()  # imports the module → triggers decorators
+                after_ids = set(OPERATION_REGISTRY.keys())
+                new_ops = sorted(after_ids - before_ids)
+
+                # Tag new operations
+                for op_id in new_ops:
+                    entry = OPERATION_REGISTRY.get(op_id)
+                    if entry:
+                        entry["tier"] = OpTier.DEVELOPER_PACK.value
+                        entry["source_file"] = f"<pip:{ep.name}>"
+
+                self._results.append(LoadResult(
+                    file_path=f"<pip:{ep.name}>",
+                    tier=OpTier.DEVELOPER_PACK,
+                    success=True,
+                    module_name=ep.value,
+                    ops_registered=new_ops,
+                ))
+
+                if new_ops:
+                    print(f"    ✅ {ep.name}: {', '.join(new_ops)}")
+                else:
+                    print(f"    ⏭  {ep.name}: imported but no new operations")
+
+            except Exception as e:
+                self._results.append(LoadResult(
+                    file_path=f"<pip:{ep.name}>",
+                    tier=OpTier.DEVELOPER_PACK,
+                    success=False,
+                    module_name=getattr(ep, 'value', str(ep)),
+                    error=f"{type(e).__name__}: {e}",
+                ))
+                print(f"    ❌ {ep.name}: {e}")
+                traceback.print_exc()
+
+    # ── Tier 2b & 3: File scanning ──────────────────────────────────────
 
     def _load_directory(self, dir_path: str, tier: OpTier):
         """

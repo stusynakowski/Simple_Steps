@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simple-steps-example-pack"          # ← change this
+version = "0.1.0"
+description = "Example operation pack for Simple Steps"
+requires-python = ">=3.9"
+readme = "README.md"
+license = "MIT"
+# authors = [{name = "Your Name"}]
+
+dependencies = [
+    "simple-steps>=0.1.0",
+    # Add your pack's own dependencies here, e.g.:
+    # "requests>=2.31",
+    # "beautifulsoup4>=4.12",
+]
+
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │  THIS IS THE KEY PART — the entry point tells Simple Steps         │
+# │  to auto-discover this pack when it's pip-installed.               │
+# └─────────────────────────────────────────────────────────────────────┘
+[project.entry-points."simple_steps.packs"]
+example_pack = "simple_steps_example_pack"  # ← "name = module_to_import"
+
+[tool.setuptools.packages.find]
+where = ["src"]
