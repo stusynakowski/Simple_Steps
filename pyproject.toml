@@ -3,12 +3,29 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simple_steps"
+name = "simple-steps"
 version = "0.1.0"
 description = "Visual pipeline orchestrator for Python functions"
 requires-python = ">=3.9"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
+authors = [
+    {name = "Stuart Synakowski"},
+]
+keywords = ["pipeline", "workflow", "orchestrator", "data", "no-code", "low-code"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Framework :: FastAPI",
+]
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -19,9 +36,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.0",
-  "ruff>=0.6",
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "build",
+    "twine",
 ]
+
+[project.urls]
+Homepage = "https://github.com/stusynakowski/Simple_Steps"
+Repository = "https://github.com/stusynakowski/Simple_Steps"
+Issues = "https://github.com/stusynakowski/Simple_Steps/issues"
 
 [project.scripts]
 simple-steps = "SIMPLE_STEPS.cli:main"
