@@ -1,0 +1,199 @@
+.agent-config-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.agent-config-panel {
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  width: 480px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.agent-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  font-weight: 600;
+  font-size: 14px;
+  color: #e0e0e0;
+}
+
+.agent-config-close {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.agent-config-close:hover {
+  background: #333;
+  color: #fff;
+}
+
+.agent-health-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.agent-health-banner.ready {
+  background: rgba(0, 128, 0, 0.1);
+  color: #4ec9b0;
+}
+
+.agent-health-banner.not-ready {
+  background: rgba(204, 120, 0, 0.1);
+  color: #dcdcaa;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agent-health-banner.ready .health-dot {
+  background: #4ec9b0;
+}
+
+.agent-health-banner.not-ready .health-dot {
+  background: #dcdcaa;
+}
+
+.health-hint {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.agent-config-error {
+  padding: 8px 16px;
+  background: rgba(200, 50, 50, 0.1);
+  color: #f48771;
+  font-size: 12px;
+  border-bottom: 1px solid #333;
+}
+
+.agent-config-body {
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-field label {
+  font-size: 12px;
+  color: #b0b0b0;
+  font-weight: 500;
+}
+
+.config-field select,
+.config-field input[type="text"],
+.config-field input[type="password"],
+.config-field textarea {
+  background: #2d2d2d;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  color: #e0e0e0;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.config-field select:focus,
+.config-field input:focus,
+.config-field textarea:focus {
+  outline: 1px solid #007fd4;
+  border-color: #007fd4;
+}
+
+.config-field input[type="range"] {
+  width: 100%;
+  accent-color: #007fd4;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #666;
+}
+
+.config-hint {
+  font-size: 11px;
+  color: #666;
+}
+
+.checkbox-field label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #cccccc;
+}
+
+.checkbox-field input[type="checkbox"] {
+  accent-color: #007fd4;
+}
+
+.config-actions {
+  padding-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.config-save-btn {
+  background: #007fd4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.config-save-btn:hover:not(:disabled) {
+  background: #0098ff;
+}
+
+.config-save-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.agent-config-loading {
+  padding: 32px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+}

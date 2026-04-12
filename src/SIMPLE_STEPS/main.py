@@ -25,6 +25,7 @@ from .file_manager import (
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
     PROJECTS_DIR,
 )
+from .agent.routes import router as agent_router
 import sys
 import os
 
@@ -95,6 +96,9 @@ app = FastAPI(
     title="Simple Steps Backend",
     description="Orchestrates data operations defined by developers"
 )
+
+# --- Agent Router ---
+app.include_router(agent_router)
 
 # --- Middleware ---
 app.add_middleware(

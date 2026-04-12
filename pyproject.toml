@@ -33,9 +33,23 @@ dependencies = [
     "pandas>=2.2.0",
     "numpy>=1.26.0",
     "importlib-metadata>=4.0; python_version<'3.10'",
+    "websockets>=12.0",
 ]
 
 [project.optional-dependencies]
+agent = [
+    "langgraph>=0.2.0",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+]
+agent-anthropic = [
+    "simple-steps[agent]",
+    "langchain-anthropic>=0.2.0",
+]
+agent-ollama = [
+    "simple-steps[agent]",
+    "langchain-ollama>=0.2.0",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",

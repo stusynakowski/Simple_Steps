@@ -559,7 +559,15 @@ export default function MainLayout() {
         overflow: 'hidden', transition: transitionStyle,
         opacity: rightSidebarWidth > 20 ? 1 : 0,
       }}>
-        <ChatSidebar isVisible={true} onClose={toggleChat} />
+        <ChatSidebar
+          isVisible={true}
+          onClose={toggleChat}
+          workflow={workflow}
+          availableOperations={availableOperations}
+          onApplyFormula={(stepId, formula) => {
+            updateStep(stepId, { formula });
+          }}
+        />
       </div>
 
       {/* ── Save modal ──────────────────────────────────────────────────── */}
