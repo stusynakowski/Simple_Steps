@@ -29,6 +29,13 @@ import time
 
 
 def main():
+    # ── Check for subcommands first ──────────────────────────────────────
+    # If the first positional arg is "pack", delegate to the pack CLI.
+    if len(sys.argv) > 1 and sys.argv[1] == "pack":
+        from .cli_pack import main as pack_main
+        pack_main(sys.argv[2:])
+        return
+
     parser = argparse.ArgumentParser(
         prog="simple-steps",
         description="Start the Simple Steps pipeline orchestrator",
@@ -106,6 +113,17 @@ def main():
         for f in os.listdir(workspace)
         if os.path.isfile(os.path.join(workspace, f))
     )
+    has_manifest = os.path.isfile(os.path.join(workspace, "simple_steps.toml"))
+
+    # Count manifest packs
+    manifest_pack_count = 0
+    if has_manifest:
+        try:
+            from .pack_manager import load_manifest
+            _m = load_manifest(workspace)
+            manifest_pack_count = len(_m.packs)
+        except Exception:
+            pass
 
     # Count projects
     projects_dir = os.path.join(workspace, "projects")
@@ -140,6 +158,8 @@ def main():
         print(f"  │    🔧 ops/ discovered")
     if has_py:
         print(f"  │    🐍 Top-level .py files discovered")
+    if has_manifest:
+        print(f"  │    📄 simple_steps.toml ({manifest_pack_count} pack(s) declared)")
     print("  └─────────────────────────────────────────────┘")
     print()
 

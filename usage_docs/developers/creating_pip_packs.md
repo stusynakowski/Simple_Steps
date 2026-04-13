@@ -18,6 +18,14 @@ Simple Steps starts:       │
 
 ## Quick Start: Create a New Pack
 
+The fastest way to get started is the scaffold command:
+
+```bash
+simple-steps pack create my-pack --pip
+```
+
+This generates the full directory structure below. Alternatively, create it manually:
+
 ### 1. Create a new repo with this structure
 
 ```
@@ -175,3 +183,11 @@ from . import analysis_ops # noqa: F401
 A ready-to-copy template is available at `pack_template/` in the Simple Steps repo.
 
 Copy it, rename the module, update `pyproject.toml`, and start writing operations.
+
+Or use `simple-steps pack create <name> --pip` to scaffold it automatically.
+
+## See Also
+
+- [`managing-packs.md`](managing-packs.md) — Import, sync, and manage packs with the `simple-steps pack` CLI
+- [`creating_packs.md`](creating_packs.md) — Three-tier overview of the pack system
+- [`creating-operation-packs.md`](creating-operation-packs.md) — Advanced OperationPack class with health checks and contracts

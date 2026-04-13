@@ -130,6 +130,28 @@ export SIMPLE_STEPS_PACKS_DIR="/path/to/team-packs;/path/to/other-packs"
 simple-steps
 ```
 
+### Using the Pack Manifest (Recommended)
+
+For a more permanent and shareable approach, use the `simple_steps.toml`
+manifest to declare pack dependencies for your workspace:
+
+```bash
+# Import a pack from a git repo
+simple-steps pack add https://github.com/org/youtube-ops.git
+
+# Import from a local directory
+simple-steps pack add ../shared-packs/analytics
+
+# Install a pip-published pack
+simple-steps pack add simple-steps-nlp --pip
+```
+
+All declared packs are recorded in `simple_steps.toml` at the workspace
+root. Commit this file — teammates can then run `simple-steps pack install`
+to fetch everything.
+
+See [`managing-packs.md`](managing-packs.md) for the full guide.
+
 ---
 
 ## Tier 3: Project Operations
@@ -272,6 +294,8 @@ are missing.
 │  └── packs/youtube/                             │
 │  └── packs/webscraping/                         │
 │  └── --packs /external/path                     │
+│  └── simple_steps.toml manifest (git/local)     │
+│  └── pip-installed packs (entry points)         │
 │                                                 │
 │  Tier 3: Project Ops (per-project)              │
 │  └── projects/my-project/ops/                   │

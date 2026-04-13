@@ -66,6 +66,7 @@ Issues = "https://github.com/stusynakowski/Simple_Steps/issues"
 simple-steps = "SIMPLE_STEPS.cli:main"
 simple-steps-dev = "SIMPLE_STEPS.cli_dev:main"
 simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
+simple-steps-pack = "SIMPLE_STEPS.cli_pack:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

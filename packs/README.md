@@ -83,3 +83,8 @@ pack.register()
   operations, put them in the project's `ops/` folder instead.
 - Use `simple-steps --packs /path/to/extra/packs` to add additional
   pack directories at startup.
+- Use `simple-steps pack add <url>` to import packs from git repos,
+  local directories, or PyPI — tracked in `simple_steps.toml`.
+- Use `simple-steps pack create <name>` to scaffold a new pack.
+- See [`usage_docs/developers/managing-packs.md`](../usage_docs/developers/managing-packs.md)
+  for the full pack management guide.
