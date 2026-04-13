@@ -56,7 +56,7 @@ export default function StepToolbar({
   onFormulaBarRef,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
-  const [formula, setFormula] = useState(step.operation || '');
+  const [formula, setFormula] = useState(step.formula || step.operation || '');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -74,11 +74,12 @@ export default function StepToolbar({
 
   // Sync with prop if the step data changes externally
   useEffect(() => {
-    if (step.operation !== formula) {
-      setFormula(step.operation || '');
+    const canonical = step.formula || step.operation || '';
+    if (canonical !== formula) {
+      setFormula(canonical);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.operation]);
+  }, [step.formula, step.operation]);
 
   const computeSuggestions = (value: string): OperationDefinition[] => {
     const raw = value.trim();

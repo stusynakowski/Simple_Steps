@@ -571,15 +571,22 @@ async def get_data_view(
 
         for col_name, val in row.items():
             # Handle list/array values correctly to avoid ValueError
+            # pd.isna() raises on array-like values, so check those first.
             if isinstance(val, (list, tuple, np.ndarray)):
                 display_val = str(val)
-                actual_val = val
-            elif pd.isna(val):
-                display_val = ""
-                actual_val = None
+                # Convert numpy arrays to lists for JSON serialization
+                actual_val = val.tolist() if isinstance(val, np.ndarray) else val
             else:
-                display_val = str(val)
-                actual_val = val
+                try:
+                    is_na = pd.isna(val)
+                except (ValueError, TypeError):
+                    is_na = False
+                if is_na:
+                    display_val = ""
+                    actual_val = None
+                else:
+                    display_val = str(val)
+                    actual_val = val
 
             cells.append({
                 "row_id": current_row_idx,

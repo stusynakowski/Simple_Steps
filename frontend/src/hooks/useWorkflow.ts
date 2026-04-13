@@ -31,10 +31,21 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
   const internalKeys = Object.fromEntries(
     Object.entries(s.config ?? {}).filter(([k]) => k.startsWith('_'))
   );
-  const configuration = { ...internalKeys, ...formulaArgs };
+
+  // When no valid formula exists (old save files), carry over ALL config keys
+  // so parameters like channel_url, url_column etc. are not lost.
+  const legacyConfig = (parsed?.isValid && Object.keys(formulaArgs).length > 0)
+    ? {}
+    : Object.fromEntries(
+        Object.entries(s.config ?? {}).filter(([k]) => !k.startsWith('_'))
+      );
+
+  const configuration = { ...internalKeys, ...legacyConfig, ...formulaArgs };
 
   // If no formula was saved, reconstruct it from the legacy fields so we have one.
-  const formula = savedFormula || buildFormula(processType, configuration);
+  const formula = savedFormula || buildFormula(processType, configuration,
+    (internalKeys._orchestrator as any) ?? null,
+  );
 
   return {
     id: s.step_id,
@@ -44,6 +55,8 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
     process_type: processType,
     configuration: configuration as Record<string, unknown>,
     status: 'pending' as StepStatus,
+    // Keep legacy 'operation' field in sync so the formula bar picks it up
+    operation: formula,
   };
 }
 
@@ -159,11 +172,18 @@ export default function useWorkflow() {
 
     // Internal (_-prefixed) keys like _orchestrator are not in the formula —
     // carry them from configuration. Formula args override everything else.
+    // When formula parsing fails (e.g. old saves without formula), fall back
+    // to the full configuration so parameters like channel_url are not lost.
     const internalKeys = Object.fromEntries(
       Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
     );
     const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
-    const resolvedConfig: Record<string, unknown> = config ?? { ...internalKeys, ...formulaArgs };
+    const hasFormulaArgs = Object.keys(formulaArgs).length > 0;
+    const resolvedConfig: Record<string, unknown> = config ?? (
+      hasFormulaArgs
+        ? { ...internalKeys, ...formulaArgs }
+        : { ...step.configuration }  // fall back to full config if formula parse yielded nothing
+    );
 
     // Identify dependency (previous step)
     const stepIndex = currentSteps.indexOf(step);
@@ -301,7 +321,12 @@ export default function useWorkflow() {
       Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
     );
     const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
-    const previewConfig: Record<string, unknown> = config ?? { ...internalKeys, ...formulaArgs };
+    const hasPreviewFormulaArgs = Object.keys(formulaArgs).length > 0;
+    const previewConfig: Record<string, unknown> = config ?? (
+      hasPreviewFormulaArgs
+        ? { ...internalKeys, ...formulaArgs }
+        : { ...step.configuration }
+    );
     
     addLog('debug', `Preview requested for "${step.label}" (${previewOperationId})`, {
       stepId: id,

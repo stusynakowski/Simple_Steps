@@ -174,7 +174,7 @@ export function useStagedPreview({
           return {
             column: colName,
             rowIndex: i,
-            displayValue: val !== undefined ? String(val) : '–',
+            displayValue: val !== undefined ? String(val) : 'staged',
             formula: `↳ ${colName}`,
             state: 'passthrough' as StagedCellState,
           };
@@ -204,7 +204,7 @@ export function useStagedPreview({
           return {
             column: colName,
             rowIndex: i,
-            displayValue: `…${operationId}(…)`,
+            displayValue: 'staged',
             formula: cellFormula,
             state: 'pending' as StagedCellState,
           };
@@ -213,7 +213,7 @@ export function useStagedPreview({
         return {
           column: colName,
           rowIndex: i,
-          displayValue: cellFormula,
+          displayValue: 'staged',
           formula: cellFormula,
           state: 'valid' as StagedCellState,
         };
