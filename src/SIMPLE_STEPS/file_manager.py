@@ -47,12 +47,21 @@ def _slugify(name: str) -> str:
 
 
 def _project_dir(project_id: str) -> str:
-    safe = re.sub(r"[^a-z0-9\-_]", "", project_id)
+    # Project IDs from list_projects() are already the raw folder name on disk.
+    # Just sanitize away anything truly dangerous (path traversal, etc.)
+    safe = re.sub(r"[^a-z0-9A-Z\-_]", "", project_id)
     return os.path.join(PROJECTS_DIR, safe)
 
 
 def _pipeline_path(project_id: str, pipeline_id: str) -> str:
-    safe = re.sub(r"[^a-z0-9\-_]", "", pipeline_id)
+    # Try _slugify first (matches how save_pipeline creates the filename),
+    # then fall back to plain sanitisation for IDs that are already on-disk slugs.
+    slug = _slugify(pipeline_id)
+    candidate = os.path.join(_project_dir(project_id), f"{slug}.json")
+    if os.path.exists(candidate):
+        return candidate
+    # Fallback: sanitize but preserve underscores / case already on disk
+    safe = re.sub(r"[^a-z0-9A-Z\-_]", "", pipeline_id)
     return os.path.join(_project_dir(project_id), f"{safe}.json")
 
 
@@ -106,7 +115,13 @@ def list_pipelines(project_id: str) -> List[PipelineFile]:
             try:
                 with open(os.path.join(folder, fname)) as f:
                     data = json.load(f)
-                results.append(PipelineFile(**data))
+                pf = PipelineFile(**data)
+                # Ensure the id matches the on-disk filename slug so that
+                # load_pipeline(_slugify(id)) will find the right file.
+                file_slug = fname[:-5]  # strip ".json"
+                if _slugify(pf.id) != file_slug:
+                    pf.id = file_slug
+                results.append(pf)
             except Exception as e:
                 print(f"Error reading {fname}: {e}")
     return results
@@ -115,7 +130,13 @@ def list_pipelines(project_id: str) -> List[PipelineFile]:
 def load_pipeline(project_id: str, pipeline_id: str) -> Optional[PipelineFile]:
     path = _pipeline_path(project_id, pipeline_id)
     if not os.path.exists(path):
-        return None
+        # Fallback: try the raw pipeline_id as a direct filename
+        # (handles cases where the id IS the filename slug already)
+        fallback = os.path.join(_project_dir(project_id), f"{pipeline_id}.json")
+        if os.path.exists(fallback):
+            path = fallback
+        else:
+            return None
     try:
         with open(path) as f:
             return PipelineFile(**json.load(f))
@@ -145,8 +166,13 @@ def save_pipeline(project_id: str, pipeline: PipelineFile) -> PipelineFile:
 
 def delete_pipeline(project_id: str, pipeline_id: str) -> bool:
     path = _pipeline_path(project_id, pipeline_id)
-    if os.path.exists(path):
-        os.remove(path)
-        return True
-    return False
+    if not os.path.exists(path):
+        # Fallback: try the raw pipeline_id as a direct filename
+        fallback = os.path.join(_project_dir(project_id), f"{pipeline_id}.json")
+        if os.path.exists(fallback):
+            path = fallback
+        else:
+            return False
+    os.remove(path)
+    return True
 
