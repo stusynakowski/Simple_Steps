@@ -5,12 +5,19 @@ Single entry point to start the full Simple Steps application
 (backend API + frontend UI).
 
 Usage:
-    simple-steps                    # start on default port 8000
+    simple-steps                    # start from cwd (workspace root)
     simple-steps --port 9000        # custom port
     simple-steps --host 0.0.0.0     # bind to all interfaces
     simple-steps --dev              # dev mode: reload on file changes
     simple-steps --no-browser       # don't auto-open browser
-    simple-steps --ops ./my_ops     # add extra operation plugin paths
+    simple-steps --packs ./my_packs # add extra operation pack directories
+
+The current working directory becomes the "workspace root".  Simple Steps
+will automatically discover:
+    <cwd>/projects/   → project folders with pipeline JSON files
+    <cwd>/packs/      → developer packs with @simple_step functions
+    <cwd>/ops/        → workspace-level custom operations
+    <cwd>/*.py        → top-level Python files with @simple_step decorators
 """
 
 import argparse
@@ -43,6 +50,11 @@ def main():
         help="Don't auto-open the browser",
     )
     parser.add_argument(
+        "--workspace", type=str, default=None,
+        help="Workspace root directory (default: current working directory). "
+             "Simple Steps discovers projects/, packs/, and ops/ relative to this.",
+    )
+    parser.add_argument(
         "--ops", nargs="*", default=[],
         help="Additional directories to scan for *_ops.py plugins (legacy — prefer --packs)",
     )
@@ -52,21 +64,23 @@ def main():
     )
     parser.add_argument(
         "--projects-dir", type=str, default=None,
-        help="Directory for project/pipeline storage (default: ./projects)",
+        help="Directory for project/pipeline storage (default: <workspace>/projects)",
     )
     args = parser.parse_args()
+
+    # ── Resolve workspace root ───────────────────────────────────────────
+    workspace = os.path.abspath(args.workspace or os.getcwd())
+    os.environ["SIMPLE_STEPS_WORKSPACE"] = workspace
 
     # ── Pass configuration via environment variables ─────────────────────
     # These are picked up by main.py and file_manager.py at import time
 
     if args.ops:
-        # Semicolon-separated list of extra plugin paths (legacy)
         os.environ["SIMPLE_STEPS_EXTRA_OPS"] = ";".join(
             os.path.abspath(p) for p in args.ops
         )
 
     if args.packs:
-        # Semicolon-separated list of developer pack directories
         os.environ["SIMPLE_STEPS_PACKS_DIR"] = ";".join(
             os.path.abspath(p) for p in args.packs
         )
@@ -77,21 +91,56 @@ def main():
     # ── Auto-open browser ────────────────────────────────────────────────
     if not args.no_browser and not args.dev:
         def _open_browser():
-            time.sleep(1.5)  # wait for server to start
+            time.sleep(1.5)
             url = f"http://{'localhost' if args.host == '0.0.0.0' else args.host}:{args.port}"
             print(f"\n  🌐 Opening {url} in your browser...\n")
             webbrowser.open(url)
         threading.Thread(target=_open_browser, daemon=True).start()
 
+    # ── Detect workspace contents ────────────────────────────────────────
+    has_projects = os.path.isdir(os.path.join(workspace, "projects"))
+    has_packs = os.path.isdir(os.path.join(workspace, "packs"))
+    has_ops = os.path.isdir(os.path.join(workspace, "ops"))
+    has_py = any(
+        f.endswith(".py") and not f.startswith("__")
+        for f in os.listdir(workspace)
+        if os.path.isfile(os.path.join(workspace, f))
+    )
+
+    # Count projects
+    projects_dir = os.path.join(workspace, "projects")
+    project_count = 0
+    pipeline_count = 0
+    if has_projects:
+        for entry in os.listdir(projects_dir):
+            full = os.path.join(projects_dir, entry)
+            if os.path.isdir(full):
+                project_count += 1
+                pipeline_count += sum(
+                    1 for f in os.listdir(full) if f.endswith(".json")
+                )
+
     # ── Print startup banner ─────────────────────────────────────────────
     print()
-    print("  ┌─────────────────────────────────────────┐")
-    print("  │         ⚡ Simple Steps v0.1.0 ⚡        │")
-    print("  ├─────────────────────────────────────────┤")
-    print(f"  │  Backend API: http://{args.host}:{args.port}/api  │")
-    print(f"  │  Frontend UI: http://{args.host}:{args.port}      │")
-    print("  │  Docs:        http://localhost:{}/docs  │".format(args.port))
-    print("  └─────────────────────────────────────────┘")
+    print("  ┌─────────────────────────────────────────────┐")
+    print("  │          ⚡ Simple Steps v0.1.0 ⚡            │")
+    print("  ├─────────────────────────────────────────────┤")
+    print(f"  │  Backend API: http://{args.host}:{args.port}/api    │")
+    print(f"  │  Frontend UI: http://{args.host}:{args.port}        │")
+    print(f"  │  Docs:        http://localhost:{args.port}/docs   │")
+    print("  ├─────────────────────────────────────────────┤")
+    print(f"  │  Workspace:   {workspace}")
+    if has_projects:
+        print(f"  │    📋 {project_count} project(s), {pipeline_count} pipeline(s)")
+    else:
+        print(f"  │    📋 No projects/ folder found (will create on first save)")
+    if has_packs:
+        print(f"  │    📦 packs/ discovered")
+    if has_ops:
+        print(f"  │    🔧 ops/ discovered")
+    if has_py:
+        print(f"  │    🐍 Top-level .py files discovered")
+    print("  └─────────────────────────────────────────────┘")
     print()
 
     if args.ops:

@@ -24,37 +24,78 @@ from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
     PROJECTS_DIR,
+    WORKSPACE_ROOT,
 )
 from .agent.routes import router as agent_router
 import sys
 import os
 
-# ── Three-Tier Pack Discovery ───────────────────────────────────────────────
+# ── Workspace-relative discovery ─────────────────────────────────────────────
 #
-# Tier 1 — System ops: already imported above (operations.py, orchestration_ops.py)
-# Tier 2 — Developer packs: reusable across projects (packs/ directory)
-# Tier 3 — Project ops: per-project custom functions (projects/<name>/ops/)
+# When a user boots Simple Steps from a directory (`cd ~/my-repo && simple-steps`)
+# that directory becomes the "workspace root".  The platform automatically
+# discovers:
 #
-# See pack_loader.py and packs/README.md for the full design.
+#   <workspace>/projects/   → project folders containing pipeline JSON files
+#   <workspace>/packs/      → developer packs (Tier 2) with @simple_step functions
+#   <workspace>/ops/        → workspace-level custom operations
+#   <workspace>/*.py        → top-level .py files with @simple_step functions
+#
+# This means any repo that contains a projects/ folder "just works" when you
+# run `simple-steps` from inside it.
+#
+# Tier 1 — System ops: always loaded (operations.py, orchestration_ops.py)
+# Tier 2 — Developer packs: packs/ in workspace + any --packs dirs
+# Tier 3 — Project ops: per-project custom functions (projects/<name>/**)
+#
+
+_PKG_DIR = os.path.dirname(__file__)
+_WORKSPACE = os.path.abspath(WORKSPACE_ROOT)
 
 # Developer pack directories (Tier 2)
-_DEVELOPER_PACK_DIRS = [
-    # Default packs/ directory at repository root
-    os.path.join(os.path.dirname(__file__), "../../packs"),
-    # Legacy sibling directories (backwards compat — will migrate to packs/)
-    os.path.join(os.path.dirname(__file__), "../youtube_operations"),
-    os.path.join(os.path.dirname(__file__), "../llm_operations"),
-    os.path.join(os.path.dirname(__file__), "../webscraping_operations"),
-    # Mock operations (for development / demo)
-    os.path.join(os.path.dirname(__file__), "../../mock_operations"),
-]
+_DEVELOPER_PACK_DIRS: list[str] = []
 
-# Pick up additional pack dirs from environment (set by CLI --packs flag)
+# 1. Workspace-local packs/ directory (primary — the user's own packs)
+_ws_packs = os.path.join(_WORKSPACE, "packs")
+if os.path.isdir(_ws_packs):
+    _DEVELOPER_PACK_DIRS.append(_ws_packs)
+
+# 2. Workspace-local ops/ directory (flat custom operations)
+_ws_ops = os.path.join(_WORKSPACE, "ops")
+if os.path.isdir(_ws_ops):
+    _DEVELOPER_PACK_DIRS.append(_ws_ops)
+
+# 3. Workspace root itself — pick up any top-level *.py files with decorators
+#    (treated as a pack dir so the loader scans .py files in it)
+_ws_has_py = any(
+    f.endswith(".py") and not f.startswith("__")
+    for f in os.listdir(_WORKSPACE)
+    if os.path.isfile(os.path.join(_WORKSPACE, f))
+)
+if _ws_has_py:
+    _DEVELOPER_PACK_DIRS.append(_WORKSPACE)
+
+# 4. Package-bundled packs/ directory (ships with the simple-steps repo itself)
+_bundled_packs = os.path.abspath(os.path.join(_PKG_DIR, "../../packs"))
+if os.path.isdir(_bundled_packs) and os.path.abspath(_bundled_packs) != os.path.abspath(_ws_packs):
+    _DEVELOPER_PACK_DIRS.append(_bundled_packs)
+
+# 5. Legacy sibling directories inside the simple-steps source tree
+for _legacy_name in ("youtube_operations", "llm_operations", "webscraping_operations"):
+    _legacy = os.path.join(_PKG_DIR, "..", _legacy_name)
+    if os.path.isdir(_legacy):
+        _DEVELOPER_PACK_DIRS.append(os.path.abspath(_legacy))
+
+# 6. Mock operations (only when running from the simple-steps repo itself)
+_mock_dir = os.path.abspath(os.path.join(_PKG_DIR, "../../mock_operations"))
+if os.path.isdir(_mock_dir):
+    _DEVELOPER_PACK_DIRS.append(_mock_dir)
+
+# 7. Additional pack dirs from environment / CLI flags
 _extra_packs = os.environ.get("SIMPLE_STEPS_PACKS_DIR", "")
 if _extra_packs:
     _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_packs.split(";") if p.strip())
 
-# Also support the legacy --ops flag
 _extra_ops = os.environ.get("SIMPLE_STEPS_EXTRA_OPS", "")
 if _extra_ops:
     _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_ops.split(";") if p.strip())
@@ -113,6 +154,45 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# --- 0. Workspace Info ---
+@app.get("/api/workspace")
+async def workspace_info():
+    """
+    Returns information about the current workspace root and what was
+    discovered at startup.  The frontend uses this for the sidebar
+    header and diagnostics.
+    """
+    loader = get_loader()
+    by_tier = loader.get_ops_by_tier() if loader else {}
+
+    # Count projects and pipelines
+    project_count = 0
+    pipeline_count = 0
+    project_names = []
+    if os.path.isdir(PROJECTS_DIR):
+        for entry in sorted(os.listdir(PROJECTS_DIR)):
+            full = os.path.join(PROJECTS_DIR, entry)
+            if os.path.isdir(full):
+                project_count += 1
+                project_names.append(entry)
+                pipeline_count += sum(
+                    1 for f in os.listdir(full) if f.endswith(".json")
+                )
+
+    return {
+        "workspace_root": _WORKSPACE,
+        "projects_dir": os.path.abspath(PROJECTS_DIR),
+        "project_count": project_count,
+        "pipeline_count": pipeline_count,
+        "project_names": project_names,
+        "has_packs": os.path.isdir(os.path.join(_WORKSPACE, "packs")),
+        "has_ops": os.path.isdir(os.path.join(_WORKSPACE, "ops")),
+        "developer_pack_dirs": [os.path.abspath(p) for p in _DEVELOPER_PACK_DIRS],
+        "ops_by_tier": by_tier,
+        "total_operations": sum(len(ops) for ops in by_tier.values()),
+    }
 
 
 # --- 1. Dynamic Discovery ---

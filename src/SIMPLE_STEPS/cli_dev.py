@@ -7,7 +7,11 @@ in a single command for local development.
 Usage:
     simple-steps-dev                     # backend :8000, frontend :5173
     simple-steps-dev --port 9000         # backend on custom port
+    simple-steps-dev --workspace ~/my-repo  # use a different workspace root
     simple-steps-dev --ops ./my_ops      # extra operation plugin dirs
+
+The current working directory (or --workspace) becomes the workspace root.
+Simple Steps discovers projects/, packs/, ops/ relative to this root.
 """
 
 import argparse
@@ -37,14 +41,26 @@ def main():
         help="Vite dev server port (default: 5173)",
     )
     parser.add_argument(
+        "--workspace", type=str, default=None,
+        help="Workspace root directory (default: cwd). "
+             "Simple Steps discovers projects/, packs/, and ops/ relative to this.",
+    )
+    parser.add_argument(
         "--ops", nargs="*", default=[],
         help="Additional directories to scan for *_ops.py plugins",
     )
     parser.add_argument(
+        "--packs", nargs="*", default=[],
+        help="Additional developer pack directories to scan for @simple_step functions",
+    )
+    parser.add_argument(
         "--projects-dir", type=str, default=None,
-        help="Directory for project/pipeline storage (default: ./projects)",
+        help="Directory for project/pipeline storage (default: <workspace>/projects)",
     )
     args = parser.parse_args()
+
+    # ── Resolve workspace root ────────────────────────────────────────────
+    workspace = os.path.abspath(args.workspace or os.getcwd())
 
     # ── Resolve paths ────────────────────────────────────────────────────
     # Find the frontend directory relative to this file or the cwd
@@ -68,14 +84,32 @@ def main():
 
     # ── Environment variables for backend ────────────────────────────────
     env = os.environ.copy()
+    env["SIMPLE_STEPS_WORKSPACE"] = workspace
 
     if args.ops:
         env["SIMPLE_STEPS_EXTRA_OPS"] = ";".join(
             os.path.abspath(p) for p in args.ops
         )
 
+    if args.packs:
+        env["SIMPLE_STEPS_PACKS_DIR"] = ";".join(
+            os.path.abspath(p) for p in args.packs
+        )
+
     if args.projects_dir:
         env["SIMPLE_STEPS_PROJECTS_DIR"] = os.path.abspath(args.projects_dir)
+
+    # ── Detect workspace contents ────────────────────────────────────────
+    has_projects = os.path.isdir(os.path.join(workspace, "projects"))
+    has_packs = os.path.isdir(os.path.join(workspace, "packs"))
+    has_ops = os.path.isdir(os.path.join(workspace, "ops"))
+
+    project_count = 0
+    if has_projects:
+        project_count = sum(
+            1 for e in os.listdir(os.path.join(workspace, "projects"))
+            if os.path.isdir(os.path.join(workspace, "projects", e))
+        )
 
     # ── Print banner ─────────────────────────────────────────────────────
     print()
@@ -85,6 +119,14 @@ def main():
     print(f"  │  Backend API:  http://{args.host}:{args.port}/api     │")
     print(f"  │  Frontend UI:  http://localhost:{args.frontend_port}        │")
     print(f"  │  API Docs:     http://localhost:{args.port}/docs    │")
+    print("  ├──────────────────────────────────────────────┤")
+    print(f"  │  Workspace:    {workspace}")
+    if has_projects:
+        print(f"  │    📋 {project_count} project(s)")
+    if has_packs:
+        print(f"  │    📦 packs/ discovered")
+    if has_ops:
+        print(f"  │    🔧 ops/ discovered")
     print("  ├──────────────────────────────────────────────┤")
     print("  │  ✏️  Backend auto-reloads on Python changes   │")
     print("  │  ✏️  Frontend hot-reloads on React/TS changes │")

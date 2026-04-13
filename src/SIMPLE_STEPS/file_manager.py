@@ -21,9 +21,18 @@ from datetime import datetime
 
 from .models import PipelineFile, ProjectInfo
 
+# ── Workspace root ───────────────────────────────────────────────────────────
+# The "workspace" is the directory the user launched simple-steps from.
+# All project/pipeline storage is relative to this root.
+
+WORKSPACE_ROOT = os.environ.get(
+    "SIMPLE_STEPS_WORKSPACE",
+    os.getcwd(),
+)
+
 PROJECTS_DIR = os.environ.get(
     "SIMPLE_STEPS_PROJECTS_DIR",
-    os.path.join(os.getcwd(), "projects"),
+    os.path.join(WORKSPACE_ROOT, "projects"),
 )
 
 

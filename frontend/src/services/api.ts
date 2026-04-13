@@ -252,3 +252,26 @@ export async function fetchLoaderStatus(): Promise<Record<string, unknown>> {
     if (!r.ok) return { error: 'Failed to fetch loader status' };
     return r.json();
 }
+
+// --- Workspace Info ---
+
+/** Information about the current workspace that Simple Steps was launched from. */
+export interface WorkspaceInfo {
+    workspace_root: string;
+    projects_dir: string;
+    project_count: number;
+    pipeline_count: number;
+    project_names: string[];
+    has_packs: boolean;
+    has_ops: boolean;
+    developer_pack_dirs: string[];
+    ops_by_tier: Record<string, string[]>;
+    total_operations: number;
+}
+
+/** Fetch workspace information from the backend. */
+export async function fetchWorkspaceInfo(): Promise<WorkspaceInfo> {
+    const r = await fetch(`${API_BASE}/workspace`);
+    if (!r.ok) throw new Error('Failed to fetch workspace info');
+    return r.json();
+}
