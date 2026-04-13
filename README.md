@@ -65,13 +65,27 @@ pip install -e .
 
 That's it. The package installs the `simple-steps` CLI command and bundles a pre-built copy of the frontend.
 
-### Option B: pip install with dev tools
+### Option B: pip install with desktop mode
+
+```bash
+pip install -e ".[desktop]"
+```
+
+This adds `pywebview`, which lets you run Simple Steps as a native desktop window — no browser required. See [Desktop mode](#desktop-mode-no-browser) below.
+
+### Option C: pip install with dev tools
 
 ```bash
 pip install -e ".[dev]"
 ```
 
 This adds `pytest` and `ruff` for running tests and linting.
+
+### Option D: pip install with everything
+
+```bash
+pip install -e ".[desktop,dev]"
+```
 
 ---
 
@@ -99,26 +113,83 @@ Open [http://localhost:8000](http://localhost:8000) to use the UI, or [http://lo
 
 ### Desktop mode (no browser)
 
-Run Simple Steps as a **native desktop window** — same UI, no browser required:
+Run Simple Steps as a **native desktop window** — same exact UI, no browser required. A native OS window opens using [pywebview](https://pywebview.flowrl.com/), and the working directory you launch from becomes the workspace root.
+
+#### Install
 
 ```bash
-pip install simple-steps[desktop]   # one-time: installs pywebview
+# If you haven't already:
+pip install -e ".[desktop]"
+# or just add pywebview to an existing install:
+pip install pywebview
+```
 
+#### Launch
+
+```bash
+# Dedicated command:
 simple-steps-local
-# or:
+
+# Or as a flag on the main CLI:
 simple-steps --local
 ```
 
-A native OS window opens with the full UI. The working directory you launch from becomes the workspace root.
+That's it — a native window opens with the full Simple Steps UI. The directory you `cd` into before running the command is the workspace shown in the app.
+
+```
+  ┌─────────────────────────────────────────────┐
+  │       ⚡ Simple Steps v0.1.0 (Desktop) ⚡     │
+  ├─────────────────────────────────────────────┤
+  │  Mode:        Native window (pywebview)      │
+  │  Backend API: http://127.0.0.1:8000/api      │
+  │  Workspace:   /Users/you/my-data-project     │
+  │    📋 2 project(s), 5 pipeline(s)            │
+  │    📦 packs/ discovered                      │
+  └─────────────────────────────────────────────┘
+```
+
+#### Desktop-specific flags
 
 | Flag | Description | Default |
 |---|---|---|
-| `--width PX` | Window width | `1280` |
-| `--height PX` | Window height | `860` |
-| `--title TEXT` | Window title | `Simple Steps — <workspace>` |
-| `--debug` | Enable right-click → Inspect (dev tools) | off |
+| `--width PX` | Window width in pixels | `1280` |
+| `--height PX` | Window height in pixels | `860` |
+| `--title TEXT` | Custom window title | `Simple Steps — <workspace>` |
+| `--debug` | Enable right-click → Inspect (web dev tools inside the window) | off |
 
-All other flags (`--port`, `--workspace`, `--packs`, etc.) work the same as the browser version.
+All other flags (`--port`, `--host`, `--workspace`, `--packs`, `--ops`, `--projects-dir`) work identically to the browser version.
+
+#### How it works
+
+1. The FastAPI backend starts in a background thread on `127.0.0.1:<port>`
+2. If the preferred port (default 8000) is busy, a free port is auto-selected
+3. Once the backend is ready, a native window opens pointing at the local server
+4. When you close the window, the entire process exits cleanly
+
+#### Desktop examples
+
+```bash
+# Open from a specific project directory
+cd ~/my-analysis-repo
+simple-steps-local
+
+# Custom window size
+simple-steps-local --width 1600 --height 1000
+
+# Use a workspace other than cwd
+simple-steps-local --workspace ~/shared-team-repo
+
+# With extra packs and a custom title
+simple-steps-local --packs ./my_packs --title "Team Pipeline Tool"
+
+# Enable dev tools (right-click → Inspect in the window)
+simple-steps-local --debug
+
+# Via the main CLI shortcut
+simple-steps --local --port 9000
+```
+
+> **Tip:** Desktop mode is great for demos, workshops, or shipping Simple Steps to non-technical users who don't want to open a browser. The UI is pixel-for-pixel identical.
 
 ### CLI options
 
@@ -128,6 +199,7 @@ All other flags (`--port`, `--workspace`, `--packs`, etc.) work the same as the 
 | `--host HOST` | Bind address (`0.0.0.0` for all interfaces) | `127.0.0.1` |
 | `--dev` | Enable auto-reload on Python file changes | off |
 | `--no-browser` | Don't auto-open the browser on start | off |
+| `--local` | Launch as a native desktop window instead of a browser (requires `pip install simple-steps[desktop]`) | off |
 | `--workspace DIR` | Workspace root (projects/, packs/, ops/ are discovered here) | current directory |
 | `--ops DIR [DIR ...]` | Extra directories to scan for `*_ops.py` plugins | none |
 | `--packs DIR [DIR ...]` | Extra developer pack directories | none |
@@ -156,6 +228,9 @@ See [`usage_docs/developers/managing-packs.md`](usage_docs/developers/managing-p
 # Custom port, don't open browser
 simple-steps --port 9000 --no-browser
 
+# Launch as a native desktop window
+simple-steps --local
+
 # Load extra operations from a custom folder
 simple-steps --ops ./my_custom_ops /shared/team_ops
 
@@ -170,6 +245,9 @@ simple-steps --projects-dir ~/my_pipelines
 
 # Run from a specific workspace root
 simple-steps --workspace ~/my-analysis-repo
+
+# Desktop window from a specific directory with custom size
+simple-steps-local --workspace ~/my-analysis-repo --width 1600 --height 1000
 
 # Import a pack from GitHub, then start
 simple-steps pack add https://github.com/org/youtube-ops.git
@@ -342,6 +420,7 @@ Simple_Steps/
 ├── src/
 │   ├── SIMPLE_STEPS/              # Core framework (pip-installable package)
 │   │   ├── cli.py                 # `simple-steps` CLI entry point
+│   │   ├── cli_local.py           # `simple-steps-local` desktop mode (pywebview)
 │   │   ├── cli_pack.py            # `simple-steps pack` subcommand
 │   │   ├── build_frontend.py      # `simple-steps-build` helper
 │   │   ├── main.py                # FastAPI app + plugin auto-scanner + SPA serving
@@ -404,6 +483,7 @@ cd frontend && npm test
 | Doc | Description |
 |---|---|
 | [`usage_docs/developers/adding-operations.md`](usage_docs/developers/adding-operations.md) | How to define and register operations |
+| [`usage_docs/developers/desktop-mode.md`](usage_docs/developers/desktop-mode.md) | Running Simple Steps as a native desktop app (no browser) |
 | [`usage_docs/developers/creating_packs.md`](usage_docs/developers/creating_packs.md) | How to create developer packs (three-tier overview) |
 | [`usage_docs/developers/creating-operation-packs.md`](usage_docs/developers/creating-operation-packs.md) | How to create failsafe Operation Packs |
 | [`usage_docs/developers/creating_pip_packs.md`](usage_docs/developers/creating_pip_packs.md) | How to create pip-installable packs |
@@ -419,8 +499,12 @@ cd frontend && npm test
 | Problem | Solution |
 |---|---|
 | `simple-steps: command not found` | Make sure your virtualenv is activated: `source .venv/bin/activate` |
+| `simple-steps-local: command not found` | Install the desktop extra: `pip install -e ".[desktop]"` or `pip install pywebview` |
+| `❌ pywebview is not installed` | Run `pip install simple-steps[desktop]` or `pip install pywebview` |
+| Desktop window is blank or won't open | On macOS, pywebview uses WebKit (built-in). On Linux, install `python3-gi gir1.2-webkit2-4.0`. On Windows, it works out of the box. |
+| Desktop window: right-click doesn't show Inspect | Launch with `--debug` flag: `simple-steps-local --debug` |
 | Frontend shows "no frontend build found" JSON | Run `simple-steps-build` to compile the React app into the package |
-| Port already in use | Use `--port` to pick a different port, or `kill $(lsof -t -i:8000)` |
+| Port already in use | Use `--port` to pick a different port, or `kill $(lsof -t -i:8000)`. Desktop mode auto-picks a free port. |
 | Operations not appearing in the UI | Ensure your file ends in `_ops.py` and is in a scanned directory (see `--ops`) |
 | Pack shows as unavailable | Check `http://localhost:8000/api/packs` for health details (missing packages, env vars) |
 | Imported pack ops not showing | Restart Simple Steps — pack discovery happens at startup |
