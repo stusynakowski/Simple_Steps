@@ -97,6 +97,29 @@ This starts the backend API **and** serves the frontend UI on a single port. You
 
 Open [http://localhost:8000](http://localhost:8000) to use the UI, or [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API docs.
 
+### Desktop mode (no browser)
+
+Run Simple Steps as a **native desktop window** — same UI, no browser required:
+
+```bash
+pip install simple-steps[desktop]   # one-time: installs pywebview
+
+simple-steps-local
+# or:
+simple-steps --local
+```
+
+A native OS window opens with the full UI. The working directory you launch from becomes the workspace root.
+
+| Flag | Description | Default |
+|---|---|---|
+| `--width PX` | Window width | `1280` |
+| `--height PX` | Window height | `860` |
+| `--title TEXT` | Window title | `Simple Steps — <workspace>` |
+| `--debug` | Enable right-click → Inspect (dev tools) | off |
+
+All other flags (`--port`, `--workspace`, `--packs`, etc.) work the same as the browser version.
+
 ### CLI options
 
 | Flag | Description | Default |

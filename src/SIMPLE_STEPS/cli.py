@@ -57,6 +57,11 @@ def main():
         help="Don't auto-open the browser",
     )
     parser.add_argument(
+        "--local", action="store_true",
+        help="Launch as a native desktop window (requires pip install simple-steps[desktop]). "
+             "Same UI, no browser — uses pywebview.",
+    )
+    parser.add_argument(
         "--workspace", type=str, default=None,
         help="Workspace root directory (default: current working directory). "
              "Simple Steps discovers projects/, packs/, and ops/ relative to this.",
@@ -74,6 +79,27 @@ def main():
         help="Directory for project/pipeline storage (default: <workspace>/projects)",
     )
     args = parser.parse_args()
+
+    # ── Delegate to native desktop mode if --local ───────────────────────
+    if args.local:
+        from .cli_local import main as local_main
+        # Rebuild sys.argv without --local so cli_local's own parser works
+        rebuilt = [sys.argv[0]]
+        if args.port != 8000:
+            rebuilt += ["--port", str(args.port)]
+        if args.host != "127.0.0.1":
+            rebuilt += ["--host", args.host]
+        if args.workspace:
+            rebuilt += ["--workspace", args.workspace]
+        for p in args.ops:
+            rebuilt += ["--ops", p]
+        for p in args.packs:
+            rebuilt += ["--packs", p]
+        if args.projects_dir:
+            rebuilt += ["--projects-dir", args.projects_dir]
+        sys.argv = rebuilt
+        local_main()
+        return
 
     # ── Resolve workspace root ───────────────────────────────────────────
     workspace = os.path.abspath(args.workspace or os.getcwd())

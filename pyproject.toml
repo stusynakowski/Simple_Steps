@@ -50,6 +50,9 @@ agent-ollama = [
     "simple-steps[agent]",
     "langchain-ollama>=0.2.0",
 ]
+desktop = [
+    "pywebview>=5.0",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.6",
@@ -64,6 +67,7 @@ Issues = "https://github.com/stusynakowski/Simple_Steps/issues"
 
 [project.scripts]
 simple-steps = "SIMPLE_STEPS.cli:main"
+simple-steps-local = "SIMPLE_STEPS.cli_local:main"
 simple-steps-dev = "SIMPLE_STEPS.cli_dev:main"
 simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
 simple-steps-pack = "SIMPLE_STEPS.cli_pack:main"
