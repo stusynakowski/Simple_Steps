@@ -1,5 +1,9 @@
 # Simple Steps
 
+<p align="center">
+  <img src="photos/simple_steps_cover_photo.png" alt="Simple Steps Cover Photo" width="600">
+</p>
+
 A visual workflow tool that lets non-technical users build and run multi-step data pipelines — backed by plain Python functions.
 
 Think of it as a spreadsheet where every cell is a Python operation, every column is a pipeline step, and every row is a piece of data flowing through it.
