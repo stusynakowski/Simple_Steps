@@ -24,6 +24,9 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
   const parsed = savedFormula ? parseFormula(savedFormula) : null;
   const formulaIsUsable = parsed?.isValid && !!parsed.operationId;
 
+  // 🔍 DEBUG — remove after confirming fix
+  console.log(`[hydrateStep] step_id=${s.step_id} savedFormula="${savedFormula}" formulaIsUsable=${formulaIsUsable} operation_id=${s.operation_id}`);
+
   // If the saved file has a valid formula, derive everything from it.
   // Fall back to the legacy operation_id/config fields for old saves.
   const processType = formulaIsUsable
@@ -56,6 +59,9 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
     : buildFormula(processType, configuration,
         (internalKeys._orchestrator as any) ?? null,
       );
+
+  // 🔍 DEBUG — remove after confirming fix
+  console.log(`[hydrateStep RESULT] step_id=${s.step_id} formula="${formula}" process_type="${processType}" operation="${formula}"`);
 
   return {
     id: s.step_id,

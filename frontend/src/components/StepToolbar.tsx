@@ -56,30 +56,46 @@ export default function StepToolbar({
   onFormulaBarRef,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
-  const [formula, setFormula] = useState(step.formula || step.operation || '');
+  const initFormula = step.formula || step.operation || '';
+  const [formula, setFormula] = useState(initFormula);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // 🔍 DEBUG — remove after confirming fix
+  console.log(`[StepToolbar MOUNT/RENDER] step.id=${step.id} step.formula="${step.formula}" step.operation="${step.operation}" initFormula="${initFormula}" externalFormula="${externalFormula}" localFormula="${formula}"`);
 
   // Wiring context — lets prior-step grids inject references into this formula bar
   const { activateWiring, deactivateWiring } = useStepWiring();
 
   // Sync from external formula updates (UI config → formula bar)
+  // Use functional setState to compare against the *current* state, not a
+  // stale closure value — this was the root cause of the formula bar showing
+  // defaults after loading a workflow.
   useEffect(() => {
-    if (externalFormula !== undefined && externalFormula !== formula) {
-      setFormula(externalFormula);
+    if (externalFormula !== undefined) {
+      setFormula(prev => {
+        if (externalFormula !== prev) {
+          console.log(`[StepToolbar SYNC externalFormula] step.id=${step.id} prev="${prev}" → new="${externalFormula}"`);
+          return externalFormula;
+        }
+        return prev;
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [externalFormula]);
+  }, [externalFormula, step.id]);
 
-  // Sync with prop if the step data changes externally
+  // Sync with prop if the step data changes externally (e.g. workflow load)
+  // Also uses functional setState to avoid stale-closure comparison.
   useEffect(() => {
     const canonical = step.formula || step.operation || '';
-    if (canonical !== formula) {
-      setFormula(canonical);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step.formula, step.operation]);
+    setFormula(prev => {
+      if (canonical !== prev) {
+        console.log(`[StepToolbar SYNC step.formula] step.id=${step.id} prev="${prev}" → canonical="${canonical}"`);
+        return canonical;
+      }
+      return prev;
+    });
+  }, [step.formula, step.operation, step.id]);
 
   const computeSuggestions = (value: string): OperationDefinition[] => {
     const raw = value.trim();

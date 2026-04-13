@@ -383,7 +383,8 @@ export default function OperationColumn({
       <div className={`op-body ${isSqueezed ? 'squeezed' : ''}`}>
         <div className="op-body-inner">
           {!isSqueezed && (
-            <StepToolbar 
+            <StepToolbar
+              key={step.id}
               step={step}
               stepIndex={stepIndex}
               availableOperations={availableOperations}
