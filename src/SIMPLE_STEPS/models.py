@@ -8,6 +8,40 @@ import uuid
 # (frontend/src/utils/formulaParser.ts) so the backend can derive the formula
 # from operation_id + config when loading old pipeline files that lack it.
 
+import re as _re
+
+def _is_step_reference(value: str) -> bool:
+    """Return True if *value* looks like a step reference token (e.g. ``step1.url``)."""
+    return bool(_re.match(r'^step[\w-]*\.\w+$', value, _re.IGNORECASE))
+
+
+def _format_formula_value(v: Any) -> str:
+    """
+    Format a config value for inclusion in a formula string.
+
+    * Step references (step1.url) → unquoted
+    * Numbers / booleans → unquoted
+    * Everything else → double-quoted
+
+    Must match ``formatFormulaValue()`` in formulaParser.ts exactly.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v).lower()          # true / false
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = str(v)
+    if s.startswith("="):
+        return s
+    if _is_step_reference(s):
+        return s
+    # Pure numeric strings stay unquoted
+    if _re.match(r'^-?\d+(\.\d+)?$', s):
+        return s
+    return f'"{s}"'
+
+
 def build_formula_from_fields(
     operation_id: str,
     config: Dict[str, Any],
@@ -19,6 +53,9 @@ def build_formula_from_fields(
     Examples:
         build_formula_from_fields("fetch_videos", {"channel_url": "https://..."}, "source")
         → '=fetch_videos.source(channel_url="https://...")'
+
+        build_formula_from_fields("extract_metadata", {"url": "step1.url"}, "map")
+        → '=extract_metadata.map(url=step1.url)'
 
     This is the Python equivalent of `buildFormula()` in formulaParser.ts.
     Both MUST produce identical output for the same inputs.
@@ -33,11 +70,7 @@ def build_formula_from_fields(
     for k, v in config.items():
         if k.startswith("_"):
             continue  # internal keys (_orchestrator, _ref, etc.)
-        if isinstance(v, str) and not str(v).startswith("="):
-            val_str = f'"{v}"'
-        else:
-            val_str = str(v) if v is not None else ""
-        arg_parts.append(f"{k}={val_str}")
+        arg_parts.append(f"{k}={_format_formula_value(v)}")
 
     args = ", ".join(arg_parts)
     return f"={operation_id}{modifier}({args})"

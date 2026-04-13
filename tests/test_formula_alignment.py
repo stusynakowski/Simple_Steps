@@ -24,6 +24,7 @@ These tests cover the THREE critical boundaries:
 import os
 import sys
 import json
+import re
 import pytest
 import pandas as pd
 
@@ -299,6 +300,32 @@ def parse_formula_python(input_str: str) -> dict:
     }
 
 
+def _is_step_reference_python(value: str) -> bool:
+    """Return True if value looks like a step reference token (e.g. step1.url)."""
+    return bool(re.match(r'^step[\w-]*\.\w+$', value, re.IGNORECASE))
+
+
+def _format_formula_value_python(v) -> str:
+    """
+    Format a config value for inclusion in a formula string.
+    Must match formatFormulaValue() in formulaParser.ts exactly.
+    """
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = str(v)
+    if s.startswith("="):
+        return s
+    if _is_step_reference_python(s):
+        return s
+    if re.match(r'^-?\d+(\.\d+)?$', s):
+        return s
+    return f'"{s}"'
+
+
 def build_formula_python(
     operation_id: str,
     config: dict,
@@ -320,11 +347,7 @@ def build_formula_python(
     for k, v in config.items():
         if k.startswith("_"):
             continue
-        if isinstance(v, str) and not v.startswith("="):
-            val_str = f'"{v}"'
-        else:
-            val_str = str(v) if v is not None else ""
-        args_parts.append(f"{k}={val_str}")
+        args_parts.append(f"{k}={_format_formula_value_python(v)}")
 
     args = ", ".join(args_parts)
     return f"={operation_id}{modifier}({args})"
@@ -777,3 +800,111 @@ class TestPackFormulaReadiness:
                 f"Round-trip failed for '{op_id}': "
                 f"built formula '{formula}' parsed to operationId '{parsed['operationId']}'"
             )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BOUNDARY 5: Step reference quoting — Python ↔ TypeScript parity
+#
+# Both build_formula_from_fields (Python) and buildFormula (TypeScript)
+# must produce identical formulas. Step references (step1.url) are UNQUOTED;
+# regular strings ("https://...") are QUOTED.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestStepReferenceQuoting:
+    """
+    Verify that step references are left unquoted in formulas, matching
+    the Python function call syntax the user expects to see.
+    """
+
+    def test_is_step_reference(self):
+        """_is_step_reference_python detects step reference patterns."""
+        assert _is_step_reference_python("step1.url") is True
+        assert _is_step_reference_python("step2.views") is True
+        assert _is_step_reference_python("step-abc123.column") is True
+        assert _is_step_reference_python("step10.col_name") is True
+
+        assert _is_step_reference_python("https://example.com") is False
+        assert _is_step_reference_python("just_a_word") is False
+        assert _is_step_reference_python("www.example.com") is False
+        assert _is_step_reference_python("") is False
+
+    def test_build_formula_python_unquotes_step_refs(self):
+        """build_formula_python leaves step references unquoted."""
+        formula = build_formula_python(
+            "extract_metadata",
+            {"url": "step1.url", "_orchestrator": "map"},
+            "map",
+        )
+        assert formula == "=extract_metadata.map(url=step1.url)"
+        assert '"step1.url"' not in formula
+
+    def test_build_formula_python_quotes_regular_strings(self):
+        """build_formula_python quotes regular string values."""
+        formula = build_formula_python(
+            "fetch_videos",
+            {"channel_url": "https://test.com", "_orchestrator": "source"},
+            "source",
+        )
+        assert formula == '=fetch_videos.source(channel_url="https://test.com")'
+
+    def test_build_formula_python_numbers_unquoted(self):
+        """build_formula_python leaves numeric values unquoted."""
+        formula = build_formula_python(
+            "is_popular",
+            {"min_views": 1000, "_orchestrator": "filter"},
+            "filter",
+        )
+        assert "min_views=1000" in formula
+        assert '"1000"' not in formula
+
+    def test_build_formula_from_fields_matches_python_reference(self):
+        """
+        build_formula_from_fields (models.py) must produce exactly the same
+        output as build_formula_python (test reference implementation).
+        """
+        from SIMPLE_STEPS.models import build_formula_from_fields
+
+        test_cases = [
+            ("fetch_videos", {"channel_url": "https://test.com"}, "source"),
+            ("extract_metadata", {"url": "step1.url"}, "map"),
+            ("is_popular", {"views": "step2.views", "min_views": "1000"}, "filter"),
+            ("analyze_sentiment", {}, "dataframe"),
+        ]
+
+        for op_id, config, orch in test_cases:
+            expected = build_formula_python(op_id, config, orch)
+            actual = build_formula_from_fields(op_id, config, orch)
+            assert actual == expected, (
+                f"Mismatch for {op_id}: expected '{expected}', got '{actual}'"
+            )
+
+    def test_step_ref_round_trip_through_pipeline_json(self):
+        """
+        Save a step with step reference args → JSON → reload → formula preserved.
+        The formula must contain the unquoted step reference.
+        """
+        from SIMPLE_STEPS.models import build_formula_from_fields
+
+        config = {"url": "step1.url", "_orchestrator": "map"}
+        formula = build_formula_from_fields("extract_metadata", config, "map")
+
+        # Simulate saving to JSON and reloading
+        step_json = {
+            "step_id": "step-002",
+            "operation_id": "extract_metadata",
+            "label": "Extract Metadata",
+            "config": config,
+            "formula": formula,
+        }
+
+        # Validate through Pydantic model
+        step_model = StepConfig(**step_json)
+        assert step_model.formula == formula
+        assert "step1.url" in step_model.formula
+        assert '"step1.url"' not in step_model.formula
+
+        # Parse the formula back
+        parsed = parse_formula_python(step_model.formula)
+        assert parsed["isValid"] is True
+        assert parsed["operationId"] == "extract_metadata"
+        assert parsed["args"]["url"] == "step1.url"

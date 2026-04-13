@@ -19,6 +19,45 @@ const ORCHESTRATION_MODES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Detect whether a value looks like a step reference token.
+ *
+ * Step references are produced by the wiring UI and follow one of these forms:
+ *   stepN.column       — positional alias  (step1.url)
+ *   step-abc123.column — step ID           (step-02iqkl5.url)
+ *   StepLabel.column   — step label        (Step 0.url)  — rare, label has space
+ *
+ * This is intentionally conservative: we only treat `word.word` patterns as
+ * references, where the first segment starts with "step" (case-insensitive)
+ * or matches a step-ID pattern.
+ */
+export function isStepReference(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  // step<N>.column  OR  step-<id>.column
+  return /^step[\w-]*\.\w+$/i.test(value);
+}
+
+/**
+ * Format a config value for inclusion in a formula string.
+ *
+ * - Step references (e.g. step1.url) are left UNQUOTED so they read like
+ *   Python variable attribute access: `=op.map(url=step1.url)`
+ * - Numbers and booleans are unquoted.
+ * - Everything else is double-quoted.
+ */
+export function formatFormulaValue(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  const s = String(v);
+  if (s.startsWith('=')) return s;
+  // Step references stay unquoted
+  if (isStepReference(s)) return s;
+  // Pure numbers typed as strings stay unquoted
+  if (/^-?\d+(\.\d+)?$/.test(s)) return s;
+  // Everything else is quoted
+  return `"${s}"`;
+}
+
+/**
  * Parses a formula string like:
  *   `=yt_extract_metadata.map(url="step1.url", min_views=1000)`
  *   `=fetch_videos(channel_url="https://...")`          ← no modifier
@@ -140,8 +179,7 @@ export function buildFormula(
   const args = Object.entries(config)
     .filter(([k]) => !k.startsWith('_')) // all _-prefixed keys are internal
     .map(([k, v]) => {
-      const valStr =
-        typeof v === 'string' && !v.startsWith('=') ? `"${v}"` : String(v ?? '');
+      const valStr = formatFormulaValue(v);
       return `${k}=${valStr}`;
     })
     .join(', ');
