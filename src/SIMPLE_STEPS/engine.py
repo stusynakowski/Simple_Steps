@@ -26,11 +26,27 @@ def resolve_reference(value: Any, step_map: Dict[str, str]) -> Any:
       stepId.columnName          → pd.Series (whole column)
       stepId[row=R, col=C]       → scalar cell value
       stepId                     → pd.DataFrame (whole output)
+      =Step Name!columnName      → pd.Series (Excel-style reference)
 
     `step_map` maps step IDs (and labels / positional aliases) to their
     output ref IDs in DATA_STORE.
     """
     if not isinstance(value, str):
+        return value
+
+    # ── Excel-style syntax: =Step Name!ColumnName ────────────────────────
+    # Strips the leading '=' and splits on '!' to get step label and column.
+    excel_match = re.match(r'^=(.+?)!(\w+)$', value)
+    if excel_match:
+        step_key = excel_match.group(1).strip()
+        col_name = excel_match.group(2)
+        ref_id = step_map.get(step_key)
+        if ref_id:
+            df = get_dataframe(ref_id)
+            if df is not None and col_name in df.columns:
+                print(f"  ↳ Resolved '{value}' → column '{col_name}' from step '{step_key}' (Excel syntax)")
+                return df[col_name]
+        print(f"  ⚠ Could not resolve Excel reference '{value}' (step_map keys: {list(step_map.keys())})")
         return value
 
     # ── dot syntax: stepId.columnName ────────────────────────────────────

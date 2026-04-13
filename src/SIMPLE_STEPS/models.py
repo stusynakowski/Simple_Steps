@@ -1,6 +1,46 @@
 from typing import List, Dict, Any, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 import uuid
+
+
+# ── Formula utilities ─────────────────────────────────────────────────────────
+# These mirror the buildFormula / parseFormula logic in the frontend
+# (frontend/src/utils/formulaParser.ts) so the backend can derive the formula
+# from operation_id + config when loading old pipeline files that lack it.
+
+def build_formula_from_fields(
+    operation_id: str,
+    config: Dict[str, Any],
+    orchestration: Optional[str] = None,
+) -> str:
+    """
+    Build a canonical formula string from an operation ID and config dict.
+
+    Examples:
+        build_formula_from_fields("fetch_videos", {"channel_url": "https://..."}, "source")
+        → '=fetch_videos.source(channel_url="https://...")'
+
+    This is the Python equivalent of `buildFormula()` in formulaParser.ts.
+    Both MUST produce identical output for the same inputs.
+    """
+    if not operation_id or operation_id in ("noop", "passthrough", ""):
+        return ""
+
+    effective_mode = orchestration or config.get("_orchestrator")
+    modifier = f".{effective_mode}" if effective_mode else ""
+
+    arg_parts = []
+    for k, v in config.items():
+        if k.startswith("_"):
+            continue  # internal keys (_orchestrator, _ref, etc.)
+        if isinstance(v, str) and not str(v).startswith("="):
+            val_str = f'"{v}"'
+        else:
+            val_str = str(v) if v is not None else ""
+        arg_parts.append(f"{k}={val_str}")
+
+    args = ", ".join(arg_parts)
+    return f"={operation_id}{modifier}({args})"
 
 # --- 1. Dynamic Discovery ---
 class OperationParam(BaseModel):
@@ -27,6 +67,21 @@ class StepConfig(BaseModel):
     # operation_id and config are derived from this on load.
     # e.g. "=filter_rows(column=\"score\", value=\"5\", mode=\"equals\")"
     formula: str = ""
+
+    @model_validator(mode="after")
+    def derive_formula_if_missing(self) -> "StepConfig":
+        """
+        Automatically derive the formula from operation_id + config when the
+        formula field is empty.  This ensures that old pipeline JSON files
+        (which predate the formula field) produce a proper formula when loaded,
+        so the frontend formula bar always shows the function + arguments.
+        """
+        if not self.formula and self.operation_id:
+            self.formula = build_formula_from_fields(
+                self.operation_id,
+                self.config,
+            )
+        return self
 
 class PipelineFile(BaseModel):
     """

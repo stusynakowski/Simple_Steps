@@ -11,7 +11,8 @@
       "config": {
         "channel_url": "https://youtube.com/mock_channel",
         "_orchestrator": "source"
-      }
+      },
+      "formula": "=yt_fetch_videos.source(channel_url=\"https://youtube.com/mock_channel\")"
     },
     {
       "step_id": "step-dxzodwi",
@@ -20,7 +21,8 @@
       "config": {
         "_orchestrator": "map",
         "url": "Step1"
-      }
+      },
+      "formula": "=yt_extract_metadata.map(url=\"Step1\")"
     }
   ]
 }

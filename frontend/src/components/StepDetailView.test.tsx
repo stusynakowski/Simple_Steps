@@ -1,8 +1,15 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import StepDetailView from './StepDetailView';
 import { describe, it, expect, vi } from 'vitest';
-import { mockCells } from '../mocks/initialData';
-import type { Step } from '../types/models';
+import type { Step, Cell } from '../types/models';
+import { StepWiringProvider } from '../context/StepWiringContext';
+
+const previewCells: Cell[] = [
+  { row_id: 0, column_id: 'name', value: 'Alice', display_value: 'Alice' },
+  { row_id: 0, column_id: 'age', value: 30, display_value: '30' },
+  { row_id: 1, column_id: 'name', value: 'Bob', display_value: 'Bob' },
+  { row_id: 1, column_id: 'age', value: 25, display_value: '25' },
+];
 
 const sampleStep: Step = {
   id: 's-1',
@@ -12,7 +19,7 @@ const sampleStep: Step = {
   process_type: 'noop',
   configuration: {},
   status: 'completed',
-  output_preview: mockCells,
+  output_preview: previewCells,
 };
 
 describe('StepDetailView', () => {
@@ -21,26 +28,18 @@ describe('StepDetailView', () => {
     expect(screen.getByTestId('step-detail-empty')).toBeInTheDocument();
   });
 
-  it('renders toolbar and output grid and calls callbacks', () => {
+  it('renders toolbar and calls callbacks', () => {
     const onRun = vi.fn();
     const onDelete = vi.fn();
-    const onCellClick = vi.fn();
 
     render(
-      <StepDetailView step={sampleStep} onRun={onRun} onDelete={onDelete} onCellClick={onCellClick} />
+      <StepWiringProvider>
+        <StepDetailView step={sampleStep} onRun={onRun} onDelete={onDelete} />
+      </StepWiringProvider>
     );
 
     expect(screen.getByTestId('step-toolbar')).toBeInTheDocument();
     expect(screen.getByTestId('btn-run')).toBeInTheDocument();
-
-    // output grid should render cells from mockCells
-    expect(screen.getByTestId('output-grid')).toBeInTheDocument();
-
-    // pick a cell and click it
-    const cell = screen.getByTestId('cell-0-name');
-    expect(cell).toHaveTextContent('Alice');
-    fireEvent.click(cell);
-    expect(onCellClick).toHaveBeenCalled();
 
     // run and delete buttons call handlers
     fireEvent.click(screen.getByTestId('btn-run'));

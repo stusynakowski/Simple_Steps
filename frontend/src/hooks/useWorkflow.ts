@@ -13,18 +13,24 @@ import type { LogEntry, LogLevel } from '../components/ExecutionLog';
  * Hydrate a saved StepConfig into a runtime Step.
  * The formula is the canonical field; process_type and configuration
  * are always re-derived from it so they stay in sync.
+ *
+ * Three scenarios handled:
+ *   1. Valid formula saved  → derive process_type + configuration from it.
+ *   2. No formula saved     → reconstruct from operation_id + config (legacy files).
+ *   3. Invalid formula saved → ignore it, reconstruct from operation_id + config.
  */
 function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
   const savedFormula = s.formula ?? '';
   const parsed = savedFormula ? parseFormula(savedFormula) : null;
+  const formulaIsUsable = parsed?.isValid && !!parsed.operationId;
 
   // If the saved file has a valid formula, derive everything from it.
   // Fall back to the legacy operation_id/config fields for old saves.
-  const processType = (parsed?.isValid && parsed.operationId)
-    ? parsed.operationId
+  const processType = formulaIsUsable
+    ? parsed!.operationId!
     : (s.operation_id ?? 'noop');
 
-  const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
+  const formulaArgs = formulaIsUsable ? (parsed!.args ?? {}) : {};
 
   // Preserve internal (_-prefixed) keys from the saved config (e.g. _orchestrator)
   // that are not part of the formula syntax, then layer formula args on top.
@@ -34,7 +40,7 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
 
   // When no valid formula exists (old save files), carry over ALL config keys
   // so parameters like channel_url, url_column etc. are not lost.
-  const legacyConfig = (parsed?.isValid && Object.keys(formulaArgs).length > 0)
+  const legacyConfig = (formulaIsUsable && Object.keys(formulaArgs).length > 0)
     ? {}
     : Object.fromEntries(
         Object.entries(s.config ?? {}).filter(([k]) => !k.startsWith('_'))
@@ -42,10 +48,14 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
 
   const configuration = { ...internalKeys, ...legacyConfig, ...formulaArgs };
 
-  // If no formula was saved, reconstruct it from the legacy fields so we have one.
-  const formula = savedFormula || buildFormula(processType, configuration,
-    (internalKeys._orchestrator as any) ?? null,
-  );
+  // Use the saved formula only if it parsed successfully.
+  // Otherwise reconstruct from legacy fields so the formula bar always
+  // shows the correct function + arguments (not just the step name).
+  const formula = formulaIsUsable
+    ? savedFormula
+    : buildFormula(processType, configuration,
+        (internalKeys._orchestrator as any) ?? null,
+      );
 
   return {
     id: s.step_id,

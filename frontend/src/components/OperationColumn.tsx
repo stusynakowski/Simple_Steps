@@ -134,12 +134,14 @@ export default function OperationColumn({
   // The formula bar always reflects step.formula (the canonical field).
   // buildFormula is only used as a fallback for legacy steps that predate
   // the formula field (i.e. loaded from old save files without a formula).
+  // With the backend model_validator fix, step.formula should always be set,
+  // but we keep this client-side fallback for resilience.
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
 
   const derivedFormula = step.formula || buildFormula(
     step.process_type,
-    step.configuration,
+    step.configuration as Record<string, any>,
     (step.configuration._orchestrator as OrchestrationMode | undefined)
       ?? (currentOp?.type as OrchestrationMode | undefined)
       ?? null,
@@ -147,12 +149,13 @@ export default function OperationColumn({
 
   // ── Staged preview state ───────────────────────────────────────────────────
   // Track what the user is typing live — separate from committed step.formula
-  const [liveFormula, setLiveFormula] = useState<string>(step.formula ?? step.operation ?? '');
+  // Prefer step.formula first, then derivedFormula, then legacy operation field.
+  const [liveFormula, setLiveFormula] = useState<string>(step.formula || derivedFormula || step.operation || '');
 
   // Keep liveFormula in sync when the step is updated externally
   useEffect(() => {
-    setLiveFormula(step.formula ?? step.operation ?? '');
-  }, [step.formula, step.operation]);
+    setLiveFormula(step.formula || derivedFormula || step.operation || '');
+  }, [step.formula, step.operation, derivedFormula]);
 
   // Parse the live formula so the staged preview hook gets a typed ParsedFormula
   const liveParsed = useMemo(

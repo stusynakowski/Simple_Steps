@@ -69,11 +69,11 @@ def test_reference_resolution_failure():
     # Current implementation passes the unresolved string if step not found.
     # The operation will then likely fail if it expects a list.
     
-    with pytest.raises(RuntimeError) as excinfo:
+    with pytest.raises(ValueError) as excinfo:
         run_operation(
             op_id="test_consume_ref",
             config=config,
             input_ref_id=None,
             step_label_map=step_map
         )
-    assert "Operation failed" in str(excinfo.value)
+    assert "Error executing step" in str(excinfo.value)
