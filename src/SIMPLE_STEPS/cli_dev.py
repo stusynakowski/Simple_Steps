@@ -20,7 +20,33 @@ import signal
 import subprocess
 import sys
 import time
+import socket
 from pathlib import Path
+
+
+def _port_is_free(host: str, port: int) -> bool:
+    """Return True if the given port is available to bind."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _find_free_port(host: str, preferred: int, max_attempts: int = 50) -> int:
+    """
+    Return *preferred* if free, otherwise scan upward (Streamlit-style)
+    until we find an open port.  Gives up after *max_attempts*.
+    """
+    for offset in range(max_attempts):
+        candidate = preferred + offset
+        if _port_is_free(host, candidate):
+            return candidate
+    # Last resort: let the OS pick one
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, 0))
+        return s.getsockname()[1]
 
 
 def main():
@@ -99,6 +125,15 @@ def main():
     if args.projects_dir:
         env["SIMPLE_STEPS_PROJECTS_DIR"] = os.path.abspath(args.projects_dir)
 
+    # ── Find free ports (Streamlit-style auto-increment) ─────────────────
+    backend_port = _find_free_port(args.host, args.port)
+    frontend_port = _find_free_port("localhost", args.frontend_port)
+
+    if backend_port != args.port:
+        print(f"  ⚠️  Backend port {args.port} is in use, using port {backend_port} instead.")
+    if frontend_port != args.frontend_port:
+        print(f"  ⚠️  Frontend port {args.frontend_port} is in use, using port {frontend_port} instead.")
+
     # ── Detect workspace contents ────────────────────────────────────────
     has_projects = os.path.isdir(os.path.join(workspace, "projects"))
     has_packs = os.path.isdir(os.path.join(workspace, "packs"))
@@ -116,9 +151,9 @@ def main():
     print("  ┌──────────────────────────────────────────────┐")
     print("  │       ⚡ Simple Steps — Dev Mode ⚡           │")
     print("  ├──────────────────────────────────────────────┤")
-    print(f"  │  Backend API:  http://{args.host}:{args.port}/api     │")
-    print(f"  │  Frontend UI:  http://localhost:{args.frontend_port}        │")
-    print(f"  │  API Docs:     http://localhost:{args.port}/docs    │")
+    print(f"  │  Backend API:  http://{args.host}:{backend_port}/api     │")
+    print(f"  │  Frontend UI:  http://localhost:{frontend_port}        │")
+    print(f"  │  API Docs:     http://localhost:{backend_port}/docs    │")
     print("  ├──────────────────────────────────────────────┤")
     print(f"  │  Workspace:    {workspace}")
     if has_projects:
@@ -149,11 +184,11 @@ def main():
             sys.executable, "-m", "uvicorn",
             "SIMPLE_STEPS.main:app",
             "--host", args.host,
-            "--port", str(args.port),
+            "--port", str(backend_port),
             "--reload",
             "--log-level", "info",
         ]
-        print(f"  🐍 Starting backend on :{args.port} ...")
+        print(f"  🐍 Starting backend on :{backend_port} ...")
         backend_proc = subprocess.Popen(
             backend_cmd,
             env=env,
@@ -167,10 +202,10 @@ def main():
         # Frontend: Vite dev server
         frontend_cmd = [
             "npx", "vite",
-            "--port", str(args.frontend_port),
+            "--port", str(frontend_port),
             "--host", "localhost",
         ]
-        print(f"  ⚛️  Starting Vite dev server on :{args.frontend_port} ...")
+        print(f"  ⚛️  Starting Vite dev server on :{frontend_port} ...")
         print()
         frontend_proc = subprocess.Popen(
             frontend_cmd,

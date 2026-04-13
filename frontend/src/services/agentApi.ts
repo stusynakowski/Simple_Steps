@@ -8,8 +8,25 @@
 import type { Step } from '../types/models';
 import type { OperationDefinition } from './api';
 
-const API_BASE = 'http://localhost:8000/api/agent';
-const WS_BASE = 'ws://localhost:8000/api/agent';
+// Dynamically resolve backend origin so multiple instances on different
+// ports work correctly (Streamlit-style port auto-increment).
+function resolveBackendOrigin(): string {
+  const envBase = (import.meta as any).env?.VITE_API_BASE;
+  if (envBase) {
+    // Strip trailing /api if present to get the origin
+    return envBase.replace(/\/api\/?$/, '');
+  }
+  // If served by the backend itself (bundled), use same-origin
+  if (window.location.port && window.location.port !== '5173') {
+    return window.location.origin;
+  }
+  // Vite dev server default
+  return 'http://localhost:8000';
+}
+
+const _BACKEND_ORIGIN = resolveBackendOrigin();
+const API_BASE = `${_BACKEND_ORIGIN}/api/agent`;
+const WS_BASE = `${_BACKEND_ORIGIN.replace(/^http/, 'ws')}/api/agent`;
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

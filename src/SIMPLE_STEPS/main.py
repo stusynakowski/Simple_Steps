@@ -149,14 +149,11 @@ app = FastAPI(
 app.include_router(agent_router)
 
 # --- Middleware ---
+# Allow any localhost port so multiple Simple Steps instances can co-exist
+# (Streamlit-style port auto-increment means we may run on :8001, :8002, etc.)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite dev server
-        "http://localhost:8000",  # Same-origin when frontend is bundled
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:8000",
-    ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

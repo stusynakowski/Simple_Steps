@@ -31,15 +31,23 @@ import time
 import socket
 
 
-def _find_free_port(preferred: int = 8000) -> int:
-    """Return *preferred* if it's available, otherwise pick a random free port."""
+def _find_free_port(preferred: int = 8000, max_attempts: int = 50) -> int:
+    """
+    Return *preferred* if it's available, otherwise scan upward
+    (Streamlit-style) until we find an open port.
+    """
+    for offset in range(max_attempts):
+        candidate = preferred + offset
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(("127.0.0.1", candidate))
+                return candidate
+            except OSError:
+                continue
+    # Last resort: let the OS pick one
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        try:
-            s.bind(("127.0.0.1", preferred))
-            return preferred
-        except OSError:
-            s.bind(("127.0.0.1", 0))
-            return s.getsockname()[1]
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def _wait_for_server(host: str, port: int, timeout: float = 15.0):
@@ -151,6 +159,9 @@ def main():
     port = _find_free_port(args.port)
     host = args.host
     url = f"http://{host}:{port}"
+
+    if port != args.port:
+        print(f"  ⚠️  Port {args.port} is in use, using port {port} instead.")
 
     # ── Detect workspace contents (for banner) ───────────────────────────
     has_projects = os.path.isdir(os.path.join(workspace, "projects"))

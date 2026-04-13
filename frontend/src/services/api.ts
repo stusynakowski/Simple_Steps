@@ -1,6 +1,24 @@
 import type { StepConfiguration } from '../types/models';
 
-const API_BASE = 'http://localhost:8000/api';
+// When the frontend is bundled and served by the backend, use same-origin.
+// When running via Vite dev server, the backend defaults to :8000 but can
+// auto-increment to :8001, :8002, etc.  Allow override via env var or
+// fall back to same-origin (works when served from the backend directly).
+function resolveApiBase(): string {
+  // Vite injects env vars prefixed with VITE_
+  const envBase = (import.meta as any).env?.VITE_API_BASE;
+  if (envBase) return envBase;
+
+  // If served by the backend itself (bundled), use same-origin
+  if (window.location.port && window.location.port !== '5173') {
+    return `${window.location.origin}/api`;
+  }
+
+  // Vite dev server default — assume backend is on :8000
+  return 'http://localhost:8000/api';
+}
+
+const API_BASE = resolveApiBase();
 
 interface StepRunResponse {
   status: 'success' | 'failed';

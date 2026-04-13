@@ -26,6 +26,32 @@ import sys
 import webbrowser
 import threading
 import time
+import socket
+
+
+def _port_is_free(host: str, port: int) -> bool:
+    """Return True if the given port is available to bind."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind((host, port))
+            return True
+        except OSError:
+            return False
+
+
+def _find_free_port(host: str, preferred: int, max_attempts: int = 50) -> int:
+    """
+    Return *preferred* if free, otherwise scan upward (Streamlit-style)
+    until we find an open port.  Gives up after *max_attempts*.
+    """
+    for offset in range(max_attempts):
+        candidate = preferred + offset
+        if _port_is_free(host, candidate):
+            return candidate
+    # Last resort: let the OS pick one
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((host, 0))
+        return s.getsockname()[1]
 
 
 def main():
@@ -121,11 +147,17 @@ def main():
     if args.projects_dir:
         os.environ["SIMPLE_STEPS_PROJECTS_DIR"] = os.path.abspath(args.projects_dir)
 
+    # ── Find a free port (Streamlit-style auto-increment) ────────────────
+    port = _find_free_port(args.host, args.port)
+    if port != args.port:
+        print(f"  ⚠️  Port {args.port} is in use, using port {port} instead.")
+        print()
+
     # ── Auto-open browser ────────────────────────────────────────────────
     if not args.no_browser and not args.dev:
         def _open_browser():
             time.sleep(1.5)
-            url = f"http://{'localhost' if args.host == '0.0.0.0' else args.host}:{args.port}"
+            url = f"http://{'localhost' if args.host == '0.0.0.0' else args.host}:{port}"
             print(f"\n  🌐 Opening {url} in your browser...\n")
             webbrowser.open(url)
         threading.Thread(target=_open_browser, daemon=True).start()
@@ -169,9 +201,9 @@ def main():
     print("  ┌─────────────────────────────────────────────┐")
     print("  │          ⚡ Simple Steps v0.1.0 ⚡            │")
     print("  ├─────────────────────────────────────────────┤")
-    print(f"  │  Backend API: http://{args.host}:{args.port}/api    │")
-    print(f"  │  Frontend UI: http://{args.host}:{args.port}        │")
-    print(f"  │  Docs:        http://localhost:{args.port}/docs   │")
+    print(f"  │  Backend API: http://{args.host}:{port}/api    │")
+    print(f"  │  Frontend UI: http://{args.host}:{port}        │")
+    print(f"  │  Docs:        http://localhost:{port}/docs   │")
     print("  ├─────────────────────────────────────────────┤")
     print(f"  │  Workspace:   {workspace}")
     if has_projects:
@@ -205,7 +237,7 @@ def main():
     uvicorn.run(
         "SIMPLE_STEPS.main:app",
         host=args.host,
-        port=args.port,
+        port=port,
         reload=args.dev,
         log_level="info",
     )
