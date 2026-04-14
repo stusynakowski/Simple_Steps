@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, useMemo } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
-import StagedDataGrid from './StagedDataGrid';
 import StepToolbar from './StepToolbar';
 import PreviousStepDataPicker from './PreviousStepDataPicker';
 import { buildFormula, parseFormula } from '../utils/formulaParser';
@@ -444,58 +443,15 @@ export default function OperationColumn({
               {activeTab === 'data' && (
                   <div className="tab-content status-content">
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
-
-                      {/* ── Staged preview — shown when formula is uncommitted ── */}
-                      {hasUncommittedFormula && (stagedPreview.columns.length > 0 || stagedPreview.globalErrors.length > 0) && (
-                        <div className="staged-preview-container">
-                          <div className="staged-preview-header">
-                            <span className="staged-preview-label">
-                              {stagedPreview.globalErrors.length > 0
-                                ? '⚠ Formula has errors'
-                                : stagedPreview.isReady
-                                ? '⚡ Staged Preview — press ▶ Run to execute'
-                                : '… Building preview'}
-                            </span>
-                            <button
-                              className="staged-preview-run-btn"
-                              onClick={() => onRun(step.id)}
-                              title="Execute this step now"
-                              disabled={!stagedPreview.isReady}
-                            >
-                              ▶ Run
-                            </button>
-                          </div>
-                          <StagedDataGrid
-                            preview={stagedPreview}
-                          />
-                        </div>
-                      )}
-
-                      {/* ── Actual committed output ── */}
-                      {/* Always show actual output when step has run, as a collapsible if staged preview is also visible */}
-                      {step.status === 'completed' && hasUncommittedFormula && stagedPreview.columns.length > 0 ? (
-                        <details className="staged-prev-output-toggle">
-                          <summary>Previous execution output</summary>
-                          <DataOutputGrid
-                            cells={step.output_preview}
-                            onCellClick={(cell) => console.log('Cell clicked:', cell)}
-                            wiringMode={isWiringSource}
-                            sourceStepId={step.id}
-                            onWireColumn={(token) => injectReference(token)}
-                            onWireCell={(token) => injectReference(token)}
-                          />
-                        </details>
-                      ) : (
-                        <DataOutputGrid
-                          cells={step.output_preview}
-                          onCellClick={(cell) => console.log('Cell clicked:', cell)}
-                          wiringMode={isWiringSource}
-                          sourceStepId={step.id}
-                          onWireColumn={(token) => injectReference(token)}
-                          onWireCell={(token) => injectReference(token)}
-                        />
-                      )}
-
+                      <DataOutputGrid
+                        cells={step.output_preview}
+                        onCellClick={(cell) => console.log('Cell clicked:', cell)}
+                        wiringMode={isWiringSource}
+                        sourceStepId={step.id}
+                        onWireColumn={(token) => injectReference(token)}
+                        onWireCell={(token) => injectReference(token)}
+                        stagedColumns={hasUncommittedFormula ? stagedPreview.columns : []}
+                      />
                     </div>
                   </div>
               )}

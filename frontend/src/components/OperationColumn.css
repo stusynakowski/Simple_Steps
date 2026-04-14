@@ -581,61 +581,6 @@
   animation: wiring-pulse 1.6s ease-in-out infinite;
 }
 
-/* ── Staged preview container ─────────────────────────────────────────────── */
-.staged-preview-container {
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 8px;
-  border: 1.5px dashed #7986cb;
-  background: #f8f9ff;
-}
-
-.staged-preview-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 5px 10px;
-  background: #e8eaf6;
-  border-bottom: 1px solid #c5cae9;
-}
-
-.staged-preview-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: #3949ab;
-  letter-spacing: 0.02em;
-}
-
-.staged-preview-run-btn {
-  font-size: 0.7rem;
-  padding: 2px 10px;
-  background: #3f51b5;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: background 0.15s;
-}
-.staged-preview-run-btn:hover:not(:disabled) {
-  background: #283593;
-}
-.staged-preview-run-btn:disabled {
-  background: #9fa8da;
-  cursor: not-allowed;
-}
-
-.staged-prev-output-toggle {
-  margin-top: 8px;
-  font-size: 0.72rem;
-  color: #888;
-  cursor: pointer;
-  user-select: none;
-}
-.staged-prev-output-toggle:hover {
-  color: #555;
-}
-
 /* Grid wiring source overlay */
 .op-data-grid.wiring-source .grid-header-cell:not(.row-index-header) {
   position: relative;

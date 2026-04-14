@@ -1,19 +1,17 @@
 import { useMemo, useState } from 'react';
 import type { Cell } from '../types/models';
+import type { StagedColumn } from '../hooks/useStagedPreview';
 import './OperationColumn.css'; // Ensure grid styles are available
 
 interface DataOutputGridProps {
   cells?: Cell[];
   onCellClick?: (cell: Cell) => void;
-  /** When true, the grid renders in "wiring source" mode — columns and cells
-   *  are highlighted and clickable as formula arguments. */
   wiringMode?: boolean;
-  /** Step id used to build a reference token, e.g. "step-abc123" */
   sourceStepId?: string;
-  /** Called when the user picks a column header as an argument. Token: `stepId.colName` */
   onWireColumn?: (token: string) => void;
-  /** Called when the user picks a specific cell. Token: `stepId[row=R, col=C]` */
   onWireCell?: (token: string) => void;
+  /** Staged columns to render as light-yellow pending cells alongside real data */
+  stagedColumns?: StagedColumn[];
 }
 
 // Wiring banner styles
@@ -37,22 +35,45 @@ export default function DataOutputGrid({
   sourceStepId = '',
   onWireColumn,
   onWireCell,
+  stagedColumns = [],
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   // Memoize grid structure calculation
-  const { cols, rows, gridData, structureType } = useMemo(() => {
+  const { cols, rows, gridData, structureType, stagedColNames, stagedData } = useMemo(() => {
     const safeCells = cells ?? [];
 
-    if (safeCells.length === 0) {
-      return { cols: [], rows: [], gridData: {}, structureType: 'empty' };
+    // Build staged lookup: "rowIndex:colName" -> formula string
+    const sColNames: string[] = [];
+    const sData: Record<string, string> = {};
+    for (const sc of stagedColumns) {
+      if (!sColNames.includes(sc.name)) sColNames.push(sc.name);
+      for (const cell of sc.cells) {
+        sData[`${cell.rowIndex}:${sc.name}`] = cell.formula;
+      }
+    }
+
+    if (safeCells.length === 0 && sColNames.length === 0) {
+      return { cols: [], rows: [], gridData: {}, structureType: 'empty', stagedColNames: [], stagedData: {} };
     }
 
     const uniqueCols = Array.from(new Set(safeCells.map((c) => c.column_id)));
     const uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort(
       (a, b) => a - b
     );
+
+    // Merge staged column names (only add ones not already in real data)
+    const allCols = [...uniqueCols];
+    for (const sc of sColNames) {
+      if (!allCols.includes(sc)) allCols.push(sc);
+    }
+
+    // If we have staged columns but no real rows, generate row indices from staged data
+    let allRows = uniqueRows;
+    if (allRows.length === 0 && sColNames.length > 0 && stagedColumns[0]?.cells.length > 0) {
+      allRows = Array.from({ length: stagedColumns[0].cells.length }, (_, i) => i);
+    }
 
     // Create a lookup map for faster access: "rowId:colId" -> Cell
     const dataMap: Record<string, Cell> = {};
@@ -62,19 +83,21 @@ export default function DataOutputGrid({
 
     // Determine visualization type
     let type = 'grid';
-    if (uniqueRows.length === 1 && uniqueCols.length === 1) {
+    if (allRows.length === 1 && allCols.length === 1 && sColNames.length === 0) {
       type = 'single-value';
-    } else if (uniqueCols.length === 1) {
+    } else if (allCols.length === 1 && sColNames.length === 0) {
       type = 'list';
     }
 
     return {
-      cols: uniqueCols,
-      rows: uniqueRows,
+      cols: allCols,
+      rows: allRows,
       gridData: dataMap,
       structureType: type,
+      stagedColNames: sColNames,
+      stagedData: sData,
     };
-  }, [cells]);
+  }, [cells, stagedColumns]);
 
   // ── Wiring helpers ──────────────────────────────────────────────────────
 
@@ -242,7 +265,10 @@ export default function DataOutputGrid({
                 ? `⚡ Insert column reference: ${sourceStepId}.${col}`
                 : col
             }
-            style={wiringColHeaderStyle(col)}
+            style={{
+              ...wiringColHeaderStyle(col),
+              ...(stagedColNames.includes(col) ? { background: '#fff8dc', color: '#665e30' } : {}),
+            }}
             onClick={() => handleColumnClick(col)}
             onMouseEnter={() => wiringMode && setHoveredCol(col)}
             onMouseLeave={() => wiringMode && setHoveredCol(null)}
@@ -272,6 +298,24 @@ export default function DataOutputGrid({
             {cols.map((c) => {
               const cell = gridData[`${r}:${c}`];
               const cellKey = `${r}:${c}`;
+              const staged = stagedData[cellKey];
+              const isStaged = staged !== undefined && stagedColNames.includes(c);
+
+              if (isStaged) {
+                return (
+                  <div
+                    key={cellKey}
+                    className="grid-cell staged"
+                    role="gridcell"
+                    title={staged}
+                    style={{ background: '#fffde7' }}
+                  >
+                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#b8960c', marginRight: 6, fontStyle: 'italic' }}>(staged)</span>
+                    <span style={{ color: '#7a6e30', fontSize: '0.72rem', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{staged}</span>
+                  </div>
+                );
+              }
+
               return (
                 <div
                   key={cellKey}

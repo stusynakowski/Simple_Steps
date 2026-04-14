@@ -196,8 +196,10 @@ export default function MainLayout() {
     setTimeout(() => { suppressModified.current = false; }, 0);
   }, [openTabs, fetchWorkflow, loadWorkflowObject]);
 
-  /** Open a demo / in-memory workflow as a tab. */
-  const openWorkflowObjectTab = useCallback((wf: Workflow) => {
+  // NOTE: openWorkflowObjectTab is kept for future use (e.g. opening demo workflows).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // @ts-expect-error -- reserved for future use
+  const _openWorkflowObjectTab = useCallback((wf: Workflow) => {
     const tabKey = `demo::${wf.id}`;
     const existing = openTabs.find(t => t.id === tabKey);
     if (existing) {

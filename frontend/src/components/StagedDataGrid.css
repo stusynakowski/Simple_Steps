@@ -6,35 +6,8 @@
   font-size: 0.78rem;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid #d0d0d0;
-  background: #fafafa;
-}
-
-/* ── Description bar ──────────────────────────────────────────────────────── */
-.staged-description {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  font-size: 0.74rem;
-  font-weight: 500;
-  border-bottom: 1px solid #e0e0e0;
-}
-.staged-description.ready {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-.staged-description.pending {
-  background: #e3f0ff;
-  color: #1565c0;
-}
-.staged-description.error {
-  background: #fffde7;
-  color: #e65100;
-}
-.staged-description-icon {
-  font-size: 0.9rem;
-  flex-shrink: 0;
+  border: 1px solid #e0d9a8;
+  background: #fffef5;
 }
 
 /* ── Global errors ────────────────────────────────────────────────────────── */
@@ -66,55 +39,27 @@
 
 /* ── Header ───────────────────────────────────────────────────────────────── */
 .staged-table thead th {
-  background: #f0f0f5;
+  background: #fff8dc;
   padding: 4px 8px;
   text-align: left;
   font-size: 0.72rem;
   font-weight: 600;
-  color: #444;
-  border-bottom: 2px solid #ddd;
+  color: #665e30;
+  border-bottom: 2px solid #e0d9a8;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 1;
 }
-.staged-col-header.col-new {
-  background: #e8eaf6;
-  color: #283593;
-}
-.staged-col-header.col-passthrough {
-  background: #f3e5f5;
-  color: #4a148c;
-}
-.col-header-label {
-  margin-right: 4px;
-}
-.col-badge {
-  display: inline-block;
-  font-size: 0.6rem;
-  padding: 1px 4px;
-  border-radius: 3px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.col-badge--new {
-  background: #c5cae9;
-  color: #1a237e;
-}
-.col-badge--pass {
-  background: #e1bee7;
-  color: #4a148c;
-}
 
 /* ── Row index ────────────────────────────────────────────────────────────── */
 .staged-row-index {
-  background: #f5f5f5;
+  background: #fffef0;
   color: #aaa;
   font-size: 0.67rem;
   text-align: right;
   padding: 3px 6px;
-  border-right: 1px solid #e8e8e8;
+  border-right: 1px solid #e8e4c8;
   min-width: 24px;
   user-select: none;
 }
@@ -122,112 +67,28 @@
 /* ── Cells ────────────────────────────────────────────────────────────────── */
 .staged-cell {
   padding: 4px 8px;
-  border-bottom: 1px solid #efefef;
-  max-width: 260px;
+  border-bottom: 1px solid #f0ecd0;
+  background: #fffde7;
+  max-width: 320px;
   vertical-align: top;
+  white-space: nowrap;
 }
-.staged-cell-value {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
+
+.staged-tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #b8960c;
+  margin-right: 6px;
+  font-style: italic;
+  flex-shrink: 0;
 }
+
 .staged-cell-text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-}
-.staged-cell-icon {
-  flex-shrink: 0;
-  font-size: 0.7rem;
-  margin-top: 1px;
-}
-
-/* State variants */
-.staged-cell--valid {
-  background: #e3f0ff;
-}
-.staged-cell-icon--valid {
-  color: #1565c0;
-}
-.staged-cell--valid .staged-cell-text {
-  color: #7b9cc5;
-  font-style: italic;
+  color: #7a6e30;
   font-size: 0.72rem;
-  letter-spacing: 0.02em;
-}
-.staged-cell--pending {
-  background: #fff8e1;
-}
-.staged-cell-icon--pending {
-  color: #f9a825;
-  font-weight: 700;
-}
-.staged-cell--pending .staged-cell-text {
-  color: #c5940a;
-  font-style: italic;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
-}
-.staged-cell--error {
-  background: #fffde7;
-}
-.staged-cell-icon--error {
-  color: #f9a825;
-}
-.staged-cell--error .staged-cell-text {
-  color: #e65100;
-  font-style: italic;
-}
-.staged-cell--passthrough {
-  background: #e8f5e9;
-}
-.staged-cell-icon--passthrough {
-  color: #2e7d32;
-}
-.staged-cell--passthrough .staged-cell-text {
-  color: #1b5e20;
-}
-
-/* ── Empty state ──────────────────────────────────────────────────────────── */
-.staged-grid-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 24px 16px;
-  color: #aaa;
-  font-size: 0.78rem;
-  text-align: center;
-  background: #fafafa;
-}
-.staged-grid-empty-icon {
-  font-size: 1.4rem;
-  opacity: 0.35;
-}
-
-/* ── Formula details panel ────────────────────────────────────────────────── */
-.staged-formula-detail {
-  border-top: 1px solid #e0e0e0;
-  padding: 4px 8px;
-  background: #fafafa;
-}
-.staged-formula-detail summary {
-  cursor: pointer;
-  font-size: 0.71rem;
-  color: #888;
-  padding: 4px 0;
-  user-select: none;
-}
-.staged-formula-detail summary:hover {
-  color: #555;
-}
-.staged-table--formulas td.staged-formula-cell code {
-  font-size: 0.67rem;
-  color: #555;
-  white-space: pre-wrap;
-  word-break: break-all;
   font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
 }

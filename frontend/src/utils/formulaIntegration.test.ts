@@ -24,7 +24,7 @@ import {
   isStepReference,
   formatFormulaValue,
 } from './formulaParser';
-import type { OrchestrationMode, ParsedFormula } from './formulaParser';
+import type { OrchestrationMode } from './formulaParser';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Helper: simulate hydrateStep (from useWorkflow.ts)
@@ -88,7 +88,7 @@ function hydrateStep(s: {
 function simulateFormulaUpdate(
   currentStep: { configuration: Record<string, any> },
   formula: string,
-) {
+): { formula: string; operation: string; process_type?: string; configuration?: Record<string, any> } {
   const parsed = parseFormula(formula);
   if (parsed.isValid && parsed.operationId) {
     const internalKeys = Object.fromEntries(
