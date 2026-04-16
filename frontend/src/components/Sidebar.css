@@ -552,3 +552,112 @@
   font-size: 0.68rem;
   font-family: 'SF Mono', Menlo, Consolas, monospace;
 }
+
+/* ── Docs reader (inline markdown) ──────────────────────────────────────── */
+
+.docs-reader h1 {
+  font-size: 1.1rem;
+  color: #e0e0e0;
+  margin: 0 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #333;
+}
+
+.docs-reader h2 {
+  font-size: 0.95rem;
+  color: #ddd;
+  margin: 16px 0 8px 0;
+}
+
+.docs-reader h3 {
+  font-size: 0.85rem;
+  color: #ccc;
+  margin: 12px 0 6px 0;
+}
+
+.docs-reader p {
+  margin: 6px 0;
+  font-size: 0.82rem;
+  color: #bbb;
+}
+
+.docs-reader code {
+  background: #2d2d2d;
+  color: #d4d4d4;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.docs-reader pre {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.docs-reader pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.docs-reader table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  font-size: 0.78rem;
+}
+
+.docs-reader th {
+  background: #2a2a2a;
+  color: #ccc;
+  text-align: left;
+  padding: 5px 8px;
+  border: 1px solid #3a3a3a;
+  font-weight: 600;
+}
+
+.docs-reader td {
+  padding: 4px 8px;
+  border: 1px solid #333;
+  color: #bbb;
+}
+
+.docs-reader ul, .docs-reader ol {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.docs-reader li {
+  font-size: 0.82rem;
+  color: #bbb;
+  margin: 3px 0;
+}
+
+.docs-reader hr {
+  border: none;
+  border-top: 1px solid #333;
+  margin: 12px 0;
+}
+
+.docs-reader strong {
+  color: #ddd;
+}
+
+.docs-reader a {
+  color: #569cd6;
+  text-decoration: none;
+}
+
+.docs-reader a:hover {
+  text-decoration: underline;
+}
+
+.docs-link-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}

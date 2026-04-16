@@ -66,15 +66,9 @@ export default function OperationColumn({
     wiringState.receivingStepIndex !== null &&
     stepIndex < wiringState.receivingStepIndex;
 
-  // When this column becomes a wiring source, automatically switch to the data
-  // tab so the user can see the output grid without extra clicks.
-  const prevWiringSource = useRef(false);
-  useEffect(() => {
-    if (isWiringSource && !prevWiringSource.current) {
-      setActiveTab('data');
-    }
-    prevWiringSource.current = isWiringSource;
-  }, [isWiringSource]);
+  // Track whether the user is hovering over this column while it's a wiring source.
+  // The yellow highlight and wiring UI only appear on hover, not automatically.
+  const [isWiringHovered, setIsWiringHovered] = useState(false);
 
   // Refs for parameter inputs so they can also participate in wiring
   const paramInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -333,11 +327,10 @@ export default function OperationColumn({
 
   return (
     <div
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isWiringSource ? 'wiring-source-column' : ''} status-${step.status}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
       style={{ 
         '--step-color': color,
         zIndex: zIndex,
-        ...(isWiringSource ? { outline: '2px solid #ffc107', outlineOffset: -2 } : {}),
       } as React.CSSProperties}
       data-testid={`operation-column-${step.id}`}
     >
@@ -355,27 +348,6 @@ export default function OperationColumn({
                 </>
             )}
         </div>
-        {/* Wiring source badge */}
-        {isWiringSource && (
-          <span
-            style={{
-              position: 'absolute',
-              top: 4,
-              right: isSqueezed ? 4 : 8,
-              background: '#ffc107',
-              color: '#5d4037',
-              borderRadius: 3,
-              padding: '1px 5px',
-              fontSize: '0.62rem',
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              zIndex: 10,
-              pointerEvents: 'none',
-            }}
-          >
-            ⚡ source
-          </span>
-        )}
       </div>
 
 
@@ -441,12 +413,17 @@ export default function OperationColumn({
 
               {/* Data Tab Content */}
               {activeTab === 'data' && (
-                  <div className="tab-content status-content">
+                  <div
+                    className="tab-content status-content"
+                    onMouseEnter={() => { if (isWiringSource) setIsWiringHovered(true); }}
+                    onMouseLeave={() => setIsWiringHovered(false)}
+                    style={isWiringSource && isWiringHovered ? { outline: '2px solid #ffc107', outlineOffset: -2, borderRadius: 4 } : {}}
+                  >
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
                       <DataOutputGrid
                         cells={step.output_preview}
                         onCellClick={(cell) => console.log('Cell clicked:', cell)}
-                        wiringMode={isWiringSource}
+                        wiringMode={isWiringSource && isWiringHovered}
                         sourceStepId={step.id}
                         onWireColumn={(token) => injectReference(token)}
                         onWireCell={(token) => injectReference(token)}

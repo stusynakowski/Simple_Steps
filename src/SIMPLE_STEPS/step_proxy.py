@@ -286,6 +286,134 @@ def step(data=None, label: str = "step", **kwargs) -> StepProxy:
     return StepProxy(pd.DataFrame([{"output": data}]), label)
 
 
+class RawValue:
+    """
+    A raw (non-tabular) value that lives in the pipeline.
+
+    Unlike StepProxy (which always wraps a DataFrame), RawValue holds any
+    Python object — a string, number, list, dict, API response, etc.
+
+    Access the value with ``.value``, convert to a Step with ``.to_step()``:
+
+        v = raw("hello world")
+        v.value                     # → "hello world"
+        v.to_step()                 # → StepProxy with 1×1 DataFrame
+
+        v = raw({"name": "alice", "score": 85})
+        v.value                     # → {"name": "alice", "score": 85}
+        v.to_step()                 # → StepProxy with 1 row, 2 columns
+
+        v = raw([1, 2, 3, 4, 5])
+        v.value                     # → [1, 2, 3, 4, 5]
+        v.to_step()                 # → StepProxy with 5 rows, 1 column
+        v.to_step(column="nums")    # → column named "nums"
+    """
+
+    __slots__ = ("_value", "_label")
+
+    def __init__(self, value: Any, label: str = "raw"):
+        object.__setattr__(self, "_value", value)
+        object.__setattr__(self, "_label", label)
+
+    @property
+    def value(self) -> Any:
+        return object.__getattribute__(self, "_value")
+
+    def to_step(self, column: str = "value", label: Optional[str] = None) -> StepProxy:
+        """
+        Convert this raw value into a StepProxy (tabular format).
+
+        Conversion rules:
+          dict with list values  → DataFrame (columns)
+          dict with scalar vals  → single-row DataFrame
+          list of dicts          → DataFrame (rows)
+          list of scalars        → single-column DataFrame
+          DataFrame              → StepProxy directly
+          scalar                 → 1×1 DataFrame
+        """
+        v = object.__getattribute__(self, "_value")
+        lbl = label or object.__getattribute__(self, "_label")
+
+        if isinstance(v, pd.DataFrame):
+            return StepProxy(v, lbl)
+        if isinstance(v, dict):
+            # Check if it's column-oriented (dict of lists)
+            if v and all(isinstance(val, (list, tuple)) for val in v.values()):
+                return StepProxy(pd.DataFrame(v), lbl)
+            # Scalar-valued dict → one row
+            return StepProxy(pd.DataFrame([v]), lbl)
+        if isinstance(v, list):
+            if v and isinstance(v[0], dict):
+                return StepProxy(pd.DataFrame(v), lbl)
+            return StepProxy(pd.DataFrame({column: v}), lbl)
+        if isinstance(v, pd.Series):
+            return StepProxy(v.to_frame(name=column), lbl)
+        # Scalar
+        return StepProxy(pd.DataFrame([{column: v}]), lbl)
+
+    # ── Dunder protocols so raw values are usable directly ───────────────
+    def __repr__(self) -> str:
+        v = object.__getattribute__(self, "_value")
+        lbl = object.__getattribute__(self, "_label")
+        typ = type(v).__name__
+        preview = repr(v)
+        if len(preview) > 80:
+            preview = preview[:77] + "..."
+        return f"<RawValue '{lbl}' ({typ}): {preview}>"
+
+    def __str__(self) -> str:
+        return str(object.__getattribute__(self, "_value"))
+
+    def __len__(self) -> int:
+        v = object.__getattribute__(self, "_value")
+        return len(v)
+
+    def __iter__(self):
+        return iter(object.__getattribute__(self, "_value"))
+
+    def __getitem__(self, key):
+        return object.__getattribute__(self, "_value")[key]
+
+    def __getattr__(self, name: str):
+        """Delegate attribute access to the wrapped value."""
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(object.__getattribute__(self, "_value"), name)
+
+    # ── Comparison / arithmetic (delegate to wrapped value) ──────────────
+    def __eq__(self, other):
+        o = other.value if isinstance(other, RawValue) else other
+        return object.__getattribute__(self, "_value") == o
+
+    def __add__(self, other):
+        o = other.value if isinstance(other, RawValue) else other
+        return object.__getattribute__(self, "_value") + o
+
+    def __mul__(self, other):
+        o = other.value if isinstance(other, RawValue) else other
+        return object.__getattribute__(self, "_value") * o
+
+    def __bool__(self) -> bool:
+        return bool(object.__getattribute__(self, "_value"))
+
+
+def raw(value: Any, label: str = "raw") -> RawValue:
+    """
+    Create a raw (non-tabular) value in the pipeline.
+
+        v = raw("hello")           # a string
+        v = raw(42)                # a number
+        v = raw([1, 2, 3])         # a list
+        v = raw({"a": 1, "b": 2}) # a dict
+        v = raw(api_response)      # anything
+
+    Access with v.value, convert with v.to_step().
+    """
+    if isinstance(value, RawValue):
+        return value
+    return RawValue(value, label)
+
+
 # ── Helpers for the engine / eval ────────────────────────────────────────────
 
 def is_column_proxy(obj) -> bool:

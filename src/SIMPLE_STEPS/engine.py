@@ -218,7 +218,11 @@ def run_operation(
         
         if not isinstance(result_df, pd.DataFrame):
              print(f"Warning: Operation {op_id} returned {type(result_df)}, expected DataFrame")
-             if isinstance(result_df, list):
+             # Handle RawValue
+             from .step_proxy import RawValue
+             if isinstance(result_df, RawValue):
+                 result_df = result_df.to_step().df
+             elif isinstance(result_df, list):
                  result_df = pd.DataFrame(result_df)
              else:
                  result_df = pd.DataFrame([result_df])

@@ -25,5 +25,5 @@ __version__ = "0.1.0"
 
 from .decorators import simple_step, register_operation  # noqa: F401
 from .operation_pack import OperationPack  # noqa: F401
-from .step_proxy import step, StepProxy, ColumnProxy  # noqa: F401
+from .step_proxy import step, StepProxy, ColumnProxy, raw, RawValue  # noqa: F401
 from .helpers import map_each, apply_to, filter_by, expand_each, val, col  # noqa: F401

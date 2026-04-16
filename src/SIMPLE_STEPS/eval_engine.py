@@ -34,7 +34,7 @@ import numpy as np
 from typing import Optional, Dict, Any
 
 from .engine import get_dataframe, resolve_reference, save_dataframe
-from .step_proxy import StepProxy, ColumnProxy, step as make_step, unwrap_step
+from .step_proxy import StepProxy, ColumnProxy, step as make_step, unwrap_step, RawValue, raw as make_raw
 
 
 def run_eval(
@@ -93,6 +93,7 @@ def _build_namespace(
         "df_in": df_in,
         "df": df_in,
         "step": make_step,
+        "raw": make_raw,
         "map_each": map_each,
         "apply_to": apply_to,
         "filter_by": filter_by,
@@ -135,6 +136,8 @@ def _normalize_result(result: Any, df_in: Optional[pd.DataFrame]) -> pd.DataFram
     if result is None:
         return df_in if df_in is not None else pd.DataFrame()
 
+    if isinstance(result, RawValue):
+        return result.to_step().df
     if isinstance(result, StepProxy):
         return unwrap_step(result)
     if isinstance(result, pd.DataFrame):

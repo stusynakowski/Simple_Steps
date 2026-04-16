@@ -58,10 +58,79 @@ export function formatFormulaValue(v: unknown): string {
 }
 
 /**
+ * Detect whether a formula body (after '=') is a literal value.
+ * Returns a ParsedFormula that routes to define_value or define_data,
+ * or null if it's not a literal.
+ */
+function _tryParseLiteral(body: string, rawInput: string): ParsedFormula | null {
+  // String literal: "..." or '...'
+  if (
+    (body.startsWith('"') && body.endsWith('"')) ||
+    (body.startsWith("'") && body.endsWith("'"))
+  ) {
+    const inner = body.slice(1, -1);
+    return {
+      operationId: 'define_value',
+      orchestration: 'source',
+      args: { value: inner, type: 'string', _literal: body },
+      isValid: true,
+      rawInput,
+    };
+  }
+
+  // Number literal
+  if (/^-?\d+(\.\d+)?$/.test(body)) {
+    return {
+      operationId: 'define_value',
+      orchestration: 'source',
+      args: { value: body, type: 'number', _literal: body },
+      isValid: true,
+      rawInput,
+    };
+  }
+
+  // Boolean literal
+  if (body === 'true' || body === 'false') {
+    return {
+      operationId: 'define_value',
+      orchestration: 'source',
+      args: { value: body, type: 'auto', _literal: body },
+      isValid: true,
+      rawInput,
+    };
+  }
+
+  // JSON array [...] → define_data
+  if (body.startsWith('[') && body.endsWith(']')) {
+    return {
+      operationId: 'define_data',
+      orchestration: 'source',
+      args: { data: body, _literal: body },
+      isValid: true,
+      rawInput,
+    };
+  }
+
+  // JSON object {...} → define_data
+  if (body.startsWith('{') && body.endsWith('}')) {
+    return {
+      operationId: 'define_data',
+      orchestration: 'source',
+      args: { data: body, _literal: body },
+      isValid: true,
+      rawInput,
+    };
+  }
+
+  return null;
+}
+
+/**
  * Parses a formula string like:
  *   `=yt_extract_metadata.map(url="step1.url", min_views=1000)`
  *   `=fetch_videos(channel_url="https://...")`          ← no modifier
  *   `=!.map df["score"] = df["score"].astype(int); result = df`  ← eval mode
+ *   `="hello"`  or  `=42`  or  `=[1,2,3]`  or  `={"a":[1,2]}`  ← literals
  * into a structured object.
  */
 export function parseFormula(input: string): ParsedFormula {
@@ -72,6 +141,13 @@ export function parseFormula(input: string): ParsedFormula {
   }
 
   const body = raw.slice(1); // Remove leading '='
+
+  // ── Literal detection ─────────────────────────────────────────────
+  // Matches: ="string", ='string', =42, =3.14, =true, =false,
+  //          =[...], ={...}  (JSON array / object)
+  const trimmed = body.trim();
+  const literalResult = _tryParseLiteral(trimmed, raw);
+  if (literalResult) return literalResult;
   const parenIdx = body.indexOf('(');
 
   if (parenIdx === -1) {
@@ -166,6 +242,16 @@ export function buildFormula(
   // Pass-through steps store their bare reference token in _ref
   if (operationId === 'passthrough') {
     return String(config._ref ?? '');
+  }
+
+  // ── Literal shorthand ──────────────────────────────────────────────
+  // If the operation is define_value or define_data and came from a literal,
+  // preserve the compact `="hello"` / `=[1,2,3]` syntax.
+  if (operationId === 'define_value' && config._literal !== undefined) {
+    return `=${config._literal}`;
+  }
+  if (operationId === 'define_data' && config._literal !== undefined) {
+    return `=${config._literal}`;
   }
 
   // The orchestration modifier — use explicit arg, else fall back to

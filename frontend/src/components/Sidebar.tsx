@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Markdown from 'react-markdown';
 import type { ActivityView } from './ActivityBar';
 import type { ProjectInfo, PipelineFile, DeveloperPack } from '../services/api';
-import { fetchDeveloperPacks } from '../services/api';
+import { fetchDeveloperPacks, readWorkspaceFile } from '../services/api';
 import FileTree from './FileTree';
 import './Sidebar.css';
 
@@ -278,9 +279,49 @@ const docSections: { category: string; docs: DocEntry[] }[] = [
     category: 'Getting Started',
     docs: [
       {
-        title: 'Introduction',
-        description: 'Overview of Simple Steps and core concepts.',
-        url: '/docs/introduction.md',
+        title: 'Getting Started',
+        description: 'What the UI looks like, core concepts (steps, formulas, operations), and your first workflow.',
+        url: '/usage_docs/getting-started.md',
+      },
+      {
+        title: 'Projects & Saving',
+        description: 'How projects and pipelines are organized, saving/loading workflows, and the file explorer.',
+        url: '/usage_docs/projects-and-saving.md',
+      },
+    ],
+  },
+  {
+    category: 'Using the App',
+    docs: [
+      {
+        title: 'The Formula Bar',
+        description: 'Formula syntax, step references (step1.url), eval mode, and how formulas get executed.',
+        url: '/usage_docs/formula-bar.md',
+      },
+      {
+        title: 'Operations & the Sidebar',
+        description: 'Where operations come from (tiers 1-3), operation types, orchestration ops, and creating your own.',
+        url: '/usage_docs/operations.md',
+      },
+      {
+        title: 'Steps as Python Variables',
+        description: 'StepProxy, ColumnProxy, auto-broadcasting — how steps work like Python objects.',
+        url: '/usage_docs/step-variables.md',
+      },
+      {
+        title: 'Helper Functions',
+        description: 'map_each, apply_to, filter_by, expand_each, val, col — use any function with step broadcasting.',
+        url: '/usage_docs/helpers.md',
+      },
+    ],
+  },
+  {
+    category: 'Configuration',
+    docs: [
+      {
+        title: 'Settings & Configuration',
+        description: 'Eval mode, simple_steps.toml manifest, environment variables, and launch options.',
+        url: '/usage_docs/settings.md',
       },
     ],
   },
@@ -289,13 +330,23 @@ const docSections: { category: string; docs: DocEntry[] }[] = [
     docs: [
       {
         title: 'Adding Operations',
-        description: 'How to create and register operations using the @simple_step decorator.',
+        description: 'Create and register operations using @simple_step or register_operation.',
         url: '/usage_docs/developers/adding-operations.md',
       },
       {
         title: 'Creating Operation Packs',
-        description: 'Bundle related functions with dependency validation and health checks.',
+        description: 'Bundle functions with dependency validation, health checks, and graceful degradation.',
         url: '/usage_docs/developers/creating-operation-packs.md',
+      },
+      {
+        title: 'Managing Packs',
+        description: 'Import packs from git/local/pip, the simple_steps.toml manifest, and the pack CLI.',
+        url: '/usage_docs/developers/managing-packs.md',
+      },
+      {
+        title: 'Desktop Mode',
+        description: 'Run Simple Steps as a native desktop window with pywebview — no browser needed.',
+        url: '/usage_docs/developers/desktop-mode.md',
       },
     ],
   },
@@ -313,6 +364,9 @@ const DocsPanel: React.FC = () => {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     () => new Set(docSections.map(s => s.category))
   );
+  const [activeDoc, setActiveDoc] = useState<DocEntry | null>(null);
+  const [docContent, setDocContent] = useState<string | null>(null);
+  const [docLoading, setDocLoading] = useState(false);
 
   const toggleCategory = (cat: string) => {
     setExpandedCategories(prev => {
@@ -321,6 +375,54 @@ const DocsPanel: React.FC = () => {
       return next;
     });
   };
+
+  const openDoc = async (doc: DocEntry) => {
+    if (activeDoc?.url === doc.url) {
+      // Toggle off
+      setActiveDoc(null);
+      setDocContent(null);
+      return;
+    }
+    setActiveDoc(doc);
+    setDocLoading(true);
+    try {
+      // url is like "/usage_docs/getting-started.md" — strip leading slash for the API
+      const path = doc.url.startsWith('/') ? doc.url.slice(1) : doc.url;
+      const result = await readWorkspaceFile(path);
+      setDocContent(result.content ?? 'File too large to display.');
+    } catch {
+      setDocContent('Could not load document.');
+    } finally {
+      setDocLoading(false);
+    }
+  };
+
+  // If a doc is open, show the reader view
+  if (activeDoc && docContent !== null) {
+    return (
+      <div className="project-explorer" style={{ overflowY: 'auto', height: '100%' }}>
+        <div style={{ padding: '8px 12px', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => { setActiveDoc(null); setDocContent(null); }}
+            style={{
+              background: 'none', border: 'none', color: '#ccc', cursor: 'pointer',
+              fontSize: '0.9rem', padding: '2px 6px',
+            }}
+            title="Back to docs list"
+          >← Back</button>
+          <span style={{ fontSize: '0.82rem', color: '#ccc', fontWeight: 600 }}>{activeDoc.title}</span>
+        </div>
+        <div className="docs-reader" style={{
+          padding: '12px 16px', fontSize: '0.82rem', color: '#ccc', lineHeight: 1.6,
+          overflowY: 'auto',
+        }}>
+          {docLoading ? <div style={{ color: '#888' }}>Loading…</div> : (
+            <Markdown>{docContent}</Markdown>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="project-explorer" style={{ overflowY: 'auto' }}>
@@ -338,22 +440,15 @@ const DocsPanel: React.FC = () => {
             {isOpen && (
               <div className="sidebar-content">
                 {section.docs.map(doc => (
-                  <a
+                  <div
                     key={doc.url}
-                    href={doc.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="docs-link-row"
                     title={doc.description}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: 8,
-                      padding: '6px 16px', textDecoration: 'none', color: 'inherit',
-                      cursor: 'pointer',
+                      padding: '6px 16px', cursor: 'pointer',
                     }}
-                    onClick={e => {
-                      e.preventDefault();
-                      window.open(doc.url, '_blank');
-                    }}
+                    onClick={() => openDoc(doc)}
                   >
                     <BookIcon />
                     <div style={{ flex: 1 }}>
@@ -362,7 +457,7 @@ const DocsPanel: React.FC = () => {
                         {doc.description}
                       </div>
                     </div>
-                  </a>
+                  </div>
                 ))}
               </div>
             )}
