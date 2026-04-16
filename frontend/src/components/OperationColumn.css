@@ -47,6 +47,7 @@
   background-color: var(--step-color, #444);
   z-index: 0;
   transition: background-color 0.3s;
+  pointer-events: none;
 }
 
 /* ARROW GEOMETRY: Depth 28px */
@@ -183,6 +184,10 @@
   /* Visual gap adjustment: Make Body narrower than Header so Header Tip overhangs */
   margin-right: 28px; 
   margin-left: 0; 
+  
+  /* Elevate body above neighboring columns' overlapping headers */
+  position: relative;
+  z-index: 10;
   
   /* GRID ANIMATION - Removed due to flex: initial usage */
   display: flex; /* Changed from grid to flex column */

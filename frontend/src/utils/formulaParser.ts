@@ -59,7 +59,7 @@ export function formatFormulaValue(v: unknown): string {
 
 /**
  * Detect whether a formula body (after '=') is a literal value.
- * Returns a ParsedFormula that routes to define_value or define_data,
+ * Returns a ParsedFormula that routes to define_value or to_rows,
  * or null if it's not a literal.
  */
 function _tryParseLiteral(body: string, rawInput: string): ParsedFormula | null {
@@ -100,29 +100,59 @@ function _tryParseLiteral(body: string, rawInput: string): ParsedFormula | null 
     };
   }
 
-  // JSON array [...] → define_data
+  // JSON array [...] → single cell with raw value
   if (body.startsWith('[') && body.endsWith(']')) {
     return {
-      operationId: 'define_data',
+      operationId: 'define_value',
       orchestration: 'source',
-      args: { data: body, _literal: body },
+      args: { value: body, type: 'string', _literal: body },
       isValid: true,
       rawInput,
     };
   }
 
-  // JSON object {...} → define_data
+  // JSON object {...} → single cell with raw value
   if (body.startsWith('{') && body.endsWith('}')) {
     return {
-      operationId: 'define_data',
+      operationId: 'define_value',
       orchestration: 'source',
-      args: { data: body, _literal: body },
+      args: { value: body, type: 'string', _literal: body },
       isValid: true,
       rawInput,
     };
   }
 
   return null;
+}
+
+/**
+ * Split a raw args string on commas, respecting quotes and brackets.
+ * e.g. `data=step-000[row=0, col=value], x="a,b"` → two tokens.
+ */
+function splitArgs(raw: string): string[] {
+  const tokens: string[] = [];
+  let current = '';
+  let depth = 0;      // bracket depth []
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; }
+    else if (ch === "'" && !inDouble) { inSingle = !inSingle; }
+    else if (!inSingle && !inDouble) {
+      if (ch === '[') depth++;
+      else if (ch === ']') depth--;
+      else if (ch === ',' && depth === 0) {
+        tokens.push(current);
+        current = '';
+        continue;
+      }
+    }
+    current += ch;
+  }
+  if (current) tokens.push(current);
+  return tokens;
 }
 
 /**
@@ -148,6 +178,20 @@ export function parseFormula(input: string): ParsedFormula {
   const trimmed = body.trim();
   const literalResult = _tryParseLiteral(trimmed, raw);
   if (literalResult) return literalResult;
+
+  // ── Step reference detection ──────────────────────────────────────
+  // =step-000.value  or  =step-000  (bare step ref without parens)
+  // These are passthrough references, not operations.
+  if (/^step[\w-]*(\.\w+)?$/i.test(trimmed)) {
+    return {
+      operationId: 'passthrough',
+      orchestration: null,
+      args: { _ref: trimmed },
+      isValid: true,
+      rawInput: raw,
+    };
+  }
+
   const parenIdx = body.indexOf('(');
 
   if (parenIdx === -1) {
@@ -191,8 +235,8 @@ export function parseFormula(input: string): ParsedFormula {
   const args: Record<string, string> = {};
 
   if (argsRaw.trim()) {
-    // Split on commas that are NOT inside quotes
-    const argTokens = argsRaw.split(/,(?=(?:[^"']*["'][^"']*["'])*[^"']*$)/);
+    // Split on commas that are NOT inside quotes or brackets
+    const argTokens = splitArgs(argsRaw);
     argTokens.forEach(token => {
       const eqIdx = token.indexOf('=');
       if (eqIdx !== -1) {
@@ -245,12 +289,12 @@ export function buildFormula(
   }
 
   // ── Literal shorthand ──────────────────────────────────────────────
-  // If the operation is define_value or define_data and came from a literal,
+  // If the operation is define_value or to_rows and came from a literal,
   // preserve the compact `="hello"` / `=[1,2,3]` syntax.
   if (operationId === 'define_value' && config._literal !== undefined) {
     return `=${config._literal}`;
   }
-  if (operationId === 'define_data' && config._literal !== undefined) {
+  if (operationId === 'to_rows' && config._literal !== undefined) {
     return `=${config._literal}`;
   }
 

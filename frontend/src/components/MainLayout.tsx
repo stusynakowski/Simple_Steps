@@ -490,7 +490,7 @@ export default function MainLayout() {
                     isActive={isExpanded}
                     isSqueezed={!isExpanded}
                     isMaximized={isMaximized}
-                    zIndex={workflow.steps.length - index}
+                    zIndex={isExpanded ? 100 : workflow.steps.length - index}
                     availableOperations={availableOperations}
                     onActivate={() => toggleStep(step.id)}
                     onUpdate={(id, updates) => updateStep(id, updates)}

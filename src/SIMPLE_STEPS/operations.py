@@ -14,15 +14,16 @@ def load_csv(filepath: str) -> pd.DataFrame:
     return pd.read_csv(filepath)
 
 
-@simple_step(name="Define Data", category="Data Sources", operation_type="source", id="define_data")
-def define_data(data: str = '{"column1": ["a", "b", "c"]}') -> pd.DataFrame:
+@simple_step(name="To Rows", category="Data Sources", operation_type="source", id="to_rows")
+def to_rows(data: str = '{"column1": ["a", "b", "c"]}') -> pd.DataFrame:
     """
-    Create a step from inline data. Accepts a JSON object where keys
-    are column names and values are lists of row values.
+    Expand inline data into rows. Accepts a JSON string — a list, an object
+    with column→values, or a list of records.
 
     Examples:
-        =define_data(data='{"name": ["alice", "bob"], "score": [85, 92]}')
-        =define_data(data='[{"name": "alice", "score": 85}, {"name": "bob", "score": 92}]')
+        =to_rows(data='[1, 2, 3]')
+        =to_rows(data='{"name": ["alice", "bob"], "score": [85, 92]}')
+        =to_rows(data='[{"name": "alice", "score": 85}, {"name": "bob", "score": 92}]')
     """
     if not data or not data.strip():
         raise ValueError("data is required — provide a JSON object or array of objects")

@@ -211,7 +211,19 @@ export default function DataOutputGrid({
       {/* Wiring mode banner */}
       {wiringMode && (
         <div style={WIRING_BANNER}>
-          <span>⚡</span> Click a{' '}
+          <span>⚡</span> Click{' '}
+          <span
+            style={{
+              background: '#e8f5e9',
+              color: '#2e7d32',
+              borderRadius: 3,
+              padding: '0 4px',
+              fontWeight: 700,
+            }}
+          >
+            #
+          </span>{' '}
+          for the whole table, a{' '}
           <span
             style={{
               background: '#ffc107',
@@ -223,7 +235,7 @@ export default function DataOutputGrid({
           >
             column header
           </span>{' '}
-          to reference the whole column, or a{' '}
+          for a column, or a{' '}
           <span
             style={{
               background: '#ffe082',
@@ -254,7 +266,24 @@ export default function DataOutputGrid({
         role="grid"
       >
         {/* Header Row */}
-        <div className="grid-header-cell row-index-header">#</div>
+        <div
+          className="grid-header-cell row-index-header"
+          title={wiringMode ? `⚡ Insert entire table reference: ${sourceStepId}` : '#'}
+          style={wiringMode ? {
+            cursor: 'crosshair',
+            background: hoveredCol === '__table__' ? '#c8e6c9' : undefined,
+            transition: 'background 0.1s ease',
+          } : {}}
+          onClick={() => {
+            if (wiringMode && onWireColumn) {
+              onWireColumn(sourceStepId);
+            }
+          }}
+          onMouseEnter={() => wiringMode && setHoveredCol('__table__')}
+          onMouseLeave={() => wiringMode && setHoveredCol(null)}
+        >
+          {wiringMode ? '⚡ #' : '#'}
+        </div>
         {cols.map((col) => (
           <div
             key={col}

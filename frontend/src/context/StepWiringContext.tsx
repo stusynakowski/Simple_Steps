@@ -112,7 +112,22 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
       const end = inputEl.selectionEnd ?? start;
       const before = inputEl.value.slice(0, start);
       const after = inputEl.value.slice(end);
-      const newValue = before + token + after;
+
+      // Context-aware injection: if the cursor is inside parens of an
+      // operation like `=to_rows(|)`, insert as `data=token` so the
+      // formula parser doesn't misinterpret bracket-style cell references.
+      let insertText = token;
+      const insideParens = before.includes('(') && (after.includes(')') || !after.trim());
+      if (insideParens) {
+        // Check if there's already a param name before the cursor (e.g. "data=")
+        const afterLastCommaOrParen = before.slice(Math.max(before.lastIndexOf('('), before.lastIndexOf(',')) + 1).trim();
+        if (!afterLastCommaOrParen.includes('=')) {
+          // No param name yet — use "data=" as default first param
+          insertText = `data=${token}`;
+        }
+      }
+
+      const newValue = before + insertText + after;
 
       // Use native input setter so React's synthetic event fires properly
       const nativeInputSetter = Object.getOwnPropertyDescriptor(
@@ -125,7 +140,7 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
       inputEl.dispatchEvent(new Event('input', { bubbles: true }));
 
       // Move cursor to after the inserted token
-      const newCursor = start + token.length;
+      const newCursor = start + insertText.length;
       setTimeout(() => {
         inputEl.focus();
         inputEl.setSelectionRange(newCursor, newCursor);

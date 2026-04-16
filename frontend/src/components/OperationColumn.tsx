@@ -92,7 +92,18 @@ export default function OperationColumn({
     const end = el.selectionEnd ?? start;
     const before = el.value.slice(0, start);
     const after = el.value.slice(end);
-    const newValue = before + token + after;
+
+    // Context-aware: if inside parens, prefix with "data=" when no param name present
+    let insertText = token;
+    const insideParens = before.includes('(') && (after.includes(')') || !after.trim());
+    if (insideParens) {
+      const afterLastCommaOrParen = before.slice(Math.max(before.lastIndexOf('('), before.lastIndexOf(',')) + 1).trim();
+      if (!afterLastCommaOrParen.includes('=')) {
+        insertText = `data=${token}`;
+      }
+    }
+
+    const newValue = before + insertText + after;
 
     // Use native setter so React's synthetic onChange fires
     const nativeInputSetter = Object.getOwnPropertyDescriptor(
@@ -117,7 +128,7 @@ export default function OperationColumn({
     }
 
     // Focus and move cursor to after the token
-    const newCursor = start + token.length;
+    const newCursor = start + insertText.length;
     setTimeout(() => {
       el.focus();
       el.setSelectionRange(newCursor, newCursor);
