@@ -4,9 +4,9 @@
   display: flex;
   flex-direction: column;
   font-size: 0.78rem;
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid #e0d9a8;
+  border: none;
   background: #fffef5;
 }
 
@@ -40,12 +40,12 @@
 /* ── Header ───────────────────────────────────────────────────────────────── */
 .staged-table thead th {
   background: #fff8dc;
-  padding: 4px 8px;
+  padding: 3px 6px;
   text-align: left;
   font-size: 0.72rem;
   font-weight: 600;
   color: #665e30;
-  border-bottom: 2px solid #e0d9a8;
+  border-bottom: 1px solid #e0d9a8;
   white-space: nowrap;
   position: sticky;
   top: 0;
@@ -58,15 +58,15 @@
   color: #aaa;
   font-size: 0.67rem;
   text-align: right;
-  padding: 3px 6px;
+  padding: 2px 4px;
   border-right: 1px solid #e8e4c8;
-  min-width: 24px;
+  min-width: 20px;
   user-select: none;
 }
 
 /* ── Cells ────────────────────────────────────────────────────────────────── */
 .staged-cell {
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-bottom: 1px solid #f0ecd0;
   background: #fffde7;
   max-width: 320px;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { ActivityView } from './ActivityBar';
 import type { ProjectInfo, PipelineFile, DeveloperPack } from '../services/api';
 import { fetchDeveloperPacks } from '../services/api';
+import FileTree from './FileTree';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -522,7 +523,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
         <span>{titles[currentView ?? ''] ?? 'Explorer'}</span>
       </div>
 
-      {currentView === 'explorer' && <ProjectTree {...rest} />}
+      {currentView === 'explorer' && (
+        <>
+          <FileTree />
+          <ProjectTree {...rest} />
+        </>
+      )}
 
       {currentView === 'search' && (
         <div className="sidebar-padding">

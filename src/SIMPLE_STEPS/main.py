@@ -200,6 +200,79 @@ async def workspace_info():
     }
 
 
+# --- 0a. File Tree (IDE-like workspace browser) ---
+
+# Directories / patterns to skip when listing workspace files
+_SKIP_DIRS = {
+    "__pycache__", ".git", "node_modules", ".venv", "venv", ".tox",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build",
+    ".egg-info", ".eggs", "*.egg-info",
+}
+_SKIP_PREFIXES = (".", "__pycache__")
+
+@app.get("/api/files")
+async def api_list_files(path: str = ""):
+    """
+    Return a directory listing relative to the workspace root.
+    Each entry has: name, type ("file" | "directory"), path (relative).
+    Pass ``?path=subdir`` to list a subdirectory.
+    """
+    base = os.path.abspath(_WORKSPACE)
+    target = os.path.normpath(os.path.join(base, path))
+
+    # Security: prevent traversal outside workspace
+    if not target.startswith(base):
+        raise HTTPException(status_code=403, detail="Path outside workspace")
+    if not os.path.isdir(target):
+        raise HTTPException(status_code=404, detail="Directory not found")
+
+    entries = []
+    try:
+        for name in sorted(os.listdir(target), key=lambda n: (not os.path.isdir(os.path.join(target, n)), n.lower())):
+            if name in _SKIP_DIRS or name.startswith("."):
+                continue
+            full = os.path.join(target, name)
+            rel = os.path.relpath(full, base)
+            if name.endswith(".egg-info"):
+                continue
+            entry_type = "directory" if os.path.isdir(full) else "file"
+            entries.append({"name": name, "type": entry_type, "path": rel})
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+
+    return {
+        "workspace_root": base,
+        "relative_path": path or ".",
+        "entries": entries,
+    }
+
+
+@app.get("/api/files/read")
+async def api_read_file(path: str):
+    """
+    Read the contents of a file relative to the workspace root.
+    Returns the text content (capped at 1 MB for safety).
+    """
+    base = os.path.abspath(_WORKSPACE)
+    target = os.path.normpath(os.path.join(base, path))
+
+    if not target.startswith(base):
+        raise HTTPException(status_code=403, detail="Path outside workspace")
+    if not os.path.isfile(target):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        size = os.path.getsize(target)
+        if size > 1_048_576:  # 1 MB
+            return {"path": path, "content": None, "truncated": True, "size": size,
+                    "error": "File too large to display (>1 MB)"}
+        with open(target, "r", errors="replace") as f:
+            content = f.read()
+        return {"path": path, "content": content, "size": size}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 # --- 0b. Pack Management ---
 @app.get("/api/packs")
 async def api_list_packs():
@@ -514,7 +587,8 @@ async def execute_step(payload: StepRunRequest):
             payload.config,
             payload.input_ref_id,
             payload.step_map,
-            payload.is_preview
+            payload.is_preview,
+            payload.formula,
         )
         
         return StepRunResponse(
@@ -537,6 +611,26 @@ async def execute_step(payload: StepRunRequest):
                 "step_id": payload.step_id,
             }
         )
+
+# --- 2b. Settings (Runtime Configuration) ---
+from .settings import get_settings, update_settings
+
+@app.get("/api/settings")
+async def read_settings():
+    """Return current runtime settings."""
+    return get_settings().model_dump()
+
+@app.post("/api/settings")
+async def write_settings(body: dict = Body(...)):
+    """
+    Update runtime settings. Example:
+      POST /api/settings  {"eval_mode": true}
+    """
+    try:
+        updated = update_settings(**body)
+        return updated.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # --- 3. Data View (Query) ---
 @app.get("/api/data/{ref_id}")

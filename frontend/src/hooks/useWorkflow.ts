@@ -238,7 +238,9 @@ export default function useWorkflow() {
           operationId, 
           resolvedConfig, 
           prevStep?.outputRefId ?? null,
-          stepMap
+          stepMap,
+          false,
+          step.formula || undefined,
       );
       
       const elapsed = Math.round(performance.now() - startTime);
@@ -357,7 +359,8 @@ export default function useWorkflow() {
           previewConfig, 
           prevStep?.outputRefId ?? null,
           stepMap,
-          true // isPreview
+          true, // isPreview
+          step.formula || undefined,
       );
       
       const rawData: any[] = await fetchDataView(res.output_ref_id);

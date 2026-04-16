@@ -142,6 +142,7 @@ class StepRunRequest(BaseModel):
     input_ref_id: Optional[str] = None
     step_map: Optional[Dict[str, str]] = None
     is_preview: bool = False
+    formula: Optional[str] = None  # raw formula string for eval-mode fallback
 
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']

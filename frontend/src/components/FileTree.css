@@ -1,0 +1,36 @@
+/* ── FileTree — IDE-like workspace file browser ───────────────────────── */
+
+.filetree-root {
+  overflow-y: auto;
+}
+
+.filetree-entries {
+  overflow-y: auto;
+}
+
+.filetree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #ccc;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.filetree-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.filetree-row.filetree-file:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.filetree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

@@ -61,6 +61,7 @@ export function formatFormulaValue(v: unknown): string {
  * Parses a formula string like:
  *   `=yt_extract_metadata.map(url="step1.url", min_views=1000)`
  *   `=fetch_videos(channel_url="https://...")`          ← no modifier
+ *   `=!.map df["score"] = df["score"].astype(int); result = df`  ← eval mode
  * into a structured object.
  */
 export function parseFormula(input: string): ParsedFormula {

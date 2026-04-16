@@ -405,8 +405,8 @@ export default function OperationColumn({
             <div className={`op-content-section ${activeTab}`} style={{ 
                 background: activeTab === 'summary' ? '#fef9e7' : 
                             activeTab === 'details' ? '#ebf5fb' : 
-                            activeTab === 'data' ? '#f4ecf7' : '#fff',
-                border: '1px solid #ddd', 
+                            activeTab === 'data' ? '#1e1e1e' : '#fff',
+                border: 'none', 
                 borderTop: 'none',
                 marginTop: 0, 
                 maxHeight: isMaximized ? 'calc(100vh - 200px)' : '400px', 

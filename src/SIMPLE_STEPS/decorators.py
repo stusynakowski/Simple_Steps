@@ -9,6 +9,138 @@ from .models import OperationParam, OperationDefinition
 OPERATION_REGISTRY: Dict[str, OperationDefinition] = {}
 DEFINITIONS_LIST: List[OperationDefinition] = []
 
+
+def _auto_broadcast(func: Callable, operation_type: str = "map") -> Callable:
+    """
+    Wraps a @simple_step function so that StepProxy / ColumnProxy arguments
+    are handled automatically depending on the operation type:
+
+    operation_type="map"  (default)
+        ColumnProxy args → broadcast the call row-wise, one call per row.
+        This is like dragging a formula down a spreadsheet column.
+
+    operation_type="dataframe" / "filter" / "expand" / "source" / "raw_output"
+        ColumnProxy args → unwrapped to pd.Series and passed through as-is.
+        StepProxy args   → unwrapped to pd.DataFrame.
+        The function receives the whole column/table at once.
+
+    If no proxy args are present, the function is called as-is regardless
+    of operation_type (plain scalar call).
+
+    Returns a StepProxy wrapping the resulting DataFrame, so steps can
+    be chained:  step2 = op_b(text=op_a(url=step1.url).output)
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        from .step_proxy import ColumnProxy, StepProxy, step as make_step
+
+        # ── Check: are any arguments ColumnProxy or StepProxy? ───────────
+        has_proxy = any(
+            isinstance(v, (ColumnProxy, StepProxy))
+            for v in list(kwargs.values()) + list(args)
+        )
+
+        if not has_proxy:
+            # No proxies — plain scalar call, just run the function
+            result = func(*args, **kwargs)
+            if isinstance(result, pd.DataFrame):
+                return make_step(result, label=func.__name__)
+            return result
+
+        # ── Determine the source step (for merging results back) ─────────
+        source_step = None
+        for v in list(kwargs.values()) + list(args):
+            if isinstance(v, ColumnProxy):
+                source_step = v._step
+                break
+            if isinstance(v, StepProxy):
+                source_step = v
+                break
+
+        # ── NON-MAP modes: unwrap proxies → pandas objects, call once ────
+        op = getattr(wrapper, '_operation_type', operation_type)
+        if op != "map":
+            unwrapped_args = [_unwrap(a) for a in args]
+            unwrapped_kwargs = {k: _unwrap(v) for k, v in kwargs.items()}
+            result = func(*unwrapped_args, **unwrapped_kwargs)
+            if isinstance(result, pd.DataFrame):
+                return make_step(result, label=func.__name__)
+            if isinstance(result, pd.Series):
+                return make_step(result.to_frame(), label=func.__name__)
+            return result
+
+        # ── MAP mode: broadcast row-wise ─────────────────────────────────
+        col_proxies = {}
+        scalar_kwargs = {}
+        for k, v in kwargs.items():
+            if isinstance(v, ColumnProxy):
+                col_proxies[k] = v
+            elif isinstance(v, StepProxy):
+                scalar_kwargs[k] = object.__getattribute__(v, "_df")
+            else:
+                scalar_kwargs[k] = v
+
+        col_args = []
+        scalar_args = []
+        for a in args:
+            if isinstance(a, ColumnProxy):
+                col_args.append(a)
+            elif isinstance(a, StepProxy):
+                scalar_args.append(object.__getattribute__(a, "_df"))
+            else:
+                scalar_args.append(a)
+
+        n_rows = len(next(iter(col_proxies.values()))) if col_proxies else (
+            len(col_args[0]) if col_args else 0
+        )
+
+        input_df = object.__getattribute__(source_step, "_df") if source_step else None
+
+        results = []
+        for i in range(n_rows):
+            row_kwargs = dict(scalar_kwargs)
+            for k, cp in col_proxies.items():
+                row_kwargs[k] = cp._series.iloc[i]
+            row_args = list(scalar_args)
+            for cp in col_args:
+                row_args.append(cp._series.iloc[i])
+
+            row_result = func(*row_args, **row_kwargs)
+            if isinstance(row_result, dict):
+                results.append(row_result)
+            else:
+                results.append({f"{func.__name__}_output": row_result})
+
+        if not results:
+            return make_step(pd.DataFrame(), label=func.__name__)
+
+        new_cols_df = pd.DataFrame(results)
+
+        # Merge new columns with the input DataFrame (preserving existing data)
+        if input_df is not None and len(input_df) == len(new_cols_df):
+            result_df = input_df.copy().reset_index(drop=True)
+            for col in new_cols_df.columns:
+                result_df[col] = new_cols_df[col].values
+        else:
+            result_df = new_cols_df
+
+        return make_step(result_df, label=func.__name__)
+
+    # Stash metadata so the engine / eval can inspect it
+    wrapper._raw_func = func
+    wrapper._operation_type = operation_type
+    return wrapper
+
+
+def _unwrap(obj):
+    """Convert proxy objects to their pandas equivalents for pass-through calls."""
+    from .step_proxy import ColumnProxy, StepProxy
+    if isinstance(obj, ColumnProxy):
+        return obj._series
+    if isinstance(obj, StepProxy):
+        return object.__getattribute__(obj, "_df")
+    return obj
+
 def simple_step(name: str = None, category: str = "General", operation_type: str = "map", id: str = None):
     """
     Decorator to transform a vanilla Python function into a SimpleSteps operation.
@@ -62,7 +194,8 @@ def simple_step(name: str = None, category: str = "General", operation_type: str
             params=params
         )
         
-        # Store in registry
+        # Store in registry — always store the RAW unwrapped function so the
+        # engine's orchestrators (map_wrapper, filter_wrapper, etc.) work as before.
         OPERATION_REGISTRY[op_id] = {
             "definition": definition,
             "func": func,  # The raw, unwrapped function
@@ -71,10 +204,11 @@ def simple_step(name: str = None, category: str = "General", operation_type: str
         }
         DEFINITIONS_LIST.append(definition)
         
-        # We return the original function unmodified. 
-        # This allows Python tests to run the unit logic easily without 
-        # the complexity of orchestration, which is handled by the engine.
-        return func
+        # Return the auto-broadcasting wrapper so that direct Python calls
+        # (and eval-mode formula bar calls) get automatic row-wise mapping
+        # when ColumnProxy arguments are passed.  The raw function is still
+        # accessible via wrapper._raw_func and through the registry.
+        return _auto_broadcast(func, operation_type=operation_type)
 
     return decorator
 

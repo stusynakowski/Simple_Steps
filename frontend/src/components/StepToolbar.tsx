@@ -161,8 +161,8 @@ export default function StepToolbar({
   };
 
   return (
-    <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', borderBottom: '1px solid #eee' }}>
-      <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+    <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
+      <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
         
         {/* Summary Button (Levels Icon) */}
         <button

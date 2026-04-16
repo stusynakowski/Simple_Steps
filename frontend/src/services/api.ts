@@ -87,7 +87,8 @@ export async function runStep(
     configuration: StepConfiguration,
     inputRefId: string | null,
     stepMap?: Record<string, string>,
-    isPreview: boolean = false
+    isPreview: boolean = false,
+    formula?: string
 ): Promise<StepRunResponse> {
   
   const payload = {
@@ -96,7 +97,8 @@ export async function runStep(
       config: configuration,
       input_ref_id: inputRefId,
       step_map: stepMap || {},
-      is_preview: isPreview
+      is_preview: isPreview,
+      formula: formula || null,
   };
 
   const response = await fetch(`${API_BASE}/run`, {
@@ -295,6 +297,34 @@ export async function fetchWorkspaceInfo(): Promise<WorkspaceInfo> {
     return r.json();
 }
 
+// --- File Tree (IDE-like workspace browser) ---
+
+export interface FileEntry {
+    name: string;
+    type: 'file' | 'directory';
+    path: string;   // relative to workspace root
+}
+
+export interface FileTreeResponse {
+    workspace_root: string;
+    relative_path: string;
+    entries: FileEntry[];
+}
+
+/** List files/directories at the given path (relative to workspace root). */
+export async function fetchFileTree(path = ''): Promise<FileTreeResponse> {
+    const r = await fetch(`${API_BASE}/files?path=${encodeURIComponent(path)}`);
+    if (!r.ok) throw new Error('Failed to list files');
+    return r.json();
+}
+
+/** Read a file's content (relative to workspace root). */
+export async function readWorkspaceFile(path: string): Promise<{ path: string; content: string | null; size: number }> {
+    const r = await fetch(`${API_BASE}/files/read?path=${encodeURIComponent(path)}`);
+    if (!r.ok) throw new Error('Failed to read file');
+    return r.json();
+}
+
 // --- Pack Management ---
 
 export interface PackInfo {
@@ -347,5 +377,29 @@ export async function removePack(name: string, deleteFiles = false): Promise<voi
 export async function installPacks(): Promise<{ success: boolean; issues: string[] }> {
     const r = await fetch(`${API_BASE}/packs/install`, { method: 'POST' });
     if (!r.ok) throw new Error('Failed to install packs');
+    return r.json();
+}
+
+// --- Settings ---
+
+export interface SimpleStepsSettings {
+    eval_mode: boolean;
+}
+
+/** Fetch current runtime settings. */
+export async function fetchSettings(): Promise<SimpleStepsSettings> {
+    const r = await fetch(`${API_BASE}/settings`);
+    if (!r.ok) throw new Error('Failed to fetch settings');
+    return r.json();
+}
+
+/** Update runtime settings. */
+export async function updateSettings(updates: Partial<SimpleStepsSettings>): Promise<SimpleStepsSettings> {
+    const r = await fetch(`${API_BASE}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+    });
+    if (!r.ok) throw new Error('Failed to update settings');
     return r.json();
 }
