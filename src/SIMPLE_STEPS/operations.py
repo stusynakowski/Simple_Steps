@@ -118,6 +118,95 @@ def define_value(value: str = "", type: str = "auto") -> pd.DataFrame:
             return pd.DataFrame({"value": [value]})
 
 
+@simple_step(name="Extract JSON", category="Data Reshaping", operation_type="map", id="extract_json")
+def extract_json(cell: str, path: str = "", fallback: str = "") -> str:
+    """
+    Parse a JSON string and extract a value at a dot-separated path.
+    Returns the extracted value as a string (or JSON string for nested objects/arrays).
+
+    Use this as a map operation on a column that contains JSON strings.
+
+    Args:
+        cell:     The JSON string to parse (typically a cell reference like step1.data)
+        path:     Dot-separated key path, e.g. "meta.city" or "scores.0"
+                  Empty string returns the parsed root.
+        fallback: Value returned when the path doesn't exist.
+
+    Examples:
+        =extract_json(cell=step1.value, path="name")
+        =extract_json(cell=step1.value, path="meta.city")
+        =extract_json(cell=step1.value, path="scores.0")
+        =extract_json(cell=step1.value, path="items", fallback="[]")
+    """
+    if not cell or not str(cell).strip():
+        return fallback
+
+    try:
+        obj = json.loads(str(cell))
+    except (json.JSONDecodeError, TypeError):
+        return fallback
+
+    if not path:
+        return json.dumps(obj) if isinstance(obj, (dict, list)) else str(obj)
+
+    keys = path.split(".")
+    for key in keys:
+        if isinstance(obj, dict):
+            obj = obj.get(key, None)
+        elif isinstance(obj, list):
+            try:
+                obj = obj[int(key)]
+            except (ValueError, IndexError):
+                return fallback
+        else:
+            return fallback
+        if obj is None:
+            return fallback
+
+    return json.dumps(obj) if isinstance(obj, (dict, list)) else str(obj)
+
+
+@simple_step(name="Flatten JSON", category="Data Reshaping", operation_type="dataframe", id="flatten_json")
+def flatten_json(df: pd.DataFrame, column: str, prefix: str = "", max_depth: int = 1) -> pd.DataFrame:
+    """
+    Take a column of JSON strings and flatten it into multiple columns.
+    Each top-level key becomes a new column. Nested objects stay as JSON strings.
+
+    Args:
+        df:        Input DataFrame
+        column:    Name of the column containing JSON strings
+        prefix:    Optional prefix for new column names (e.g. "meta_")
+        max_depth: How many levels deep to flatten (default 1 = top-level keys only)
+
+    Examples:
+        =flatten_json(column="data")
+        =flatten_json(column="response", prefix="resp_")
+    """
+    if df is None or column not in df.columns:
+        return df if df is not None else pd.DataFrame()
+
+    def _parse_row(val):
+        if pd.isna(val) or not str(val).strip():
+            return {}
+        try:
+            parsed = json.loads(str(val))
+            if isinstance(parsed, dict):
+                # Convert nested dicts/lists back to JSON strings
+                return {
+                    k: (json.dumps(v) if isinstance(v, (dict, list)) else v)
+                    for k, v in parsed.items()
+                }
+            return {"value": val}
+        except (json.JSONDecodeError, TypeError):
+            return {"value": val}
+
+    expanded = df[column].apply(_parse_row).apply(pd.Series)
+    if prefix:
+        expanded = expanded.add_prefix(prefix)
+
+    return pd.concat([df.drop(columns=[column]), expanded], axis=1)
+
+
 @simple_step(name="Filter Rows", category="Data Cleaning", operation_type="dataframe", id="filter_rows")
 def filter_rows(df: pd.DataFrame, column: str, value: str, mode: str = "equals") -> pd.DataFrame:
     """Keep rows where a column matches a condition"""

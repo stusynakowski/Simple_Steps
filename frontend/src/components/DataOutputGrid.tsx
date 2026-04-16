@@ -81,13 +81,8 @@ export default function DataOutputGrid({
       dataMap[`${c.row_id}:${c.column_id}`] = c;
     });
 
-    // Determine visualization type
-    let type = 'grid';
-    if (allRows.length === 1 && allCols.length === 1 && sColNames.length === 0) {
-      type = 'single-value';
-    } else if (allCols.length === 1 && sColNames.length === 0) {
-      type = 'list';
-    }
+    // Determine visualization type — always use grid for tabular consistency
+    const type = 'grid';
 
     return {
       cols: allCols,

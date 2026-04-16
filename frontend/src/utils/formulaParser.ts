@@ -100,23 +100,23 @@ function _tryParseLiteral(body: string, rawInput: string): ParsedFormula | null 
     };
   }
 
-  // JSON array [...] → single cell with raw value
+  // JSON array [...] → parse into rows via auto detection
   if (body.startsWith('[') && body.endsWith(']')) {
     return {
       operationId: 'define_value',
       orchestration: 'source',
-      args: { value: body, type: 'string', _literal: body },
+      args: { value: body, type: 'auto', _literal: body },
       isValid: true,
       rawInput,
     };
   }
 
-  // JSON object {...} → single cell with raw value
+  // JSON object {...} → parse into columns/rows via auto detection
   if (body.startsWith('{') && body.endsWith('}')) {
     return {
       operationId: 'define_value',
       orchestration: 'source',
-      args: { value: body, type: 'string', _literal: body },
+      args: { value: body, type: 'auto', _literal: body },
       isValid: true,
       rawInput,
     };
