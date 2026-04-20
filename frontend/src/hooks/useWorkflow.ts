@@ -172,9 +172,16 @@ export default function useWorkflow() {
     if (maximizedStepId === id) setMaximizedStepId(null);
   }
 
+  // Ref to always access the latest workflow state (avoids stale closures in pipeline runs)
+  const workflowRef = useRef(workflow);
+  useEffect(() => {
+    workflowRef.current = workflow;
+  }, [workflow]);
+
   const runStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
-    // Locate the step in the current state to get parameters
-    const currentSteps = workflow.steps; // Access latest state
+    // Use the ref to always get the LATEST workflow state — critical for pipeline
+    // sequential execution where React state updates may not have flushed yet.
+    const currentSteps = workflowRef.current.steps;
     const step = currentSteps.find((s) => s.id === id);
     if (!step) return;
 
@@ -310,11 +317,11 @@ export default function useWorkflow() {
       });
       throw error;
     }
-  }, [workflow.steps, addLog]);
+  }, [addLog]);
 
   const previewStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
      // Similar to runStep but with isPreview=true
-    const currentSteps = workflow.steps;
+    const currentSteps = workflowRef.current.steps;
     const step = currentSteps.find((s) => s.id === id);
     if (!step) return;
 
@@ -405,12 +412,7 @@ export default function useWorkflow() {
        });
        console.error("Preview failed", error);
     }
-  }, [workflow.steps, addLog]);
-
-  const workflowRef = useRef(workflow);
-  useEffect(() => {
-    workflowRef.current = workflow;
-  }, [workflow]);
+  }, [addLog]);
 
   // Use a ref to access the latest runSequence function to avoid dependency cycles
   const runSequenceRef = useRef<(index: number) => Promise<void>>();

@@ -227,6 +227,395 @@ def drop_na(df: pd.DataFrame) -> pd.DataFrame:
     if df is None: return pd.DataFrame()
     return df.dropna()
 
+
+# ─── Data Reshaping & Transformation Operations ─────────────────────────────
+
+@simple_step(name="Select Columns", category="Data Reshaping", operation_type="dataframe", id="select_columns")
+def select_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
+    """
+    Keep only the specified columns (drop everything else).
+
+    Args:
+        df:      Input DataFrame
+        columns: Comma-separated column names, e.g. "name, score, city"
+
+    Examples:
+        =select_columns(columns="name, score")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    cols = [c.strip() for c in columns.split(",") if c.strip()]
+    if not cols:
+        return df
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"Columns not found: {missing}. Available: {list(df.columns)}")
+    return df[cols]
+
+
+@simple_step(name="Drop Columns", category="Data Reshaping", operation_type="dataframe", id="drop_columns")
+def drop_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
+    """
+    Remove the specified columns, keep everything else.
+
+    Args:
+        df:      Input DataFrame
+        columns: Comma-separated column names to drop, e.g. "temp, debug_info"
+
+    Examples:
+        =drop_columns(columns="temp, debug_info")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    cols = [c.strip() for c in columns.split(",") if c.strip()]
+    if not cols:
+        return df
+    return df.drop(columns=[c for c in cols if c in df.columns])
+
+
+@simple_step(name="Rename Columns", category="Data Reshaping", operation_type="dataframe", id="rename_columns")
+def rename_columns(df: pd.DataFrame, mapping: str = "") -> pd.DataFrame:
+    """
+    Rename columns using old=new pairs.
+
+    Args:
+        df:      Input DataFrame
+        mapping: Comma-separated old=new pairs, e.g. "name=full_name, val=score"
+
+    Examples:
+        =rename_columns(mapping="name=full_name, val=score")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if not mapping.strip():
+        return df
+    rename_map = {}
+    for pair in mapping.split(","):
+        pair = pair.strip()
+        if "=" in pair:
+            old, new = pair.split("=", 1)
+            rename_map[old.strip()] = new.strip()
+    return df.rename(columns=rename_map)
+
+
+@simple_step(name="Sort By", category="Data Reshaping", operation_type="dataframe", id="sort_by")
+def sort_by(df: pd.DataFrame, column: str = "", direction: str = "asc") -> pd.DataFrame:
+    """
+    Sort rows by one or more columns.
+
+    Args:
+        df:        Input DataFrame
+        column:    Comma-separated column names to sort by, e.g. "score, name"
+        direction: "asc" for ascending, "desc" for descending (applies to all columns)
+
+    Examples:
+        =sort_by(column="score", direction="desc")
+        =sort_by(column="category, name")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    cols = [c.strip() for c in column.split(",") if c.strip()]
+    if not cols:
+        return df
+    ascending = direction.strip().lower() != "desc"
+    return df.sort_values(by=cols, ascending=ascending).reset_index(drop=True)
+
+
+@simple_step(name="Group By", category="Data Reshaping", operation_type="dataframe", id="group_by")
+def group_by(df: pd.DataFrame, column: str = "", agg: str = "count") -> pd.DataFrame:
+    """
+    Group rows by a column and aggregate the rest.
+
+    Args:
+        df:     Input DataFrame
+        column: Column to group by (comma-separated for multiple)
+        agg:    Aggregation function: "count", "sum", "mean", "min", "max", "first", "last"
+
+    Examples:
+        =group_by(column="category", agg="sum")
+        =group_by(column="city, status", agg="count")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    cols = [c.strip() for c in column.split(",") if c.strip()]
+    if not cols:
+        raise ValueError("Must specify at least one column to group by")
+    agg_fn = agg.strip().lower()
+    valid_aggs = {"count", "sum", "mean", "min", "max", "first", "last"}
+    if agg_fn not in valid_aggs:
+        raise ValueError(f"Unknown agg '{agg_fn}'. Choose from: {valid_aggs}")
+    if agg_fn == "count":
+        return df.groupby(cols).size().reset_index(name="count")
+    return df.groupby(cols).agg(agg_fn).reset_index()
+
+
+@simple_step(name="Pivot", category="Data Reshaping", operation_type="dataframe", id="pivot")
+def pivot(df: pd.DataFrame, index: str = "", columns: str = "", values: str = "", agg: str = "first") -> pd.DataFrame:
+    """
+    Pivot rows into columns (like a spreadsheet pivot table).
+
+    Args:
+        df:      Input DataFrame
+        index:   Column(s) to keep as rows
+        columns: Column whose values become new column headers
+        values:  Column whose values fill the cells
+        agg:     Aggregation if there are duplicates: "first", "sum", "mean", "count"
+
+    Examples:
+        =pivot(index="date", columns="category", values="revenue", agg="sum")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if not index or not columns or not values:
+        raise ValueError("pivot requires index, columns, and values parameters")
+    idx = [c.strip() for c in index.split(",") if c.strip()]
+    result = df.pivot_table(index=idx, columns=columns.strip(), values=values.strip(), aggfunc=agg.strip())
+    result.columns = [str(c) for c in result.columns]
+    return result.reset_index()
+
+
+@simple_step(name="Aggregate", category="Data Reshaping", operation_type="dataframe", id="aggregate")
+def aggregate(df: pd.DataFrame, column: str = "", functions: str = "count") -> pd.DataFrame:
+    """
+    Compute summary statistics on a column (or all numeric columns).
+
+    Args:
+        df:        Input DataFrame
+        column:    Column to aggregate (leave empty for all numeric columns)
+        functions: Comma-separated: "count", "sum", "mean", "min", "max", "std", "median"
+
+    Examples:
+        =aggregate(column="score", functions="mean, min, max")
+        =aggregate(functions="count, sum")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    fns = [f.strip() for f in functions.split(",") if f.strip()]
+    if not fns:
+        fns = ["count"]
+    if column.strip():
+        col = column.strip()
+        if col not in df.columns:
+            raise ValueError(f"Column '{col}' not found. Available: {list(df.columns)}")
+        result = df[[col]].agg(fns)
+        return result.reset_index().rename(columns={"index": "statistic"})
+    else:
+        result = df.select_dtypes(include="number").agg(fns)
+        return result.reset_index().rename(columns={"index": "statistic"})
+
+
+@simple_step(name="Merge Steps", category="Data Reshaping", operation_type="dataframe", id="merge_steps")
+def merge_steps(df: pd.DataFrame, right_data: str = "", on: str = "", how: str = "inner") -> pd.DataFrame:
+    """
+    Join/merge two datasets on a shared key column.
+
+    Args:
+        df:         Left DataFrame (from upstream step)
+        right_data: JSON string of the right dataset, or a step reference
+        on:         Column name to join on (must exist in both)
+        how:        Join type: "inner", "left", "right", "outer"
+
+    Examples:
+        =merge_steps(right_data=step2.value, on="id", how="left")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if not on.strip():
+        raise ValueError("Must specify 'on' — the column to join on")
+    try:
+        right = pd.DataFrame(json.loads(right_data)) if isinstance(right_data, str) else right_data
+    except (json.JSONDecodeError, TypeError):
+        raise ValueError("right_data must be valid JSON or a step reference")
+    return pd.merge(df, right, on=on.strip(), how=how.strip())
+
+
+@simple_step(name="Cast Column", category="Data Reshaping", operation_type="dataframe", id="cast_column")
+def cast_column(df: pd.DataFrame, column: str = "", to_type: str = "string") -> pd.DataFrame:
+    """
+    Convert a column's data type.
+
+    Args:
+        df:      Input DataFrame
+        column:  Column to cast
+        to_type: Target type: "string", "int", "float", "bool", "datetime"
+
+    Examples:
+        =cast_column(column="price", to_type="float")
+        =cast_column(column="date", to_type="datetime")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if not column.strip():
+        raise ValueError("Must specify a column to cast")
+    col = column.strip()
+    if col not in df.columns:
+        raise ValueError(f"Column '{col}' not found. Available: {list(df.columns)}")
+    result = df.copy()
+    type_map = {
+        "string": str, "str": str,
+        "int": "Int64", "integer": "Int64",
+        "float": float,
+        "bool": bool, "boolean": bool,
+        "datetime": "datetime64[ns]",
+    }
+    target = type_map.get(to_type.strip().lower())
+    if target is None:
+        raise ValueError(f"Unknown type '{to_type}'. Choose from: {list(type_map.keys())}")
+    if to_type.strip().lower() in ("datetime",):
+        result[col] = pd.to_datetime(result[col], errors="coerce")
+    elif target == str:
+        result[col] = result[col].astype(str)
+    else:
+        result[col] = result[col].astype(target)
+    return result
+
+
+@simple_step(name="Add Column", category="Data Reshaping", operation_type="dataframe", id="add_column")
+def add_column(df: pd.DataFrame, name: str = "new_col", expression: str = "") -> pd.DataFrame:
+    """
+    Add a new column computed from an expression referencing existing columns.
+    Uses pandas eval for simple math, or fills a constant value.
+
+    Args:
+        df:         Input DataFrame
+        name:       Name for the new column
+        expression: A pandas expression like "price * quantity" or a constant like "hello"
+
+    Examples:
+        =add_column(name="total", expression="price * quantity")
+        =add_column(name="label", expression="ready")
+        =add_column(name="ratio", expression="score / max_score * 100")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    result = df.copy()
+    expr = expression.strip()
+    if not expr:
+        result[name] = None
+        return result
+    try:
+        result[name] = result.eval(expr)
+    except Exception:
+        # Fall back to constant value
+        result[name] = expr
+    return result
+
+
+@simple_step(name="Unpivot / Melt", category="Data Reshaping", operation_type="dataframe", id="unpivot")
+def unpivot(df: pd.DataFrame, id_columns: str = "", value_name: str = "value", var_name: str = "variable") -> pd.DataFrame:
+    """
+    Unpivot (melt) columns into rows — the inverse of pivot.
+
+    Args:
+        df:         Input DataFrame
+        id_columns: Comma-separated columns to keep fixed (everything else gets melted)
+        value_name: Name for the values column
+        var_name:   Name for the variable/category column
+
+    Examples:
+        =unpivot(id_columns="name", value_name="score", var_name="subject")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    id_cols = [c.strip() for c in id_columns.split(",") if c.strip()] if id_columns.strip() else []
+    return pd.melt(df, id_vars=id_cols or None, value_name=value_name, var_name=var_name)
+
+
+@simple_step(name="Deduplicate", category="Data Cleaning", operation_type="dataframe", id="deduplicate")
+def deduplicate(df: pd.DataFrame, columns: str = "", keep: str = "first") -> pd.DataFrame:
+    """
+    Remove duplicate rows.
+
+    Args:
+        df:      Input DataFrame
+        columns: Comma-separated columns to check for duplicates (empty = all columns)
+        keep:    Which duplicate to keep: "first", "last", or "none" (drop all dupes)
+
+    Examples:
+        =deduplicate(columns="email")
+        =deduplicate(columns="name, date", keep="last")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    cols = [c.strip() for c in columns.split(",") if c.strip()] if columns.strip() else None
+    keep_val = keep.strip().lower()
+    if keep_val == "none":
+        keep_val = False
+    return df.drop_duplicates(subset=cols, keep=keep_val).reset_index(drop=True)
+
+
+@simple_step(name="Sample Rows", category="Data Reshaping", operation_type="dataframe", id="sample_rows")
+def sample_rows(df: pd.DataFrame, n: int = 5, random: str = "false") -> pd.DataFrame:
+    """
+    Take a subset of rows — either the first N or a random sample.
+
+    Args:
+        df:     Input DataFrame
+        n:      Number of rows to return
+        random: "true" for random sample, "false" for first N rows
+
+    Examples:
+        =sample_rows(n=10)
+        =sample_rows(n=20, random="true")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    n = min(int(n), len(df))
+    if random.strip().lower() in ("true", "1", "yes"):
+        return df.sample(n=n).reset_index(drop=True)
+    return df.head(n).reset_index(drop=True)
+
+
+@simple_step(name="Pandas", category="Data Reshaping", operation_type="dataframe", id="pandas_eval")
+def pandas_eval(df: pd.DataFrame, expr: str = "df") -> pd.DataFrame:
+    """
+    Run any pandas expression directly on the incoming DataFrame.
+    The DataFrame is available as 'df' in the expression.
+    Must return a DataFrame.
+
+    Args:
+        df:   Input DataFrame (from upstream step)
+        expr: A Python/pandas expression. Use 'df' to reference the data.
+
+    Examples:
+        =pandas_eval(expr="df.groupby('category')['score'].mean().reset_index()")
+        =pandas_eval(expr="df[df['score'] > 80].sort_values('name')")
+        =pandas_eval(expr="df.describe()")
+        =pandas_eval(expr="df.pivot_table(index='date', columns='type', values='amount', aggfunc='sum')")
+        =pandas_eval(expr="df.merge(df.groupby('category')['price'].mean().rename('avg_price'), on='category')")
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    # Restricted namespace — only pandas and the DataFrame
+    namespace = {"df": df, "pd": pd}
+    result = eval(expr, {"__builtins__": {}}, namespace)  # noqa: S307
+    if isinstance(result, pd.Series):
+        return result.to_frame()
+    if isinstance(result, pd.DataFrame):
+        return result.reset_index(drop=True) if result.index.name or not result.index.equals(pd.RangeIndex(len(result))) else result
+    # Scalar result → wrap in 1×1 DataFrame
+    return pd.DataFrame({"value": [result]})
+
+
+@simple_step(name="Format String", category="Data Reshaping", operation_type="map", id="format_string")
+def format_string(cell: str = "", template: str = "{value}") -> str:
+    """
+    Format a cell value into a string template.
+
+    Args:
+        cell:     The cell value to format
+        template: A Python format string. Use {value} for the cell value.
+
+    Examples:
+        =format_string(cell=step1.name, template="Hello, {value}!")
+        =format_string(cell=step1.price, template="${value:.2f}")
+    """
+    try:
+        return template.format(value=cell)
+    except (ValueError, KeyError):
+        return template.replace("{value}", str(cell))
+
+
 # --- Re-export for Engine Compatibility ---
 
 # Use list directly so appends in other modules are reflected
