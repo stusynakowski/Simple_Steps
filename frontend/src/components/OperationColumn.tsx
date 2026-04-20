@@ -433,8 +433,21 @@ export default function OperationColumn({
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
                       <DataOutputGrid
                         cells={step.output_preview}
-                        onCellClick={(cell) => console.log('Cell clicked:', cell)}
-                        wiringMode={isWiringSource && isWiringHovered}
+                        onCellClick={(cell) => {
+                          // If this is a wiring source, the wiring callbacks handle it.
+                          // Otherwise, clicking a cell/column inserts a reference into
+                          // the current step's formula bar.
+                          if (!isWiringSource) {
+                            if (cell.row_id === -1) {
+                              // Column header click → column reference
+                              handlePickerTokenSelect(`${step.id}.${cell.column_id}`);
+                            } else {
+                              // Cell click → specific cell reference
+                              handlePickerTokenSelect(`${step.id}[row=${cell.row_id}, col=${cell.column_id}]`);
+                            }
+                          }
+                        }}
+                        wiringMode={isWiringSource}
                         sourceStepId={step.id}
                         onWireColumn={(token) => injectReference(token)}
                         onWireCell={(token) => injectReference(token)}

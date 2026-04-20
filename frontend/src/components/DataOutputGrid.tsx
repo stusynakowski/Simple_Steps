@@ -101,6 +101,10 @@ export default function DataOutputGrid({
       onWireColumn(`${sourceStepId}.${col}`);
       return;
     }
+    // Non-wiring mode: notify parent with a synthetic cell so it can insert a column reference
+    if (onCellClick) {
+      onCellClick({ row_id: -1, column_id: col, value: col, display_value: col } as Cell);
+    }
   };
 
   const handleCellWireClick = (cell: Cell) => {
@@ -114,7 +118,7 @@ export default function DataOutputGrid({
   // ── Wiring overlay styles ───────────────────────────────────────────────
 
   const wiringColHeaderStyle = (col: string): React.CSSProperties => {
-    if (!wiringMode) return {};
+    if (!wiringMode) return { cursor: 'pointer', userSelect: 'none' as const };
     const isHovered = hoveredCol === col;
     return {
       cursor: 'crosshair',
@@ -130,7 +134,7 @@ export default function DataOutputGrid({
   };
 
   const wiringCellStyle = (key: string, col: string): React.CSSProperties => {
-    if (!wiringMode) return {};
+    if (!wiringMode) return { cursor: 'pointer' };
     const colHovered = hoveredCol === col;
     const cellHovered = hoveredCell === key;
     return {

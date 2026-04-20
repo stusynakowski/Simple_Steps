@@ -32,8 +32,8 @@ const ORCHESTRATION_MODES: ReadonlySet<string> = new Set([
  */
 export function isStepReference(value: unknown): boolean {
   if (typeof value !== 'string') return false;
-  // step<N>.column  OR  step-<id>.column
-  return /^step[\w-]*\.\w+$/i.test(value);
+  // step<N>.column  OR  step-<id>.column  OR  step-<id>[row=N, col=X]
+  return /^step[\w-]*\.\w+$/i.test(value) || /^step[\w-]*\[.*\]$/i.test(value);
 }
 
 /**
@@ -181,8 +181,9 @@ export function parseFormula(input: string): ParsedFormula {
 
   // ── Step reference detection ──────────────────────────────────────
   // =step-000.value  or  =step-000  (bare step ref without parens)
+  // =step-000[row=2, col=value]  (specific cell reference)
   // These are passthrough references, not operations.
-  if (/^step[\w-]*(\.\w+)?$/i.test(trimmed)) {
+  if (/^step[\w-]*(\.\w+)?$/i.test(trimmed) || /^step[\w-]*\[.*\]$/i.test(trimmed)) {
     return {
       operationId: 'passthrough',
       orchestration: null,

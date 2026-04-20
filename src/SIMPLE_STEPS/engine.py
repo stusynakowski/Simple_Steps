@@ -115,7 +115,14 @@ def _passthrough(
         if isinstance(resolved, pd.Series):
             return resolved.to_frame()
         if resolved != ref_token:          # scalar — not the same string back
-            return pd.DataFrame([{ref_token.split('.')[-1].split(',')[0]: resolved}])
+            # Extract a sensible column name from the reference
+            col_label = "value"
+            bracket_m = re.match(r'^[\w-]+\[.*col=(\w+).*\]$', ref_token)
+            if bracket_m:
+                col_label = bracket_m.group(1)
+            elif '.' in ref_token:
+                col_label = ref_token.split('.')[-1]
+            return pd.DataFrame([{col_label: resolved}])
         # Could not resolve — fall through to df_in
 
     if df_in is not None:
