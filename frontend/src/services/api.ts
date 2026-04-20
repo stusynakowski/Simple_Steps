@@ -20,6 +20,43 @@ function resolveApiBase(): string {
 
 const API_BASE = resolveApiBase();
 
+export interface ProgressEvent {
+  current: number;
+  total: number;
+  message: string;
+  elapsed: number;
+  done?: boolean;
+}
+
+/**
+ * Opens an SSE connection to stream progress for a running step.
+ * Returns a cleanup function to close the connection.
+ */
+export function listenProgress(
+  stepId: string,
+  onProgress: (evt: ProgressEvent) => void,
+  onDone?: () => void,
+): () => void {
+  const url = `${API_BASE}/progress/${stepId}`;
+  const source = new EventSource(url);
+  source.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data) as ProgressEvent;
+      if (data.done) {
+        source.close();
+        onDone?.();
+      } else {
+        onProgress(data);
+      }
+    } catch { /* ignore parse errors */ }
+  };
+  source.onerror = () => {
+    source.close();
+    onDone?.();
+  };
+  return () => source.close();
+}
+
 interface StepRunResponse {
   status: 'success' | 'failed';
   output_ref_id: string;

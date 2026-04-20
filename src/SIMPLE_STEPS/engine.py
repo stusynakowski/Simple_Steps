@@ -138,6 +138,7 @@ def run_operation(
     step_label_map: Optional[Dict[str, str]] = None,
     is_preview: bool = False,
     formula: Optional[str] = None,
+    step_id: Optional[str] = None,
 ) -> tuple[str, dict]:
     """
     Orchestrates the running of a single step with dynamic wrappers.

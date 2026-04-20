@@ -50,6 +50,7 @@ export default function MainLayout() {
     expandedStepIds,
     pipelineStatus,
     maximizedStepId,
+    stepProgress,
     addStepAt,
     toggleStep,
     toggleMaximizeStep,
@@ -492,6 +493,7 @@ export default function MainLayout() {
                     isMaximized={isMaximized}
                     zIndex={isExpanded ? 100 : workflow.steps.length - index}
                     availableOperations={availableOperations}
+                    progress={stepProgress[step.id]}
                     onActivate={() => toggleStep(step.id)}
                     onUpdate={(id, updates) => updateStep(id, updates)}
                     onRun={runStep}

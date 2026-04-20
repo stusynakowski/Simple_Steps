@@ -4,8 +4,9 @@ import { initialWorkflow } from '../mocks/initialData';
 import { runStep as runStepApi, fetchDataView, getOperations,
   listProjects, createProject, deleteProject,
   listPipelines, loadPipeline, savePipeline, deletePipeline,
+  listenProgress,
 } from '../services/api';
-import type { OperationDefinition, PipelineFile, BackendError } from '../services/api';
+import type { OperationDefinition, PipelineFile, BackendError, ProgressEvent } from '../services/api';
 import { parseFormula, buildFormula } from '../utils/formulaParser';
 import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 
@@ -114,13 +115,17 @@ export default function useWorkflow() {
   
   const [maximizedStepId, setMaximizedStepId] = useState<string | null>(null);
   
-  const [pipelineStatus, setPipelineStatus] = useState<'idle' | 'running' | 'paused'>('idle');
+  // Progress tracking — keyed by step ID
+  const [stepProgress, setStepProgress] = useState<Record<string, ProgressEvent>>({});
+
+  const [pipelineStatus, _setPipelineStatus] = useState<'idle' | 'running' | 'paused'>('idle');
   const pipelineStatusRef = useRef<'idle' | 'running' | 'paused'>('idle');
 
-  // Sync ref with state
-  useEffect(() => {
-    pipelineStatusRef.current = pipelineStatus;
-  }, [pipelineStatus]);
+  // Wrapper that keeps the ref in sync *immediately* (not after re-render)
+  const setPipelineStatus = useCallback((s: 'idle' | 'running' | 'paused') => {
+    pipelineStatusRef.current = s;
+    _setPipelineStatus(s);
+  }, []);
 
   function addStepAt(index: number) {
     const newStep: Step = {
@@ -238,6 +243,13 @@ export default function useWorkflow() {
       return { ...prev, steps: next };
     });
 
+    // Start SSE progress listener
+    const stopListening = listenProgress(
+      id,
+      (evt) => setStepProgress((prev) => ({ ...prev, [id]: evt })),
+      () => setStepProgress((prev) => { const { [id]: _, ...rest } = prev; return rest; }),
+    );
+
     try {
       // Execute the step — use operationId and resolvedConfig derived from the formula
       const res = await runStepApi(
@@ -316,6 +328,8 @@ export default function useWorkflow() {
         return { ...prev, steps: next };
       });
       throw error;
+    } finally {
+      stopListening();
     }
   }, [addLog]);
 
@@ -432,8 +446,8 @@ export default function useWorkflow() {
     const step = currentWorkflow.steps[startIndex];
     
     try {
-        // We must pass the LATEST configuration from the ref, just in case
-        await runStep(step.id, step.configuration);
+        // Don't pass config — let runStep derive it from the formula (the canonical source)
+        await runStep(step.id);
         
         // After step finishes, check status again before creating next promise
         if (pipelineStatusRef.current === 'running') {
@@ -598,6 +612,7 @@ export default function useWorkflow() {
     expandedStepIds, 
     pipelineStatus,
     maximizedStepId,
+    stepProgress,
     addStepAt, 
     toggleStep, 
     toggleMaximizeStep,

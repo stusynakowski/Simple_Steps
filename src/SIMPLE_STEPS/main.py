@@ -579,17 +579,20 @@ async def execute_step(payload: StepRunRequest):
     Receives: Config + Input Reference ID + Reference Map
     Returns: New Output Reference ID
     """
+    import asyncio as _asyncio
     try:
-        # The Engine handles the heavy lifting
-        # It never transmits the full DataFrame over HTTP
-        out_ref, metrics = run_operation(
+        # Run the (synchronous) engine in a thread so it doesn't block the
+        # event loop — this allows SSE progress streams to flow concurrently.
+        loop = _asyncio.get_event_loop()
+        out_ref, metrics = await loop.run_in_executor(None, lambda: run_operation(
             payload.operation_id,
             payload.config,
             payload.input_ref_id,
             payload.step_map,
             payload.is_preview,
             payload.formula,
-        )
+            payload.step_id,
+        ))
         
         return StepRunResponse(
             status="success",
@@ -611,6 +614,45 @@ async def execute_step(payload: StepRunRequest):
                 "step_id": payload.step_id,
             }
         )
+
+# --- 2a. Step Progress SSE ---
+from .progress import get_progress
+from starlette.responses import StreamingResponse
+import asyncio, json as _json
+
+@app.get("/api/progress/{step_id}")
+async def stream_progress(step_id: str):
+    """SSE stream of progress events for a running step."""
+    async def event_generator():
+        # Wait briefly for the progress tracker to be registered (the /api/run
+        # endpoint starts it in a thread, so there's a small race window).
+        prog = None
+        for _ in range(10):
+            prog = get_progress(step_id)
+            if prog:
+                break
+            await asyncio.sleep(0.2)
+        if not prog:
+            yield f"data: {_json.dumps({'done': True})}\n\n"
+            return
+        loop = asyncio.get_event_loop()
+        while True:
+            try:
+                evt = await loop.run_in_executor(None, lambda: prog.queue.get(timeout=0.5))
+            except Exception:
+                # No event yet — send a keep-alive comment
+                yield ": keepalive\n\n"
+                # Check if progress was removed (step finished elsewhere)
+                if get_progress(step_id) is None:
+                    yield f"data: {_json.dumps({'done': True})}\n\n"
+                    return
+                continue
+            if evt is None:  # sentinel = done
+                yield f"data: {_json.dumps({'done': True})}\n\n"
+                return
+            yield f"data: {_json.dumps(evt)}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # --- 2b. Settings (Runtime Configuration) ---
 from .settings import get_settings, update_settings

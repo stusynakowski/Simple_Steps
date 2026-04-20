@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
+import type { ProgressEvent } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
 import PreviousStepDataPicker from './PreviousStepDataPicker';
@@ -32,6 +33,8 @@ interface OperationColumnProps {
   onMaximize?: () => void; // New callback
   /** Called with the pointer position when the user drags the header far enough to detach */
   onDetach?: (position: { x: number; y: number }) => void;
+  /** Live progress for row-iterating operations */
+  progress?: ProgressEvent;
 }
 
 export default function OperationColumn({
@@ -52,6 +55,7 @@ export default function OperationColumn({
   onMinimize,
   onMaximize,
   onDetach,
+  progress,
 }: OperationColumnProps) {
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data' | 'settings'>('data');
@@ -361,6 +365,16 @@ export default function OperationColumn({
         </div>
       </div>
 
+      {/* Progress bar — visible during row-iterating operations */}
+      {step.status === 'running' && progress && progress.total > 0 && (
+        <div className="step-progress-bar-container">
+          <div className="step-progress-bar" style={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }} />
+          <span className="step-progress-label">
+            {progress.current} / {progress.total} — {Math.round((progress.current / progress.total) * 100)}%
+            {progress.elapsed > 0 && ` (${progress.elapsed}s)`}
+          </span>
+        </div>
+      )}
 
       <div className={`op-body ${isSqueezed ? 'squeezed' : ''}`}>
         <div className="op-body-inner">
