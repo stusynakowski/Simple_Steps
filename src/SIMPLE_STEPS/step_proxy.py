@@ -134,6 +134,69 @@ class ColumnProxy:
     def tolist(self):
         return self._series.tolist()
 
+    def head(self, n: int = 5):
+        return self._series.head(n)
+
+    def tail(self, n: int = 5):
+        return self._series.tail(n)
+
+    def unique(self):
+        return self._series.unique()
+
+    def nunique(self):
+        return self._series.nunique()
+
+    def value_counts(self, **kwargs):
+        return self._series.value_counts(**kwargs)
+
+    def isnull(self):
+        return self._series.isnull()
+
+    def isna(self):
+        return self._series.isna()
+
+    def notna(self):
+        return self._series.notna()
+
+    def fillna(self, value, **kwargs):
+        return self._series.fillna(value, **kwargs)
+
+    def dropna(self):
+        return self._series.dropna()
+
+    def sum(self):
+        return self._series.sum()
+
+    def mean(self):
+        return self._series.mean()
+
+    def min(self):
+        return self._series.min()
+
+    def max(self):
+        return self._series.max()
+
+    def sort_values(self, **kwargs):
+        return self._series.sort_values(**kwargs)
+
+    def reset_index(self, **kwargs):
+        return self._series.reset_index(**kwargs)
+
+    @property
+    def iloc(self):
+        return self._series.iloc
+
+    @property
+    def loc(self):
+        return self._series.loc
+
+    @property
+    def dtype(self):
+        return self._series.dtype
+
+    def __contains__(self, item):
+        return item in self._series.values
+
 
 class StepProxy:
     """

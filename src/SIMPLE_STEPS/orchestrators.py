@@ -47,6 +47,8 @@ def source_wrapper(func: Callable) -> Callable:
     """
     def wrapper(*args, **kwargs) -> pd.DataFrame:
         print(f"[Orchestrator:Source] Executing {func.__name__}...")
+        # Source operations don't use the input DataFrame — strip it
+        kwargs.pop('_input_df', None)
         result = func(*args, **kwargs)
         
         if result is None:
@@ -209,13 +211,34 @@ def expand_wrapper(func: Callable) -> Callable:
 def dataframe_op_wrapper(func: Callable) -> Callable:
     """
     Wraps a function that natively expects a DataFrame.
-    Just ensures the output is a DataFrame.
+    Extracts _input_df from kwargs and injects it as the 'df' or 'data'
+    parameter (whichever the function expects), then calls the function.
     """
     def wrapper(*args, **kwargs) -> pd.DataFrame:
         print(f"[Orchestrator:DataFrame] Executing {func.__name__}...")
         
-        # Special logic: if the function expects 'df' or 'data' and it's in kwargs but not matched
-        # (Already handled by python's argument passing if names match)
+        # Extract the injected DataFrame and remap it to the function's
+        # expected parameter name (typically 'df' or 'data').
+        input_df = kwargs.pop('_input_df', None)
+        if input_df is not None:
+            sig = inspect.signature(func)
+            # Find the parameter that expects a DataFrame
+            df_param = None
+            for pname, p in sig.parameters.items():
+                hints = {}
+                try:
+                    from typing import get_type_hints
+                    hints = get_type_hints(func)
+                except Exception:
+                    pass
+                if pname in ('df', 'data') or hints.get(pname) is pd.DataFrame:
+                    df_param = pname
+                    break
+            if df_param and df_param not in kwargs:
+                kwargs[df_param] = input_df
+            elif df_param is None:
+                # No recognized DataFrame param — pass as first positional arg
+                args = (input_df,) + tuple(args)
         
         res = func(*args, **kwargs)
         if not isinstance(res, pd.DataFrame):

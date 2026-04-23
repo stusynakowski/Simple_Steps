@@ -15,7 +15,7 @@ function resolveApiBase(): string {
   }
 
   // Vite dev server default — assume backend is on :8000
-  return 'http://localhost:8000/api';
+  return '/api';
 }
 
 const API_BASE = resolveApiBase();
