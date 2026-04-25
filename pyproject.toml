@@ -71,6 +71,7 @@ simple-steps-local = "SIMPLE_STEPS.cli_local:main"
 simple-steps-dev = "SIMPLE_STEPS.cli_dev:main"
 simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
 simple-steps-pack = "SIMPLE_STEPS.cli_pack:main"
+simple-steps-bootstrap = "SIMPLE_STEPS.bootstrap_install:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

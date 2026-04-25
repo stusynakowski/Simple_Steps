@@ -17,6 +17,7 @@ interface MenuBarProps {
   onSave: () => void;
   onSaveAs: () => void;
   onRename: () => void;
+  onEditFiles?: () => void;
 }
 
 export default function MenuBar({
@@ -27,6 +28,7 @@ export default function MenuBar({
   onSave,
   onSaveAs,
   onRename,
+  onEditFiles,
 }: MenuBarProps) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -97,7 +99,13 @@ export default function MenuBar({
         {isModified && <span className="breadcrumb-dot" title="Unsaved changes">●</span>}
       </div>
 
-      <div className="menubar-right" />
+      <div className="menubar-right">
+        {onEditFiles && (
+          <button className="menubar-edit-files" onClick={onEditFiles}>
+            Edit Files
+          </button>
+        )}
+      </div>
     </div>
   );
 }

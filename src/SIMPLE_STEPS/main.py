@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
+from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 import traceback as tb_module
@@ -269,6 +270,40 @@ async def api_read_file(path: str):
         with open(target, "r", errors="replace") as f:
             content = f.read()
         return {"path": path, "content": content, "size": size}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+class FileWriteRequest(BaseModel):
+    path: str
+    content: str
+
+
+@app.post("/api/files/write")
+async def api_write_file(body: FileWriteRequest):
+    """
+    Write text content to a file relative to the workspace root.
+    Creates parent directories if needed. Refuses writes larger than 1 MB.
+    """
+    base = os.path.abspath(_WORKSPACE)
+    target = os.path.normpath(os.path.join(base, body.path))
+
+    if not target.startswith(base):
+        raise HTTPException(status_code=403, detail="Path outside workspace")
+
+    encoded_size = len(body.content.encode("utf-8"))
+    if encoded_size > 1_048_576:
+        raise HTTPException(status_code=413, detail="File too large to save (>1 MB)")
+
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(body.content)
+        return {
+            "path": body.path,
+            "size": encoded_size,
+            "saved": True,
+        }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 

@@ -1,0 +1,146 @@
+.workspace-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.workspace-editor-panel {
+  width: min(1200px, 96vw);
+  height: min(760px, 92vh);
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.workspace-editor-header {
+  height: 42px;
+  min-height: 42px;
+  border-bottom: 1px solid #303030;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.workspace-editor-title {
+  font-size: 0.85rem;
+  color: #ddd;
+  font-weight: 600;
+}
+
+.workspace-editor-close {
+  border: none;
+  background: transparent;
+  color: #bbb;
+  font-size: 0.9rem;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+}
+
+.workspace-editor-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.workspace-editor-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.workspace-editor-tree {
+  width: 290px;
+  min-width: 220px;
+  border-right: 1px solid #2f2f2f;
+  overflow: auto;
+}
+
+.workspace-editor-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace-editor-path {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #2f2f2f;
+  color: #aaa;
+  font-size: 0.78rem;
+  padding: 0 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workspace-editor-textarea {
+  flex: 1;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: #151515;
+  color: #e6e6e6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+.workspace-editor-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #777;
+  font-size: 0.82rem;
+}
+
+.workspace-editor-footer {
+  height: 42px;
+  min-height: 42px;
+  border-top: 1px solid #303030;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.workspace-editor-status {
+  color: #999;
+  font-size: 0.78rem;
+}
+
+.workspace-editor-status.error {
+  color: #f07b7b;
+}
+
+.workspace-editor-save {
+  border: 1px solid #4a4a4a;
+  background: #2f2f2f;
+  color: #ddd;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.workspace-editor-save:hover:not(:disabled) {
+  background: #3a3a3a;
+}
+
+.workspace-editor-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

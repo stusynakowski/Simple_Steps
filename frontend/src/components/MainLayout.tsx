@@ -9,6 +9,7 @@ import Sidebar from './Sidebar';
 import ChatSidebar from './ChatSidebar';
 import ActivityBar from './ActivityBar';
 import MenuBar from './MenuBar';
+import WorkspaceFileEditor from './WorkspaceFileEditor';
 import SaveModal from './SaveModal';
 import RenameModal from './RenameModal';
 import ExecutionLog from './ExecutionLog';
@@ -36,6 +37,7 @@ export default function MainLayout() {
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
   const [isDragging, setIsDragging] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isFileEditorOpen, setIsFileEditorOpen] = useState(false);
 
   const isResizingHeader = useRef(false);
   const isResizingSidebar = useRef(false);
@@ -346,6 +348,14 @@ export default function MainLayout() {
     }
   };
 
+  const handleOpenFileEditor = useCallback(() => {
+    setActiveActivityView('explorer');
+    if (sidebarWidth === 0) {
+      setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
+    }
+    setIsFileEditorOpen(true);
+  }, [sidebarWidth]);
+
   const toggleChat = () => {
     if (rightSidebarWidth > 20) { lastRightSidebarWidth.current = rightSidebarWidth; setRightSidebarWidth(0); }
     else setRightSidebarWidth(lastRightSidebarWidth.current > 20 ? lastRightSidebarWidth.current : 300);
@@ -436,6 +446,7 @@ export default function MainLayout() {
             onSave={handleSave}
             onSaveAs={handleSaveAs}
             onRename={() => setRenameModalOpen(true)}
+            onEditFiles={handleOpenFileEditor}
           />
 
           {/* Row 2: file tabs */}
@@ -597,6 +608,11 @@ export default function MainLayout() {
         currentName={workflow.name || 'Untitled'}
         onClose={() => setRenameModalOpen(false)}
         onRename={handleRename}
+      />
+
+      <WorkspaceFileEditor
+        isOpen={isFileEditorOpen}
+        onClose={() => setIsFileEditorOpen(false)}
       />
     </div>
   );

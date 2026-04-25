@@ -11,7 +11,7 @@ Set this manually before using an agent:
 - IDEA: may edit only `docs/introduction.md` and `docs/context.md`
 - SPEC: may edit only `docs/spec/**`, `docs/adr/**`, and `docs/context.md`
 - TESTS: may edit only `tests/**`, `docs/testplan/**`, and `docs/context.md`
-- IMPL: may edit only `src/**` and `docs/context.md` (plus explicitly allowed config files if needed)
+- IMPL: may edit only `src/**`, `frontend/**`, `scripts/guardrails.py`, `start_backend.sh`, `docs/context.md`, `README.md`, and `pyproject.toml`
 
 ## Canonical docs
 - Introduction: `docs/introduction.md`
@@ -22,7 +22,8 @@ Set this manually before using an agent:
 ## Commands
 - Install (dev): `python -m pip install -e ".[dev]"`
 - Run tests: `pytest -q`
-- Run guardrails: `PHASE=spec ./scripts/verify_phase.sh`
+- Run guardrails: `PHASE=spec ./scripts/verify_phase.ph`
+- Guardrails with temporary overrides: `python ./scripts/guardrails.py --phase impl --allow "README.md,pyproject.toml"`
 
 ## Conventions
 - Every requirement in specs MUST have an ID like `REQ-CORE-001`

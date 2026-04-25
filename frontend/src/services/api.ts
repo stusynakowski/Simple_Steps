@@ -362,6 +362,20 @@ export async function readWorkspaceFile(path: string): Promise<{ path: string; c
     return r.json();
 }
 
+/** Write a file's content (relative to workspace root). */
+export async function writeWorkspaceFile(path: string, content: string): Promise<{ path: string; size: number; saved: boolean }> {
+    const r = await fetch(`${API_BASE}/files/write`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, content }),
+    });
+    if (!r.ok) {
+        const err = await r.json().catch(() => ({ detail: 'Failed to write file' }));
+        throw new Error(err.detail || 'Failed to write file');
+    }
+    return r.json();
+}
+
 // --- Pack Management ---
 
 export interface PackInfo {

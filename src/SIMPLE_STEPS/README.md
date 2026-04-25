@@ -95,3 +95,34 @@ To add a new capability to the backend:
 # In main.py
 from . import my_tool 
 ```
+
+---
+
+## 📦 Install from GitHub (per-project, isolated)
+
+Use the bootstrap installer to create a local virtual environment and install
+`simple-steps` directly from the GitHub repo URL.
+
+### One-liner
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stusynakowski/Simple_Steps/main/src/SIMPLE_STEPS/bootstrap_install.py | python -
+```
+
+### Common options
+
+```bash
+# include extras
+curl -fsSL https://raw.githubusercontent.com/stusynakowski/Simple_Steps/main/src/SIMPLE_STEPS/bootstrap_install.py | python - --extras dev
+
+# pin to a tag/branch/commit
+curl -fsSL https://raw.githubusercontent.com/stusynakowski/Simple_Steps/main/src/SIMPLE_STEPS/bootstrap_install.py | python - --ref main
+
+# force installer backend
+curl -fsSL https://raw.githubusercontent.com/stusynakowski/Simple_Steps/main/src/SIMPLE_STEPS/bootstrap_install.py | python - --installer pip
+curl -fsSL https://raw.githubusercontent.com/stusynakowski/Simple_Steps/main/src/SIMPLE_STEPS/bootstrap_install.py | python - --installer uv
+```
+
+The script auto-selects `uv` when available, otherwise falls back to `pip`.
+It creates a project-local `.venv` and installs `simple-steps` into that
+environment (not system-wide).

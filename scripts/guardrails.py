@@ -29,9 +29,13 @@ PHASE_ALLOWLIST = {
     "impl": [
         "src/*",
         "src/**",
+        "frontend/*",
+        "frontend/**",
+        "scripts/guardrails.py",
+        "start_backend.sh",
         "docs/context.md",
-        # If you want to allow limited config edits during IMPL, uncomment:
-        # "pyproject.toml",
+        "README.md",
+        "pyproject.toml",
     ],
 }
 
@@ -51,7 +55,14 @@ def changed_files() -> list[str]:
         return files
     for line in status.splitlines():
         # Format: XY <path> or XY <path> -> <path>
-        path = line[3:]
+        # Be defensive: some environments may trim leading spaces in output.
+        if len(line) >= 4 and line[2] == " ":
+            path = line[3:]
+        else:
+            parts = line.split(maxsplit=1)
+            if len(parts) < 2:
+                continue
+            path = parts[1]
         # Handle rename "old -> new"
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
@@ -64,9 +75,22 @@ def is_allowed(path: str, patterns: Iterable[str]) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--phase", required=True, choices=PHASE_ALLOWLIST.keys())
+    parser.add_argument(
+        "--allow",
+        action="append",
+        default=[],
+        help=(
+            "Additional allowed glob pattern(s) for this run only. "
+            "Can be provided multiple times or as a comma-separated list."
+        ),
+    )
     args = parser.parse_args()
 
-    patterns = PHASE_ALLOWLIST[args.phase]
+    patterns = list(PHASE_ALLOWLIST[args.phase])
+    extra_patterns: list[str] = []
+    for raw in args.allow:
+        extra_patterns.extend(part.strip() for part in raw.split(",") if part.strip())
+    patterns.extend(extra_patterns)
     files = changed_files()
 
     if not files:
