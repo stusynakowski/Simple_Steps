@@ -11,6 +11,7 @@ import type { OperationDefinition } from './api';
 // Dynamically resolve backend origin so multiple instances on different
 // ports work correctly (Streamlit-style port auto-increment).
 function resolveBackendOrigin(): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const envBase = (import.meta as any).env?.VITE_API_BASE;
   if (envBase) {
     // Strip trailing /api if present to get the origin

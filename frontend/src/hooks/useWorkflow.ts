@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Workflow, Step, StepStatus } from '../types/models';
+import type { Workflow, Step, StepStatus, Cell } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
 import { runStep as runStepApi, fetchDataView, getOperations,
   listProjects, createProject, deleteProject,
@@ -58,6 +58,7 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
   const formula = formulaIsUsable
     ? savedFormula
     : buildFormula(processType, configuration,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (internalKeys._orchestrator as any) ?? null,
       );
 
@@ -247,7 +248,7 @@ export default function useWorkflow() {
     const stopListening = listenProgress(
       id,
       (evt) => setStepProgress((prev) => ({ ...prev, [id]: evt })),
-      () => setStepProgress((prev) => { const { [id]: _, ...rest } = prev; return rest; }),
+      () => setStepProgress((prev) => { const { [id]: _unused, ...rest } = prev; void _unused; return rest; }),
     );
 
     try {
@@ -265,7 +266,7 @@ export default function useWorkflow() {
       const elapsed = Math.round(performance.now() - startTime);
 
       // Fetch preview — backend returns Cell[] directly ({row_id, column_id, value, display_value})
-      const rawData: any[] = await fetchDataView(res.output_ref_id);
+      const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
 
       // Determine which columns are NEW to this step.
       // Use prevStep.outputColumns (full accumulated column list), not output_preview (filtered).
@@ -306,7 +307,7 @@ export default function useWorkflow() {
       console.error(error);
 
       // ── Log: Step failed ──
-      const backendErr = (error as any)?.backendError as BackendError | undefined;
+      const backendErr = (error as { backendError?: BackendError })?.backendError;
       const errorMessage = backendErr?.detail || (error instanceof Error ? error.message : String(error));
       const errorDetail = [
         backendErr?.error_type ? `Error Type: ${backendErr.error_type}` : null,
@@ -384,7 +385,7 @@ export default function useWorkflow() {
           step.formula || undefined,
       );
       
-      const rawData: any[] = await fetchDataView(res.output_ref_id);
+      const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
 
       // Same column-diff logic as runStep — use outputColumns (full list), not output_preview
       const inputCols = new Set(prevStep?.outputColumns ?? []);
@@ -416,7 +417,7 @@ export default function useWorkflow() {
         return { ...prev, steps: next };
       });
     } catch (error) {
-       const backendErr = (error as any)?.backendError as BackendError | undefined;
+       const backendErr = (error as { backendError?: BackendError })?.backendError;
        const errorMessage = backendErr?.detail || (error instanceof Error ? error.message : String(error));
        addLog('warn', `Preview failed for "${step.label}": ${errorMessage}`, {
          stepId: id,
@@ -456,10 +457,10 @@ export default function useWorkflow() {
                 await runSequenceRef.current(startIndex + 1);
             }
         }
-    } catch (e) {
+    } catch {
         setPipelineStatus('idle'); // Stop on error
     }
-  }, [runStep]); // Re-create when runStep changes
+  }, [runStep, setPipelineStatus]); // Re-create when runStep changes
 
   // Update the ref whenever runSequence changes
   useEffect(() => {
@@ -484,12 +485,12 @@ export default function useWorkflow() {
     });
 
     runSequence(startIndex);
-  }, [runSequence, addLog]);
+  }, [runSequence, addLog, setPipelineStatus]);
 
   const pausePipeline = useCallback(() => {
     if (pipelineStatusRef.current !== 'running') return;
     setPipelineStatus('paused');
-  }, []);
+  }, [setPipelineStatus]);
 
   const stopPipeline = useCallback(() => {
     setPipelineStatus('idle');
@@ -503,7 +504,7 @@ export default function useWorkflow() {
         });
         return { ...prev, steps: next };
     });
-  }, []);
+  }, [setPipelineStatus]);
 
   function deleteStep(id: string) {
     setWorkflow((prev) => {
@@ -544,7 +545,7 @@ export default function useWorkflow() {
     setExpandedStepIds(new Set(reset.steps.length > 0 ? [reset.steps[0].id] : []));
     setMaximizedStepId(null);
     setPipelineStatus('idle');
-  }, []);
+  }, [setPipelineStatus]);
 
   /**
    * Save the current workflow as a pipeline file inside a project folder.
@@ -591,7 +592,7 @@ export default function useWorkflow() {
     setExpandedStepIds(new Set(restoredSteps.length > 0 ? [restoredSteps[0].id] : []));
     setMaximizedStepId(null);
     setPipelineStatus('idle');
-  }, []);
+  }, [setPipelineStatus]);
 
   /** Fetch a pipeline as a Workflow object WITHOUT changing hook state. */
   const fetchWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<Workflow> => {

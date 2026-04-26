@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef } from 'react';
 import './SaveModal.css'; /* reuse same modal styles */
 
 interface RenameModalProps {
@@ -9,16 +9,12 @@ interface RenameModalProps {
 }
 
 export default function RenameModal({ isOpen, currentName, onClose, onRename }: RenameModalProps) {
-  const [name, setName] = useState(currentName);
-
-  useEffect(() => {
-    if (isOpen) setName(currentName);
-  }, [isOpen, currentName]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
   const confirm = () => {
-    const trimmed = name.trim();
+    const trimmed = (inputRef.current?.value ?? currentName).trim();
     if (trimmed) { onRename(trimmed); onClose(); }
   };
 
@@ -33,10 +29,10 @@ export default function RenameModal({ isOpen, currentName, onClose, onRename }: 
           <div className="modal-field">
             <label className="modal-label">New name</label>
             <input
+              ref={inputRef}
               className="modal-input"
-              value={name}
+              defaultValue={currentName}
               autoFocus
-              onChange={e => setName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') confirm(); if (e.key === 'Escape') onClose(); }}
             />
           </div>

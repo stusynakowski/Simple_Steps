@@ -15,7 +15,7 @@ describe('services/api', () => {
         // That comes from a separate fetchDataView call in the hook.
         expect(mockCells).toBeTruthy(); // Use mockCells to avoid unused var
         expect(res.status).toBe('success');
-    } catch (e) {
+    } catch {
         // Mock fetch not available in node test environment unless polyfilled
     }
   });

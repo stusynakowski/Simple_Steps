@@ -222,7 +222,6 @@ export default function DetachedStepWindow({
     };
   // pos/size refs inside the closure are read at mouseup time via state —
   // we capture them via the closure update below
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos, size]);
 
   // Derive CSS classes

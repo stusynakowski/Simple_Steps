@@ -280,6 +280,7 @@ export function parseFormula(input: string): ParsedFormula {
  */
 export function buildFormula(
   operationId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: Record<string, any>,
   orchestration?: OrchestrationMode | null,
 ): string {

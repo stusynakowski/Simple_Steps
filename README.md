@@ -50,7 +50,25 @@ The formula bar is the single source of truth. The UI controls (dropdowns, param
 - **Python 3.9+**
 - **Node.js 18+** (only needed if you want to develop the frontend or rebuild the UI)
 
-### Option A: pip install (recommended)
+### Option A: Use Simple Steps (no local repo checkout)
+
+If you want to use the tool for a project without seeing/cloning the repository, install directly from GitHub:
+
+```bash
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git"
+```
+
+Optional: pin to a specific tag/release:
+
+```bash
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.0"
+```
+
+This installs the package into your environment (`site-packages`) and gives you the `simple-steps` CLI without creating a repo folder in your current workspace.
+
+### Option B: Develop Simple Steps (full repo checkout)
+
+If you want to work on the codebase itself:
 
 ```bash
 git clone https://github.com/stusynakowski/Simple_Steps.git
@@ -65,7 +83,7 @@ pip install -e .
 
 That's it. The package installs the `simple-steps` CLI command and bundles a pre-built copy of the frontend.
 
-### Option B: pip install with desktop mode
+### Option C: Add desktop mode
 
 ```bash
 pip install -e ".[desktop]"
@@ -73,7 +91,7 @@ pip install -e ".[desktop]"
 
 This adds `pywebview`, which lets you run Simple Steps as a native desktop window — no browser required. See [Desktop mode](#desktop-mode-no-browser) below.
 
-### Option C: pip install with dev tools
+### Option D: Add dev tools
 
 ```bash
 pip install -e ".[dev]"
@@ -81,11 +99,34 @@ pip install -e ".[dev]"
 
 This adds `pytest` and `ruff` for running tests and linting.
 
-### Option D: pip install with everything
+### Option E: Add everything
 
 ```bash
 pip install -e ".[desktop,dev]"
 ```
+
+### A vs B quick guide
+
+- Choose **Option A** when you only want to use the tool in a project and do not want a local repo checkout.
+- Choose **Option B** when you want to develop Simple Steps itself and need full source visibility.
+
+### Recommended two-environment setup (use + dev)
+
+```bash
+# 1) Use environment (no repo checkout in your project folders)
+conda create -n simple_steps_use python=3.11 -y
+conda activate simple_steps_use
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.0"
+
+# 2) Dev environment (full repo, editable install)
+conda create -n simple_steps_dev python=3.11 -y
+conda activate simple_steps_dev
+git clone https://github.com/stusynakowski/Simple_Steps.git
+cd Simple_Steps
+python -m pip install -e ".[desktop,dev]"
+```
+
+With this split, your day-to-day usage stays clean, and your development environment stays fully inspectable.
 
 ---
 

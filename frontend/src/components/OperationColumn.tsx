@@ -149,6 +149,7 @@ export default function OperationColumn({
 
   const derivedFormula = step.formula || buildFormula(
     step.process_type,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     step.configuration as Record<string, any>,
     (step.configuration._orchestrator as OrchestrationMode | undefined)
       ?? (currentOp?.type as OrchestrationMode | undefined)
@@ -160,8 +161,9 @@ export default function OperationColumn({
   // Prefer step.formula first, then derivedFormula, then legacy operation field.
   const [liveFormula, setLiveFormula] = useState<string>(step.formula || derivedFormula || step.operation || '');
 
-  // Keep liveFormula in sync when the step is updated externally
+  // Keep liveFormula in sync when the step is updated externally.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLiveFormula(step.formula || derivedFormula || step.operation || '');
   }, [step.formula, step.operation, derivedFormula]);
 

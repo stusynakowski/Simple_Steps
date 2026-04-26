@@ -19,7 +19,6 @@ export default function GlobalControls({
 }: GlobalControlsProps) {
   const [computeTarget, setComputeTarget] = useState('Local');
   const [pythonEnv, setPythonEnv] = useState('simple-steps-env');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [resources, setResources] = useState(['OpenAI', 'Postgres']);
 
   return (

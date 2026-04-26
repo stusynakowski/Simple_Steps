@@ -98,6 +98,7 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const injectReference = useCallback(
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     (token: string) => {
       // Cancel any pending deactivation — the user clicked a grid cell
       if (deactivateTimeout.current) {
@@ -157,7 +158,7 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────────
-
+// eslint-disable-next-line react-refresh/only-export-components
 export function useStepWiring() {
   return useContext(StepWiringContext);
 }

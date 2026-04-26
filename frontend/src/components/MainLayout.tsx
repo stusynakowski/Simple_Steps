@@ -200,8 +200,8 @@ export default function MainLayout() {
   }, [openTabs, fetchWorkflow, loadWorkflowObject]);
 
   // NOTE: openWorkflowObjectTab is kept for future use (e.g. opening demo workflows).
+  // @ts-expect-error TS6133 — reserved for future use
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  // @ts-expect-error -- reserved for future use
   const _openWorkflowObjectTab = useCallback((wf: Workflow) => {
     const tabKey = `demo::${wf.id}`;
     const existing = openTabs.find(t => t.id === tabKey);

@@ -46,7 +46,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) 
       const cfg = await getAgentConfig();
       setConfig(cfg);
       setDirty(false);
-    } catch (e) {
+    } catch {
       setError('Failed to load agent config');
     }
   };
@@ -75,7 +75,7 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) 
       setConfig(updated);
       setDirty(false);
       await loadHealth();
-    } catch (e) {
+    } catch {
       setError('Failed to save config');
     } finally {
       setSaving(false);

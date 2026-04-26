@@ -6,6 +6,7 @@ import type { StepConfiguration } from '../types/models';
 // fall back to same-origin (works when served from the backend directly).
 function resolveApiBase(): string {
   // Vite injects env vars prefixed with VITE_
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const envBase = (import.meta as any).env?.VITE_API_BASE;
   if (envBase) return envBase;
 
@@ -80,7 +81,7 @@ export interface OperationParam {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'list';
   description: string;
-  default?: any;
+  default?: unknown;
 }
 
 export interface OperationDefinition {
@@ -169,7 +170,7 @@ export async function fetchDataView(
     refId: string, 
     offset: number = 0, 
     limit: number = 50
-): Promise<any[]> {
+): Promise<unknown[]> {
     const response = await fetch(`${API_BASE}/data/${refId}?offset=${offset}&limit=${limit}`);
     if (!response.ok) {
         // If 404, maybe ref expired.

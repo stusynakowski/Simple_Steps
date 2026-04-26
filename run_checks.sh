@@ -5,13 +5,29 @@
 #   ./run_checks.sh backend    # only backend checks
 #   ./run_checks.sh frontend   # only frontend checks
 #   ./run_checks.sh lint       # only linters
+#   ./run_checks.sh precommit  # commit-safe checks (skip backend ruff)
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_DIR="$REPO_ROOT/.venv"
 FRONTEND_DIR="$REPO_ROOT/frontend"
+
+# ─── Resolve Python and Node from simple_steps conda env if available ─────────
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-simple_steps}"
+CONDA_BASE="${CONDA_BASE:-/home/stu/anaconda3}"
+CONDA_ENV_BIN="$CONDA_BASE/envs/$CONDA_ENV_NAME/bin"
+
+if [[ -x "$CONDA_ENV_BIN/python" ]]; then
+    PYTHON_BIN="${PYTHON_BIN:-$CONDA_ENV_BIN/python}"
+else
+    PYTHON_BIN="${PYTHON_BIN:-python3}"
+fi
+
+if [[ -x "$CONDA_ENV_BIN/node" ]]; then
+    export PATH="$CONDA_ENV_BIN:$PATH"
+fi
+
+VENV_DIR="$REPO_ROOT/.venv"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -112,7 +128,7 @@ check_frontend_lint() {
 check_frontend_typecheck() {
     _header "Frontend — type-check (tsc)"
     run_step "tsc --noEmit" \
-        npm --prefix "$FRONTEND_DIR" exec -- tsc --noEmit
+        "$FRONTEND_DIR/node_modules/.bin/tsc" --noEmit -p "$FRONTEND_DIR/tsconfig.app.json"
 }
 
 check_frontend_tests() {
@@ -209,6 +225,15 @@ case "$TARGET" in
         check_python_env
         check_backend_startup
         ;;
+    precommit)
+        check_python_env
+        check_backend_tests
+        check_guardrails
+        check_frontend_install
+        check_frontend_lint
+        check_frontend_typecheck
+        check_frontend_tests
+        ;;
     all)
         check_python_env
         check_backend_lint
@@ -222,7 +247,7 @@ case "$TARGET" in
         ;;
     *)
         echo "Unknown target: $TARGET"
-        echo "Usage: $0 [all|backend|frontend|lint|smoke]"
+        echo "Usage: $0 [all|backend|frontend|lint|smoke|precommit]"
         exit 1
         ;;
 esac
