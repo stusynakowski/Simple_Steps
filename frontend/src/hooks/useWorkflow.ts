@@ -239,10 +239,13 @@ export default function useWorkflow() {
       detail: `Config: ${JSON.stringify(resolvedConfig, null, 2)}\nInput Ref: ${prevStep?.outputRefId ?? '(none)'}\nStep Map keys: ${Object.keys(stepMap).join(', ') || '(empty)'}`,
     });
 
-    setWorkflow((prev) => {
-      const next = prev.steps.map((s) => (s.id === id ? { ...s, status: 'running' as const } : s));
-      return { ...prev, steps: next };
-    });
+    {
+      const latest = workflowRef.current;
+      const next = latest.steps.map((s) => (s.id === id ? { ...s, status: 'running' as const } : s));
+      const updated = { ...latest, steps: next };
+      workflowRef.current = updated;
+      setWorkflow(updated);
+    }
 
     // Start SSE progress listener
     const stopListening = listenProgress(
@@ -288,8 +291,9 @@ export default function useWorkflow() {
         detail: `Output Ref: ${res.output_ref_id}\nColumns: ${outputCols.join(', ')}\nNew columns: ${newCols.join(', ') || '(none)'}`,
       });
 
-      setWorkflow((prev) => {
-        const next = prev.steps.map((s) => {
+      {
+        const latest = workflowRef.current;
+        const next = latest.steps.map((s) => {
           if (s.id !== id) return s;
           return {
             ...s,
@@ -299,8 +303,10 @@ export default function useWorkflow() {
             output_preview: previewCells,
           };
         });
-        return { ...prev, steps: next };
-      });
+        const updated = { ...latest, steps: next };
+        workflowRef.current = updated;
+        setWorkflow(updated);
+      }
       return 'completed';
     } catch (error) {
       const elapsed = Math.round(performance.now() - startTime);
@@ -324,10 +330,13 @@ export default function useWorkflow() {
         detail: errorDetail,
       });
 
-      setWorkflow((prev) => {
-        const next = prev.steps.map((s) => (s.id === id ? { ...s, status: 'error' as const } : s));
-        return { ...prev, steps: next };
-      });
+      {
+        const latest = workflowRef.current;
+        const next = latest.steps.map((s) => (s.id === id ? { ...s, status: 'error' as const } : s));
+        const updated = { ...latest, steps: next };
+        workflowRef.current = updated;
+        setWorkflow(updated);
+      }
       throw error;
     } finally {
       stopListening();
@@ -429,44 +438,6 @@ export default function useWorkflow() {
     }
   }, [addLog]);
 
-  // Use a ref to access the latest runSequence function to avoid dependency cycles
-  const runSequenceRef = useRef<(index: number) => Promise<void>>();
-
-  const runSequence = useCallback(async (startIndex: number) => {
-    // Check status at start of each iteration
-    if (pipelineStatusRef.current !== 'running') {
-        return; 
-    }
-
-    const currentWorkflow = workflowRef.current;
-    if (startIndex >= currentWorkflow.steps.length) {
-        setPipelineStatus('idle'); // Finished
-        return;
-    }
-
-    const step = currentWorkflow.steps[startIndex];
-    
-    try {
-        // Don't pass config — let runStep derive it from the formula (the canonical source)
-        await runStep(step.id);
-        
-        // After step finishes, check status again before creating next promise
-        if (pipelineStatusRef.current === 'running') {
-            // Recursive call using the ref
-            if (runSequenceRef.current) {
-                await runSequenceRef.current(startIndex + 1);
-            }
-        }
-    } catch {
-        setPipelineStatus('idle'); // Stop on error
-    }
-  }, [runStep, setPipelineStatus]); // Re-create when runStep changes
-
-  // Update the ref whenever runSequence changes
-  useEffect(() => {
-    runSequenceRef.current = runSequence;
-  }, [runSequence]);
-
   const runPipeline = useCallback(() => {
     if (pipelineStatusRef.current === 'running') return;
     
@@ -484,8 +455,27 @@ export default function useWorkflow() {
       detail: `Steps: ${steps.slice(startIndex).map(s => s.label).join(' → ')}`,
     });
 
-    runSequence(startIndex);
-  }, [runSequence, addLog, setPipelineStatus]);
+    void (async () => {
+      try {
+        for (let i = startIndex; i < workflowRef.current.steps.length; i += 1) {
+          // Re-check control state before each step
+          if (pipelineStatusRef.current !== 'running') break;
+
+          // Always read fresh step from the live ref so we never use stale closures.
+          const liveStep = workflowRef.current.steps[i];
+          if (!liveStep) break;
+
+          await runStep(liveStep.id);
+        }
+
+        if (pipelineStatusRef.current === 'running') {
+          setPipelineStatus('idle');
+        }
+      } catch {
+        setPipelineStatus('idle');
+      }
+    })();
+  }, [runStep, addLog, setPipelineStatus]);
 
   const pausePipeline = useCallback(() => {
     if (pipelineStatusRef.current !== 'running') return;

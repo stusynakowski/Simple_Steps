@@ -226,26 +226,31 @@ export async function createProject(name: string): Promise<ProjectInfo> {
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
-    const r = await fetch(`${API_BASE}/projects/${projectId}`, { method: 'DELETE' });
+    const p = encodeURIComponent(projectId);
+    const r = await fetch(`${API_BASE}/projects/${p}`, { method: 'DELETE' });
     if (!r.ok) throw new Error('Failed to delete project');
 }
 
 // ── Pipelines (files inside a project) ───────────────────────────────────
 
 export async function listPipelines(projectId: string): Promise<PipelineFile[]> {
-    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines`);
+    const p = encodeURIComponent(projectId);
+    const r = await fetch(`${API_BASE}/projects/${p}/pipelines`);
     if (!r.ok) throw new Error('Failed to list pipelines');
     return r.json();
 }
 
 export async function loadPipeline(projectId: string, pipelineId: string): Promise<PipelineFile> {
-    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines/${pipelineId}`);
+    const p = encodeURIComponent(projectId);
+    const f = encodeURIComponent(pipelineId);
+    const r = await fetch(`${API_BASE}/projects/${p}/pipelines/${f}`);
     if (!r.ok) throw new Error('Pipeline not found');
     return r.json();
 }
 
 export async function savePipeline(projectId: string, pipeline: PipelineFile): Promise<PipelineFile> {
-    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines`, {
+    const p = encodeURIComponent(projectId);
+    const r = await fetch(`${API_BASE}/projects/${p}/pipelines`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(pipeline),
@@ -255,7 +260,9 @@ export async function savePipeline(projectId: string, pipeline: PipelineFile): P
 }
 
 export async function deletePipeline(projectId: string, pipelineId: string): Promise<void> {
-    const r = await fetch(`${API_BASE}/projects/${projectId}/pipelines/${pipelineId}`, { method: 'DELETE' });
+    const p = encodeURIComponent(projectId);
+    const f = encodeURIComponent(pipelineId);
+    const r = await fetch(`${API_BASE}/projects/${p}/pipelines/${f}`, { method: 'DELETE' });
     if (!r.ok) throw new Error('Failed to delete pipeline');
 }
 

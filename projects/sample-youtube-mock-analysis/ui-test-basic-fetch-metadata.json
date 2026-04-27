@@ -1,0 +1,28 @@
+{
+  "id": "ui-test-basic-fetch-metadata",
+  "name": "ui_test_basic_fetch_metadata",
+  "created_at": "2026-04-26T12:00:00.000Z",
+  "updated_at": "2026-04-26T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-fetch",
+      "operation_id": "yt_fetch_videos",
+      "label": "Step 0",
+      "config": {
+        "channel_url": "https://youtube.com/mock_channel",
+        "_orchestrator": "source"
+      },
+      "formula": "=yt_fetch_videos.source(channel_url=\"https://youtube.com/mock_channel\")"
+    },
+    {
+      "step_id": "step-metadata",
+      "operation_id": "yt_extract_metadata",
+      "label": "Step 1",
+      "config": {
+        "url": "Step1",
+        "_orchestrator": "map"
+      },
+      "formula": "=yt_extract_metadata.map(url=\"Step1\")"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "id": "ui-test-full-analysis-report",
+  "name": "ui_test_full_analysis_report",
+  "created_at": "2026-04-26T12:00:00.000Z",
+  "updated_at": "2026-04-26T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-fetch",
+      "operation_id": "yt_fetch_videos",
+      "label": "Step 0",
+      "config": {
+        "channel_url": "https://youtube.com/mock_channel",
+        "_orchestrator": "source"
+      },
+      "formula": "=yt_fetch_videos.source(channel_url=\"https://youtube.com/mock_channel\")"
+    },
+    {
+      "step_id": "step-metadata",
+      "operation_id": "yt_extract_metadata",
+      "label": "Step 1",
+      "config": {
+        "url": "Step1",
+        "_orchestrator": "map"
+      },
+      "formula": "=yt_extract_metadata.map(url=\"Step1\")"
+    },
+    {
+      "step_id": "step-transcribe",
+      "operation_id": "yt_transcribe",
+      "label": "Step 2",
+      "config": {
+        "url": "Step2",
+        "_orchestrator": "map"
+      },
+      "formula": "=yt_transcribe.map(url=\"Step2\")"
+    },
+    {
+      "step_id": "step-sentiment",
+      "operation_id": "yt_analyze_sentiment",
+      "label": "Step 3",
+      "config": {
+        "data": "Step3",
+        "_orchestrator": "dataframe"
+      },
+      "formula": "=yt_analyze_sentiment.dataframe(data=\"Step3\")"
+    },
+    {
+      "step_id": "step-report",
+      "operation_id": "yt_report",
+      "label": "Step 4",
+      "config": {
+        "metrics_df": "Step4",
+        "_orchestrator": "dataframe"
+      },
+      "formula": "=yt_report.dataframe(metrics_df=\"Step4\")"
+    }
+  ]
+}

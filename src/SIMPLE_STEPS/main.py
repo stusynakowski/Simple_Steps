@@ -183,7 +183,9 @@ async def workspace_info():
                 project_count += 1
                 project_names.append(entry)
                 pipeline_count += sum(
-                    1 for f in os.listdir(full) if f.endswith(".json")
+                    1
+                    for f in os.listdir(full)
+                    if f.endswith(".simple-steps-workflow") or f.endswith(".json")
                 )
 
     return {

@@ -10,10 +10,78 @@ OPERATION_REGISTRY: Dict[str, OperationDefinition] = {}
 DEFINITIONS_LIST: List[OperationDefinition] = []
 
 
+def _resolve_list_input(args, kwargs):
+    """Resolve list input from first positional arg or a single list kwarg."""
+    if args and isinstance(args[0], list):
+        return ("arg", args[0], None)
+
+    list_kwargs = [k for k, v in kwargs.items() if isinstance(v, list)]
+    if len(list_kwargs) == 1:
+        key = list_kwargs[0]
+        return ("kwarg", kwargs[key], key)
+
+    return (None, None, None)
+
+
+def _apply_list_mode(func: Callable, args, kwargs, mode: str, strict: bool = False):
+    """Apply map/flatmap over list inputs for non-proxy calls."""
+    source_kind, items, kw_key = _resolve_list_input(args, kwargs)
+
+    if items is None:
+        if strict:
+            raise ValueError(
+                "Explicit __mode='map' or __mode='flatmap' requires either "
+                "a list as the first positional argument or exactly one "
+                "list-valued keyword argument."
+            )
+        return None
+
+    def _call_with_item(item):
+        if source_kind == "arg":
+            return func(item, *args[1:], **kwargs)
+        call_kwargs = dict(kwargs)
+        call_kwargs[kw_key] = item
+        return func(*args, **call_kwargs)
+
+    if mode == "map":
+        return [_call_with_item(item) for item in items]
+
+    if mode == "flatmap":
+        flattened = []
+        for item in items:
+            value = _call_with_item(item)
+            if isinstance(value, list):
+                flattened.extend(value)
+            else:
+                flattened.append(value)
+        return flattened
+
+    return None
+
+
+def _normalize_mode(mode):
+    """Normalize mode aliases to canonical orchestration mode names."""
+    aliases = {
+        "apply_across_rows": "map",
+        "apply_and_flatten": "flatmap",
+        "auto": "default",
+    }
+    return aliases.get(mode, mode)
+
+
 def _auto_broadcast(func: Callable, operation_type: str = "map") -> Callable:
     """
     Wraps a @simple_step function so that StepProxy / ColumnProxy arguments
-    are handled automatically depending on the operation type:
+    are handled automatically depending on the operation type.
+
+    Broadcast syntax options:
+    - `fn(x)` → best-effort default behavior.
+    - `fn(x, __mode="raw")` → force raw direct call.
+    - `fn(xs, __mode="map")` or `fn(xs, __mode="apply_across_rows")` → map list inputs.
+    - `fn(xs, __mode="flatmap")` or `fn(xs, __mode="apply_and_flatten")` → map + flatten.
+    - `fn.apply_across_rows(xs)` → chaining helper for map.
+    - `fn.apply_and_flatten(xs)` → chaining helper for flatmap.
+    - `fn.run_raw(x)` → chaining helper for raw.
 
     operation_type="map"  (default)
         ColumnProxy args → broadcast the call row-wise, one call per row.
@@ -34,6 +102,17 @@ def _auto_broadcast(func: Callable, operation_type: str = "map") -> Callable:
     def wrapper(*args, **kwargs):
         from .step_proxy import ColumnProxy, StepProxy, step as make_step
 
+        explicit_mode = _normalize_mode(kwargs.pop("__mode", None))
+        allowed_modes = {None, "default", "raw", "map", "flatmap"}
+        if explicit_mode not in allowed_modes:
+            raise ValueError(
+                "Invalid __mode. Allowed values are: default, raw, map, flatmap, "
+                "apply_across_rows, apply_and_flatten, auto, or None."
+            )
+
+        if explicit_mode == "raw":
+            return func(*args, **kwargs)
+
         # ── Check: are any arguments ColumnProxy or StepProxy? ───────────
         has_proxy = any(
             isinstance(v, (ColumnProxy, StepProxy))
@@ -41,7 +120,23 @@ def _auto_broadcast(func: Callable, operation_type: str = "map") -> Callable:
         )
 
         if not has_proxy:
-            # No proxies — plain scalar call, just run the function
+            # No proxies — optionally apply explicit/implicit list strategies.
+            apply_mode = getattr(wrapper, "_apply", None)
+            list_mode = explicit_mode if explicit_mode in ("map", "flatmap") else apply_mode
+            strict_list_mode = explicit_mode in ("map", "flatmap")
+
+            if list_mode in ("map", "flatmap"):
+                mapped = _apply_list_mode(
+                    func,
+                    args,
+                    kwargs,
+                    mode=list_mode,
+                    strict=strict_list_mode,
+                )
+                if mapped is not None:
+                    return mapped
+
+            # Plain scalar call, just run the function
             result = func(*args, **kwargs)
             if isinstance(result, pd.DataFrame):
                 return make_step(result, label=func.__name__)
@@ -58,7 +153,7 @@ def _auto_broadcast(func: Callable, operation_type: str = "map") -> Callable:
                 break
 
         # ── NON-MAP modes: unwrap proxies → pandas objects, call once ────
-        op = getattr(wrapper, '_operation_type', operation_type)
+        op = "map" if explicit_mode in ("map", "flatmap") else getattr(wrapper, '_operation_type', operation_type)
         if op != "map":
             unwrapped_args = [_unwrap(a) for a in args]
             unwrapped_kwargs = {k: _unwrap(v) for k, v in kwargs.items()}
@@ -129,6 +224,17 @@ def _auto_broadcast(func: Callable, operation_type: str = "map") -> Callable:
     # Stash metadata so the engine / eval can inspect it
     wrapper._raw_func = func
     wrapper._operation_type = operation_type
+    wrapper._apply = None  # set by simple_step when apply= is provided
+
+    # Chaining-style convenience methods for explicit orchestration.
+    wrapper.apply_across_rows = lambda data, *args, **kwargs: wrapper(
+        data, *args, __mode="map", **kwargs
+    )
+    wrapper.apply_and_flatten = lambda data, *args, **kwargs: wrapper(
+        data, *args, __mode="flatmap", **kwargs
+    )
+    wrapper.run_raw = lambda *args, **kwargs: wrapper(*args, __mode="raw", **kwargs)
+
     return wrapper
 
 
@@ -141,15 +247,23 @@ def _unwrap(obj):
         return object.__getattribute__(obj, "_df")
     return obj
 
-def simple_step(name: str = None, category: str = "General", operation_type: str = "map", id: str = None):
+def simple_step(name: str = None, category: str = "General", operation_type: str = "map", id: str = None, apply: str = None):
     """
     Decorator to transform a vanilla Python function into a SimpleSteps operation.
     
     Args:
         name: Display name for the UI.
         category: For sidebar grouping.
-        operation_type: ...
+        operation_type: Default orchestration recommendation.
         id: Optional explicit ID. If None, uses function name.
+        apply: Optional implicit list behavior for non-proxy calls ("map" or
+            "flatmap"). Can be overridden per call with __mode.
+
+    Broadcast table (current):
+    - Default: `fn(x)`
+    - Raw: `fn(x, __mode="raw")` or `fn.run_raw(x)`
+    - Map list: `fn(xs, __mode="map")`, `fn(xs, __mode="apply_across_rows")`, `fn.apply_across_rows(xs)`
+    - Flatmap list: `fn(xs, __mode="flatmap")`, `fn(xs, __mode="apply_and_flatten")`, `fn.apply_and_flatten(xs)`
     """
     def decorator(func: Callable):
         # 1. Register Metadata
@@ -208,7 +322,9 @@ def simple_step(name: str = None, category: str = "General", operation_type: str
         # (and eval-mode formula bar calls) get automatic row-wise mapping
         # when ColumnProxy arguments are passed.  The raw function is still
         # accessible via wrapper._raw_func and through the registry.
-        return _auto_broadcast(func, operation_type=operation_type)
+        wrapped = _auto_broadcast(func, operation_type=operation_type)
+        wrapped._apply = apply
+        return wrapped
 
     return decorator
 

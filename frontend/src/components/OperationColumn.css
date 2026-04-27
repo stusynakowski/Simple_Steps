@@ -319,6 +319,21 @@
 .operation-column.status-running .op-status-indicator { color: orange; }
 .operation-column.status-error .op-status-indicator { color: red; }
 
+.cell-wait-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(184, 150, 12, 0.25);
+  border-top-color: #b8960c;
+  border-radius: 50%;
+  display: inline-block;
+  animation: cell-wait-spin 0.9s linear infinite;
+}
+
+@keyframes cell-wait-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Step progress bar */
 .step-progress-bar-container {
   position: relative;

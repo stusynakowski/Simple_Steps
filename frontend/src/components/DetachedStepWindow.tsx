@@ -11,6 +11,8 @@ interface DetachedStepWindowProps {
   stepIndex: number;
   previousSteps: Step[];
   availableOperations: OperationDefinition[];
+  pipelineStatus?: 'idle' | 'running' | 'paused';
+  pipelineCursorIndex?: number;
   color: string;
   initialPosition: { x: number; y: number };
   onClose: () => void;
@@ -43,6 +45,8 @@ export default function DetachedStepWindow({
   stepIndex,
   previousSteps,
   availableOperations,
+  pipelineStatus = 'idle',
+  pipelineCursorIndex = -1,
   color,
   initialPosition,
   onClose,
@@ -301,6 +305,8 @@ export default function DetachedStepWindow({
               stepIndex={stepIndex}
               previousSteps={previousSteps}
               availableOperations={availableOperations}
+              pipelineStatus={pipelineStatus}
+              pipelineCursorIndex={pipelineCursorIndex}
               color={color}
               isActive={true}
               isSqueezed={false}

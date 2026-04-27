@@ -1,0 +1,66 @@
+{
+  "id": "runner-example-yt-analysis",
+  "name": "Runner Example – YouTube Analysis",
+  "created_at": "2026-04-27T00:00:00.000Z",
+  "updated_at": "2026-04-27T00:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-0-fetch",
+      "operation_id": "fetch_channel_videos",
+      "label": "Fetch Videos",
+      "config": {
+        "channel_url": "https://youtube.com/@mock_channel_with_cases",
+        "_orchestrator": "source"
+      },
+      "formula": "=fetch_channel_videos.source(channel_url=\"https://youtube.com/@mock_channel_with_cases\")"
+    },
+    {
+      "step_id": "step-1-metadata",
+      "operation_id": "extract_metadata",
+      "label": "Extract Metadata",
+      "config": {
+        "_orchestrator": "map"
+      },
+      "formula": "=extract_metadata.map(video_url=step1.output)"
+    },
+    {
+      "step_id": "step-2-transcribe",
+      "operation_id": "transcribe_video",
+      "label": "Transcribe",
+      "config": {
+        "_orchestrator": "map"
+      },
+      "formula": "=transcribe_video.map(video_url=step1.output)"
+    },
+    {
+      "step_id": "step-3-segment",
+      "operation_id": "segment_conversations",
+      "label": "Segment Conversations",
+      "config": {
+        "_orchestrator": "expand",
+        "transcript": "transcribe_video_output"
+      },
+      "formula": "=segment_conversations.expand(transcript=\"transcribe_video_output\")"
+    },
+    {
+      "step_id": "step-4-sentiment",
+      "operation_id": "analyze_sentiment",
+      "label": "Analyze Sentiment",
+      "config": {
+        "_orchestrator": "map",
+        "text": "segment_conversations_output"
+      },
+      "formula": "=analyze_sentiment.map(text=\"segment_conversations_output\")"
+    },
+    {
+      "step_id": "step-5-report",
+      "operation_id": "generate_report",
+      "label": "Generate Report",
+      "config": {
+        "_orchestrator": "map",
+        "segments": "segment_conversations_output"
+      },
+      "formula": "=generate_report.map(segments=\"segment_conversations_output\")"
+    }
+  ]
+}

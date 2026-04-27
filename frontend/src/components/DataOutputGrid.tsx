@@ -12,6 +12,8 @@ interface DataOutputGridProps {
   onWireCell?: (token: string) => void;
   /** Staged columns to render as light-yellow pending cells alongside real data */
   stagedColumns?: StagedColumn[];
+  /** Visual mode for staged cells when pipeline is queued/running */
+  stagedCellMode?: 'idle' | 'scheduled' | 'running';
 }
 
 // Wiring banner styles
@@ -36,6 +38,7 @@ export default function DataOutputGrid({
   onWireColumn,
   onWireCell,
   stagedColumns = [],
+  stagedCellMode = 'idle',
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
@@ -44,13 +47,16 @@ export default function DataOutputGrid({
   const { cols, rows, gridData, structureType, stagedColNames, stagedData } = useMemo(() => {
     const safeCells = cells ?? [];
 
-    // Build staged lookup: "rowIndex:colName" -> formula string
+    // Build staged lookup: "rowIndex:colName" -> staged metadata
     const sColNames: string[] = [];
-    const sData: Record<string, string> = {};
+    const sData: Record<string, { formula: string; state: string }> = {};
     for (const sc of stagedColumns) {
       if (!sColNames.includes(sc.name)) sColNames.push(sc.name);
       for (const cell of sc.cells) {
-        sData[`${cell.rowIndex}:${sc.name}`] = cell.formula;
+        sData[`${cell.rowIndex}:${sc.name}`] = {
+          formula: cell.formula,
+          state: cell.state,
+        };
       }
     }
 
@@ -326,20 +332,52 @@ export default function DataOutputGrid({
             {cols.map((c) => {
               const cell = gridData[`${r}:${c}`];
               const cellKey = `${r}:${c}`;
-              const staged = stagedData[cellKey];
-              const isStaged = staged !== undefined && stagedColNames.includes(c);
+              const stagedInfo = stagedData[cellKey];
+              const isStaged = stagedInfo !== undefined && stagedColNames.includes(c);
 
               if (isStaged) {
+                const isError = stagedInfo.state === 'error';
+                const showSpinner = !isError && (stagedCellMode === 'running' || stagedCellMode === 'scheduled');
+                const modeLabel = stagedCellMode === 'running'
+                  ? 'running'
+                  : stagedCellMode === 'scheduled'
+                    ? 'scheduled'
+                    : 'staged';
                 return (
                   <div
                     key={cellKey}
                     className="grid-cell staged"
                     role="gridcell"
-                    title={staged}
-                    style={{ background: '#fffde7' }}
+                    title={stagedInfo.formula}
+                    style={{
+                      background: isError ? '#ffebee' : '#fffde7',
+                      borderLeft: showSpinner ? '2px solid #ffb300' : undefined,
+                    }}
                   >
-                    <span style={{ fontSize: '0.65rem', fontWeight: 600, color: '#b8960c', marginRight: 6, fontStyle: 'italic' }}>(staged)</span>
-                    <span style={{ color: '#7a6e30', fontSize: '0.72rem', fontFamily: 'Menlo, Monaco, Consolas, monospace' }}>{staged}</span>
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        color: isError ? '#b71c1c' : '#b8960c',
+                        marginRight: 6,
+                        fontStyle: 'italic',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      {showSpinner && <span className="cell-wait-spinner" />}
+                      ({modeLabel})
+                    </span>
+                    <span
+                      style={{
+                        color: isError ? '#8e0000' : '#7a6e30',
+                        fontSize: '0.72rem',
+                        fontFamily: 'Menlo, Monaco, Consolas, monospace',
+                      }}
+                    >
+                      {stagedInfo.formula}
+                    </span>
                   </div>
                 );
               }

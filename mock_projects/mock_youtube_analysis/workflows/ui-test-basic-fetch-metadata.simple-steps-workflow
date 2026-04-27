@@ -1,0 +1,27 @@
+{
+  "id": "ui-test-basic-fetch-metadata",
+  "name": "UI Test – Fetch & Metadata",
+  "created_at": "2026-04-26T12:00:00.000Z",
+  "updated_at": "2026-04-27T00:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-fetch",
+      "operation_id": "fetch_channel_videos",
+      "label": "Fetch Videos",
+      "config": {
+        "channel_url": "https://youtube.com/@mock_channel",
+        "_orchestrator": "source"
+      },
+      "formula": "=fetch_channel_videos.source(channel_url=\"https://youtube.com/@mock_channel\")"
+    },
+    {
+      "step_id": "step-metadata",
+      "operation_id": "extract_metadata",
+      "label": "Extract Metadata",
+      "config": {
+        "_orchestrator": "map"
+      },
+      "formula": "=extract_metadata.map(video_url=step1.output)"
+    }
+  ]
+}

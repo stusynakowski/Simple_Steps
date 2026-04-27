@@ -84,6 +84,10 @@ export default function MainLayout() {
 
   const activeTab = openTabs.find(t => t.isActive) ?? openTabs[0];
   const projectName = activeTab?.projectDisplayName ?? activeTab?.projectId ?? '';
+  const runningStepIndex = workflow.steps.findIndex((s) => s.status === 'running');
+  const pipelineCursorIndex = runningStepIndex >= 0
+    ? runningStepIndex
+    : workflow.steps.findIndex((s) => s.status !== 'completed');
 
   // Suppress isModified when we're switching tabs / loading (not user edits)
   const suppressModified = useRef(false);
@@ -179,7 +183,15 @@ export default function MainLayout() {
       return;
     }
     // Fetch and open new tab
-    const wf = await fetchWorkflow(projectId, pipelineId);
+    let wf: Workflow;
+    try {
+      wf = await fetchWorkflow(projectId, pipelineId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Failed to open pipeline', { projectId, pipelineId, err });
+      window.alert(`Failed to open pipeline "${pipelineId}": ${message}`);
+      return;
+    }
     // Get project display name from existing projects list
     const newTab: OpenTab = {
       id: tabKey,
@@ -505,6 +517,8 @@ export default function MainLayout() {
                     zIndex={isExpanded ? 100 : workflow.steps.length - index}
                     availableOperations={availableOperations}
                     progress={stepProgress[step.id]}
+                    pipelineStatus={pipelineStatus}
+                    pipelineCursorIndex={pipelineCursorIndex}
                     onActivate={() => toggleStep(step.id)}
                     onUpdate={(id, updates) => updateStep(id, updates)}
                     onRun={runStep}
@@ -545,6 +559,8 @@ export default function MainLayout() {
               stepIndex={stepIndex}
               previousSteps={previousSteps}
               availableOperations={availableOperations}
+              pipelineStatus={pipelineStatus}
+              pipelineCursorIndex={pipelineCursorIndex}
               color={getStepColor(stepIndex)}
               initialPosition={dw.position}
               onClose={() => closeDetachedWindow(dw.id)}

@@ -35,6 +35,8 @@ interface OperationColumnProps {
   onDetach?: (position: { x: number; y: number }) => void;
   /** Live progress for row-iterating operations */
   progress?: ProgressEvent;
+  pipelineStatus?: 'idle' | 'running' | 'paused';
+  pipelineCursorIndex?: number;
 }
 
 export default function OperationColumn({
@@ -56,6 +58,8 @@ export default function OperationColumn({
   onMaximize,
   onDetach,
   progress,
+  pipelineStatus = 'idle',
+  pipelineCursorIndex = -1,
 }: OperationColumnProps) {
   // Tab State
   const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data' | 'settings'>('data');
@@ -215,6 +219,24 @@ export default function OperationColumn({
     (step.status === 'pending' ||
       step.status === 'stopped' ||
       liveFormula !== (step.formula ?? step.operation ?? ''));
+
+  const isScheduledInPipeline =
+    pipelineStatus === 'running' &&
+    step.status === 'pending' &&
+    pipelineCursorIndex >= 0 &&
+    stepIndex >= pipelineCursorIndex;
+
+  const stagedCellMode: 'idle' | 'scheduled' | 'running' =
+    step.status === 'running'
+      ? 'running'
+      : isScheduledInPipeline
+        ? 'scheduled'
+        : 'idle';
+
+  const showExecutionStagedCells =
+    hasUncommittedFormula ||
+    step.status === 'running' ||
+    isScheduledInPipeline;
 
   // Handler for UI-based updates (Dropdowns/Inputs in the Details tab)
   // The UI form writes to the formula FIRST; process_type and configuration
@@ -467,7 +489,8 @@ export default function OperationColumn({
                         sourceStepId={step.id}
                         onWireColumn={(token) => injectReference(token)}
                         onWireCell={(token) => injectReference(token)}
-                        stagedColumns={hasUncommittedFormula ? stagedPreview.columns : []}
+                        stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
+                        stagedCellMode={stagedCellMode}
                       />
                     </div>
                   </div>
