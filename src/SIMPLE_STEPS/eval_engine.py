@@ -33,7 +33,7 @@ import pandas as pd
 import numpy as np
 from typing import Optional, Dict, Any
 
-from .engine import get_dataframe, resolve_reference, save_dataframe
+from .engine import get_dataframe
 from .step_proxy import StepProxy, ColumnProxy, step as make_step, unwrap_step, RawValue, raw as make_raw
 
 
@@ -42,6 +42,7 @@ def run_eval(
     df_in: Optional[pd.DataFrame],
     step_map: Dict[str, str],
     orchestrator_type: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Execute a formula as Python code and return a DataFrame result.
@@ -53,7 +54,7 @@ def run_eval(
             '{"eval_mode": true} before using eval formulas.'
         )
 
-    ns = _build_namespace(df_in, step_map)
+    ns = _build_namespace(df_in, step_map, session_id=session_id)
 
     # ── Try eval first (single expression), fall back to exec (statements) ──
     _SENTINEL = object()
@@ -77,6 +78,7 @@ def run_eval(
 def _build_namespace(
     df_in: Optional[pd.DataFrame],
     step_map: Dict[str, str],
+    session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Build the execution namespace — this is what makes the formula bar
@@ -104,7 +106,7 @@ def _build_namespace(
 
     # ── Populate step variables: step1, step2, … + label-based names ─────
     for key, ref_id in step_map.items():
-        df = get_dataframe(ref_id)
+        df = get_dataframe(ref_id, session_id=session_id)
         if df is None:
             continue
         proxy = StepProxy(df, label=key, ref_id=ref_id)

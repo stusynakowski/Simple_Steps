@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import type { ActivityView } from './ActivityBar';
-import type { ProjectInfo, PipelineFile, DeveloperPack } from '../services/api';
-import { fetchDeveloperPacks, readWorkspaceFile } from '../services/api';
+import type { ProjectInfo, PipelineFile, DeveloperPack, SimpleStepsSettings } from '../services/api';
+import { fetchDeveloperPacks, readWorkspaceFile, fetchSettings, updateSettings } from '../services/api';
 import FileTree from './FileTree';
 import './Sidebar.css';
 
@@ -252,6 +252,111 @@ interface PacksPanelProps {
   refreshTrigger?: number;
 }
 
+// ── Settings Panel ────────────────────────────────────────────────────────
+
+const defaultSettings: SimpleStepsSettings = {
+  eval_mode: false,
+  result_store: 'memory',
+};
+
+const SettingsPanel: React.FC = () => {
+  const [settings, setSettings] = useState<SimpleStepsSettings>(defaultSettings);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const s = await fetchSettings();
+      setSettings({
+        eval_mode: !!s.eval_mode,
+        result_store: s.result_store ?? 'memory',
+      });
+    } catch {
+      setError('Could not load runtime settings');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const persist = useCallback(async (updates: Partial<SimpleStepsSettings>) => {
+    setSaving(true);
+    setError(null);
+    try {
+      const next = await updateSettings(updates);
+      setSettings({
+        eval_mode: !!next.eval_mode,
+        result_store: next.result_store ?? 'memory',
+      });
+      setSavedAt(Date.now());
+    } catch {
+      setError('Could not save runtime settings');
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  return (
+    <div className="settings-panel">
+      <div className="settings-card">
+        <div className="settings-card-title">Execution</div>
+
+        <label className="settings-field">
+          <span className="settings-label">Result Storage</span>
+          <select
+            className="settings-select"
+            value={settings.result_store}
+            disabled={loading || saving}
+            onChange={(e) => {
+              const value = e.target.value as 'memory' | 'parquet';
+              void persist({ result_store: value });
+            }}
+          >
+            <option value="memory">Memory (fast, volatile)</option>
+            <option value="parquet">Parquet cache (persistent)</option>
+          </select>
+          <span className="settings-help">
+            Memory keeps step outputs in RAM only. Parquet writes outputs to disk cache and survives process memory eviction.
+          </span>
+        </label>
+
+        <label className="settings-toggle-row">
+          <input
+            type="checkbox"
+            checked={settings.eval_mode}
+            disabled={loading || saving}
+            onChange={(e) => {
+              void persist({ eval_mode: e.target.checked });
+            }}
+          />
+          <span className="settings-label">Enable Eval Mode</span>
+        </label>
+        <div className="settings-help">
+          Eval mode executes arbitrary Python from formulas. Keep this off in untrusted environments.
+        </div>
+      </div>
+
+      <div className="settings-meta-row">
+        <button className="settings-refresh-btn" onClick={() => void load()} disabled={loading || saving}>
+          Refresh
+        </button>
+        {loading && <span className="settings-meta">Loading…</span>}
+        {saving && <span className="settings-meta">Saving…</span>}
+        {!loading && !saving && savedAt && <span className="settings-meta">Saved</span>}
+      </div>
+
+      {error && <div className="settings-error">{error}</div>}
+    </div>
+  );
+};
+
 const PacksPanel: React.FC<PacksPanelProps> = ({ refreshTrigger }) => {
   const [packs, setPacks] = useState<DeveloperPack[]>([]);
   const [loading, setLoading] = useState(false);
@@ -440,9 +545,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
 
       {currentView === 'packs' && <PacksPanel refreshTrigger={rest.refreshTrigger} />}
 
-      {(currentView === 'settings' || currentView === 'account') && (
+      {currentView === 'settings' && <SettingsPanel />}
+
+      {currentView === 'account' && (
         <div className="sidebar-padding" style={{ color: '#888', fontStyle: 'italic', padding: 20 }}>
-          {currentView === 'settings' ? 'Global Settings' : 'User Profiles'}
+          User Profiles
         </div>
       )}
     </div>

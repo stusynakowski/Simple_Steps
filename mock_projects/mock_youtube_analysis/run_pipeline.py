@@ -109,6 +109,11 @@ class PipelineRunner:
         workflow_path: str,
         stop_after: Optional[int] = None,
         on_error: str = "warn",
+        continue_on_error: bool = False,
+        wait_for_stable: bool = False,
+        stable_checks: int = 3,
+        poll_interval: float = 0.5,
+        stable_timeout: float = 20.0,
     ):
         """
         Parameters
@@ -120,14 +125,68 @@ class PipelineRunner:
         on_error:
             'warn' (default) — print error, skip step, continue.
             'raise'          — re-raise immediately and abort.
+        continue_on_error:
+            Only applies when on_error='warn'.
+            False (default) — stop pipeline after first failed step.
+            True            — keep previous behavior: skip failed step and continue.
+        wait_for_stable:
+            If True, poll each completed step output and only continue to the
+            next step once row count is stable for `stable_checks` polls.
+            Useful when an operation returns early while data is still growing.
+        stable_checks:
+            Number of consecutive identical row-count polls required.
+        poll_interval:
+            Seconds between stability polls.
+        stable_timeout:
+            Max seconds to wait for a step output to stabilize.
         """
         self.workflow_path = Path(workflow_path).resolve()
         self.stop_after = stop_after
         self.on_error = on_error
+        self.continue_on_error = continue_on_error
+        self.wait_for_stable = wait_for_stable
+        self.stable_checks = max(1, int(stable_checks))
+        self.poll_interval = max(0.05, float(poll_interval))
+        self.stable_timeout = max(0.5, float(stable_timeout))
         self.pipeline: Optional[PipelineFile] = None
         self.results: Dict[str, StepResult] = {}
         self.errors: Dict[str, str] = {}   # step_id → error message
         self._step_map: Dict[str, str] = {}
+        # Stage: canonical record of all outputs available for downstream steps.
+        # Keys are every alias that identifies a completed step (id, label, step<N>).
+        # A step's input is resolved from here before it is allowed to run.
+        self._stage: Dict[str, str] = {}     # alias → ref_id
+
+    def _wait_until_stable(self, ref_id: str, label: str) -> None:
+        """Wait until row count for `ref_id` stops changing for N polls."""
+        if not self.wait_for_stable:
+            return
+
+        start = time.perf_counter()
+        last_rows: Optional[int] = None
+        stable_hits = 0
+
+        while True:
+            df = get_dataframe(ref_id)
+            rows = len(df) if df is not None else 0
+
+            if last_rows is None:
+                last_rows = rows
+            elif rows == last_rows:
+                stable_hits += 1
+                if stable_hits >= self.stable_checks:
+                    print(f"       ↺ stabilized at {rows} rows — continuing")
+                    return
+            else:
+                print(f"       ↺ output still growing: {last_rows} → {rows} rows")
+                last_rows = rows
+                stable_hits = 0
+
+            if (time.perf_counter() - start) >= self.stable_timeout:
+                print(f"       ⚠ stability timeout after {self.stable_timeout:.1f}s; continuing with {rows} rows")
+                return
+
+            time.sleep(self.poll_interval)
 
     # ------------------------------------------------------------------
     # Load
@@ -150,7 +209,13 @@ class PipelineRunner:
     # ------------------------------------------------------------------
 
     def run(self) -> "PipelineRunner":
-        """Execute all steps (or stop_after steps) sequentially."""
+        """Execute all steps (or stop_after steps) sequentially.
+
+        After every successful step the output is committed to ``self._stage``.
+        Before each step runs, the stage is checked for the previous step's
+        output so that a step is never executed against incomplete or missing
+        upstream data — even in continue-on-error mode.
+        """
         if self.pipeline is None:
             self.load()
 
@@ -162,7 +227,9 @@ class PipelineRunner:
         print(f"  Running {len(steps)} step(s)…")
         print()
 
-        prev_ref_id: Optional[str] = None
+        # Clear stage at the start of each run so re-runs are clean.
+        self._stage = {}
+        self._step_map = {}
 
         for i, step_cfg in enumerate(steps):
             label = step_cfg.label or f"Step {i}"
@@ -170,6 +237,28 @@ class PipelineRunner:
             config = dict(step_cfg.config)
 
             print(f"  [{i + 1}/{len(steps)}] {label}  ({op_id})")
+
+            # ── Resolve input from stage ────────────────────────────────────
+            # For the first step there is no prior output.
+            # For all others, look up the previous step's ref_id in the stage.
+            # If it's absent (because that step failed/was skipped) we refuse
+            # to run this step against stale or missing data.
+            input_ref_id: Optional[str] = None
+            if i > 0:
+                prev_cfg = steps[i - 1]
+                prev_key = prev_cfg.step_id
+                input_ref_id = self._stage.get(prev_key)
+                if input_ref_id is None:
+                    msg = (
+                        f"Input not staged — step '{prev_cfg.label or prev_key}' "
+                        f"did not produce output. Skipping '{label}'."
+                    )
+                    print(f"       ⚠ {msg}")
+                    self.errors[step_cfg.step_id] = msg
+                    if self.on_error == "raise" or not self.continue_on_error:
+                        print("         (stopping pipeline — upstream data is missing)")
+                        break
+                    continue
 
             t0 = time.perf_counter()
             try:
@@ -179,7 +268,7 @@ class PipelineRunner:
                     ref_id, metrics = run_operation(
                         op_id=op_id,
                         config=config,
-                        input_ref_id=prev_ref_id,
+                        input_ref_id=input_ref_id,
                         step_label_map=self._step_map,
                         formula=step_cfg.formula or None,
                         step_id=step_cfg.step_id,
@@ -191,9 +280,10 @@ class PipelineRunner:
                 print(f"       ✗ FAILED ({elapsed:.2f}s) — {msg}")
                 if self.on_error == "raise":
                     raise
-                # 'warn' — skip this step; subsequent steps that reference it
-                # will resolve to the previous step's output (or None).
-                print(f"         (skipping — use --strict to abort on error)")
+                if not self.continue_on_error:
+                    print("         (stopping pipeline — use --continue-on-error to keep running)")
+                    break
+                print("         (skipping — use --strict to abort on error)")
                 continue
 
             elapsed = time.perf_counter() - t0
@@ -204,25 +294,37 @@ class PipelineRunner:
                 metrics=metrics,
                 elapsed=elapsed,
             )
+
+            # Optional barrier mode: do not start downstream steps until this
+            # step's output stops changing.
+            self._wait_until_stable(ref_id, label)
+
+            # Refresh result shape after stability wait in case rows/columns
+            # changed after run_operation returned.
+            final_df = get_dataframe(ref_id)
+            if final_df is not None:
+                result.rows = len(final_df)
+                result.columns = list(final_df.columns)
+
             self.results[step_cfg.step_id] = result
 
-            # Update step_map so later steps can reference this one.
-            # Keys match what the frontend wires:
-            #   step<N>          positional alias  (step1, step2, …)
-            #   <step_id>        exact ID
-            #   <label>          human label
+            # ── Commit to stage ────────────────────────────────────────────
+            # Register all aliases for this step so downstream steps and the
+            # step_map can resolve references by any name.
             positional = f"step{i + 1}"
             for key in (step_cfg.step_id, label, positional):
+                self._stage[key] = ref_id
                 self._step_map[key] = ref_id
 
-            cols_str = ", ".join(metrics.get("columns", []))
+            cols_str = ", ".join(result.columns[:6])
+            if len(result.columns) > 6:
+                cols_str += f", … (+{len(result.columns) - 6})"
             print(
-                f"       ✓ {metrics.get('rows', '?')} rows × "
-                f"{len(metrics.get('columns', []))} cols  "
+                f"       ✓ {result.rows} rows × "
+                f"{len(result.columns)} cols  "
                 f"[{elapsed:.2f}s]  columns: {cols_str}"
             )
-
-            prev_ref_id = ref_id
+            print(f"       ↳ staged as: {step_cfg.step_id}, {label}, {positional}")
 
         print()
         return self
@@ -335,6 +437,37 @@ def main():
         help="Abort immediately on any step error (default: warn and skip).",
     )
     parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="When not in --strict mode, skip failed steps and keep running downstream steps.",
+    )
+    parser.add_argument(
+        "--wait-stable",
+        action="store_true",
+        help="After each step, wait until output row-count stabilizes before running next step.",
+    )
+    parser.add_argument(
+        "--stable-checks",
+        type=int,
+        default=3,
+        metavar="N",
+        help="Consecutive stable polls required with --wait-stable (default 3).",
+    )
+    parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=0.5,
+        metavar="SEC",
+        help="Seconds between stability polls with --wait-stable (default 0.5).",
+    )
+    parser.add_argument(
+        "--stable-timeout",
+        type=float,
+        default=20.0,
+        metavar="SEC",
+        help="Max seconds to wait for stability with --wait-stable (default 20).",
+    )
+    parser.add_argument(
         "--rows",
         type=int,
         default=5,
@@ -346,7 +479,16 @@ def main():
     _banner("Simple Steps — Pipeline Runner")
 
     on_error = "raise" if args.strict else "warn"
-    runner = PipelineRunner(args.workflow, stop_after=args.steps, on_error=on_error)
+    runner = PipelineRunner(
+        args.workflow,
+        stop_after=args.steps,
+        on_error=on_error,
+        continue_on_error=args.continue_on_error,
+        wait_for_stable=args.wait_stable,
+        stable_checks=args.stable_checks,
+        poll_interval=args.poll_interval,
+        stable_timeout=args.stable_timeout,
+    )
     runner.load()
     runner.run()
     runner.summary()

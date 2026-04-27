@@ -9,7 +9,7 @@ toggled via the API at runtime.
 """
 
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 
 
 class SimpleStepsSettings(BaseModel):
@@ -26,11 +26,15 @@ class SimpleStepsSettings(BaseModel):
     #
     # This is essentially Python's eval() — treat it with the same caution.
     eval_mode: bool = False
+    # Controls where step outputs are persisted by default:
+    # - memory: in-process RAM only
+    # - parquet: RAM + parquet files under SIMPLE_STEPS_RESULT_CACHE_DIR
+    result_store: Literal['memory', 'parquet'] = 'memory'
 
     class Config:
         # Allow mutation so we can toggle at runtime
         # (Pydantic v2 uses model_config but this works for both)
-        pass
+        validate_assignment = True
 
 
 # Singleton instance — import this from anywhere

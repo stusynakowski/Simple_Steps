@@ -126,7 +126,9 @@ export async function runStep(
     inputRefId: string | null,
     stepMap?: Record<string, string>,
     isPreview: boolean = false,
-    formula?: string
+    formula?: string,
+    sessionId?: string,
+    resultStore?: 'memory' | 'parquet'
 ): Promise<StepRunResponse> {
   
   const payload = {
@@ -137,6 +139,8 @@ export async function runStep(
       step_map: stepMap || {},
       is_preview: isPreview,
       formula: formula || null,
+      session_id: sessionId || null,
+      result_store: resultStore || null,
   };
 
   const response = await fetch(`${API_BASE}/run`, {
@@ -175,6 +179,20 @@ export async function fetchDataView(
     if (!response.ok) {
         // If 404, maybe ref expired.
         throw new Error('Data not found');
+    }
+    return response.json();
+}
+
+export interface DataMeta {
+    rows: number;
+    columns: string[];
+}
+
+/** Fetches lightweight metadata (row/column counts) for a data reference. */
+export async function fetchDataMeta(refId: string): Promise<DataMeta> {
+    const response = await fetch(`${API_BASE}/data-meta/${refId}`);
+    if (!response.ok) {
+        throw new Error('Data metadata not found');
     }
     return response.json();
 }
@@ -443,6 +461,7 @@ export async function installPacks(): Promise<{ success: boolean; issues: string
 
 export interface SimpleStepsSettings {
     eval_mode: boolean;
+    result_store: 'memory' | 'parquet';
 }
 
 /** Fetch current runtime settings. */

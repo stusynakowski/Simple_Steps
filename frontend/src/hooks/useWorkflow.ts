@@ -5,6 +5,7 @@ import { runStep as runStepApi, fetchDataView, getOperations,
   listProjects, createProject, deleteProject,
   listPipelines, loadPipeline, savePipeline, deletePipeline,
   listenProgress,
+  fetchDataMeta,
 } from '../services/api';
 import type { OperationDefinition, PipelineFile, BackendError, ProgressEvent } from '../services/api';
 import { parseFormula, buildFormula } from '../utils/formulaParser';
@@ -121,6 +122,64 @@ export default function useWorkflow() {
 
   const [pipelineStatus, _setPipelineStatus] = useState<'idle' | 'running' | 'paused'>('idle');
   const pipelineStatusRef = useRef<'idle' | 'running' | 'paused'>('idle');
+
+  const STABLE_CHECKS = 2;
+  const STABLE_POLL_MS = 250;
+  const STABLE_TIMEOUT_MS = 20000;
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const waitForStableOutput = useCallback(async (
+    refId: string,
+    stepId: string,
+    stepLabel: string,
+    operationId: string,
+  ): Promise<{ rows: number; columns: string[] }> => {
+    let lastRows: number | null = null;
+    let stableHits = 0;
+    const startedAt = performance.now();
+
+    addLog('debug', `Waiting for output stability for "${stepLabel}"`, {
+      stepId,
+      stepLabel,
+      operationId,
+      detail: `Ref: ${refId}`,
+    });
+
+    while (true) {
+      const meta = await fetchDataMeta(refId);
+      const rows = meta.rows ?? 0;
+
+      if (lastRows === null) {
+        lastRows = rows;
+      } else if (rows === lastRows) {
+        stableHits += 1;
+        if (stableHits >= STABLE_CHECKS) {
+          return { rows, columns: meta.columns ?? [] };
+        }
+      } else {
+        addLog('debug', `Output still growing for "${stepLabel}": ${lastRows} -> ${rows} rows`, {
+          stepId,
+          stepLabel,
+          operationId,
+        });
+        lastRows = rows;
+        stableHits = 0;
+      }
+
+      if ((performance.now() - startedAt) >= STABLE_TIMEOUT_MS) {
+        addLog('warn', `Stability timeout for "${stepLabel}"; proceeding with latest output`, {
+          stepId,
+          stepLabel,
+          operationId,
+          detail: `Rows: ${rows}`,
+        });
+        return { rows, columns: meta.columns ?? [] };
+      }
+
+      await sleep(STABLE_POLL_MS);
+    }
+  }, [addLog]);
 
   // Wrapper that keeps the ref in sync *immediately* (not after re-render)
   const setPipelineStatus = useCallback((s: 'idle' | 'running' | 'paused') => {
@@ -264,7 +323,10 @@ export default function useWorkflow() {
           stepMap,
           false,
           step.formula || undefined,
+          workflowRef.current.id,
       );
+
+          const stableMeta = await waitForStableOutput(res.output_ref_id, id, step.label, operationId);
       
       const elapsed = Math.round(performance.now() - startTime);
 
@@ -274,7 +336,9 @@ export default function useWorkflow() {
       // Determine which columns are NEW to this step.
       // Use prevStep.outputColumns (full accumulated column list), not output_preview (filtered).
       const inputCols = new Set(prevStep?.outputColumns ?? []);
-      const outputCols: string[] = res.metrics.columns ?? [];
+      const outputCols: string[] = stableMeta.columns.length > 0
+        ? stableMeta.columns
+        : (res.metrics.columns ?? []);
       const newCols = outputCols.filter((c) => !inputCols.has(c));
       // Fall back to all output columns for source steps (no previous step)
       const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
@@ -283,7 +347,7 @@ export default function useWorkflow() {
       const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
 
       // ── Log: Step succeeded ──
-      addLog('success', `Step "${step.label}" completed — ${res.metrics.rows} rows, ${outputCols.length} columns`, {
+      addLog('success', `Step "${step.label}" completed — ${stableMeta.rows} rows, ${outputCols.length} columns`, {
         stepId: id,
         stepLabel: step.label,
         operationId,
@@ -341,7 +405,7 @@ export default function useWorkflow() {
     } finally {
       stopListening();
     }
-  }, [addLog]);
+  }, [addLog, waitForStableOutput]);
 
   const previewStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
      // Similar to runStep but with isPreview=true
@@ -392,6 +456,7 @@ export default function useWorkflow() {
           stepMap,
           true, // isPreview
           step.formula || undefined,
+          workflowRef.current.id,
       );
       
       const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
@@ -442,30 +507,80 @@ export default function useWorkflow() {
     if (pipelineStatusRef.current === 'running') return;
     
     setPipelineStatus('running');
-    // Start from wherever we left off if paused, or from beginning?
-    // Let's find first non-completed step
-    let startIndex = 0;
     const steps = workflowRef.current.steps;
     const firstIncomplete = steps.findIndex(s => s.status !== 'completed');
-    if (firstIncomplete >= 0) {
-        startIndex = firstIncomplete;
-    }
+    const startIndex = firstIncomplete >= 0 ? firstIncomplete : 0;
 
     addLog('info', `▶ Pipeline started — running ${steps.length - startIndex} step(s) from index ${startIndex}`, {
       detail: `Steps: ${steps.slice(startIndex).map(s => s.label).join(' → ')}`,
     });
 
     void (async () => {
+      // Stage: tracks every step output that has been committed and is safe to
+      // use as input for downstream steps.  Keyed by step ID.
+      // Only a successfully-completed step's outputRefId is added here.
+      const staged = new Map<string, string>(); // stepId → outputRefId
+
+      // Pre-populate stage with already-completed steps so resume works.
+      for (const s of workflowRef.current.steps) {
+        if (s.status === 'completed' && s.outputRefId) {
+          staged.set(s.id, s.outputRefId);
+        }
+      }
+
       try {
         for (let i = startIndex; i < workflowRef.current.steps.length; i += 1) {
-          // Re-check control state before each step
           if (pipelineStatusRef.current !== 'running') break;
 
-          // Always read fresh step from the live ref so we never use stale closures.
           const liveStep = workflowRef.current.steps[i];
           if (!liveStep) break;
 
+          // ── Check stage before running ──────────────────────────────────
+          // If this is not the first step, the previous step's output must be
+          // staged.  If it isn't (because that step failed or was skipped),
+          // we refuse to run against missing upstream data.
+          if (i > 0) {
+            const prevStep = workflowRef.current.steps[i - 1];
+            if (prevStep && !staged.has(prevStep.id)) {
+              addLog('warn', `Skipping "${liveStep.label}" — upstream step "${prevStep.label}" did not produce staged output`, {
+                stepId: liveStep.id,
+                stepLabel: liveStep.label,
+                operationId: liveStep.process_type,
+                detail: `Stage contains: [${[...staged.keys()].join(', ')}]`,
+              });
+              // Mark as error so it's visible in the UI
+              setWorkflow(prev => ({
+                ...prev,
+                steps: prev.steps.map(s =>
+                  s.id === liveStep.id ? { ...s, status: 'error' as const } : s
+                ),
+              }));
+              break; // stop pipeline — data is missing
+            }
+          }
+
+          addLog('info', `Queued next step "${liveStep.label}"`, {
+            stepId: liveStep.id,
+            stepLabel: liveStep.label,
+            operationId: liveStep.process_type,
+            detail: `Pipeline index ${i + 1}/${workflowRef.current.steps.length} | Staged outputs: [${[...staged.keys()].join(', ')}]`,
+          });
+
           await runStep(liveStep.id);
+
+          // ── Commit to stage on success ──────────────────────────────────
+          // runStep updates workflowRef on success and sets outputRefId.
+          // Read it back from the live ref and add it to the stage.
+          const completedStep = workflowRef.current.steps[i];
+          if (completedStep?.outputRefId && completedStep.status === 'completed') {
+            staged.set(completedStep.id, completedStep.outputRefId);
+            addLog('debug', `Staged output for "${completedStep.label}"`, {
+              stepId: completedStep.id,
+              stepLabel: completedStep.label,
+              operationId: completedStep.process_type,
+              detail: `Ref: ${completedStep.outputRefId} | Stage size: ${staged.size}`,
+            });
+          }
         }
 
         if (pipelineStatusRef.current === 'running') {

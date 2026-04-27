@@ -30,7 +30,13 @@ print("\n" + "=" * 60)
 print("  1. Load and run the full pipeline")
 print("=" * 60)
 
-runner = PipelineRunner(WORKFLOW)
+runner = PipelineRunner(
+    WORKFLOW,
+    continue_on_error=True,
+    wait_for_stable=True,
+    stable_checks=2,
+    poll_interval=0.25,
+)
 runner.load()
 runner.run()
 
@@ -55,17 +61,25 @@ fetch_df = runner.results["step-0-fetch"].df
 print(f"\n  Fetch Videos — {len(fetch_df)} rows")
 print(fetch_df["output"].to_string(index=True))
 
-# Step 4 — Analyze Sentiment: includes 'analyze_sentiment_output' scores
-sentiment_df = runner.results["step-4-sentiment"].df
-if sentiment_df is not None and "analyze_sentiment_output" in sentiment_df.columns:
-    print(f"\n  Analyze Sentiment — scores sample:")
-    print(sentiment_df[["segment_conversations_output", "analyze_sentiment_output"]].head(5).to_string(index=True))
+# Step 4 — Analyze Sentiment (may be blocked if an upstream step failed)
+sentiment_result = runner.results.get("step-4-sentiment")
+if sentiment_result:
+    sentiment_df = sentiment_result.df
+    if sentiment_df is not None and "analyze_sentiment_output" in sentiment_df.columns:
+        print(f"\n  Analyze Sentiment — scores sample:")
+        print(sentiment_df[["segment_conversations_output", "analyze_sentiment_output"]].head(5).to_string(index=True))
+else:
+    print("\n  Analyze Sentiment — (blocked: upstream step did not produce staged output)")
 
-# Step 5 — Generate Report: 'generate_report_output' column
-report_df = runner.results["step-5-report"].df
-if report_df is not None and "generate_report_output" in report_df.columns:
-    print(f"\n  Generate Report — first report entry:")
-    print(" ", report_df["generate_report_output"].iloc[0])
+# Step 5 — Generate Report (may be blocked if an upstream step failed)
+report_result = runner.results.get("step-5-report")
+if report_result:
+    report_df = report_result.df
+    if report_df is not None and "generate_report_output" in report_df.columns:
+        print(f"\n  Generate Report — first report entry:")
+        print(" ", report_df["generate_report_output"].iloc[0])
+else:
+    print("  Generate Report — (blocked: upstream step did not produce staged output)")
 
 # ===========================================================================
 # 4. Check which steps errored
@@ -91,7 +105,7 @@ print("\n" + "=" * 60)
 print("  5. Partial run — first 2 steps only")
 print("=" * 60)
 
-partial = PipelineRunner(WORKFLOW, stop_after=2)
+partial = PipelineRunner(WORKFLOW, stop_after=2, continue_on_error=True)
 partial.load()
 partial.run()
 partial.summary()

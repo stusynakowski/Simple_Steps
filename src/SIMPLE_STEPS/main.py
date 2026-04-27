@@ -629,6 +629,8 @@ async def execute_step(payload: StepRunRequest):
             payload.is_preview,
             payload.formula,
             payload.step_id,
+            payload.session_id,
+            payload.result_store,
         ))
         
         return StepRunResponse(
@@ -769,6 +771,22 @@ async def get_data_view(
             })
 
     return cells
+
+
+@app.get("/api/data-meta/{ref_id}")
+async def get_data_meta(ref_id: str):
+    """
+    Returns lightweight metadata for a result reference.
+    Useful for UI orchestration barriers (e.g. waiting for row-count stability).
+    """
+    df = get_dataframe(ref_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Data reference expired")
+
+    return {
+        "rows": int(len(df)),
+        "columns": [str(c) for c in df.columns],
+    }
 
 # ── Serve bundled frontend (SPA) ────────────────────────────────────────────
 # The built React app lives in the package at SIMPLE_STEPS/frontend_dist/.

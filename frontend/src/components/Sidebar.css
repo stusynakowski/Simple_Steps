@@ -360,6 +360,109 @@
   line-height: 1.4;
 }
 
+/* ── Global Settings Panel ───────────────────────────────────── */
+
+.settings-panel {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-card {
+  background: #252526;
+  border: 1px solid #323232;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-card-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #9d9d9d;
+  font-weight: 700;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-label {
+  font-size: 0.82rem;
+  color: #d2d2d2;
+}
+
+.settings-select {
+  background: #1f1f1f;
+  border: 1px solid #3b3b3b;
+  color: #ddd;
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 0.8rem;
+}
+
+.settings-select:disabled {
+  opacity: 0.6;
+}
+
+.settings-help {
+  font-size: 0.72rem;
+  color: #8b8b8b;
+  line-height: 1.45;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-toggle-row input[type='checkbox'] {
+  width: 14px;
+  height: 14px;
+}
+
+.settings-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-refresh-btn {
+  background: #0e639c;
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.settings-refresh-btn:hover {
+  background: #1177bb;
+}
+
+.settings-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.settings-meta {
+  font-size: 0.72rem;
+  color: #8b8b8b;
+}
+
+.settings-error {
+  font-size: 0.75rem;
+  color: #ef9a9a;
+}
+
 .resource-empty-subhint {
   padding: 2px 16px 10px 35px;
   font-size: 0.7rem;

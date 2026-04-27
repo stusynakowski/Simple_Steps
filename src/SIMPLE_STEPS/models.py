@@ -143,6 +143,8 @@ class StepRunRequest(BaseModel):
     step_map: Optional[Dict[str, str]] = None
     is_preview: bool = False
     formula: Optional[str] = None  # raw formula string for eval-mode fallback
+    session_id: Optional[str] = None
+    result_store: Optional[Literal['memory', 'parquet']] = None
 
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']
