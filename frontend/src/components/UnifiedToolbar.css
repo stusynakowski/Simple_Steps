@@ -576,3 +576,78 @@
   letter-spacing: 0.3px;
   flex-shrink: 0;
 }
+
+/* ── Pipeline meta stats panel ─────────────────────────────────────────── */
+.ut-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ut-meta-data {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ut-meta-chip {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.ut-meta-chip.ut-meta-rows { color: #9cdcfe; }
+.ut-meta-chip.ut-meta-cols { color: #b5cea8; }
+.ut-meta-chip.ut-meta-cells { color: #ce9178; font-weight: 600; }
+
+.ut-meta-sep {
+  font-size: 0.68rem;
+  color: #555;
+  user-select: none;
+}
+
+.ut-meta-icon {
+  font-size: 0.55rem;
+  margin-right: 3px;
+  vertical-align: middle;
+  opacity: 0.6;
+}
+
+.ut-meta-divider {
+  width: 1px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 2px;
+}
+
+.ut-meta-counts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ut-meta-count {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.ut-count-staged  { background: rgba(78, 201, 176, 0.18); color: #4ec9b0; }
+.ut-count-queued  { background: rgba(150, 150, 150, 0.15); color: #999; }
+.ut-count-running { background: rgba(86, 156, 214, 0.22); color: #569cd6; animation: ut-pulse 1.4s ease-in-out infinite; }
+.ut-count-ran     { background: rgba(181, 206, 168, 0.18); color: #98c379; }
+.ut-count-errors  { background: rgba(215, 58, 73, 0.2);  color: #f85149; }
+.ut-count-idle    { color: #555; font-style: italic; font-weight: 400; }
+
+@keyframes ut-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}

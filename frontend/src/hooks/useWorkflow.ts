@@ -363,6 +363,7 @@ export default function useWorkflow() {
             ...s,
             status: 'completed' as StepStatus,
             outputRefId: res.output_ref_id,
+            outputRows: stableMeta.rows,
             outputColumns: outputCols,
             output_preview: previewCells,
           };

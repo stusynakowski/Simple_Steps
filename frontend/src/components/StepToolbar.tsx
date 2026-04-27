@@ -160,19 +160,23 @@ export default function StepToolbar({
     }, 0);
   };
 
+  // Local toggle for the step overview panel
+  const [showMeta, setShowMeta] = useState(false);
+
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
+
       <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-        
-        {/* Summary Button (Levels Icon) */}
+
+        {/* Summary Button (Levels Icon) — toggles the step overview panel */}
         <button
-          className={`btn-icon tab-icon ${activeTab === 'summary' ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTabChange('summary'); }}
-          title="Step Summary"
+          className={`btn-icon tab-icon ${showMeta ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); setShowMeta(v => !v); }}
+          title="Step Overview"
           style={{
             position: 'relative',
-            color: activeTab === 'summary' ? '#f39c12' : '#95a5a6',
-            background: activeTab === 'summary' ? '#fef9e7' : 'transparent',
+            color: showMeta ? '#f39c12' : '#95a5a6',
+            background: showMeta ? '#fef9e7' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
@@ -181,11 +185,11 @@ export default function StepToolbar({
                 <line x1="12" y1="20" x2="12" y2="4"></line>
                 <line x1="6" y1="20" x2="6" y2="14"></line>
             </svg>
-            {activeTab === 'summary' && (
+            {showMeta && (
                 <div style={{
                     position: 'absolute',
-                    bottom: '-4px', // Connect to content below
-                    left: 0, 
+                    bottom: '-4px',
+                    left: 0,
                     right: 0,
                     height: '2px',
                     background: '#f39c12',
@@ -336,6 +340,58 @@ export default function StepToolbar({
             </svg>
         </button>
       </div>
+
+      {/* ── Step overview panel — toggled by info button ─────────────────── */}
+      {showMeta && (() => {
+        const opDef = availableOperations.find(o => o.id === step.process_type);
+        const opLabel = opDef?.label ?? step.process_type;
+        const hasParams = Object.keys(step.configuration ?? {}).filter(k => !k.startsWith('_')).length > 0;
+        const hasOutput = !!step.outputRefId && (step.outputColumns?.length ?? 0) > 0;
+        const statusLabel: Record<string, string> = {
+          pending: 'Queued', running: 'Running', completed: 'Completed',
+          error: 'Error', paused: 'Paused', stopped: 'Stopped',
+        };
+        return (
+          <div className="step-overview-panel">
+            <div className="step-overview-grid">
+              <span className="sop-key">Step</span>
+              <span className="sop-val">{step.label}</span>
+
+              <span className="sop-key">Operation</span>
+              <span className="sop-val">{opLabel}</span>
+
+              <span className="sop-key">Status</span>
+              <span className={`sop-val sop-status sop-status--${step.status}`}>
+                {statusLabel[step.status] ?? step.status}
+              </span>
+
+              <span className="sop-key">Execution ID</span>
+              <span className="sop-val sop-mono">{step.id}</span>
+
+              {hasParams && (
+                <>
+                  <span className="sop-key">Parameters</span>
+                  <span className="sop-val sop-params">Configured</span>
+                </>
+              )}
+
+              {hasOutput && (
+                <>
+                  <span className="sop-key">Output</span>
+                  <span className="sop-val">
+                    <span className="sop-chip sop-rows">{(step.outputRows ?? 0).toLocaleString()} rows</span>
+                    <span className="sop-x">×</span>
+                    <span className="sop-chip sop-cols">{step.outputColumns!.length} cols</span>
+                    <span className="sop-x">=</span>
+                    <span className="sop-chip sop-cells">{((step.outputRows ?? 0) * step.outputColumns!.length).toLocaleString()} cells</span>
+                    <span className="sop-staged">staged</span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Formula Bar Section - Now on Top */}
       <div className="formula-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>

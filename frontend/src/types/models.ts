@@ -34,6 +34,7 @@ export interface Step {
   /** @deprecated Use `formula` instead. Kept for backward-compat during migration. */
   operation?: string;
   outputRefId?: string; // The backend reference ID for the result DataFrame
+  outputRows?: number;   // Row count of the output DataFrame
   outputColumns?: string[]; // Full list of columns in the output DataFrame (for step diffing)
   output_preview?: Cell[]; 
 }

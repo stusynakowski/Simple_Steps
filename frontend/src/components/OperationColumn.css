@@ -643,3 +643,103 @@
   background: #ffc107;
   border-radius: 1px;
 }
+
+
+/* ── Step overview panel (toggled by info button) ──────────────────────── */
+.step-overview-panel {
+  margin: 0 2px 2px 2px;
+  background: #f0f0f0;
+  border: 1px solid #d0d0d0;
+  border-radius: 5px;
+  padding: 8px 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+}
+
+.step-overview-grid {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 4px 8px;
+  align-items: start;
+}
+
+.sop-key {
+  font-size: 0.67rem;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding-top: 1px;
+  white-space: nowrap;
+}
+
+.sop-val {
+  font-size: 0.72rem;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  word-break: break-all;
+}
+
+.sop-mono {
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 0.65rem;
+  color: #444;
+  background: #e4e4e4;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.sop-params {
+  font-size: 0.67rem;
+  color: #2e6da4;
+  background: #ddeeff;
+  border: 1px solid #b0d0f0;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+/* Status variants */
+.sop-status {
+  font-weight: 700;
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 8px;
+}
+.sop-status--pending   { color: #666;    background: #e8e8e8; }
+.sop-status--running   { color: #1565c0; background: #ddeeff; }
+.sop-status--completed { color: #1a6b45; background: #d4edda; }
+.sop-status--error     { color: #b91c1c; background: #fee2e2; }
+.sop-status--paused    { color: #92400e; background: #fef3c7; }
+.sop-status--stopped   { color: #555;    background: #e8e8e8; }
+
+/* Output shape chips */
+.sop-chip {
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.1);
+}
+.sop-rows  { background: #e8f4fd; color: #1565c0; }
+.sop-cols  { background: #e9f5e9; color: #2e7d32; }
+.sop-cells { background: #fff3e0; color: #e65100; font-weight: 700; }
+
+.sop-x {
+  font-size: 0.6rem;
+  color: #999;
+  user-select: none;
+}
+
+.sop-staged {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #1a6b45;
+  background: #d4edda;
+  border: 1px solid #a3d5b5;
+  padding: 0 5px;
+  border-radius: 8px;
+  margin-left: 2px;
+}
