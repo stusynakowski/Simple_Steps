@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from .formula_parser import parse_formula, build_formula
 from typing import List, Optional
 from pydantic import BaseModel
 import pandas as pd
@@ -149,6 +150,22 @@ app = FastAPI(
 # --- Agent Router ---
 app.include_router(agent_router)
 
+    # --- Formula Parser API ---
+@app.post("/api/parse_formula")
+async def api_parse_formula(payload: dict = Body(...)):
+    """Parse a formula string and return the parsed structure."""
+    formula = payload.get("formula", "")
+    parsed = parse_formula(formula)
+    return parsed.as_dict()
+
+@app.post("/api/build_formula")
+async def api_build_formula(payload: dict = Body(...)):
+    """Build a formula string from operation_id, config, and orchestration."""
+    operation_id = payload.get("operation_id", "")
+    config = payload.get("config", {})
+    orchestration = payload.get("orchestration")
+    formula = build_formula(operation_id, config, orchestration)
+    return {"formula": formula}
 # --- Middleware ---
 # Allow any localhost port so multiple Simple Steps instances can co-exist
 # (Streamlit-style port auto-increment means we may run on :8001, :8002, etc.)

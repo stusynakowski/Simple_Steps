@@ -44,6 +44,7 @@ if not any("SIMPLE_STEPS" in p for p in sys.path):
 # ---------------------------------------------------------------------------
 from SIMPLE_STEPS.engine import run_operation, get_dataframe  # noqa: E402
 from SIMPLE_STEPS.models import PipelineFile                  # noqa: E402
+import SIMPLE_STEPS.operations  # Ensure core operations are registered
 
 # ---------------------------------------------------------------------------
 # Register ops — order matters only for clarity; all ops share a global registry

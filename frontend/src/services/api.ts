@@ -19,7 +19,7 @@ function resolveApiBase(): string {
   return '/api';
 }
 
-const API_BASE = resolveApiBase();
+export const API_BASE = resolveApiBase();
 
 export interface ProgressEvent {
   current: number;

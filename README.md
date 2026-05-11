@@ -519,6 +519,19 @@ cd frontend && npm test
 
 ---
 
+## Coverage (backend + frontend)
+
+To run coverage for both backend (pytest) and frontend (vitest), there's a small helper script:
+
+```bash
+./scripts/run_coverage.sh
+```
+
+Notes:
+- The frontend coverage run requires Node.js and npm. The script will run `npm install` in `frontend/` if needed.
+- Backend coverage uses `pytest --cov=src` and prints a terminal summary.
+
+
 ## Documentation
 
 | Doc | Description |

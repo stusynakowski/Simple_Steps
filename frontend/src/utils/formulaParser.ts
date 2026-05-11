@@ -14,9 +14,7 @@ export interface ParsedFormula {
   rawInput: string;
 }
 
-const ORCHESTRATION_MODES: ReadonlySet<string> = new Set([
-  'source', 'map', 'filter', 'dataframe', 'expand', 'raw_output',
-]);
+
 
 /**
  * Detect whether a value looks like a step reference token.
@@ -30,10 +28,21 @@ const ORCHESTRATION_MODES: ReadonlySet<string> = new Set([
  * references, where the first segment starts with "step" (case-insensitive)
  * or matches a step-ID pattern.
  */
-export function isStepReference(value: unknown): boolean {
+
+// --- Canonical formula parsing/building is now in the backend (Python).
+// These stubs call the backend API for all formula operations.
+import { API_BASE } from '../services/api';
+
+export async function isStepReference(value: unknown): Promise<boolean> {
   if (typeof value !== 'string') return false;
-  // step<N>.column  OR  step-<id>.column  OR  step-<id>[row=N, col=X]
-  return /^step[\w-]*\.\w+$/i.test(value) || /^step[\w-]*\[.*\]$/i.test(value);
+  // Use the backend's parser for canonical check
+  const resp = await fetch(`${API_BASE}/parse_formula`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formula: `=${value}` }),
+  });
+  const parsed = await resp.json();
+  return parsed.operationId === 'passthrough';
 }
 
 /**
@@ -44,116 +53,19 @@ export function isStepReference(value: unknown): boolean {
  * - Numbers and booleans are unquoted.
  * - Everything else is double-quoted.
  */
-export function formatFormulaValue(v: unknown): string {
-  if (v === null || v === undefined) return '';
-  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-  const s = String(v);
-  if (s.startsWith('=')) return s;
-  // Step references stay unquoted
-  if (isStepReference(s)) return s;
-  // Pure numbers typed as strings stay unquoted
-  if (/^-?\d+(\.\d+)?$/.test(s)) return s;
-  // Everything else is quoted
-  return `"${s}"`;
+// No-op: always use backend for formula building
+export function formatFormulaValue(_v: unknown): string {
+  throw new Error('formatFormulaValue is now handled by the backend. Use buildFormula().');
 }
 
-/**
- * Detect whether a formula body (after '=') is a literal value.
- * Returns a ParsedFormula that routes to define_value or to_rows,
- * or null if it's not a literal.
- */
-function _tryParseLiteral(body: string, rawInput: string): ParsedFormula | null {
-  // String literal: "..." or '...'
-  if (
-    (body.startsWith('"') && body.endsWith('"')) ||
-    (body.startsWith("'") && body.endsWith("'"))
-  ) {
-    const inner = body.slice(1, -1);
-    return {
-      operationId: 'define_value',
-      orchestration: 'source',
-      args: { value: inner, type: 'string', _literal: body },
-      isValid: true,
-      rawInput,
-    };
-  }
+// No-op: always use backend for formula parsing
 
-  // Number literal
-  if (/^-?\d+(\.\d+)?$/.test(body)) {
-    return {
-      operationId: 'define_value',
-      orchestration: 'source',
-      args: { value: body, type: 'number', _literal: body },
-      isValid: true,
-      rawInput,
-    };
-  }
-
-  // Boolean literal
-  if (body === 'true' || body === 'false') {
-    return {
-      operationId: 'define_value',
-      orchestration: 'source',
-      args: { value: body, type: 'auto', _literal: body },
-      isValid: true,
-      rawInput,
-    };
-  }
-
-  // JSON array [...] → parse into rows via auto detection
-  if (body.startsWith('[') && body.endsWith(']')) {
-    return {
-      operationId: 'define_value',
-      orchestration: 'source',
-      args: { value: body, type: 'auto', _literal: body },
-      isValid: true,
-      rawInput,
-    };
-  }
-
-  // JSON object {...} → parse into columns/rows via auto detection
-  if (body.startsWith('{') && body.endsWith('}')) {
-    return {
-      operationId: 'define_value',
-      orchestration: 'source',
-      args: { value: body, type: 'auto', _literal: body },
-      isValid: true,
-      rawInput,
-    };
-  }
-
-  return null;
-}
 
 /**
  * Split a raw args string on commas, respecting quotes and brackets.
  * e.g. `data=step-000[row=0, col=value], x="a,b"` → two tokens.
  */
-function splitArgs(raw: string): string[] {
-  const tokens: string[] = [];
-  let current = '';
-  let depth = 0;      // bracket depth []
-  let inSingle = false;
-  let inDouble = false;
 
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (ch === '"' && !inSingle) { inDouble = !inDouble; }
-    else if (ch === "'" && !inDouble) { inSingle = !inSingle; }
-    else if (!inSingle && !inDouble) {
-      if (ch === '[') depth++;
-      else if (ch === ']') depth--;
-      else if (ch === ',' && depth === 0) {
-        tokens.push(current);
-        current = '';
-        continue;
-      }
-    }
-    current += ch;
-  }
-  if (current) tokens.push(current);
-  return tokens;
-}
 
 /**
  * Parses a formula string like:
@@ -163,105 +75,13 @@ function splitArgs(raw: string): string[] {
  *   `="hello"`  or  `=42`  or  `=[1,2,3]`  or  `={"a":[1,2]}`  ← literals
  * into a structured object.
  */
-export function parseFormula(input: string): ParsedFormula {
-  const raw = (input || '').trim();
-
-  if (!raw.startsWith('=')) {
-    return { operationId: null, orchestration: null, args: {}, isValid: false, rawInput: raw };
-  }
-
-  const body = raw.slice(1); // Remove leading '='
-
-  // ── Literal detection ─────────────────────────────────────────────
-  // Matches: ="string", ='string', =42, =3.14, =true, =false,
-  //          =[...], ={...}  (JSON array / object)
-  const trimmed = body.trim();
-  const literalResult = _tryParseLiteral(trimmed, raw);
-  if (literalResult) return literalResult;
-
-  // ── Step reference detection ──────────────────────────────────────
-  // =step-000.value  or  =step-000  (bare step ref without parens)
-  // =step-000[row=2, col=value]  (specific cell reference)
-  // These are passthrough references, not operations.
-  if (/^step[\w-]*(\.\w+)?$/i.test(trimmed) || /^step[\w-]*\[.*\]$/i.test(trimmed)) {
-    return {
-      operationId: 'passthrough',
-      orchestration: null,
-      args: { _ref: trimmed },
-      isValid: true,
-      rawInput: raw,
-    };
-  }
-
-  const parenIdx = body.indexOf('(');
-
-  if (parenIdx === -1) {
-    // Still typing — no '(' yet. May have a partial modifier too.
-    const dotIdx = body.indexOf('.');
-    const operationId = dotIdx !== -1 ? body.slice(0, dotIdx) : body;
-    return {
-      operationId: operationId.toUpperCase() || null,
-      orchestration: null,
-      args: {},
-      isValid: false,
-      rawInput: raw,
-    };
-  }
-
-  // Everything before '(' is either "opId" or "opId.modifier"
-  const head = body.slice(0, parenIdx);
-  const dotIdx = head.indexOf('.');
-  let operationId: string;
-  let orchestration: OrchestrationMode | null = null;
-
-  if (dotIdx !== -1) {
-    operationId = head.slice(0, dotIdx);
-    const maybeMode = head.slice(dotIdx + 1);
-    orchestration = ORCHESTRATION_MODES.has(maybeMode)
-      ? (maybeMode as OrchestrationMode)
-      : null;
-  } else {
-    operationId = head;
-  }
-
-  if (!operationId) {
-    return { operationId: null, orchestration: null, args: {}, isValid: false, rawInput: raw };
-  }
-
-  const hasClosingParen = raw.endsWith(')');
-  const argsRaw = hasClosingParen
-    ? body.slice(parenIdx + 1, body.length - 1)
-    : body.slice(parenIdx + 1);
-
-  const args: Record<string, string> = {};
-
-  if (argsRaw.trim()) {
-    // Split on commas that are NOT inside quotes or brackets
-    const argTokens = splitArgs(argsRaw);
-    argTokens.forEach(token => {
-      const eqIdx = token.indexOf('=');
-      if (eqIdx !== -1) {
-        const key = token.slice(0, eqIdx).trim();
-        let val = token.slice(eqIdx + 1).trim();
-        // Strip surrounding quotes
-        if (
-          (val.startsWith('"') && val.endsWith('"')) ||
-          (val.startsWith("'") && val.endsWith("'"))
-        ) {
-          val = val.slice(1, -1);
-        }
-        if (key) args[key] = val;
-      }
-    });
-  }
-
-  return {
-    operationId,
-    orchestration,
-    args,
-    isValid: hasClosingParen,
-    rawInput: raw,
-  };
+export async function parseFormula(input: string): Promise<ParsedFormula> {
+  const resp = await fetch(`${API_BASE}/parse_formula`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ formula: input }),
+  });
+  return resp.json();
 }
 
 /**
@@ -278,44 +98,16 @@ export function parseFormula(input: string): ParsedFormula {
  *   buildFormula('fetch_videos', null, { channel_url: 'https://...' })
  *   → `=fetch_videos(channel_url="https://...")`  ← no modifier
  */
-export function buildFormula(
+export async function buildFormula(
   operationId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   config: Record<string, any>,
   orchestration?: OrchestrationMode | null,
-): string {
-  if (!operationId || operationId === 'noop') return '';
-  // Pass-through steps store their bare reference token in _ref
-  if (operationId === 'passthrough') {
-    return String(config._ref ?? '');
-  }
-
-  // ── Literal shorthand ──────────────────────────────────────────────
-  // If the operation is define_value or to_rows and came from a literal,
-  // preserve the compact `="hello"` / `=[1,2,3]` syntax.
-  if (operationId === 'define_value' && config._literal !== undefined) {
-    return `=${config._literal}`;
-  }
-  if (operationId === 'to_rows' && config._literal !== undefined) {
-    return `=${config._literal}`;
-  }
-
-  // The orchestration modifier — use explicit arg, else fall back to
-  // _orchestrator stored in config (legacy path), else omit.
-  const effectiveMode: OrchestrationMode | null =
-    orchestration !== undefined
-      ? orchestration
-      : (config._orchestrator as OrchestrationMode | null) ?? null;
-
-  const modifier = effectiveMode ? `.${effectiveMode}` : '';
-
-  const args = Object.entries(config)
-    .filter(([k]) => !k.startsWith('_')) // all _-prefixed keys are internal
-    .map(([k, v]) => {
-      const valStr = formatFormulaValue(v);
-      return `${k}=${valStr}`;
-    })
-    .join(', ');
-
-  return `=${operationId}${modifier}(${args})`;
+): Promise<string> {
+  const resp = await fetch(`${API_BASE}/build_formula`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ operation_id: operationId, config, orchestration }),
+  });
+  const data = await resp.json();
+  return data.formula;
 }

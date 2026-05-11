@@ -318,10 +318,49 @@ def run_operation(
         if k in _PASSTHROUGH_PARAMS:
             resolved_config[k] = v  # keep as literal string
             continue
-        resolved_config[k] = resolve_reference(v, step_map, session_id=session_id)
+        resolved_val = resolve_reference(v, step_map, session_id=session_id)
+        resolved_config[k] = resolved_val
 
     if df_in is not None:
         resolved_config['_input_df'] = df_in
+
+    # If any resolved config values are DataFrames or Series, they will
+    # cause unexpected keyword argument errors when passed directly to
+    # dataframe-style functions. Move such values into '_input_df' so the
+    # dataframe wrapper can inject them under the expected parameter name
+    # (e.g., 'df' or 'data'). This handles cases like config: {"data": "step1"}
+    # where resolve_reference returned a DataFrame object.
+    # Use the raw function signature to decide how to treat DataFrame/Series
+    try:
+        import inspect as _inspect
+        sig = _inspect.signature(func)
+        func_params = set(sig.parameters.keys())
+    except Exception:
+        func_params = set()
+
+    for key, val in list(resolved_config.items()):
+        try:
+            import pandas as _pd
+        except Exception:
+            _pd = None
+
+        # If it's a Series and the function expects this named parameter,
+        # convert it to a plain list so functions expecting List inputs
+        # (common for consumer-style ops) receive a native Python list.
+        if _pd is not None and isinstance(val, _pd.Series):
+            if key in func_params:
+                resolved_config[key] = val.tolist()
+                continue
+
+        # If it's a DataFrame or Series and the function does NOT accept
+        # the corresponding kwarg name, move it into the special
+        # '_input_df' slot so dataframe-oriented orchestrators can inject
+        # it under the expected parameter name (df/data).
+        if _pd is not None and isinstance(val, (_pd.DataFrame, _pd.Series)):
+            if key not in func_params:
+                resolved_config.pop(key, None)
+                if '_input_df' not in resolved_config:
+                    resolved_config['_input_df'] = val
     
     executable_func = func if not wrapper else wrapper(func)
     

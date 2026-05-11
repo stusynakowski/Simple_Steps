@@ -244,13 +244,80 @@ def select_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
     """
     if df is None or df.empty:
         return pd.DataFrame()
-    cols = [c.strip() for c in columns.split(",") if c.strip()]
+    # Support either a comma-separated string or a JSON array string
+    cols = []
+    if isinstance(columns, (list, tuple)):
+        cols = list(columns)
+    else:
+        s = (columns or "").strip()
+        if s.startswith("["):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    cols = [str(c) for c in parsed]
+            except Exception:
+                # Fall back to comma-split on parse error
+                cols = [c.strip() for c in s.split(",") if c.strip()]
+        else:
+            cols = [c.strip() for c in s.split(",") if c.strip()]
     if not cols:
         return df
     missing = [c for c in cols if c not in df.columns]
     if missing:
         raise ValueError(f"Columns not found: {missing}. Available: {list(df.columns)}")
     return df[cols]
+
+
+@simple_step(name="Select Rows", category="Data Reshaping", operation_type="dataframe", id="select_rows")
+def select_rows(df: pd.DataFrame, row_indices: str = "") -> pd.DataFrame:
+    """
+    Select specific row indices from the DataFrame.
+
+    Accepts a JSON array string like "[0,2]" or a comma-separated list "0,2".
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    idx_list = []
+    if isinstance(row_indices, (list, tuple)):
+        idx_list = list(row_indices)
+    else:
+        s = str(row_indices).strip()
+        if not s:
+            return df
+        if s.startswith("["):
+            try:
+                parsed = json.loads(s)
+                if isinstance(parsed, list):
+                    idx_list = [int(x) for x in parsed]
+            except Exception:
+                idx_list = [int(x) for x in s.split(",") if x.strip()]
+        else:
+            idx_list = [int(x) for x in s.split(",") if x.strip()]
+
+    # Bound-check and select
+    valid = [i for i in idx_list if 0 <= i < len(df)]
+    return df.iloc[valid].reset_index(drop=True)
+
+
+@simple_step(name="Select Cell", category="Data Reshaping", operation_type="dataframe", id="select_cell")
+def select_cell(df: pd.DataFrame, row_index: int = 0, column: str = "") -> pd.DataFrame:
+    """
+    Return a single cell value as a 1x1 DataFrame.
+    """
+    if df is None or df.empty:
+        return pd.DataFrame()
+    if column and column in df.columns:
+        try:
+            val = df.iloc[int(row_index)][column]
+        except Exception:
+            return pd.DataFrame()
+    else:
+        try:
+            val = df.iloc[int(row_index), 0]
+        except Exception:
+            return pd.DataFrame()
+    return pd.DataFrame([[val]])
 
 
 @simple_step(name="Drop Columns", category="Data Reshaping", operation_type="dataframe", id="drop_columns")

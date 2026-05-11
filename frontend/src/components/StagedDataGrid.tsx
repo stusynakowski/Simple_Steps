@@ -47,11 +47,17 @@ export default function StagedDataGrid({ preview }: StagedDataGridProps) {
                   return (
                     <td
                       key={col.name}
-                      className="staged-cell"
+                      className={`staged-cell${cell.errorMessage ? ' staged-cell-error' : ''}`}
                       title={cell.formula}
                     >
                       <span className="staged-tag">(staged)</span>
                       <span className="staged-cell-text">{cell.formula}</span>
+                      {cell.errorMessage && (
+                        <div className="staged-cell-error-message">
+                          <span role="img" aria-label="Error" style={{color: 'red', marginRight: 4}}>⚠</span>
+                          {cell.errorMessage}
+                        </div>
+                      )}
                     </td>
                   );
                 })}
