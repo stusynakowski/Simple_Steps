@@ -1,0 +1,28 @@
+{
+  "id": "select-columns",
+  "name": "Select Columns",
+  "created_at": "2026-05-10T12:00:00.000Z",
+  "updated_at": "2026-05-10T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-table",
+      "operation_id": "make_table",
+      "label": "Create Table",
+      "config": {
+        "rows": "[{\"name\": \"alice\", \"score\": 90, \"age\": 30}, {\"name\": \"bob\", \"score\": 75, \"age\": 25}, {\"name\": \"carol\", \"score\": 88, \"age\": 28}]",
+        "_orchestrator": "source"
+      },
+      "formula": "=make_table(rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')"
+    },
+    {
+      "step_id": "step-select-columns",
+      "operation_id": "select_columns",
+      "label": "Select Columns",
+      "config": {
+        "data": "step1",
+        "columns": "[\"name\", \"score\"]"
+      },
+      "formula": "=select_columns(data=step1, columns=[\"name\",\"score\"])"
+    }
+  ]
+}

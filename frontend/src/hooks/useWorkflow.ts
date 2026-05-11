@@ -26,16 +26,13 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
   const parsed = savedFormula ? parseFormula(savedFormula) : null;
   const formulaIsUsable = parsed?.isValid && !!parsed.operationId;
 
-  // 🔍 DEBUG — remove after confirming fix
-  console.log(`[hydrateStep] step_id=${s.step_id} savedFormula="${savedFormula}" formulaIsUsable=${formulaIsUsable} operation_id=${s.operation_id}`);
-
   // If the saved file has a valid formula, derive everything from it.
   // Fall back to the legacy operation_id/config fields for old saves.
   const processType = formulaIsUsable
     ? parsed!.operationId!
     : (s.operation_id ?? 'noop');
 
-  const formulaArgs = formulaIsUsable ? (parsed!.args ?? {}) : {};
+  let formulaArgs = formulaIsUsable ? (parsed!.args ?? {}) : {};
 
   // Preserve internal (_-prefixed) keys from the saved config (e.g. _orchestrator)
   // that are not part of the formula syntax, then layer formula args on top.
@@ -51,20 +48,43 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
         Object.entries(s.config ?? {}).filter(([k]) => !k.startsWith('_'))
       );
 
+  // --- Enforce reference to previous step (if not first step) ---
+  // If not the first step, inject a 'data' reference to the previous step if not present
+  if (i > 0) {
+    const prevStepId = `step${i}`; // step1, step2, ... (1-based)
+    // Only inject if no step reference is present in any arg
+    const hasStepRef = Object.values(formulaArgs).some(v => typeof v === 'string' && v.startsWith('step'));
+    if (!hasStepRef) {
+      formulaArgs = { ...formulaArgs, data: `${prevStepId}` };
+    }
+  }
+
   const configuration = { ...internalKeys, ...legacyConfig, ...formulaArgs };
 
   // Use the saved formula only if it parsed successfully.
   // Otherwise reconstruct from legacy fields so the formula bar always
   // shows the correct function + arguments (not just the step name).
   const formula = formulaIsUsable
-    ? savedFormula
+    ? buildFormula(processType, formulaArgs, (internalKeys._orchestrator as any) ?? null)
     : buildFormula(processType, configuration,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (internalKeys._orchestrator as any) ?? null,
       );
 
-  // 🔍 DEBUG — remove after confirming fix
-  console.log(`[hydrateStep RESULT] step_id=${s.step_id} formula="${formula}" process_type="${processType}" operation="${formula}"`);
+  // --- Validate that all step references only point to previous steps ---
+  // (Assume step references are of the form stepN or step-<id>)
+  const stepRefPattern = /^step(\d+)(\.|$)/;
+  Object.values(formulaArgs).forEach(v => {
+    if (typeof v === 'string') {
+      const match = v.match(stepRefPattern);
+      if (match) {
+        const refIdx = parseInt(match[1], 10);
+        if (refIdx >= i + 1) {
+          throw new Error(`Step ${i + 1} references a future or current step (step${refIdx}) in its formula, which is not allowed.`);
+        }
+      }
+    }
+  });
 
   return {
     id: s.step_id,
