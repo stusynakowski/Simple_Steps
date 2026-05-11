@@ -1,0 +1,18 @@
+{
+  "id": "var-nested-dict",
+  "name": "Variable — Nested Dictionary",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "literal",
+      "label": "Nested Dictionary Variable",
+      "config": {
+        "expr": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}",
+        "_orchestrator": "source"
+      },
+      "formula": "= {\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}"
+    }
+  ]
+}

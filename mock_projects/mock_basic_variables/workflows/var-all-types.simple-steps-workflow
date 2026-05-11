@@ -1,0 +1,78 @@
+{
+  "id": "var-all-types",
+  "name": "Variables — All Types in Sequence",
+  "created_at": "2026-05-08T12:00:00.000Z",
+  "updated_at": "2026-05-08T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-str",
+      "operation_id": "literal",
+      "label": "greeting",
+      "config": {
+        "expr": "\"hello world\"",
+        "_orchestrator": "source"
+      },
+      "formula": "= \"hello world\""
+    },
+    {
+      "step_id": "step-int",
+      "operation_id": "literal",
+      "label": "count",
+      "config": {
+        "expr": "42",
+        "_orchestrator": "source"
+      },
+      "formula": "= 42"
+    },
+    {
+      "step_id": "step-float",
+      "operation_id": "literal",
+      "label": "pi",
+      "config": {
+        "expr": "3.14",
+        "_orchestrator": "source"
+      },
+      "formula": "= 3.14"
+    },
+    {
+      "step_id": "step-bool",
+      "operation_id": "literal",
+      "label": "is_active",
+      "config": {
+        "expr": "True",
+        "_orchestrator": "source"
+      },
+      "formula": "= True"
+    },
+    {
+      "step_id": "step-list",
+      "operation_id": "literal",
+      "label": "scores",
+      "config": {
+        "expr": "[10, 20, 30, 40, 50]",
+        "_orchestrator": "source"
+      },
+      "formula": "= [10, 20, 30, 40, 50]"
+    },
+    {
+      "step_id": "step-dict",
+      "operation_id": "literal",
+      "label": "user",
+      "config": {
+        "expr": "{\"name\": \"alice\", \"age\": 30, \"active\": True}",
+        "_orchestrator": "source"
+      },
+      "formula": "= {\"name\": \"alice\", \"age\": 30, \"active\": True}"
+    },
+    {
+      "step_id": "step-nested",
+      "operation_id": "literal",
+      "label": "profile",
+      "config": {
+        "expr": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}",
+        "_orchestrator": "source"
+      },
+      "formula": "= {\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}"
+    }
+  ]
+}

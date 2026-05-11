@@ -1,0 +1,28 @@
+{
+  "id": "expand-list-scalars",
+  "name": "Expand — List of Scalars",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "define_variable",
+      "label": "List of Integers",
+      "config": {
+        "value": "[1, 2, 3, 4, 5]",
+        "type": "json",
+        "_orchestrator": "source"
+      },
+      "formula": "=define_variable(value=\"[1, 2, 3, 4, 5]\", type=\"json\")"
+    },
+    {
+      "step_id": "step-expand",
+      "operation_id": "expand_cell",
+      "label": "Expand to Rows",
+      "config": {
+        "_orchestrator": "dataframe"
+      },
+      "formula": "=expand_cell()"
+    }
+  ]
+}

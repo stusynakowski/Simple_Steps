@@ -1,0 +1,28 @@
+{
+  "id": "expand-list-nested-dicts",
+  "name": "Expand — List of Nested Dicts",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "define_variable",
+      "label": "List of Nested Dicts",
+      "config": {
+        "value": "[{\"name\": \"alice\", \"address\": {\"city\": \"NYC\", \"zip\": \"10001\"}}, {\"name\": \"bob\", \"address\": {\"city\": \"LA\", \"zip\": \"90001\"}}, {\"name\": \"carol\", \"address\": {\"city\": \"Chicago\", \"zip\": \"60601\"}}]",
+        "type": "json",
+        "_orchestrator": "source"
+      },
+      "formula": "=define_variable(value='[{\"name\":\"alice\",\"address\":{\"city\":\"NYC\",\"zip\":\"10001\"}},{\"name\":\"bob\",\"address\":{\"city\":\"LA\",\"zip\":\"90001\"}},{\"name\":\"carol\",\"address\":{\"city\":\"Chicago\",\"zip\":\"60601\"}}]', type=\"json\")"
+    },
+    {
+      "step_id": "step-expand",
+      "operation_id": "expand_cell",
+      "label": "Flatten Nested Rows",
+      "config": {
+        "_orchestrator": "dataframe"
+      },
+      "formula": "=expand_cell()"
+    }
+  ]
+}

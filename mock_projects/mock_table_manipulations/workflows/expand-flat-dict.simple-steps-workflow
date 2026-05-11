@@ -1,0 +1,28 @@
+{
+  "id": "expand-flat-dict",
+  "name": "Expand — Flat Dictionary",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "define_variable",
+      "label": "Flat Dictionary",
+      "config": {
+        "value": "{\"name\": \"alice\", \"age\": 30, \"active\": true}",
+        "type": "json",
+        "_orchestrator": "source"
+      },
+      "formula": "=define_variable(value='{\"name\":\"alice\",\"age\":30,\"active\":true}', type=\"json\")"
+    },
+    {
+      "step_id": "step-expand",
+      "operation_id": "expand_cell",
+      "label": "Expand to Row",
+      "config": {
+        "_orchestrator": "dataframe"
+      },
+      "formula": "=expand_cell()"
+    }
+  ]
+}

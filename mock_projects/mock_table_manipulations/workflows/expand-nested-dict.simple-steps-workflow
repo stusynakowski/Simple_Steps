@@ -1,0 +1,28 @@
+{
+  "id": "expand-nested-dict",
+  "name": "Expand — Nested Dictionary",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "define_variable",
+      "label": "Nested Dictionary",
+      "config": {
+        "value": "{\"user\": {\"name\": \"alice\", \"age\": 30}, \"meta\": {\"version\": 1, \"active\": true}}",
+        "type": "json",
+        "_orchestrator": "source"
+      },
+      "formula": "=define_variable(value='{\"user\":{\"name\":\"alice\",\"age\":30},\"meta\":{\"version\":1,\"active\":true}}', type=\"json\")"
+    },
+    {
+      "step_id": "step-expand",
+      "operation_id": "expand_cell",
+      "label": "Flatten to Columns",
+      "config": {
+        "_orchestrator": "dataframe"
+      },
+      "formula": "=expand_cell()"
+    }
+  ]
+}

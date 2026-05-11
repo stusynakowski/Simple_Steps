@@ -1,0 +1,18 @@
+{
+  "id": "var-float",
+  "name": "Variable — Float",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "literal",
+      "label": "Float Variable",
+      "config": {
+        "expr": "3.14",
+        "_orchestrator": "source"
+      },
+      "formula": "= 3.14"
+    }
+  ]
+}

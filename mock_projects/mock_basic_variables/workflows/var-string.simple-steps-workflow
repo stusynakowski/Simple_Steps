@@ -1,0 +1,18 @@
+{
+  "id": "var-string",
+  "name": "Variable — String",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "literal",
+      "label": "String Variable",
+      "config": {
+        "expr": "\"hello world\"",
+        "_orchestrator": "source"
+      },
+      "formula": "= \"hello world\""
+    }
+  ]
+}

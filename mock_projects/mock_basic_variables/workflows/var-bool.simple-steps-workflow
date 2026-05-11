@@ -1,0 +1,18 @@
+{
+  "id": "var-bool",
+  "name": "Variable — Boolean",
+  "created_at": "2026-05-07T12:00:00.000Z",
+  "updated_at": "2026-05-07T12:00:00.000Z",
+  "steps": [
+    {
+      "step_id": "step-var",
+      "operation_id": "literal",
+      "label": "Boolean Variable",
+      "config": {
+        "expr": "True",
+        "_orchestrator": "source"
+      },
+      "formula": "= True"
+    }
+  ]
+}
