@@ -8,6 +8,36 @@
   color: #fff;
 }
 
+/* Wrapper around the three-pane Allotment shell (left | content | right).
+   Allotment requires an explicit size on its parent container. */
+.main-layout__panes {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+}
+
+/* Allotment.Pane gives us a full-bleed surface; these wrappers keep their
+   children behaving like the old fixed-width sidebars (column flex, hidden overflow). */
+.main-layout__sidebar-pane,
+.main-layout__chat-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.main-layout__sidebar-pane {
+  border-right: 1px solid #333;
+}
+
+/* Allotment ships dark divider colours that work fine with our theme;
+   tighten the visible separator width and tint to match the rest of the UI. */
+.main-layout__panes .allotment-module_sashContainer__9-9Ms {
+  --sash-size: 6px;
+}
+
 .content-area {
   display: flex;
   flex-direction: column;

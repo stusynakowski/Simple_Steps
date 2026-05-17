@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { Allotment } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
@@ -19,6 +20,16 @@ import { initialWorkflow } from '../mocks/initialData';
 import { StepWiringProvider } from '../context/StepWiringContext';
 import './MainLayout.css';
 
+// ── Layout constants ───────────────────────────────────────────────────────
+// Sizes the user sees on first launch. Allotment will persist user drags
+// in-memory for the session; durable persistence is a follow-up (S4 settings).
+const DEFAULT_LEFT_SIDEBAR_WIDTH = 250;
+const DEFAULT_RIGHT_SIDEBAR_WIDTH = 300;
+const DEFAULT_HEADER_HEIGHT = 110;
+const MIN_HEADER_HEIGHT = 44;
+const MAX_HEADER_HEIGHT = 600;
+const SIDEBAR_SNAP_THRESHOLD = 80; // dragging below this pixel width collapses the pane
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface OpenTab extends WorkflowTab {
@@ -28,23 +39,25 @@ interface OpenTab extends WorkflowTab {
   workflow: Workflow;
 }
 
+interface DetachedWindow {
+  id: string;          // unique window id (not step id — same step can detach multiple times)
+  stepId: string;
+  position: { x: number; y: number };
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function MainLayout() {
-  const [headerHeight, setHeaderHeight] = useState(110);
-  const [sidebarWidth, setSidebarWidth] = useState(250);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState(300);
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
-  const [isDragging, setIsDragging] = useState(false);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isFileEditorOpen, setIsFileEditorOpen] = useState(false);
 
-  const isResizingHeader = useRef(false);
-  const isResizingSidebar = useRef(false);
-  const isResizingRightSidebar = useRef(false);
-  const lastRightSidebarWidth = useRef(300);
-  const lastSidebarWidth = useRef(250);
-  const lastHeaderHeight = useRef(110);
+  // Pane visibility — Allotment handles the actual width animation via `visible`.
+  const [leftPaneVisible, setLeftPaneVisible] = useState(true);
+  const [rightPaneVisible, setRightPaneVisible] = useState(true);
+
+  // Live right-pane width so the floating ExecutionLog overlay can offset itself.
+  const [rightPaneWidth, setRightPaneWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH);
 
   const {
     workflow,
@@ -122,7 +135,6 @@ export default function MainLayout() {
   const handleSave = useCallback(async () => {
     if (activeTab?.projectId && activeTab?.pipelineId) {
       try {
-        // Re-save using the existing pipeline name (id == slug == name-derived)
         suppressModified.current = true;
         await saveWorkflow(activeTab.projectId, activeTab.workflow.name || activeTab.pipelineId);
         setOpenTabs(prev => prev.map(t => t.isActive ? { ...t, isModified: false } : t));
@@ -148,7 +160,7 @@ export default function MainLayout() {
     suppressModified.current = true;
     try {
       const saved = await saveWorkflow(projectId, pipelineName);
-      // saved.id is now the slug derived from pipelineName, matching the filename on disk
+      // saved.id is the slug derived from pipelineName, matching the filename on disk
       setOpenTabs(prev => prev.map(t => {
         if (!t.isActive) return t;
         return {
@@ -162,7 +174,6 @@ export default function MainLayout() {
           workflow: { ...t.workflow, name: pipelineName },
         };
       }));
-      // Tell sidebar to refresh so the new file appears
       setSidebarRefreshTrigger(n => n + 1);
     } finally {
       suppressModified.current = false;
@@ -170,12 +181,10 @@ export default function MainLayout() {
   }, [saveWorkflow]);
 
   const handleRename = useCallback((newName: string) => {
-    // Update workflow name in state + mark tab title
     setOpenTabs(prev => prev.map(t => {
       if (!t.isActive) return t;
       return { ...t, title: `${newName}.json`, isModified: true };
     }));
-    // Also update the in-memory workflow name via loadWorkflowObject with new name
     loadWorkflowObject({ ...workflow, name: newName });
   }, [workflow, loadWorkflowObject]);
 
@@ -203,7 +212,6 @@ export default function MainLayout() {
       setTimeout(() => { suppressModified.current = false; }, 0);
       return;
     }
-    // Fetch and open new tab
     let wf: Workflow;
     try {
       wf = await fetchWorkflow(projectId, pipelineId);
@@ -213,7 +221,6 @@ export default function MainLayout() {
       window.alert(`Failed to open pipeline "${pipelineId}": ${message}`);
       return;
     }
-    // Get project display name from existing projects list
     const newTab: OpenTab = {
       id: tabKey,
       title: `${wf.name}.json`,
@@ -305,104 +312,26 @@ export default function MainLayout() {
     ));
   }, [workflow]);
 
-  // ── Resize logic ─────────────────────────────────────────────────────────
-
-  const startResizingHeader = useCallback(() => {
-    isResizingHeader.current = true; setIsDragging(true);
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  const toggleHeader = useCallback(() => {
-    if (headerHeight > 60) { lastHeaderHeight.current = headerHeight; setHeaderHeight(44); }
-    else setHeaderHeight(lastHeaderHeight.current > 60 ? lastHeaderHeight.current : 200);
-  }, [headerHeight]);
-
-  const startResizingSidebar = useCallback(() => {
-    isResizingSidebar.current = true; setIsDragging(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  const toggleSidebar = useCallback(() => {
-    if (sidebarWidth > 20) { lastSidebarWidth.current = sidebarWidth; setSidebarWidth(0); }
-    else setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
-  }, [sidebarWidth]);
-
-  const startResizingRightSidebar = useCallback(() => {
-    isResizingRightSidebar.current = true; setIsDragging(true);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  const stopResizing = useCallback(() => {
-    isResizingHeader.current = false;
-    isResizingSidebar.current = false;
-    isResizingRightSidebar.current = false;
-    setIsDragging(false);
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-  }, []);
-
-  const resize = useCallback((e: MouseEvent) => {
-    if (isResizingHeader.current) {
-      const h = Math.max(44, Math.min(e.clientY, 600));
-      setHeaderHeight(h);
-      if (h > 60) lastHeaderHeight.current = h;
-    }
-    if (isResizingSidebar.current) {
-      const w = Math.max(0, Math.min(e.clientX, 500));
-      setSidebarWidth(w);
-      if (w > 50) lastSidebarWidth.current = w;
-    }
-    if (isResizingRightSidebar.current) {
-      const w = Math.max(0, Math.min(window.innerWidth - e.clientX, 600));
-      setRightSidebarWidth(w);
-      if (w > 50) lastRightSidebarWidth.current = w;
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('mousemove', resize);
-    window.addEventListener('mouseup', stopResizing);
-    return () => {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
-    };
-  }, [resize, stopResizing]);
-
+  // ── Activity-bar / sidebar toggles ────────────────────────────────────
+  // Clicking the active view collapses; clicking a different view expands+switches.
   const handleViewChange = (view: ActivityView) => {
     if (view === activeActivityView) {
-      if (sidebarWidth > 0) { lastSidebarWidth.current = sidebarWidth; setSidebarWidth(0); }
-      else setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
+      setLeftPaneVisible(v => !v);
     } else {
       setActiveActivityView(view);
-      if (sidebarWidth === 0) setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
+      setLeftPaneVisible(true);
     }
   };
 
   const handleOpenFileEditor = useCallback(() => {
     setActiveActivityView('explorer');
-    if (sidebarWidth === 0) {
-      setSidebarWidth(lastSidebarWidth.current > 20 ? lastSidebarWidth.current : 250);
-    }
+    setLeftPaneVisible(true);
     setIsFileEditorOpen(true);
-  }, [sidebarWidth]);
+  }, []);
 
-  const toggleChat = () => {
-    if (rightSidebarWidth > 20) { lastRightSidebarWidth.current = rightSidebarWidth; setRightSidebarWidth(0); }
-    else setRightSidebarWidth(lastRightSidebarWidth.current > 20 ? lastRightSidebarWidth.current : 300);
-  };
-
-  const transitionStyle = isDragging ? 'none'
-    : 'width 0.3s cubic-bezier(0.4,0,0.2,1), height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.3s cubic-bezier(0.4,0,0.2,1)';
+  const toggleChat = useCallback(() => setRightPaneVisible(v => !v), []);
 
   // ── Detached step windows ──────────────────────────────────────────────
-  interface DetachedWindow {
-    id: string;          // unique window id (not step id — same step can detach multiple times)
-    stepId: string;
-    position: { x: number; y: number };
-  }
   const [detachedWindows, setDetachedWindows] = useState<DetachedWindow[]>([]);
 
   const handleDetach = useCallback((stepId: string, position: { x: number; y: number }) => {
@@ -430,141 +359,191 @@ export default function MainLayout() {
     setSaveModalOpen(true);
   }, []);
 
+  // ── Allotment pane-size handlers ──────────────────────────────────────
+  // Snap to "collapsed" when the user drags the divider very small, so the
+  // sidebar can never get stuck in a sliver state.
+  const handleOuterSizes = useCallback((sizes: number[]) => {
+    // sizes[0] = left pane, sizes[1] = center, sizes[2] = right pane
+    const leftSize = sizes[0] ?? 0;
+    const rightSize = sizes[2] ?? 0;
+
+    if (leftPaneVisible && leftSize > 0 && leftSize < SIDEBAR_SNAP_THRESHOLD) {
+      setLeftPaneVisible(false);
+    }
+    if (rightPaneVisible && rightSize > 0 && rightSize < SIDEBAR_SNAP_THRESHOLD) {
+      setRightPaneVisible(false);
+    }
+    setRightPaneWidth(rightSize);
+  }, [leftPaneVisible, rightPaneVisible]);
+
   // ── Render ────────────────────────────────────────────────────────────────
+
+  const headerBlock = (
+    <header className="header-container">
+      {/* Row 1: menu bar (File menu + breadcrumb) */}
+      <MenuBar
+        workflowName={workflow.name || 'Untitled'}
+        projectName={projectName || undefined}
+        isModified={activeTab?.isModified}
+        onNew={handleNewTab}
+        onSave={handleSave}
+        onSaveAs={handleSaveAs}
+        onRename={() => setRenameModalOpen(true)}
+        onEditFiles={handleOpenFileEditor}
+      />
+
+      {/* Row 2: file tabs */}
+      <div className="tabs-row">
+        <WorkflowTabs
+          tabs={openTabs}
+          onTabClick={handleTabClick}
+          onTabClose={handleTabClose}
+          onNewTab={handleNewTab}
+        />
+      </div>
+
+      {/* Row 3: pipeline controls */}
+      <UnifiedToolbar
+        onRunAll={runPipeline}
+        onPauseAll={pausePipeline}
+        onStopAll={stopPipeline}
+        pipelineStatus={pipelineStatus}
+        logCount={executionLogs.length}
+        logErrorCount={executionLogs.filter(l => l.level === 'error').length}
+        isLogOpen={isLogOpen}
+        onToggleLogs={() => setIsLogOpen(prev => !prev)}
+        onClearOutputs={clearLogs}
+        availableOperations={availableOperations}
+        pipelineMeta={pipelineMeta}
+      />
+    </header>
+  );
+
+  const canvasBlock = (
+    <main className="main-content horizontal-scroll-area">
+      <StepWiringProvider>
+        <div className="columns-container" data-testid="columns-container">
+          {workflow.steps.map((step, index) => {
+            const isExpanded = expandedStepIds.has(step.id);
+            const isMaximized = maximizedStepId === step.id;
+            const previousSteps = workflow.steps.slice(0, index);
+            return (
+              <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
+                <OperationColumn
+                  step={step}
+                  stepIndex={index}
+                  previousSteps={previousSteps}
+                  color={getStepColor(index)}
+                  isActive={isExpanded}
+                  isSqueezed={!isExpanded}
+                  isMaximized={isMaximized}
+                  zIndex={isExpanded ? 100 : workflow.steps.length - index}
+                  availableOperations={availableOperations}
+                  progress={stepProgress[step.id]}
+                  pipelineStatus={pipelineStatus}
+                  pipelineCursorIndex={pipelineCursorIndex}
+                  onActivate={() => toggleStep(step.id)}
+                  onUpdate={(id, updates) => updateStep(id, updates)}
+                  onRun={runStep}
+                  onPreview={previewStep}
+                  onPause={id => console.log('Pause', id)}
+                  onDelete={deleteStep}
+                  onMinimize={() => collapseStep(step.id)}
+                  onMaximize={() => toggleMaximizeStep(step.id)}
+                  onDetach={(pos) => handleDetach(step.id, pos)}
+                />
+              </div>
+            );
+          })}
+          <div className="add-step-container">
+            <button className="rectangular-add-btn" onClick={() => addStepAt(workflow.steps.length)} title="Add New Step">
+              + Add Step
+            </button>
+          </div>
+        </div>
+      </StepWiringProvider>
+    </main>
+  );
 
   return (
     <div className="main-layout" data-testid="main-layout">
       <ActivityBar activeView={activeActivityView} onViewChange={handleViewChange} />
 
-      {/* Left sidebar */}
-      <div style={{
-        width: sidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
-        transition: transitionStyle, overflow: 'hidden',
-        borderRight: sidebarWidth > 0 ? '1px solid #333' : 'none',
-      }}>
-        <Sidebar
-          isVisible={true}
-          currentView={activeActivityView}
-          refreshTrigger={sidebarRefreshTrigger}
-          onListProjects={listSavedProjects}
-          onCreateProject={createNewProject}
-          onDeleteProject={removeProject}
-          onListPipelines={listProjectPipelines}
-          onLoadPipeline={openPipelineTab}
-          onRequestSave={handleRequestSaveFromSidebar}
-          onDeletePipeline={removePipeline}
-        />
-      </div>
-
-      <div className="sidebar-resize-handle" onMouseDown={startResizingSidebar} onDoubleClick={toggleSidebar}>
-        <div className="sidebar-resize-line" />
-        <button className="resize-toggle-btn"
-          onClick={e => { e.stopPropagation(); toggleSidebar(); }}
-          onMouseDown={e => e.stopPropagation()}
-          title={sidebarWidth > 20 ? 'Collapse Sidebar' : 'Expand Sidebar'}>
-          {sidebarWidth > 20 ? '◀' : '▶'}
-        </button>
-      </div>
-
-      <div className="content-area">
-        {/* ── Header (resizable) ─────────────────────────────────────────── */}
-        <header className="header-container" style={{ height: headerHeight, transition: transitionStyle }}>
-
-          {/* Row 1: menu bar (File menu + breadcrumb) */}
-          <MenuBar
-            workflowName={workflow.name || 'Untitled'}
-            projectName={projectName || undefined}
-            isModified={activeTab?.isModified}
-            onNew={handleNewTab}
-            onSave={handleSave}
-            onSaveAs={handleSaveAs}
-            onRename={() => setRenameModalOpen(true)}
-            onEditFiles={handleOpenFileEditor}
-          />
-
-          {/* Row 2: file tabs */}
-          <div className="tabs-row">
-            <WorkflowTabs
-              tabs={openTabs}
-              onTabClick={handleTabClick}
-              onTabClose={handleTabClose}
-              onNewTab={handleNewTab}
-            />
-          </div>
-
-          {/* Row 3: pipeline controls */}
-          <UnifiedToolbar
-            onRunAll={runPipeline}
-            onPauseAll={pausePipeline}
-            onStopAll={stopPipeline}
-            pipelineStatus={pipelineStatus}
-            logCount={executionLogs.length}
-            logErrorCount={executionLogs.filter(l => l.level === 'error').length}
-            isLogOpen={isLogOpen}
-            onToggleLogs={() => setIsLogOpen(prev => !prev)}
-            onClearOutputs={clearLogs}
-            availableOperations={availableOperations}
-            pipelineMeta={pipelineMeta}
-          />
-        </header>
-
-        <div className="resize-handle" onMouseDown={startResizingHeader} onDoubleClick={toggleHeader}>
-          <div className="resize-line" />
-          <button className="resize-toggle-btn"
-            onClick={e => { e.stopPropagation(); toggleHeader(); }}
-            onMouseDown={e => e.stopPropagation()}
-            title={headerHeight > 60 ? 'Collapse Header' : 'Expand Header'}>
-            {headerHeight > 60 ? '▲' : '▼'}
-          </button>
-        </div>
-
-        {/* ── Pipeline canvas ────────────────────────────────────────────── */}
-        <main className="main-content horizontal-scroll-area">
-          <StepWiringProvider>
-          <div className="columns-container" data-testid="columns-container">
-            {workflow.steps.map((step, index) => {
-              const isExpanded = expandedStepIds.has(step.id);
-              const isMaximized = maximizedStepId === step.id;
-              const previousSteps = workflow.steps.slice(0, index);
-              return (
-                <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
-                  <OperationColumn
-                    step={step}
-                    stepIndex={index}
-                    previousSteps={previousSteps}
-                    color={getStepColor(index)}
-                    isActive={isExpanded}
-                    isSqueezed={!isExpanded}
-                    isMaximized={isMaximized}
-                    zIndex={isExpanded ? 100 : workflow.steps.length - index}
-                    availableOperations={availableOperations}
-                    progress={stepProgress[step.id]}
-                    pipelineStatus={pipelineStatus}
-                    pipelineCursorIndex={pipelineCursorIndex}
-                    onActivate={() => toggleStep(step.id)}
-                    onUpdate={(id, updates) => updateStep(id, updates)}
-                    onRun={runStep}
-                    onPreview={previewStep}
-                    onPause={id => console.log('Pause', id)}
-                    onDelete={deleteStep}
-                    onMinimize={() => collapseStep(step.id)}
-                    onMaximize={() => toggleMaximizeStep(step.id)}
-                    onDetach={(pos) => handleDetach(step.id, pos)}
-                  />
-                </div>
-              );
-            })}
-            <div className="add-step-container">
-              <button className="rectangular-add-btn" onClick={() => addStepAt(workflow.steps.length)} title="Add New Step">
-                + Add Step
-              </button>
+      {/* ── Three-pane shell: left sidebar | content | right chat ───────── */}
+      <div className="main-layout__panes">
+        <Allotment onChange={handleOuterSizes} proportionalLayout={false}>
+          {/* Left sidebar (Explorer / Packs / Search / History / Settings) */}
+          <Allotment.Pane
+            preferredSize={DEFAULT_LEFT_SIDEBAR_WIDTH}
+            minSize={150}
+            maxSize={500}
+            snap
+            visible={leftPaneVisible}
+          >
+            <div className="main-layout__sidebar-pane">
+              <Sidebar
+                isVisible={true}
+                currentView={activeActivityView}
+                refreshTrigger={sidebarRefreshTrigger}
+                onListProjects={listSavedProjects}
+                onCreateProject={createNewProject}
+                onDeleteProject={removeProject}
+                onListPipelines={listProjectPipelines}
+                onLoadPipeline={openPipelineTab}
+                onRequestSave={handleRequestSaveFromSidebar}
+                onDeletePipeline={removePipeline}
+              />
             </div>
-          </div>
-          </StepWiringProvider>
-        </main>
+          </Allotment.Pane>
 
-        {/* ── Execution Log Panel (overlay) ──────────────────────────── */}
-        <ExecutionLog logs={executionLogs} onClear={clearLogs} isOpen={isLogOpen} onClose={() => setIsLogOpen(false)} rightOffset={rightSidebarWidth + 30} />
+          {/* Center content: header (vertical split) over canvas */}
+          <Allotment.Pane minSize={400}>
+            <div className="content-area">
+              <Allotment vertical proportionalLayout={false}>
+                <Allotment.Pane
+                  preferredSize={DEFAULT_HEADER_HEIGHT}
+                  minSize={MIN_HEADER_HEIGHT}
+                  maxSize={MAX_HEADER_HEIGHT}
+                >
+                  {headerBlock}
+                </Allotment.Pane>
+                <Allotment.Pane minSize={200}>
+                  {canvasBlock}
+                </Allotment.Pane>
+              </Allotment>
+
+              {/* ExecutionLog is a fixed-position overlay; offset by current right-pane width */}
+              <ExecutionLog
+                logs={executionLogs}
+                onClear={clearLogs}
+                isOpen={isLogOpen}
+                onClose={() => setIsLogOpen(false)}
+                rightOffset={(rightPaneVisible ? rightPaneWidth : 0) + 30}
+              />
+            </div>
+          </Allotment.Pane>
+
+          {/* Right chat / agent sidebar */}
+          <Allotment.Pane
+            preferredSize={DEFAULT_RIGHT_SIDEBAR_WIDTH}
+            minSize={200}
+            maxSize={600}
+            snap
+            visible={rightPaneVisible}
+          >
+            <div className="main-layout__chat-pane">
+              <ChatSidebar
+                isVisible={true}
+                onClose={toggleChat}
+                workflow={workflow}
+                availableOperations={availableOperations}
+                onApplyFormula={(stepId, formula) => {
+                  updateStep(stepId, { formula });
+                }}
+              />
+            </div>
+          </Allotment.Pane>
+        </Allotment>
       </div>
 
       {/* ── Detached step windows (floating, fixed-position) ───────────── */}
@@ -594,34 +573,6 @@ export default function MainLayout() {
           );
         })}
       </StepWiringProvider>
-
-      {/* Right sidebar resize handle */}
-      <div className="sidebar-resize-handle" onMouseDown={startResizingRightSidebar} onDoubleClick={toggleChat}>
-        <div className="sidebar-resize-line" />
-        <button className="resize-toggle-btn"
-          onClick={e => { e.stopPropagation(); toggleChat(); }}
-          onMouseDown={e => e.stopPropagation()}
-          title={rightSidebarWidth > 20 ? 'Close Chat' : 'Open Chat'}>
-          {rightSidebarWidth > 20 ? '▶' : '◀'}
-        </button>
-      </div>
-
-      {/* Right chat sidebar */}
-      <div style={{
-        width: rightSidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column',
-        overflow: 'hidden', transition: transitionStyle,
-        opacity: rightSidebarWidth > 20 ? 1 : 0,
-      }}>
-        <ChatSidebar
-          isVisible={true}
-          onClose={toggleChat}
-          workflow={workflow}
-          availableOperations={availableOperations}
-          onApplyFormula={(stepId, formula) => {
-            updateStep(stepId, { formula });
-          }}
-        />
-      </div>
 
       {/* ── Save modal ──────────────────────────────────────────────────── */}
       <SaveModal
@@ -655,4 +606,3 @@ export default function MainLayout() {
     </div>
   );
 }
-

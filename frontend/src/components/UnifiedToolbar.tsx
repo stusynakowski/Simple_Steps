@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import type { OperationDefinition } from '../services/api';
+import Icon from './Icon';
 import './UnifiedToolbar.css';
 
 export interface PipelineMeta {
@@ -125,7 +126,7 @@ export default function UnifiedToolbar({
       <div className="ut-group ut-execution">
         {pipelineStatus === 'running' ? (
           <button className="ut-btn ut-btn-pause" onClick={onPauseAll} title="Pause Pipeline">
-            <span className="ut-icon">⏸</span>
+            <Icon name="debug-pause" size={14} />
             <span className="ut-label">Pause</span>
           </button>
         ) : (
@@ -134,7 +135,7 @@ export default function UnifiedToolbar({
             onClick={onRunAll}
             title={pipelineStatus === 'paused' ? 'Resume Pipeline' : 'Run Pipeline'}
           >
-            <span className="ut-icon">▶</span>
+            <Icon name="play" size={14} />
             <span className="ut-label">{pipelineStatus === 'paused' ? 'Resume' : 'Run'}</span>
           </button>
         )}
@@ -145,18 +146,18 @@ export default function UnifiedToolbar({
           title="Stop Pipeline"
           disabled={pipelineStatus === 'idle'}
         >
-          <span className="ut-icon">⏹</span>
+          <Icon name="debug-stop" size={14} />
         </button>
 
         {onRestartBackend && (
           <button className="ut-btn" onClick={onRestartBackend} title="Restart Backend">
-            <span className="ut-icon">⟳</span>
+            <Icon name="debug-restart" size={14} />
           </button>
         )}
 
         {onClearOutputs && (
           <button className="ut-btn" onClick={onClearOutputs} title="Clear All Outputs">
-            <span className="ut-icon">🧹</span>
+            <Icon name="clear-all" size={14} />
           </button>
         )}
       </div>
@@ -170,9 +171,9 @@ export default function UnifiedToolbar({
           onClick={() => { setEnvOpen(v => !v); setResOpen(false); }}
           title="Environment Settings"
         >
-          <span className="ut-icon">⚙</span>
+          <Icon name="gear" size={14} />
           <span className="ut-label">{envLabel}</span>
-          <span className="ut-caret">{envOpen ? '▴' : '▾'}</span>
+          <Icon name={envOpen ? 'chevron-up' : 'chevron-down'} size={12} className="ut-caret" />
         </button>
 
         {envOpen && (
@@ -215,12 +216,12 @@ export default function UnifiedToolbar({
           onClick={() => { setResOpen(v => !v); setEnvOpen(false); if (resOpen) setFilterText(''); }}
           title="Function Registry — All registered operations"
         >
-          <span className="ut-icon">�</span>
+          <Icon name="symbol-method" size={14} />
           <span className="ut-label">Resources</span>
           {availableOperations.length > 0 && (
             <span className="ut-badge">{availableOperations.length}</span>
           )}
-          <span className="ut-caret">{resOpen ? '▴' : '▾'}</span>
+          <Icon name={resOpen ? 'chevron-up' : 'chevron-down'} size={12} className="ut-caret" />
         </button>
 
         {resOpen && (
@@ -357,7 +358,7 @@ export default function UnifiedToolbar({
             onClick={onToggleLogs}
             title={isLogOpen ? 'Close Logs' : 'Open Logs'}
           >
-            <span className="ut-icon">📋</span>
+            <Icon name="output" size={14} />
             {logCount > 0 && <span className="ut-log-count">{logCount}</span>}
             {logErrorCount > 0 && <span className="ut-error-dot" />}
           </button>
