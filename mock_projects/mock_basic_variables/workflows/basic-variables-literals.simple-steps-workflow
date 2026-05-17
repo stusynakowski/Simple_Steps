@@ -1,0 +1,90 @@
+{{
+
+  "format_version": 2,  "format_version": 2,
+
+  "name": "Basic Variables \u2014 Literal Declarations",  "name": "Basic Variables \u2014 Literal Declarations",
+
+  "meta": {  "meta": {
+
+    "legacy_id": "basic-variables-literals",    "legacy_id": "basic-variables-literals",
+
+    "description": "Seven steps, each declaring a single Python literal via the `literal` operation. Every step produces a 1\u00d71 DataFrame with column `value`. Step names intentionally left blank \u2014 naming is exercised in a separate workflow."    "description": "Seven steps, each declaring a single Python literal via the `literal` operation. Every step produces a 1\u00d71 DataFrame with column `value`."
+
+  },  },
+
+  "steps": [  "steps": [
+
+    {    {
+
+      "name": "",      "name": "var_string",
+
+      "expression": "\"hello world\"",      "expression": "\"hello world\"",
+
+      "meta": {}      "meta": { "label": "String" }
+
+    },    },
+
+    {    {
+
+      "name": "",      "name": "var_int",
+
+      "expression": "42",      "expression": "42",
+
+      "meta": {}      "meta": { "label": "Integer" }
+
+    },    },
+
+    {    {
+
+      "name": "",      "name": "var_float",
+
+      "expression": "3.14",      "expression": "3.14",
+
+      "meta": {}      "meta": { "label": "Float" }
+
+    },    },
+
+    {    {
+
+      "name": "",      "name": "var_bool",
+
+      "expression": "True",      "expression": "True",
+
+      "meta": {}      "meta": { "label": "Boolean" }
+
+    },    },
+
+    {    {
+
+      "name": "",      "name": "var_list",
+
+      "expression": "[1, 2, 3, 4, 5]",      "expression": "[1, 2, 3, 4, 5]",
+
+      "meta": {}      "meta": { "label": "List" }
+
+    },    },
+
+    {    {
+
+      "name": "",      "name": "var_dict",
+
+      "expression": "{\"name\": \"alice\", \"age\": 30}",      "expression": "{\"name\": \"alice\", \"age\": 30}",
+
+      "meta": {}      "meta": { "label": "Dict" }
+
+    },    },
+
+    {    {
+
+      "name": "",      "name": "var_nested_dict",
+
+      "expression": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}}",      "expression": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}}",
+
+      "meta": {}      "meta": { "label": "Nested Dict" }
+
+    }    }
+
+  ]  ]
+
+}}
+

@@ -1,0 +1,20 @@
+{
+  "format_version": 2,
+  "id": "sample-basic-handbuilt-workflow",
+  "name": "sample_basic_handbuilt_workflow",
+  "meta": {
+    "legacy_id": "sample-basic-handbuilt-workflow"
+  },
+  "created_at": "2026-05-17T20:34:29.491Z",
+  "updated_at": "2026-05-17T16:35:22.789744",
+  "steps": [
+    {
+      "name": "step-000",
+      "expression": "3.14",
+      "meta": {
+        "label": "Step 0",
+        "legacy_step_id": "step-000"
+      }
+    }
+  ]
+}

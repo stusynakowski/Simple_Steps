@@ -1,0 +1,44 @@
+{
+  "format_version": 2,
+  "id": "new-workflow",
+  "name": "New Workflow",
+  "meta": {
+    "legacy_id": "new-workflow"
+  },
+  "created_at": "2026-05-17T20:34:29.491Z",
+  "updated_at": "2026-05-17T16:37:18.183675",
+  "steps": [
+    {
+      "name": "step-000",
+      "expression": "3.14",
+      "meta": {
+        "label": "Step 0",
+        "legacy_step_id": "step-000"
+      }
+    },
+    {
+      "name": "step-k9wu8jo",
+      "expression": "[1,2,3,4,5]",
+      "meta": {
+        "label": "Step 1",
+        "legacy_step_id": "step-k9wu8jo"
+      }
+    },
+    {
+      "name": "step-9g4k408",
+      "expression": "\"string\"",
+      "meta": {
+        "label": "Step 2",
+        "legacy_step_id": "step-9g4k408"
+      }
+    },
+    {
+      "name": "step-w34zrg6",
+      "expression": "hello",
+      "meta": {
+        "label": "Step 3",
+        "legacy_step_id": "step-w34zrg6"
+      }
+    }
+  ]
+}
