@@ -227,12 +227,80 @@ def _passthrough(
             elif '.' in ref_token:
                 col_label = ref_token.split('.')[-1]
             return pd.DataFrame([{col_label: resolved}])
+
+        # Legacy regex resolver couldn't handle it — try the AST evaluator
+        # (covers Stage-3 selection forms: step1["col"][n], step1[["a","b"]],
+        # step1[[0,2]], step1[0:5], chained subscripts, etc.).
+        ast_result = _eval_ref_via_ast(ref_token, step_map, session_id=session_id)
+        if ast_result is not None:
+            return ast_result
         # Could not resolve — fall through to df_in
 
     if df_in is not None:
         return df_in
 
     return pd.DataFrame()
+
+
+def _eval_ref_via_ast(
+    ref_token: str,
+    step_map: Dict[str, str],
+    session_id: Optional[str] = None,
+) -> Optional[pd.DataFrame]:
+    """Evaluate a Stage-3 selection-style reference via safe_formula.
+
+    Returns a DataFrame on success, or ``None`` if the expression can't be
+    interpreted in the current step environment (caller falls back to df_in).
+    """
+    try:
+        from . import safe_formula
+        from .step_proxy import StepProxy, ColumnProxy
+    except Exception:
+        return None
+
+    # Resolve every step in the map to its DataFrame so the AST env has
+    # everything it might reference. Skip ones whose data is unavailable.
+    env: Dict[str, pd.DataFrame] = {}
+    seen_refs: set = set()
+    for key, rid in step_map.items():
+        if rid in seen_refs:
+            # Same ref under multiple aliases (e.g. step1 / step_table / label)
+            # — re-resolve so each alias maps to its DF.
+            pass
+        seen_refs.add(rid)
+        df = get_dataframe(rid, session_id=session_id)
+        if df is not None:
+            env[key] = df
+
+    try:
+        result = safe_formula.run_formula(ref_token, steps=env)
+    except Exception as exc:
+        print(f"  ⚠ AST eval of '{ref_token}' failed: {exc}")
+        return None
+
+    # Unwrap proxies → pandas
+    if isinstance(result, StepProxy):
+        result = result._df
+    elif isinstance(result, ColumnProxy):
+        result = result._series
+
+    if isinstance(result, pd.DataFrame):
+        return result.reset_index(drop=True)
+    if isinstance(result, pd.Series):
+        name = result.name if result.name is not None else "value"
+        return result.to_frame(name=name).reset_index(drop=True)
+    # Scalar — wrap as 1×1 frame, inferring a column label from the
+    # innermost subscript key if it's a string literal.
+    col_label = _infer_scalar_column_label(ref_token)
+    return pd.DataFrame([{col_label: result}])
+
+
+def _infer_scalar_column_label(ref_token: str) -> str:
+    """Best-effort: pull the last quoted-string subscript key from a ref expr."""
+    matches = re.findall(r"""\[\s*['"]([^'"]+)['"]\s*\]""", ref_token)
+    if matches:
+        return matches[-1]
+    return "value"
 
 
 def run_operation(

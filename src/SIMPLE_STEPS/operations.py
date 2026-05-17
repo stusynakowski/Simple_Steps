@@ -727,3 +727,15 @@ class RegistryProxy(dict):
         return ((k, v['func']) for k, v in OPERATION_REGISTRY.items())
 
 REGISTRY = RegistryProxy()
+
+
+# ---------------------------------------------------------------------------
+# Stage 3e preview placeholders.
+# Importing the module registers the placeholder ops (literal_preview,
+# make_table_preview, expand_preview, filter_preview, …) in
+# ``OPERATION_REGISTRY`` so the UI's ``/api/operations`` introspection can
+# see the proposed shape of the next-gen core pack. The bodies raise
+# ``NotImplementedError`` — they exist for UI / spec review only.
+# Spec: dev_notes/stage3_formula_grammar_and_shape_vocabulary.md §11
+# ---------------------------------------------------------------------------
+from . import core_pack_v2_preview  # noqa: F401, E402

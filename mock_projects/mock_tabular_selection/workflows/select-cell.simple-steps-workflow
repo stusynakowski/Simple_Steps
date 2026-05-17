@@ -15,7 +15,7 @@
     },
     {
       "name": "step_select_cell",
-      "expression": "select_cell(data=step1, row_index=1, column=score)",
+      "expression": "step1[\"score\"][1]",
       "meta": {
         "label": "Select Cell",
         "legacy_step_id": "step-select-cell"

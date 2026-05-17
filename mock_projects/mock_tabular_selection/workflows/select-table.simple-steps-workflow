@@ -15,7 +15,7 @@
     },
     {
       "name": "step_select_table",
-      "expression": "select_table(data=step1)",
+      "expression": "step1",
       "meta": {
         "label": "Select Table",
         "legacy_step_id": "step-select-table"

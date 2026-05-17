@@ -15,7 +15,7 @@
     },
     {
       "name": "step_select_rows",
-      "expression": "select_rows(data=step1, row_indices=[0,2])",
+      "expression": "step1[[0,2]]",
       "meta": {
         "label": "Select Rows",
         "legacy_step_id": "step-select-rows"

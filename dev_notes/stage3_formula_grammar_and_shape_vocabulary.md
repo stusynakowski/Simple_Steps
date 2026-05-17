@@ -1,12 +1,22 @@
 # Stage 3 — Formula Grammar & Shape Vocabulary
 
 *Date: 2026-05-17*
-*Status: design — pre-implementation*
+*Status: **3a–3d shipped, 3f partially shipped (mock_tabular_selection)**, 3e–3f in progress*
 
-This note captures the design conclusions reached while planning Stage 3
-of the formula-system cleanup. It is the **evidence-based replacement**
-for `.rowmap` / `.source` / `.dataframe` / `.expand` modifier syntax, and
-the rationale for the changes the mock workflows will need.
+## Implementation log
+
+| Sub-stage | Status | What landed |
+|---|---|---|
+| **3a** | ✅ shipped | `safe_formula.validate()` + `_interpret()` now accept chained subscripts (`step["col"][n]`), homogeneous list keys (`step[["a","b"]]`, `step[[0,2]]`), and slices (`step[0:5]`). `StepProxy.__getitem__` routes a list-of-ints through `.iloc` so positional row subsets do the intuitive thing. |
+| **3b** | ✅ shipped | Scratch-verified that every `select_*` op formula in `mock_tabular_selection` and every `.rowmap`/`.source`/`.dataframe`/`.expand` formula in `mock_youtube_analysis` has a clean modifier-free equivalent that produces identical results. |
+| **3c** | ✅ shipped | `safe_formula.parse()` silently strips legacy `.rowmap` / `.source` / `.filter` / `.dataframe` / `.expand` / `.map` / `.flatmap` / `.raw_output` modifiers via the `_LEGACY_MODIFIER_RE` pre-rewrite. Existing workflow files keep loading. New saves never emit modifiers. |
+| **3d** | ✅ shipped | `formula_parser.py` reduced from 155 lines of regex to a ~190-line legacy-shape adapter (1 trivial regex left for `is_step_reference`). All parsing/build logic lives in `safe_formula`: new helpers `parse_call()`, `build()`, `format_value()`, `_arg_source()`, `_source_of()`. The frontend `ParsedFormula` JSON contract is preserved verbatim; `orchestration` is always `None` for Stage 3+ formulas. `_arg_source()` keeps two legacy quirks alive: string-literal args are unwrapped (so `make_table(rows="...")` round-trips), and literal `List/Dict/Tuple` args are JSON-encoded (so `select_columns` can still `json.loads()` them). |
+| **3f.1** | ✅ shipped | `mock_tabular_selection`: all four `select_*` workflows rewritten to pure subscript syntax (`step1`, `step1[["name","score"]]`, `step1[[0,2]]`, `step1["score"][1]`). Enabling change: `engine._passthrough` now falls back to `safe_formula.run_formula()` when the legacy regex resolver can't handle a `_ref`. Series → 1-col frame; scalars → 1×1 frame (column label inferred from the innermost string subscript key). |
+| **3e.0** | ✅ placeholders | `src/SIMPLE_STEPS/core_pack_v2_preview.py` registers 8 non-functional Stage-3e ops (`literal_preview`, `make_table_preview`, `expand_preview`, `filter_preview`, `pivot_preview`, `melt_preview`, `groupby_agg_preview`, `cross_join_preview`) under category `"Core (preview · Stage 3e)"`. Bodies raise `NotImplementedError`. Purpose: UI engineer can introspect `/api/operations` and confirm the new op shape is renderable *before* implementations land. |
+| **3e** | ⏭ next | Implement the four canonical ops (`literal`, `make_table`, `expand`, `filter`) and drop the `_preview` suffix. |
+| **3f.rest** | ⏭ pending | Rewrite `mock_table_manipulations` + `mock_youtube_analysis`; delete `select_*`, `define_variable`, `filter_rows`, `expand_cell`. |
+
+Tests: **215/215 passing** after 3a–3d + 3f.1 + 3e.0. Zero regressions.
 
 ---
 
@@ -284,6 +294,38 @@ op's signature, once in the formula modifier.
 
 ---
 
+## 8.5 Multi-step row-wise iteration (zip-by-index)
+
+A common case the modifier-free syntax must handle: a single call drawing
+columns from **two or more different prior steps** of the same row count.
+
+```
+=score(url=step1["url"], views=step2["views"], likes=step2["likes"])
+```
+
+### Rule
+
+> All `step["col"]` arguments inside the same call must come from steps
+> with the same row count. The runtime pairs them by row index. If row
+> counts don't match, it errors before running.
+
+That's the entire contract. `_auto_broadcast` already iterates
+`i = 0..n-1` and picks `series.iloc[i]` from each column argument,
+regardless of which step the column originated from. We just need to
+add an up-front shape check so a length mismatch fails loudly with a
+diagnostic naming the offending columns, instead of silently truncating
+or raising a bare `IndexError`.
+
+### Cartesian product is not automatic
+
+Cross-product / cross-join is a real shape operation (every row of A
+paired with every row of B), and it should never happen by accident.
+It will be a future reshape verb (`cross_join(a, b) -> DataFrame`),
+added when the need arises. **Decision deferred** — not in Stage 3
+scope.
+
+---
+
 ## 9. What this does *not* address (and why that's fine)
 
 **Cost / latency awareness.** A separate concern. Will be handled by a
@@ -325,3 +367,120 @@ the fix is well-defined: add a shape primitive, add a built-in op, or
 write a clearer reshape verb.
 
 That is the test we should hold every future change to.
+
+---
+
+## 11. Core pack v2 — table-op concepts (Stage 3e spec)
+
+This is the operational spec for the four canonical table verbs that
+Stage 3e ships. Each has a placeholder registered today in
+`src/SIMPLE_STEPS/core_pack_v2_preview.py` (suffix `_preview`, category
+`"Core (preview · Stage 3e)"`) so the UI can introspect the shape now,
+before implementations land.
+
+### Guiding principles
+
+1. **The annotation is the contract.** Every parameter has a real Python
+   type annotation. The runtime (`_auto_broadcast`) reads the annotation
+   to decide whether the arg should be passed whole (`pd.DataFrame`),
+   per-row (scalar slot + `pd.Series` arg = broadcast), per-column
+   (`pd.Series` slot), or as a Python value (`Any`).
+2. **One op = one shape transform.** No more `select_*` family — that's
+   what subscript syntax is for. Ops only exist when they *change shape*
+   in a way Python expressions can't.
+3. **No string-in-the-middle.** When an arg is a list or dict, it is
+   passed as a real Python list/dict — *not* a JSON string the op then
+   re-parses. The grammar already produces literal `List`/`Dict` AST
+   nodes; the runtime now passes them through.
+4. **Built-in ops are spec, not implementation.** The placeholder
+   docstrings *are* the spec. If the docstring is ambiguous, the op
+   isn't ready.
+
+### 11.1 `literal(value: Any) -> DataFrame`
+
+| Aspect | Detail |
+|---|---|
+| Replaces | `literal` (string-eval) + `define_variable(value="...", type="json")` |
+| Input | Any Python value (scalar, list, dict, nested) |
+| Output | 1×1 DataFrame, column `"value"`, cell = the value unchanged (opaque) |
+| Bar sugar | `=42`, `="hi"`, `={"k":"v"}`, `=[1,2,3]` all desugar to `literal(value=...)` |
+| Why opaque | Dicts/lists are *single values*, not implicit tables. Call `expand` to unfold. |
+
+### 11.2 `make_table(rows: List[dict]) -> DataFrame`
+
+| Aspect | Detail |
+|---|---|
+| Replaces | `make_table(rows="<json string>")` |
+| Input | A real Python list-of-dicts. The bar's literal-list syntax produces this directly — no `json.loads` step. |
+| Output | N rows × M cols (union of dict keys; NaN for missing) |
+| Sister ops | `to_rows` stays for `{"col": [values]}` columnar input and list-of-scalars. |
+
+### 11.3 `expand(df: DataFrame, column: Optional[str] = None, sep: str = ".") -> DataFrame`
+
+| Aspect | Detail |
+|---|---|
+| Replaces | `expand_cell()` |
+| Input | Whole frame + optional target column |
+| Behaviour | If `column` is None and frame is 1×1, expand the single cell (legacy `expand_cell` behaviour). Otherwise unnest the named column. |
+| Cell-type rules | list-of-dicts → explode rows + dict keys → cols; list-of-scalars → explode rows + `"value"` col; flat dict → keys → cols on same row; nested dict → `"a.sep.b"` cols; scalar → pass-through |
+| Why one op | The old `expand_cell` quietly assumed 1×1. Real workflows need column-aware expansion. Same verb, broader contract. |
+
+### 11.4 `filter(df: DataFrame, predicate: str) -> DataFrame`
+
+| Aspect | Detail |
+|---|---|
+| Replaces | `filter_rows(column=..., value=..., mode=...)` |
+| Input | Whole frame + a Python boolean expression as a string |
+| Eval semantics | Predicate is parsed via `safe_formula` (same allow-list as the formula bar). Column names are bound to the corresponding `pd.Series` of the frame. Operators `&`, `\|`, `~`, parens, `.str.*` methods all work. |
+| Output | K rows × M cols (K ≤ N), index reset, row order preserved |
+| Why predicate | The col/value/mode tuple is a constrained API — couldn't express `(score > 80) & (city == "NYC")` without a derived-column step first. Predicate is one slot, infinite expressivity, and still safe (`safe_formula` allow-list applies). |
+
+### 11.5 Future reshape verbs (registered as placeholders only)
+
+Not in Stage 3 scope, but registered now so the sidebar communicates
+where the core pack is heading:
+
+- `pivot(df, index, columns, values, aggfunc)` — long → wide
+- `melt(df, id_vars, value_vars, var_name, value_name)` — wide → long
+- `groupby_agg(df, by, agg)` — collapse rows by group
+- `cross_join(a, b)` — explicit cartesian product (required because the
+  default multi-step rule is zip-by-index, §8.5)
+
+### 11.6 UI-introspection gaps surfaced by the placeholders
+
+While registering the placeholders, three gaps in the decorator's
+type-hint → UI-type mapping became visible. None block Stage 3e, but
+they want flagging so the UI engineer knows what to plan around:
+
+| Annotation | UI type today | What the UI probably wants |
+|---|---|---|
+| `Any` | `"string"` | `"json"` (free-form Python literal editor) |
+| `List[dict]`, `List[str]` (parameterised generics) | `"string"` | `"list"` + an element-type hint |
+| `dict` (plain), `Dict[str, Any]` | `"string"` (plain `dict`) / `"string"` (`Dict[…]`) | `"object"` with optional value-type hint |
+| `Optional[str]` | `"string"` | `"string"` (correct — flagged here only because it's worth knowing the unwrapping works) |
+| `Callable` | `"string"` | `"predicate"` or `"expression"` editor with column-name autocomplete |
+
+The pragmatic fix is in `decorators.simple_step` — extend the
+type-hints lookup to recognise `typing.get_origin` / `get_args` and
+return richer `ui_type` values. Doing it now would change the JSON
+contract of `/api/operations` for *every* op, so it's a UI-coordinated
+change — best done alongside whichever component this conversation is
+building toward.
+
+### 11.7 Promotion path (preview → canonical)
+
+When an implementation lands, the promotion is a single mechanical
+edit per op:
+
+1. Implement the body (move code from the old op or write fresh).
+2. Drop the `_preview` suffix from the `id=` in the decorator.
+3. Change category from `"Core (preview · Stage 3e)"` to `"Core"`.
+4. In the same commit, delete the legacy op being replaced (`literal`
+   string-eval → `literal_preview` becomes `literal`; `define_variable`,
+   `filter_rows`, `expand_cell`, `select_*` are all deleted outright;
+   their mock workflows are rewritten to the new vocabulary).
+5. Run `pytest tests/` — the mock-driven tests fail loudly if the new
+   op's behaviour doesn't match.
+
+When all four mocks read cleanly with no modifier syntax anywhere and
+no legacy op names, Stage 3 is done.

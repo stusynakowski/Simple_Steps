@@ -15,7 +15,7 @@
     },
     {
       "name": "step_select_columns",
-      "expression": "select_columns(data=step1, columns=[\"name\",\"score\"])",
+      "expression": "step1[[\"name\",\"score\"]]",
       "meta": {
         "label": "Select Columns",
         "legacy_step_id": "step-select-columns"

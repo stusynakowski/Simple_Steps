@@ -244,15 +244,22 @@ class StepProxy:
     # ── Dict-style column access ─────────────────────────────────────────
     def __getitem__(self, key):
         df = object.__getattribute__(self, "_df")
+        label = object.__getattribute__(self, "_label")
+        ref_id = object.__getattribute__(self, "_ref_id")
+
+        # String → single column → ColumnProxy
         if isinstance(key, str) and key in df.columns:
-            label = object.__getattribute__(self, "_label")
             return ColumnProxy(df[key], self, key)
-        # Support boolean mask filtering: step1[step1.score > 50]
-        return StepProxy(
-            df[key],
-            object.__getattribute__(self, "_label"),
-            object.__getattribute__(self, "_ref_id"),
-        )
+
+        # List of ints → row subset by position (use .iloc, not df[key]).
+        # df[list_of_ints] would look up columns labelled 0, 2, …, which is
+        # almost never what the user wants from `step1[[0,2]]`.
+        if isinstance(key, list) and key and all(isinstance(k, int) and not isinstance(k, bool) for k in key):
+            return StepProxy(df.iloc[key].reset_index(drop=True), label, ref_id)
+
+        # Everything else (list of column names, slice, boolean mask) →
+        # delegate to pandas: df[["a","b"]], df[0:5], df[mask] all work.
+        return StepProxy(df[key], label, ref_id)
 
     # ── Core properties ──────────────────────────────────────────────────
     @property

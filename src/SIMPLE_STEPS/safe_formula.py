@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import re
 import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
@@ -107,11 +108,68 @@ _ALLOWED_NODES: Tuple[type, ...] = (
     ast.Compare,
     ast.Eq, ast.NotEq, ast.Lt, ast.Gt, ast.LtE, ast.GtE,
     ast.Load,
+    ast.Slice,   # for step[0:5] row slicing
 )
 
 # Index-style slice nodes (Python <3.9 vs >=3.9 compatibility shim)
 if hasattr(ast, "Index"):
     _ALLOWED_NODES = _ALLOWED_NODES + (ast.Index,)  # type: ignore[attr-defined]
+
+
+def _subscript_root_step(node: ast.AST, steps: set) -> Optional[str]:
+    """
+    Walk down a chained Subscript/Attribute expression and return the
+    name of the root step reference, or None if the chain doesn't bottom
+    out at a known step.
+
+    Examples (with steps={'step1'}):
+      Name('step1')                              → 'step1'
+      Subscript(Name('step1'), 'col')            → 'step1'
+      Subscript(Subscript(Name('step1'),'c'), 0) → 'step1'
+      Attribute(Name('step1'), 'col')            → 'step1'
+      Name('foo')                                → None
+    """
+    cur: ast.AST = node
+    while isinstance(cur, (ast.Subscript, ast.Attribute)):
+        cur = cur.value
+    if isinstance(cur, ast.Name) and cur.id in steps:
+        return cur.id
+    return None
+
+
+def _is_valid_subscript_key(key_node: ast.AST) -> bool:
+    """
+    Accept any of:
+      "col"                — column name (string constant)
+      0                    — row index (int constant)
+      ["a","b"]            — column subset (list of strings)
+      [0,2]                — row subset (list of ints)
+      0:5                  — row slice (Slice node)
+    """
+    # Unwrap legacy ast.Index wrapper (Python <3.9 compat).
+    if hasattr(ast, "Index") and isinstance(key_node, ast.Index):
+        key_node = key_node.value  # type: ignore[attr-defined]
+
+    # Slice: step[a:b], step[a:b:c]
+    if isinstance(key_node, ast.Slice):
+        return True
+
+    # Constant string or int.
+    if isinstance(key_node, ast.Constant) and isinstance(key_node.value, (str, int)):
+        return True
+
+    # List of constants (all strings, or all ints).
+    if isinstance(key_node, ast.List):
+        if not key_node.elts:
+            return False
+        consts = [e for e in key_node.elts
+                  if isinstance(e, ast.Constant) and isinstance(e.value, (str, int))]
+        if len(consts) != len(key_node.elts):
+            return False
+        types = {type(e.value) for e in consts}  # type: ignore[attr-defined]
+        return len(types) == 1   # homogeneous list
+
+    return False
 
 
 # --------------------------------------------------------------------------- #
@@ -122,7 +180,13 @@ def parse(formula: str) -> ast.Expression:
     Parse a formula string into an ``ast.Expression``.
 
     Strips a single leading ``=`` (the formula-bar convention) and any
-    surrounding whitespace. Raises ``FormulaError`` on syntax errors.
+    surrounding whitespace. Also silently strips legacy orchestration
+    modifiers (``.rowmap`` / ``.source`` / ``.filter`` / ``.dataframe``
+    / ``.expand`` / ``.map`` / ``.flatmap`` / ``.raw_output``) inserted
+    between an op name and its ``(`` — they are no longer part of the
+    grammar (orchestration is decided by argument shapes at runtime),
+    but existing workflow files may still contain them. Raises
+    ``FormulaError`` on syntax errors.
     """
     if formula is None:
         raise FormulaError("Formula is empty.")
@@ -131,11 +195,31 @@ def parse(formula: str) -> ast.Expression:
         text = text[1:].strip()
     if not text:
         raise FormulaError("Formula is empty.")
+    text = _strip_legacy_modifiers(text)
     try:
         tree = ast.parse(text, mode="eval")
     except SyntaxError as e:
         raise FormulaError(f"Syntax error: {e.msg} (col {e.offset})") from e
     return tree
+
+
+# Legacy orchestration modifiers that used to live between an op name and
+# its opening paren — e.g. ``extract_metadata.rowmap(video_url=step1)``.
+# As of Stage 3, orchestration is determined by argument shapes at runtime
+# and these modifiers carry no information. ``parse()`` strips them so old
+# workflow files keep loading. New writes never emit them.
+_LEGACY_MODIFIERS = (
+    "rowmap", "source", "filter", "dataframe",
+    "expand", "map", "flatmap", "raw_output",
+)
+_LEGACY_MODIFIER_RE = re.compile(
+    r"(?P<op>[A-Za-z_]\w*)\.(?P<mod>" + "|".join(_LEGACY_MODIFIERS) + r")\("
+)
+
+
+def _strip_legacy_modifiers(text: str) -> str:
+    """Rewrite ``op.modifier(`` → ``op(`` for any legacy modifier."""
+    return _LEGACY_MODIFIER_RE.sub(r"\g<op>(", text)
 
 
 # --------------------------------------------------------------------------- #
@@ -315,17 +399,17 @@ def validate(
                     f"(got '.{node.attr}' on non-step expression).",
                     "attr_non_step", node)
 
-        # 4. Subscript only on step refs, with a string literal key
+        # 4. Subscript: target must root at a step ref; key must be a
+        #    string / int / homogeneous list / slice.
         if isinstance(node, ast.Subscript):
-            if not (isinstance(node.value, ast.Name) and node.value.id in steps):
-                add("Subscript [...] is only allowed on step references.",
+            if _subscript_root_step(node.value, steps) is None:
+                add("Subscript [...] is only allowed on step references "
+                    "(or on a column/cell derived from one).",
                     "subscript_non_step", node)
-            key_node = node.slice
-            if hasattr(ast, "Index") and isinstance(key_node, ast.Index):
-                key_node = key_node.value  # type: ignore[attr-defined]
-            if not (isinstance(key_node, ast.Constant) and isinstance(key_node.value, str)):
-                add("Subscript key must be a string literal.",
-                    "subscript_non_string", node)
+            if not _is_valid_subscript_key(node.slice):
+                add("Subscript key must be a string, int, homogeneous list "
+                    "of strings/ints, or a slice.",
+                    "subscript_invalid_key", node)
 
         # 5. Bare Names must be either a step ref OR a registered op
         if isinstance(node, ast.Name):
@@ -397,12 +481,20 @@ def _interpret(node: ast.AST, env: Dict[str, Any]) -> Any:
         return getattr(step, node.attr)
 
     if isinstance(node, ast.Subscript):
+        # Resolve target recursively — supports chained subscripts:
+        #   step1["col"][0]   → ColumnProxy then scalar
+        #   step1[["a","b"]]  → narrower StepProxy
+        target = _interpret(node.value, env)
         slice_node = node.slice
         if hasattr(ast, "Index") and isinstance(slice_node, ast.Index):
             slice_node = slice_node.value  # type: ignore[attr-defined]
+        if isinstance(slice_node, ast.Slice):
+            lower = _interpret(slice_node.lower, env) if slice_node.lower else None
+            upper = _interpret(slice_node.upper, env) if slice_node.upper else None
+            step  = _interpret(slice_node.step,  env) if slice_node.step  else None
+            return target[slice(lower, upper, step)]
         key = _interpret(slice_node, env)
-        step = steps[node.value.id]  # type: ignore[union-attr]
-        return step[key]
+        return target[key]
 
     if isinstance(node, ast.List):
         return [_interpret(e, env) for e in node.elts]
@@ -538,3 +630,161 @@ def describe(formula: str) -> Dict[str, Any]:
         "step_refs": step_refs,
         "top_level_op": calls[0]["op"] if calls else None,
     }
+
+
+# --------------------------------------------------------------------------- #
+# Legacy-shape adapters                                                       #
+#                                                                             #
+# These produce the {op, kwargs_as_source_text} view that the v1              #
+# `ParsedFormula` and `build_formula` helpers expose. They exist purely so    #
+# the regex-based `formula_parser.py` can be reduced to a thin shim over the  #
+# AST implementation here. New code should prefer `describe()` / `run`.       #
+# --------------------------------------------------------------------------- #
+def _source_of(node: ast.AST) -> str:
+    """Return the formula source text of an AST node (Python 3.9+)."""
+    try:
+        return ast.unparse(node)
+    except AttributeError:  # pragma: no cover  (Python <3.9)
+        return repr(node)
+
+
+def _arg_source(node: ast.AST) -> str:
+    """
+    Return the *legacy-contract* representation of a call kwarg value:
+
+    * String literals  → the inner string, unquoted (so the engine sees
+      ``[{"a":1}]`` instead of ``'[{"a":1}]'``). This matches what the
+      pre-Stage-3 regex parser did.
+    * Literal lists / dicts / tuples of constants → JSON-formatted
+      (double-quoted), since several core ops (e.g. ``select_columns``)
+      run ``json.loads()`` on the incoming string. ``ast.unparse`` would
+      otherwise emit single-quoted Python repr, which isn't valid JSON.
+    * Everything else  → the source text (``ast.unparse``), which yields
+      step refs like ``step1["col"]`` and numbers unchanged.
+    """
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    # Static collection literal? Try ast.literal_eval → json.dumps.
+    if isinstance(node, (ast.List, ast.Dict, ast.Tuple)):
+        try:
+            import json
+            value = ast.literal_eval(node)
+            return json.dumps(value)
+        except (ValueError, TypeError):
+            pass  # Contains non-literal entries (e.g. a step ref) → fall through.
+    return _source_of(node)
+
+
+def parse_call(formula: str) -> Dict[str, Any]:
+    """
+    Parse a formula and return a flat legacy-shape view of its top-level
+    expression::
+
+        { "op":      "extract_metadata",   # None if no top-level call
+          "args":    { "video_url": 'step1["video_url"]' },
+          "is_call": True,                 # False for bare ref / literal
+          "is_valid": True,
+          "raw":     "=extract_metadata(...)" }
+
+    Argument *values* are returned as their formula source text (not
+    evaluated). Step references stay as ``step1["col"]``; literals stay
+    quoted/unquoted exactly as they appeared. The top-level call may be
+    nested arbitrarily deep — we only describe the outermost.
+    """
+    raw = formula or ""
+    try:
+        tree = parse(raw)
+    except FormulaError:
+        return {"op": None, "args": {}, "is_call": False, "is_valid": False, "raw": raw}
+
+    body = tree.body
+    if isinstance(body, ast.Call) and isinstance(body.func, ast.Name):
+        args: Dict[str, str] = {}
+        for kw in body.keywords:
+            if kw.arg:
+                args[kw.arg] = _arg_source(kw.value)
+        return {
+            "op":       body.func.id,
+            "args":     args,
+            "is_call":  True,
+            "is_valid": True,
+            "raw":      raw,
+        }
+
+    # Bare reference / literal — no call.
+    return {
+        "op":       None,
+        "args":     {"_ref": _source_of(body)},
+        "is_call":  False,
+        "is_valid": True,
+        "raw":      raw,
+    }
+
+
+def build(op: Optional[str], kwargs: Optional[Dict[str, Any]] = None) -> str:
+    """
+    Build a canonical (modifier-free) formula string.
+
+    * ``op`` is the registered operation name. Falsy / 'noop' → empty string.
+    * ``kwargs`` is a dict of {arg_name: value}. Keys starting with ``_``
+      are skipped (legacy internal markers like ``_orchestrator``,
+      ``_literal``, ``_ref``).
+    * Values are formatted with :func:`format_value`.
+
+    Examples::
+
+        build("extract_metadata", {"video_url": 'step1["video_url"]'})
+            → '=extract_metadata(video_url=step1["video_url"])'
+
+        build(None, {"_ref": 'step1["col"]'})
+            → '=step1["col"]'         # bare passthrough
+    """
+    if not op or op in ("noop", ""):
+        # Bare-reference passthrough — return the stored _ref.
+        if kwargs and "_ref" in kwargs:
+            return f"={kwargs['_ref']}"
+        return ""
+
+    parts = []
+    for k, v in (kwargs or {}).items():
+        if k.startswith("_"):
+            continue
+        parts.append(f"{k}={format_value(v)}")
+    return f"={op}({', '.join(parts)})"
+
+
+_STEP_REF_RE = re.compile(r'^step[\w-]*(\[.*\]|\.\w+)*$', re.IGNORECASE)
+_NUMBER_RE   = re.compile(r'^-?\d+(\.\d+)?$')
+
+
+def format_value(v: Any) -> str:
+    """
+    Format a Python value (or source-text string from `parse_call`) for
+    inclusion in a formula. Mirrors the spreadsheet-style rules:
+
+    * ``None``                        → ``""``
+    * ``bool`` / ``int`` / ``float``  → ``str(v).lower()`` / ``str(v)``
+    * string already looking like a step ref / number / formula → unchanged
+    * everything else                 → double-quoted
+    """
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return str(v).lower()
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = str(v)
+    if not s:
+        return '""'
+    if s.startswith("="):
+        return s
+    if _STEP_REF_RE.match(s):
+        return s
+    if _NUMBER_RE.match(s):
+        return s
+    # Already a valid Python literal (list, dict, quoted string, etc.)?
+    # Leave it as-is so round-tripping doesn't double-quote.
+    if s[0] in '"\'[{(' or s in ("True", "False", "None"):
+        return s
+    return f'"{s}"'
+
