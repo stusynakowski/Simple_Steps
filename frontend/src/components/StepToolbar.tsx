@@ -1,9 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import { parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
+
+// Lazy-load the Monaco-backed formula editor so the ~2 MB editor bundle
+// stays out of the initial JS payload.  While it's loading we render a
+// plain textarea fallback so the user can still type immediately.
+const FormulaEditor = lazy(() => import('./FormulaEditor'));
 
 /** Visual colour coding for each orchestration mode — used in the autocomplete dropdown. */
 const ORCHESTRATION_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -444,21 +449,45 @@ export default function StepToolbar({
 
         {/* Formula Input + Autocomplete Dropdown */}
         <div style={{ flex: 1, position: 'relative' }}>
-          <textarea
-            ref={(el) => {
-              (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
-              onFormulaBarRef?.(el);
-            }}
-            rows={1}
+          <Suspense
+            fallback={
+              <textarea
+                ref={(el) => {
+                  (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                  onFormulaBarRef?.(el);
+                }}
+                rows={1}
+                value={formula}
+                onChange={handleInputChange}
+                placeholder="Loading editor…"
+                style={{
+                  width: '100%',
+                  padding: '4px 8px',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  fontFamily: 'monospace',
+                  boxSizing: 'border-box',
+                  resize: 'none',
+                  minHeight: '26px',
+                  lineHeight: 1.4,
+                }}
+                data-testid="formula-input"
+              />
+            }
+          >
+            <FormulaEditor
             value={formula}
-            onChange={handleInputChange}
-            onKeyDown={(e) => {
-              // Enter submits / closes suggestions; Shift+Enter inserts a newline.
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                setShowSuggestions(false);
-                onRun?.(step.id);
-              }
+            onChange={(next) => {
+              // Build a synthetic event so we reuse handleInputChange's logic
+              // without duplicating its body.
+              const fakeEvent = {
+                target: { value: next },
+              } as unknown as React.ChangeEvent<HTMLTextAreaElement>;
+              handleInputChange(fakeEvent);
+            }}
+            onEnter={() => {
+              setShowSuggestions(false);
+              onRun?.(step.id);
             }}
             onBlur={() => {
               setTimeout(() => setShowSuggestions(false), 150);
@@ -468,30 +497,20 @@ export default function StepToolbar({
               const sugg = computeSuggestions(formula);
               setSuggestions(sugg);
               setShowSuggestions(sugg.length > 0);
-              // Register this input as the current wiring target so prior-step
-              // grids can inject references into it.
               if (inputRef.current) {
                 activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLTextAreaElement>);
               }
             }}
+            shadowRef={(el) => {
+              (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+              onFormulaBarRef?.(el);
+            }}
             placeholder={availableOperations?.length
               ? `=operation.source(param="value") or =operation.map(col=step1.col)`
               : '=OPERATION.mode(param="value")'}
-            style={{
-              width: '100%',
-              padding: '4px 8px',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              fontFamily: 'monospace',
-              boxSizing: 'border-box',
-              resize: 'none',
-              overflow: 'hidden',
-              minHeight: '26px',
-              maxHeight: '240px',
-              lineHeight: 1.4,
-            }}
-            data-testid="formula-input"
+            testId="formula-input"
           />
+          </Suspense>
 
           {/* Reference-misuse hint: user typed a bare step reference as a full formula
               but the step already has a real operation selected (not noop/passthrough).

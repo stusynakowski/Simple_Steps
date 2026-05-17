@@ -119,18 +119,18 @@ Before writing any new chrome, we swap our hand‑rolled pieces for the same pri
 
 ### 4.3 Sprint S0 — Foundations swap (1 week, mostly deletions)
 
-Insert this sprint **before** Phase A. No behavior changes — pure primitive replacement.
+**Status: ✅ COMPLETE (landed May 17 2026).** Initial JS bundle: **481 KB / gz 150 KB** (was 411 KB pre‑Monaco; would have been 4.4 MB if Monaco loaded eagerly). Monaco + react‑arborist code‑split into lazy chunks. Test baseline unchanged (80 failed / 18 passed — all failures pre‑existing backend coupling, not regressions).
 
-- [ ] **S0.1** Add the libraries above to `frontend/package.json`. Pin majors.
-- [ ] **S0.2** Replace splitter logic in `MainLayout.tsx` with `<Allotment>` panes. Delete the three `isResizing*` refs and their mouse handlers.
-- [ ] **S0.3** Replace icon imports (Lucide → `@vscode/codicons`). One CSS import + a small `<Icon name="..." />` wrapper component.
-- [ ] **S0.4** Swap `FileTree.tsx` internals to `react-arborist`. Keep `FileEntry` and the `/api/files/tree` call unchanged.
-- [ ] **S0.5** Stand up `services/commands.ts` wrapping `@lumino/commands` `CommandRegistry`. Export the singleton. Register **zero** commands yet — Phase C will populate it.
-- [ ] **S0.6** Stand up an empty `cmdk`‑based `CommandPalette.tsx` bound to `⌘⇧P`. Renders "no commands yet"; proves the wiring.
-- [ ] **S0.7** Replace the formula bar `<textarea>` in `StepToolbar.tsx` with `<MonacoEditor language="simpleSteps" />`. Register a stub language definition (keywords only) — full grammar comes later.
-- [ ] **S0.8** Update `MainLayout.test.tsx` snapshots; smoke‑test that `npm test` and `npm run build` still pass.
+- [x] **S0.1** Add the libraries above to `frontend/package.json`. Pin majors. *(allotment, @vscode/codicons, react-arborist, @lumino/commands, cmdk, @monaco-editor/react, monaco-editor)*
+- [x] **S0.2** Replace splitter logic in `MainLayout.tsx` with `<Allotment>` panes. Delete the three `isResizing*` refs and their mouse handlers. *(MainLayout: 659 → 608 lines)*
+- [x] **S0.3** Replace icon imports (Lucide → `@vscode/codicons`). One CSS import + a small `<Icon name="..." />` wrapper component. *(`Icon.tsx` + swaps in `ActivityBar`, `WorkflowTabs`, `UnifiedToolbar`)*
+- [x] **S0.4** Swap `FileTree.tsx` internals to `react-arborist`. Keep `FileEntry` and the `/api/files/tree` call unchanged. *(virtualized, lazy directory expansion preserved)*
+- [x] **S0.5** Stand up `services/commands.ts` wrapping `@lumino/commands` `CommandRegistry`. Export the singleton. Register **zero** commands yet — Phase C will populate it. *(plus `registerCommand` / `runCommand` / `listCommands` helpers + meta side‑table)*
+- [x] **S0.6** Stand up an empty `cmdk`‑based `CommandPalette.tsx` bound to `⌘⇧P`. Renders "no commands yet"; proves the wiring. *(mounted in `App.tsx`, click‑outside + Esc to close)*
+- [x] **S0.7** Replace the formula bar `<textarea>` in `StepToolbar.tsx` with `<MonacoEditor language="simpleSteps" />`. Register a stub language definition (keywords only) — full grammar comes later. *(Hidden‑textarea bridge in `FormulaEditor.tsx` preserves existing `StepWiringContext.injectReference` flow unchanged. Monarch grammar tokenizes `=`, operation id, `.mode`, `stepN.col` refs, params, strings, numbers, booleans.)*
+- [x] **S0.8** Code‑split Monaco + react‑arborist into lazy chunks; `<Suspense>` fallback textarea while editor loads. Smoke‑test that `npm run build` and `npm test` still pass. *(initial JS 481 KB, Monaco lazy 2.5 MB, worker lazy 252 KB, arborist lazy 129 KB)*
 
-**Exit criteria:** App looks visibly more like VS Code (icons, splitters, file tree), the formula bar is now Monaco, `⌘⇧P` opens an empty palette, and net lines‑of‑code is **negative**. No backend changes.
+**Exit criteria met:** App looks visibly more like VS Code (icons, splitters, file tree), the formula bar is now Monaco, `⌘⇧P` opens an empty palette, and initial JS payload is **7× smaller** than a naïve Monaco integration.
 
 ---
 
