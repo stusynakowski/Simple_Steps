@@ -81,7 +81,7 @@ def test_validate_rejects_unknown_op():
 
 def test_validate_rejects_method_calls():
     errs = validate("=step1.name.upper()", available_steps={"step1"})
-    assert any("direct calls" in e.lower() or "method" in e.lower() for e in errs)
+    assert any("direct calls" in e.message.lower() or "method" in e.message.lower() for e in errs)
 
 
 def test_validate_rejects_dunder_attribute():
@@ -107,7 +107,7 @@ def test_validate_rejects_comprehension():
 
 def test_validate_rejects_star_args():
     errs = validate("=sf_add(*[1,2])", available_steps=set())
-    assert any("unpacking" in e.lower() for e in errs)
+    assert any("unpacking" in e.message.lower() for e in errs)
 
 
 def test_validate_rejects_unknown_step_attribute_target():
@@ -171,3 +171,71 @@ def test_describe_handles_syntax_error():
     info = describe("=sf_upper(text=")
     assert info["valid"] is False
     assert info["errors"]
+
+
+# ── Arithmetic & comparison operators ────────────────────────────────────
+def test_run_arithmetic_in_kwargs():
+    # +, -, *, /, //, %, ** as arguments to a registered op
+    assert run_formula("=sf_add(a=2+3, b=4*5)", steps={}) == 25
+    assert run_formula("=sf_add(a=10-3, b=2**3)", steps={}) == 15
+    assert run_formula("=sf_add(a=10//3, b=10%3)", steps={}) == 4
+
+
+def test_run_arithmetic_top_level():
+    # Top-level expression need not be a call.
+    assert run_formula("=2 + 3 * 4", steps={}) == 14
+
+
+def test_run_comparison():
+    assert run_formula("=sf_add(a=1, b=1)", steps={}) == 2
+    # Comparison as top-level
+    assert run_formula("=10 > 3", steps={}) is True
+    assert run_formula("=10 == 11", steps={}) is False
+
+
+def test_validate_rejects_chained_comparison_at_runtime():
+    # Validate allows it (it's valid syntax), but interpret rejects it
+    # to avoid pandas truthiness issues.
+    with pytest.raises(FormulaError):
+        run_formula("=1 < 2 < 3", steps={})
+
+
+# ── Signature-aware validation ───────────────────────────────────────────
+def test_validate_unknown_kwarg():
+    errs = validate("=sf_add(a=1, b=2, c=3)", available_steps=set())
+    codes = {e.code for e in errs}
+    assert "unknown_kwarg" in codes
+
+
+def test_validate_missing_required_kwarg():
+    errs = validate("=sf_add(a=1)", available_steps=set())
+    codes = {e.code for e in errs}
+    assert "missing_required" in codes
+
+
+def test_validate_too_many_positional():
+    errs = validate("=sf_add(1, 2, 3)", available_steps=set())
+    codes = {e.code for e in errs}
+    assert "too_many_positional" in codes
+
+
+def test_validate_clean_call_has_no_diagnostics():
+    errs = validate("=sf_add(a=1, b=2)", available_steps=set())
+    assert errs == []
+
+
+# ── Diagnostic offsets (for UI squiggles) ────────────────────────────────
+def test_diagnostics_carry_offsets():
+    errs = validate("=does_not_exist(x=1)", available_steps=set())
+    assert errs
+    # At least one diagnostic should pinpoint a character range.
+    assert any(
+        e.col_offset is not None and e.end_col_offset is not None
+        for e in errs
+    )
+
+
+def test_diagnostic_to_dict_shape():
+    errs = validate("=does_not_exist(x=1)", available_steps=set())
+    d = errs[0].to_dict()
+    assert set(d.keys()) >= {"message", "code", "col_offset", "end_col_offset"}

@@ -21,9 +21,9 @@ import type { LogEntry, LogLevel } from '../components/ExecutionLog';
  *   2. No formula saved     → reconstruct from operation_id + config (legacy files).
  *   3. Invalid formula saved → ignore it, reconstruct from operation_id + config.
  */
-function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
+async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise<Step> {
   const savedFormula = s.formula ?? '';
-  const parsed = savedFormula ? parseFormula(savedFormula) : null;
+  const parsed = savedFormula ? await parseFormula(savedFormula) : null;
   const formulaIsUsable = parsed?.isValid && !!parsed.operationId;
 
   // If the saved file has a valid formula, derive everything from it.
@@ -65,8 +65,8 @@ function hydrateStep(s: PipelineFile['steps'][number], i: number): Step {
   // Otherwise reconstruct from legacy fields so the formula bar always
   // shows the correct function + arguments (not just the step name).
   const formula = formulaIsUsable
-    ? buildFormula(processType, formulaArgs, (internalKeys._orchestrator as any) ?? null)
-    : buildFormula(processType, configuration,
+    ? await buildFormula(processType, formulaArgs, (internalKeys._orchestrator as any) ?? null)
+    : await buildFormula(processType, configuration,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (internalKeys._orchestrator as any) ?? null,
       );
@@ -273,7 +273,7 @@ export default function useWorkflow() {
     // ── Derive operation_id and args from the formula (the canonical source) ──
     // If a config override is explicitly passed (e.g. from runPipeline), use it
     // as-is. Otherwise, always parse the formula to get the authoritative args.
-    const parsed = step.formula ? parseFormula(step.formula) : null;
+    const parsed = step.formula ? await parseFormula(step.formula) : null;
     const operationId = (parsed?.isValid && parsed.operationId)
       ? parsed.operationId
       : step.process_type;
@@ -447,7 +447,7 @@ export default function useWorkflow() {
     }
 
     // Derive operation_id and args from the formula (the canonical source)
-    const parsed = step.formula ? parseFormula(step.formula) : null;
+    const parsed = step.formula ? await parseFormula(step.formula) : null;
     const previewOperationId = (parsed?.isValid && parsed.operationId)
       ? parsed.operationId
       : step.process_type;
@@ -708,7 +708,7 @@ export default function useWorkflow() {
   /** Load a pipeline from a project and replace the current workflow. */
   const loadWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<void> => {
     const pipeline = await loadPipeline(projectId, pipelineId);
-    const restoredSteps: Step[] = pipeline.steps.map(hydrateStep);
+    const restoredSteps: Step[] = await Promise.all(pipeline.steps.map(hydrateStep));
     setWorkflow({
       id: pipeline.id,
       name: pipeline.name,
@@ -723,7 +723,7 @@ export default function useWorkflow() {
   /** Fetch a pipeline as a Workflow object WITHOUT changing hook state. */
   const fetchWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<Workflow> => {
     const pipeline = await loadPipeline(projectId, pipelineId);
-    const steps: Step[] = pipeline.steps.map(hydrateStep);
+    const steps: Step[] = await Promise.all(pipeline.steps.map(hydrateStep));
     return { id: pipeline.id, name: pipeline.name, created_at: pipeline.created_at, steps };
   }, []);
 

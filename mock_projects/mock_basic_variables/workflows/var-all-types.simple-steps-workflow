@@ -1,78 +1,65 @@
 {
-  "id": "var-all-types",
-  "name": "Variables — All Types in Sequence",
-  "created_at": "2026-05-08T12:00:00.000Z",
-  "updated_at": "2026-05-08T12:00:00.000Z",
+  "format_version": 2,
+  "name": "Variables \u2014 All Types in Sequence",
+  "meta": {
+    "legacy_id": "var-all-types"
+  },
   "steps": [
     {
-      "step_id": "step-str",
-      "operation_id": "literal",
-      "label": "greeting",
-      "config": {
-        "expr": "\"hello world\"",
-        "_orchestrator": "source"
-      },
-      "formula": "= \"hello world\""
+      "name": "step_str",
+      "expression": "\"hello world\"",
+      "meta": {
+        "label": "greeting",
+        "legacy_step_id": "step-str"
+      }
     },
     {
-      "step_id": "step-int",
-      "operation_id": "literal",
-      "label": "count",
-      "config": {
-        "expr": "42",
-        "_orchestrator": "source"
-      },
-      "formula": "= 42"
+      "name": "step_int",
+      "expression": "42",
+      "meta": {
+        "label": "count",
+        "legacy_step_id": "step-int"
+      }
     },
     {
-      "step_id": "step-float",
-      "operation_id": "literal",
-      "label": "pi",
-      "config": {
-        "expr": "3.14",
-        "_orchestrator": "source"
-      },
-      "formula": "= 3.14"
+      "name": "step_float",
+      "expression": "3.14",
+      "meta": {
+        "label": "pi",
+        "legacy_step_id": "step-float"
+      }
     },
     {
-      "step_id": "step-bool",
-      "operation_id": "literal",
-      "label": "is_active",
-      "config": {
-        "expr": "True",
-        "_orchestrator": "source"
-      },
-      "formula": "= True"
+      "name": "step_bool",
+      "expression": "True",
+      "meta": {
+        "label": "is_active",
+        "legacy_step_id": "step-bool"
+      }
     },
     {
-      "step_id": "step-list",
-      "operation_id": "literal",
-      "label": "scores",
-      "config": {
-        "expr": "[10, 20, 30, 40, 50]",
-        "_orchestrator": "source"
-      },
-      "formula": "= [10, 20, 30, 40, 50]"
+      "name": "step_list",
+      "expression": "[10, 20, 30, 40, 50]",
+      "meta": {
+        "label": "scores",
+        "legacy_step_id": "step-list"
+      }
     },
     {
-      "step_id": "step-dict",
-      "operation_id": "literal",
-      "label": "user",
-      "config": {
-        "expr": "{\"name\": \"alice\", \"age\": 30, \"active\": True}",
-        "_orchestrator": "source"
-      },
-      "formula": "= {\"name\": \"alice\", \"age\": 30, \"active\": True}"
+      "name": "step_dict",
+      "expression": "{\"name\": \"alice\", \"age\": 30, \"active\": True}",
+      "meta": {
+        "label": "user",
+        "legacy_step_id": "step-dict"
+      }
     },
     {
-      "step_id": "step-nested",
-      "operation_id": "literal",
-      "label": "profile",
-      "config": {
-        "expr": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}",
-        "_orchestrator": "source"
-      },
-      "formula": "= {\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}"
+      "name": "step_nested",
+      "expression": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}",
+      "meta": {
+        "label": "profile",
+        "legacy_step_id": "step-nested"
+      }
     }
   ]
 }

@@ -1,56 +1,49 @@
 {
-  "id": "ui-test-full-analysis-report",
-  "name": "UI Test – Full Analysis Report",
-  "created_at": "2026-04-26T12:00:00.000Z",
-  "updated_at": "2026-04-27T00:00:00.000Z",
+  "format_version": 2,
+  "name": "UI Test \u2013 Full Analysis Report",
+  "meta": {
+    "legacy_id": "ui-test-full-analysis-report"
+  },
   "steps": [
     {
-      "step_id": "step-fetch",
-      "operation_id": "fetch_channel_videos",
-      "label": "Fetch Videos",
-      "config": {
-        "channel_url": "https://youtube.com/@mock_channel",
-        "_orchestrator": "source"
-      },
-      "formula": "=fetch_channel_videos.source(channel_url=\"https://youtube.com/@mock_channel\")"
+      "name": "step_fetch",
+      "expression": "fetch_channel_videos(channel_url=\"https://youtube.com/@mock_channel\")",
+      "meta": {
+        "label": "Fetch Videos",
+        "legacy_step_id": "step-fetch"
+      }
     },
     {
-      "step_id": "step-metadata",
-      "operation_id": "extract_metadata",
-      "label": "Extract Metadata",
-      "config": {
-        "_orchestrator": "map"
-      },
-      "formula": "=extract_metadata.map(video_url=step1.output)"
+      "name": "step_metadata",
+      "expression": "extract_metadata(video_url=step1)",
+      "meta": {
+        "label": "Extract Metadata",
+        "legacy_step_id": "step-metadata"
+      }
     },
     {
-      "step_id": "step-transcribe",
-      "operation_id": "transcribe_video",
-      "label": "Transcribe",
-      "config": {
-        "_orchestrator": "map"
-      },
-      "formula": "=transcribe_video.map(video_url=step1.output)"
+      "name": "step_transcribe",
+      "expression": "transcribe_video(video_url=step1)",
+      "meta": {
+        "label": "Transcribe",
+        "legacy_step_id": "step-transcribe"
+      }
     },
     {
-      "step_id": "step-segment",
-      "operation_id": "segment_conversations",
-      "label": "Segment Conversations",
-      "config": {
-        "_orchestrator": "expand",
-        "transcript": "transcribe_video_output"
-      },
-      "formula": "=segment_conversations.expand(transcript=\"transcribe_video_output\")"
+      "name": "step_segment",
+      "expression": "segment_conversations(transcript=\"transcribe_video_output\")",
+      "meta": {
+        "label": "Segment Conversations",
+        "legacy_step_id": "step-segment"
+      }
     },
     {
-      "step_id": "step-sentiment",
-      "operation_id": "analyze_sentiment",
-      "label": "Analyze Sentiment",
-      "config": {
-        "_orchestrator": "map",
-        "text": "segment_conversations_output"
-      },
-      "formula": "=analyze_sentiment.map(text=\"segment_conversations_output\")"
+      "name": "step_sentiment",
+      "expression": "analyze_sentiment(text=\"segment_conversations_output\")",
+      "meta": {
+        "label": "Analyze Sentiment",
+        "legacy_step_id": "step-sentiment"
+      }
     }
   ]
 }

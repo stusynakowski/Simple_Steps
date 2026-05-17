@@ -1,18 +1,17 @@
 {
-  "id": "var-string",
-  "name": "Variable — String",
-  "created_at": "2026-05-07T12:00:00.000Z",
-  "updated_at": "2026-05-07T12:00:00.000Z",
+  "format_version": 2,
+  "name": "Variable \u2014 String",
+  "meta": {
+    "legacy_id": "var-string"
+  },
   "steps": [
     {
-      "step_id": "step-var",
-      "operation_id": "literal",
-      "label": "String Variable",
-      "config": {
-        "expr": "\"hello world\"",
-        "_orchestrator": "source"
-      },
-      "formula": "= \"hello world\""
+      "name": "step_var",
+      "expression": "\"hello world\"",
+      "meta": {
+        "label": "String Variable",
+        "legacy_step_id": "step-var"
+      }
     }
   ]
 }

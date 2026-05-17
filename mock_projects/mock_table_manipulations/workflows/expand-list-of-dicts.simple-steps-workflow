@@ -1,28 +1,25 @@
 {
-  "id": "expand-list-of-dicts",
-  "name": "Expand — List of Flat Dicts",
-  "created_at": "2026-05-07T12:00:00.000Z",
-  "updated_at": "2026-05-07T12:00:00.000Z",
+  "format_version": 2,
+  "name": "Expand \u2014 List of Flat Dicts",
+  "meta": {
+    "legacy_id": "expand-list-of-dicts"
+  },
   "steps": [
     {
-      "step_id": "step-var",
-      "operation_id": "define_variable",
-      "label": "List of Flat Dicts",
-      "config": {
-        "value": "[{\"name\": \"alice\", \"score\": 90}, {\"name\": \"bob\", \"score\": 75}, {\"name\": \"carol\", \"score\": 88}]",
-        "type": "json",
-        "_orchestrator": "source"
-      },
-      "formula": "=define_variable(value='[{\"name\":\"alice\",\"score\":90},{\"name\":\"bob\",\"score\":75},{\"name\":\"carol\",\"score\":88}]', type=\"json\")"
+      "name": "step_var",
+      "expression": "define_variable(value='[{\"name\":\"alice\",\"score\":90},{\"name\":\"bob\",\"score\":75},{\"name\":\"carol\",\"score\":88}]', type=\"json\")",
+      "meta": {
+        "label": "List of Flat Dicts",
+        "legacy_step_id": "step-var"
+      }
     },
     {
-      "step_id": "step-expand",
-      "operation_id": "expand_cell",
-      "label": "Expand to Table",
-      "config": {
-        "_orchestrator": "dataframe"
-      },
-      "formula": "=expand_cell()"
+      "name": "step_expand",
+      "expression": "expand_cell()",
+      "meta": {
+        "label": "Expand to Table",
+        "legacy_step_id": "step-expand"
+      }
     }
   ]
 }

@@ -151,14 +151,29 @@ export default function OperationColumn({
   const currentOp = availableOperations.find(op => op.id === step.process_type);
   const hasParams = currentOp && currentOp.params && currentOp.params.length > 0;
 
-  const derivedFormula = step.formula || buildFormula(
-    step.process_type,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    step.configuration as Record<string, any>,
-    (step.configuration._orchestrator as OrchestrationMode | undefined)
-      ?? (currentOp?.type as OrchestrationMode | undefined)
-      ?? null,
-  );
+  // `derivedFormula` is async because buildFormula() round-trips to the backend
+  // for legacy steps without a saved formula. We cache the result in state and
+  // recompute whenever the inputs change.
+  const [derivedFormula, setDerivedFormula] = useState<string>(step.formula || '');
+  useEffect(() => {
+    let cancelled = false;
+    if (step.formula) {
+      setDerivedFormula(step.formula);
+      return;
+    }
+    (async () => {
+      const f = await buildFormula(
+        step.process_type,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        step.configuration as Record<string, any>,
+        (step.configuration._orchestrator as OrchestrationMode | undefined)
+          ?? (currentOp?.type as OrchestrationMode | undefined)
+          ?? null,
+      );
+      if (!cancelled) setDerivedFormula(f);
+    })();
+    return () => { cancelled = true; };
+  }, [step.formula, step.process_type, step.configuration, currentOp?.type]);
 
   // ── Staged preview state ───────────────────────────────────────────────────
   // Track what the user is typing live — separate from committed step.formula
@@ -171,11 +186,21 @@ export default function OperationColumn({
     setLiveFormula(step.formula || derivedFormula || step.operation || '');
   }, [step.formula, step.operation, derivedFormula]);
 
-  // Parse the live formula so the staged preview hook gets a typed ParsedFormula
-  const liveParsed = useMemo(
-    () => (liveFormula ? parseFormula(liveFormula) : null),
-    [liveFormula]
-  );
+  // Parse the live formula so the staged preview hook gets a typed ParsedFormula.
+  // parseFormula is async (it round-trips to the backend) so we cache the result
+  // in state instead of useMemo.
+  const [liveParsed, setLiveParsed] = useState<ParsedFormula | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!liveFormula) {
+      setLiveParsed(null);
+      return;
+    }
+    parseFormula(liveFormula).then((p) => {
+      if (!cancelled) setLiveParsed(p);
+    });
+    return () => { cancelled = true; };
+  }, [liveFormula]);
 
   // Derive upstream rows/columns from the last previous step's output_preview
   const upstreamRows = useMemo<Record<string, unknown>[]>(() => {
@@ -241,16 +266,16 @@ export default function OperationColumn({
   // Handler for UI-based updates (Dropdowns/Inputs in the Details tab)
   // The UI form writes to the formula FIRST; process_type and configuration
   // are derived from the formula and kept in sync.
-  const handleUiUpdate = (updates: Partial<Step>) => {
+  const handleUiUpdate = async (updates: Partial<Step>) => {
     const newOpId = updates.process_type !== undefined ? updates.process_type : step.process_type;
     const newConfig = updates.configuration !== undefined ? updates.configuration : step.configuration;
     // Preserve the orchestration modifier already in the formula if no config override
-    const existingParsed = step.formula ? parseFormula(step.formula) : null;
+    const existingParsed = step.formula ? await parseFormula(step.formula) : null;
     const orchMode = (newConfig._orchestrator as import('../utils/formulaParser').OrchestrationMode | undefined)
       ?? existingParsed?.orchestration
       ?? currentOp?.type as import('../utils/formulaParser').OrchestrationMode | undefined
       ?? null;
-    const newFormula = buildFormula(newOpId, newConfig, orchMode);
+    const newFormula = await buildFormula(newOpId, newConfig, orchMode);
     setLiveFormula(newFormula); // keep staged preview in sync
     onUpdate?.(step.id, { ...updates, formula: newFormula, operation: newFormula });
   };

@@ -109,7 +109,7 @@ export default function StepToolbar({
     return [];
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVal = e.target.value;
     setFormula(newVal);
 
@@ -117,7 +117,7 @@ export default function StepToolbar({
     setSuggestions(sugg);
     setShowSuggestions(sugg.length > 0);
 
-    const parsed = parseFormula(newVal);
+    const parsed = await parseFormula(newVal);
     onFormulaChange?.(step.id, newVal, parsed);
   };
 
@@ -132,15 +132,17 @@ export default function StepToolbar({
       const sugg = computeSuggestions(newVal);
       setSuggestions(sugg);
       setShowSuggestions(sugg.length > 0);
-      const parsed = parseFormula(newVal);
-      onFormulaChange?.(step.id, newVal, parsed);
+      // Fire-and-forget async parse — the formula bar UI doesn't wait on it.
+      void parseFormula(newVal).then((parsed) => {
+        onFormulaChange?.(step.id, newVal, parsed);
+      });
     };
     el.addEventListener('input', onNativeInput);
     return () => el.removeEventListener('input', onNativeInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.id]);
 
-  const handleSuggestionClick = (op: OperationDefinition) => {
+  const handleSuggestionClick = async (op: OperationDefinition) => {
     // Stamp the operation's default orchestration type as the modifier so it's
     // immediately visible and editable in the formula bar.
     // e.g. "source" → =fetch_videos.source(   "map" → =yt_extract_metadata.map(
@@ -148,7 +150,7 @@ export default function StepToolbar({
     const newFormula = `=${op.id}${modifier}(`;
     setFormula(newFormula);
     setShowSuggestions(false);
-    const parsed = parseFormula(newFormula);
+    const parsed = await parseFormula(newFormula);
     onFormulaChange?.(step.id, newFormula, parsed);
     // Re-focus and move cursor to end
     setTimeout(() => {

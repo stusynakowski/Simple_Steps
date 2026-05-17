@@ -1,27 +1,25 @@
 {
-  "id": "select-table",
+  "format_version": 2,
   "name": "Select Table",
-  "created_at": "2026-05-10T12:00:00.000Z",
-  "updated_at": "2026-05-10T12:00:00.000Z",
+  "meta": {
+    "legacy_id": "select-table"
+  },
   "steps": [
     {
-      "step_id": "step-table",
-      "operation_id": "make_table",
-      "label": "Create Table",
-      "config": {
-        "rows": "[{\"name\": \"alice\", \"score\": 90, \"age\": 30}, {\"name\": \"bob\", \"score\": 75, \"age\": 25}, {\"name\": \"carol\", \"score\": 88, \"age\": 28}]",
-        "_orchestrator": "source"
-      },
-      "formula": "=make_table(rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')"
+      "name": "step_table",
+      "expression": "make_table(rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')",
+      "meta": {
+        "label": "Create Table",
+        "legacy_step_id": "step-table"
+      }
     },
     {
-      "step_id": "step-select-table",
-      "operation_id": "select_table",
-      "label": "Select Table",
-      "config": {
-        "data": "step1"
-      },
-      "formula": "=select_table(data=step1)"
+      "name": "step_select_table",
+      "expression": "select_table(data=step1)",
+      "meta": {
+        "label": "Select Table",
+        "legacy_step_id": "step-select-table"
+      }
     }
   ]
 }

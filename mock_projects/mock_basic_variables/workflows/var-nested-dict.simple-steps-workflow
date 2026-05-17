@@ -1,18 +1,17 @@
 {
-  "id": "var-nested-dict",
-  "name": "Variable — Nested Dictionary",
-  "created_at": "2026-05-07T12:00:00.000Z",
-  "updated_at": "2026-05-07T12:00:00.000Z",
+  "format_version": 2,
+  "name": "Variable \u2014 Nested Dictionary",
+  "meta": {
+    "legacy_id": "var-nested-dict"
+  },
   "steps": [
     {
-      "step_id": "step-var",
-      "operation_id": "literal",
-      "label": "Nested Dictionary Variable",
-      "config": {
-        "expr": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}",
-        "_orchestrator": "source"
-      },
-      "formula": "= {\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}"
+      "name": "step_var",
+      "expression": "{\"user\": {\"name\": \"alice\", \"scores\": [90, 85, 92]}, \"meta\": {\"version\": 1, \"tags\": [\"a\", \"b\"]}}",
+      "meta": {
+        "label": "Nested Dictionary Variable",
+        "legacy_step_id": "step-var"
+      }
     }
   ]
 }

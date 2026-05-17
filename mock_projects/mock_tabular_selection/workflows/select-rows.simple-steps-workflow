@@ -1,28 +1,25 @@
 {
-  "id": "select-rows",
+  "format_version": 2,
   "name": "Select Rows",
-  "created_at": "2026-05-10T12:00:00.000Z",
-  "updated_at": "2026-05-10T12:00:00.000Z",
+  "meta": {
+    "legacy_id": "select-rows"
+  },
   "steps": [
     {
-      "step_id": "step-table",
-      "operation_id": "make_table",
-      "label": "Create Table",
-      "config": {
-        "rows": "[{\"name\": \"alice\", \"score\": 90, \"age\": 30}, {\"name\": \"bob\", \"score\": 75, \"age\": 25}, {\"name\": \"carol\", \"score\": 88, \"age\": 28}]",
-        "_orchestrator": "source"
-      },
-      "formula": "=make_table(rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')"
+      "name": "step_table",
+      "expression": "make_table(rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')",
+      "meta": {
+        "label": "Create Table",
+        "legacy_step_id": "step-table"
+      }
     },
     {
-      "step_id": "step-select-rows",
-      "operation_id": "select_rows",
-      "label": "Select Rows",
-      "config": {
-        "data": "step1",
-        "row_indices": "[0,2]"
-      },
-      "formula": "=select_rows(data=step1, row_indices=[0,2])"
+      "name": "step_select_rows",
+      "expression": "select_rows(data=step1, row_indices=[0,2])",
+      "meta": {
+        "label": "Select Rows",
+        "legacy_step_id": "step-select-rows"
+      }
     }
   ]
 }

@@ -1,5 +1,8 @@
 import type { Workflow, Step } from '../types/models';
-import { buildFormula } from '../utils/formulaParser';
+
+// Mock pipelines used in tests and demos. Formulas are inlined as strings
+// rather than built via `buildFormula(...)` so this module stays synchronous
+// (buildFormula is now an async backend call).
 
 const step0: Step = {
   id: 'step-000',
@@ -32,7 +35,7 @@ export const youtubeAnalysisPipeline: Workflow = {
       id: 'yt-step-1',
       sequence_index: 0,
       label: 'Fetch Videos',
-      formula: buildFormula('fetch_channel_videos', { channel_url: 'https://www.youtube.com/@MockChannel' }),
+      formula: '=fetch_channel_videos(channel_url="https://www.youtube.com/@MockChannel")',
       process_type: 'fetch_channel_videos',
       configuration: { channel_url: 'https://www.youtube.com/@MockChannel' },
       status: 'pending',
@@ -41,7 +44,7 @@ export const youtubeAnalysisPipeline: Workflow = {
       id: 'yt-step-2',
       sequence_index: 1,
       label: 'Extract Metadata',
-      formula: buildFormula('extract_metadata', { url_column: 'video_url' }),
+      formula: '=extract_metadata(url_column="video_url")',
       process_type: 'extract_metadata',
       configuration: { url_column: 'video_url' },
       status: 'pending',
@@ -50,7 +53,7 @@ export const youtubeAnalysisPipeline: Workflow = {
       id: 'yt-step-3',
       sequence_index: 2,
       label: 'Transcribe Videos',
-      formula: buildFormula('transcribe_video', { url_column: 'video_url' }),
+      formula: '=transcribe_video(url_column="video_url")',
       process_type: 'transcribe_video',
       configuration: { url_column: 'video_url' },
       status: 'pending',
@@ -59,7 +62,7 @@ export const youtubeAnalysisPipeline: Workflow = {
       id: 'yt-step-4',
       sequence_index: 3,
       label: 'Segment Conversations',
-      formula: buildFormula('segment_conversations', { transcript_column: 'transcript', title_column: 'title' }),
+      formula: '=segment_conversations(transcript_column="transcript", title_column="title")',
       process_type: 'segment_conversations',
       configuration: { transcript_column: 'transcript', title_column: 'title' },
       status: 'pending',
@@ -68,7 +71,7 @@ export const youtubeAnalysisPipeline: Workflow = {
       id: 'yt-step-5',
       sequence_index: 4,
       label: 'Analyze Sentiment',
-      formula: buildFormula('analyze_sentiment', { text_column: 'segment_text' }),
+      formula: '=analyze_sentiment(text_column="segment_text")',
       process_type: 'analyze_sentiment',
       configuration: { text_column: 'segment_text' },
       status: 'pending',
@@ -77,7 +80,7 @@ export const youtubeAnalysisPipeline: Workflow = {
       id: 'yt-step-6',
       sequence_index: 5,
       label: 'Generate Report',
-      formula: buildFormula('generate_report', { score_column: 'sentiment_score' }),
+      formula: '=generate_report(score_column="sentiment_score")',
       process_type: 'generate_report',
       configuration: { score_column: 'sentiment_score' },
       status: 'pending',

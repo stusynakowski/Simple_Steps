@@ -1,28 +1,25 @@
 {
-  "id": "expand-nested-dict",
-  "name": "Expand — Nested Dictionary",
-  "created_at": "2026-05-07T12:00:00.000Z",
-  "updated_at": "2026-05-07T12:00:00.000Z",
+  "format_version": 2,
+  "name": "Expand \u2014 Nested Dictionary",
+  "meta": {
+    "legacy_id": "expand-nested-dict"
+  },
   "steps": [
     {
-      "step_id": "step-var",
-      "operation_id": "define_variable",
-      "label": "Nested Dictionary",
-      "config": {
-        "value": "{\"user\": {\"name\": \"alice\", \"age\": 30}, \"meta\": {\"version\": 1, \"active\": true}}",
-        "type": "json",
-        "_orchestrator": "source"
-      },
-      "formula": "=define_variable(value='{\"user\":{\"name\":\"alice\",\"age\":30},\"meta\":{\"version\":1,\"active\":true}}', type=\"json\")"
+      "name": "step_var",
+      "expression": "define_variable(value='{\"user\":{\"name\":\"alice\",\"age\":30},\"meta\":{\"version\":1,\"active\":true}}', type=\"json\")",
+      "meta": {
+        "label": "Nested Dictionary",
+        "legacy_step_id": "step-var"
+      }
     },
     {
-      "step_id": "step-expand",
-      "operation_id": "expand_cell",
-      "label": "Flatten to Columns",
-      "config": {
-        "_orchestrator": "dataframe"
-      },
-      "formula": "=expand_cell()"
+      "name": "step_expand",
+      "expression": "expand_cell()",
+      "meta": {
+        "label": "Flatten to Columns",
+        "legacy_step_id": "step-expand"
+      }
     }
   ]
 }

@@ -1,18 +1,17 @@
 {
-  "id": "var-dict",
-  "name": "Variable — Dictionary",
-  "created_at": "2026-05-07T12:00:00.000Z",
-  "updated_at": "2026-05-07T12:00:00.000Z",
+  "format_version": 2,
+  "name": "Variable \u2014 Dictionary",
+  "meta": {
+    "legacy_id": "var-dict"
+  },
   "steps": [
     {
-      "step_id": "step-var",
-      "operation_id": "literal",
-      "label": "Dictionary Variable",
-      "config": {
-        "expr": "{\"name\": \"alice\", \"age\": 30, \"active\": True}",
-        "_orchestrator": "source"
-      },
-      "formula": "= {\"name\": \"alice\", \"age\": 30, \"active\": True}"
+      "name": "step_var",
+      "expression": "{\"name\": \"alice\", \"age\": 30, \"active\": True}",
+      "meta": {
+        "label": "Dictionary Variable",
+        "legacy_step_id": "step-var"
+      }
     }
   ]
 }
