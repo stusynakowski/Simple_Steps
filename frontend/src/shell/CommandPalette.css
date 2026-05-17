@@ -1,0 +1,106 @@
+/* Command Palette — VS-Code-style centered overlay. */
+
+.cmd-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 10000;
+}
+
+.cmd-palette {
+  width: min(640px, 92vw);
+  max-height: 60vh;
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  color: #d4d4d4;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.cmd-palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #3c3c3c;
+  background: #1e1e1e;
+}
+
+.cmd-palette-input-row input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #d4d4d4;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cmd-palette-input-row input::placeholder {
+  color: #6a6a6a;
+}
+
+.cmd-palette-list {
+  overflow-y: auto;
+  max-height: 50vh;
+  padding: 4px 0;
+}
+
+.cmd-palette-empty {
+  padding: 16px;
+  color: #888;
+  font-size: 12px;
+  text-align: center;
+}
+
+.cmd-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cmd-palette-item[data-selected='true'] {
+  background: #04395e;
+  color: #fff;
+}
+
+.cmd-palette-item[data-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.cmd-palette-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cmd-palette-category {
+  font-size: 11px;
+  color: #888;
+  background: #2d2d2d;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.cmd-palette-kbd {
+  font-family: 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: #aaa;
+  background: #2d2d2d;
+  border: 1px solid #3c3c3c;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
