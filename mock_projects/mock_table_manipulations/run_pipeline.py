@@ -115,8 +115,6 @@ class PipelineRunner:
             raise FileNotFoundError(f"Workflow not found: {self.workflow_path}")
         with open(self.workflow_path) as f:
             data = json.load(f)
-        from SIMPLE_STEPS.file_manager import _adapt_v2_to_v1
-        data = _adapt_v2_to_v1(data)
         self.pipeline = PipelineFile(**data)
         print(f"  Loaded  : {self.pipeline.name}")
         print(f"  File    : {self.workflow_path.name}")

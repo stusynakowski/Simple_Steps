@@ -83,7 +83,7 @@ export default function OperationColumn({
 
   // Ref to the formula bar input — forwarded from StepToolbar so the
   // PreviousStepDataPicker can focus + activate wiring without losing context.
-  const formulaBarRef = useRef<HTMLInputElement | null>(null);
+  const formulaBarRef = useRef<HTMLTextAreaElement | null>(null);
 
   /** Called by PreviousStepDataPicker when a column/cell badge is clicked.
    *  Directly injects the reference token into the formula bar without relying
@@ -93,7 +93,7 @@ export default function OperationColumn({
     if (!el) return;
 
     // Activate wiring so context state is consistent for other interactions
-    activateWiring(step.id, stepIndex, { current: el } as React.RefObject<HTMLInputElement>);
+    activateWiring(step.id, stepIndex, { current: el } as React.RefObject<HTMLTextAreaElement>);
 
     // Splice the token at the current cursor position (or append)
     const start = el.selectionStart ?? el.value.length;

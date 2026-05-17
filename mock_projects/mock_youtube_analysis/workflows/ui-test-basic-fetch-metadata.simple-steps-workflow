@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_fetch",
-      "expression": "fetch_channel_videos(channel_url=\"https://youtube.com/@mock_channel\")",
+      "expression": "fetch_channel_videos.source(channel_url=\"https://youtube.com/@mock_channel\")",
       "meta": {
         "label": "Fetch Videos",
         "legacy_step_id": "step-fetch"
@@ -15,7 +15,7 @@
     },
     {
       "name": "step_metadata",
-      "expression": "extract_metadata(video_url=step1)",
+      "expression": "extract_metadata.rowmap(video_url=step1)",
       "meta": {
         "label": "Extract Metadata",
         "legacy_step_id": "step-metadata"

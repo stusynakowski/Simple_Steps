@@ -92,40 +92,129 @@ class OperationDefinition(BaseModel):
 
 # --- 2. Blueprint / Execution ---
 class StepConfig(BaseModel):
-    step_id: str
-    operation_id: str
-    label: str = ""
-    config: Dict[str, Any] = Field(default_factory=dict)
-    # Canonical formula — the single source of truth for what this step executes.
-    # operation_id and config are derived from this on load.
-    # e.g. "=filter_rows(column=\"score\", value=\"5\", mode=\"equals\")"
-    formula: str = ""
+    """
+    Canonical step shape (v2). A step is just a name + a Python expression::
 
-    @model_validator(mode="after")
-    def derive_formula_if_missing(self) -> "StepConfig":
-        """
-        Automatically derive the formula from operation_id + config when the
-        formula field is empty.  This ensures that old pipeline JSON files
-        (which predate the formula field) produce a proper formula when loaded,
-        so the frontend formula bar always shows the function + arguments.
-        """
-        if not self.formula and self.operation_id:
-            self.formula = build_formula_from_fields(
-                self.operation_id,
-                self.config,
+        { "name": "step_1_metadata",
+          "expression": "extract_metadata.rowmap(video_url=step1)",
+          "meta": { "label": "Extract Metadata" } }
+
+    The v1 fields (`step_id`, `operation_id`, `config`, `formula`, `label`)
+    are exposed as computed properties derived from the expression, so that
+    existing call sites continue to work unchanged. They are NOT serialised.
+    """
+
+    name: str = ""
+    expression: str = ""
+    meta: Dict[str, Any] = Field(default_factory=dict)
+
+    # ── v1 compatibility ────────────────────────────────────────────────
+    # Older files were shaped { step_id, operation_id, label, config, formula }.
+    # `_coerce_v1` normalises both shapes into the v2 fields at load time.
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_v1(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        # If already v2-shaped, nothing to do.
+        if "expression" in data or "name" in data and "step_id" not in data:
+            # Ensure meta exists as a dict.
+            data.setdefault("meta", {})
+            return data
+
+        # Translate v1 fields into v2.
+        meta: Dict[str, Any] = dict(data.get("meta") or {})
+        if data.get("label"):
+            meta.setdefault("label", data["label"])
+        if data.get("step_id"):
+            meta.setdefault("legacy_step_id", data["step_id"])
+
+        formula = (data.get("formula") or "").strip()
+        if not formula and data.get("operation_id"):
+            formula = build_formula_from_fields(
+                data["operation_id"], data.get("config") or {}
             )
-        return self
+        expression = formula[1:].lstrip() if formula.startswith("=") else formula
+
+        return {
+            "name": data.get("step_id") or data.get("name") or "",
+            "expression": expression,
+            "meta": meta,
+        }
+
+    # ── v1 read-only accessors ──────────────────────────────────────────
+    @property
+    def step_id(self) -> str:
+        return self.meta.get("legacy_step_id") or self.name
+
+    @property
+    def label(self) -> str:
+        return self.meta.get("label") or self.name
+
+    @property
+    def formula(self) -> str:
+        return f"={self.expression}" if self.expression else ""
+
+    @property
+    def _parsed(self) -> Any:
+        """Cached parse of the expression — `operation_id` / `config` use this."""
+        if not hasattr(self, "__parsed_cache"):
+            from .formula_parser import parse_formula
+            object.__setattr__(self, "__parsed_cache", parse_formula(self.formula))
+        return getattr(self, "__parsed_cache")
+
+    @property
+    def operation_id(self) -> str:
+        p = self._parsed
+        return p.operation_id or ""
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        p = self._parsed
+        cfg: Dict[str, Any] = dict(p.args or {})
+        if p.orchestration:
+            cfg["_orchestrator"] = p.orchestration
+        return cfg
+
 
 class PipelineFile(BaseModel):
     """
-    A single pipeline definition stored as <project_dir>/<name>.json.
-    Contains only the workflow blueprint — no runtime data.
+    A single pipeline definition stored as <project_dir>/<name>.simple-steps-workflow.
+
+    On-disk shape (v2)::
+
+        { "format_version": 2,
+          "name": "...",
+          "meta": {...},          # optional, free-form
+          "steps": [StepConfig]  }
     """
+    format_version: int = 2
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    meta: Dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
     steps: List[StepConfig]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_pipeline_v1(cls, data: Any) -> Any:
+        """Accept both v1 docs ({id, name, steps}) and v2 docs ({format_version,
+        name, meta, steps}). Carry forward `meta.legacy_id` if v1 had an opaque
+        id."""
+        if not isinstance(data, dict):
+            return data
+        out = dict(data)
+        meta: Dict[str, Any] = dict(out.get("meta") or {})
+        # v1 had `id` as a separate field; if it's present and looks like a
+        # legacy slug, surface it through meta.legacy_id.
+        if "format_version" not in out and out.get("id"):
+            meta.setdefault("legacy_id", out["id"])
+        out["meta"] = meta
+        out.setdefault("format_version", 2)
+        return out
+
 
 # --- 3. Project (folder) ---
 class ProjectInfo(BaseModel):

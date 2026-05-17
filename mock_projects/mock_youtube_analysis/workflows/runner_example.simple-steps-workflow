@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_0_fetch",
-      "expression": "fetch_channel_videos(channel_url=\"https://youtube.com/@mock_channel_with_cases\")",
+      "expression": "fetch_channel_videos.source(channel_url=\"https://youtube.com/@mock_channel_with_cases\")",
       "meta": {
         "label": "Fetch Videos",
         "legacy_step_id": "step-0-fetch"
@@ -15,7 +15,7 @@
     },
     {
       "name": "step_1_metadata",
-      "expression": "extract_metadata(video_url=step1)",
+      "expression": "extract_metadata.rowmap(video_url=step1)",
       "meta": {
         "label": "Extract Metadata",
         "legacy_step_id": "step-1-metadata"
@@ -23,7 +23,7 @@
     },
     {
       "name": "step_2_transcribe",
-      "expression": "transcribe_video(video_url=step1)",
+      "expression": "transcribe_video.rowmap(video_url=step1)",
       "meta": {
         "label": "Transcribe",
         "legacy_step_id": "step-2-transcribe"
@@ -31,7 +31,7 @@
     },
     {
       "name": "step_3_segment",
-      "expression": "segment_conversations(transcript=\"transcribe_video_output\")",
+      "expression": "segment_conversations.expand(transcript=\"transcribe_video_output\")",
       "meta": {
         "label": "Segment Conversations",
         "legacy_step_id": "step-3-segment"
@@ -39,7 +39,7 @@
     },
     {
       "name": "step_4_sentiment",
-      "expression": "analyze_sentiment(text=\"segment_conversations_output\")",
+      "expression": "analyze_sentiment.rowmap(text=\"segment_conversations_output\")",
       "meta": {
         "label": "Analyze Sentiment",
         "legacy_step_id": "step-4-sentiment"
@@ -47,7 +47,7 @@
     },
     {
       "name": "step_5_report",
-      "expression": "generate_report(segments=\"segment_conversations_output\")",
+      "expression": "generate_report.rowmap(segments=\"segment_conversations_output\")",
       "meta": {
         "label": "Generate Report",
         "legacy_step_id": "step-5-report"

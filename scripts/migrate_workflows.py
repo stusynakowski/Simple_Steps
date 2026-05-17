@@ -7,9 +7,11 @@ described in docs/dev_plan/102-workflow-and-session-shapes.md.
 
 Transforms per file:
   1. Strip a leading '=' from each formula (UI affordance, not stored).
-  2. Strip orchestration modifiers from call sites:
-        op.source(...) / op.map(...) / op.expand(...) / op.dataframe(...) /
-        op.filter(...) / op.raw_output(...)        →   op(...)
+  2. Normalise orchestration modifiers (kept on the call site so the
+     iteration intent is explicit in the expression):
+        op.map(...)         →   op.rowmap(...)   (preferred alias)
+        op.source(...) / op.expand(...) / op.dataframe(...) /
+        op.filter(...) / op.raw_output(...)        →   unchanged
   3. Rewrite the legacy `.output` pseudo-column:
         stepN.output     →   stepN
         stepN.output.col →   stepN["col"]   (best-effort, only single dotted col)
@@ -34,7 +36,9 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[1]
 MOCK_DIR = ROOT / "mock_projects"
 
-ORCH_MODIFIERS = ("source", "map", "expand", "dataframe", "filter", "raw_output")
+ORCH_MODIFIERS = ("source", "map", "rowmap", "expand", "dataframe", "filter", "raw_output")
+# When migrating from v1, rewrite these legacy aliases to their preferred form.
+ORCH_REWRITES = {"map": "rowmap"}
 
 # Matches  word(.modifier)(   — captures the function name and the modifier.
 _CALL_WITH_MOD = re.compile(
@@ -42,9 +46,12 @@ _CALL_WITH_MOD = re.compile(
 )
 
 
-def strip_orch_modifiers(expr: str) -> str:
-    """`op.map(` → `op(`. Idempotent."""
-    return _CALL_WITH_MOD.sub(lambda m: f"{m.group(1)}(", expr)
+def normalise_orch_modifiers(expr: str) -> str:
+    """Rewrite legacy orchestration aliases (e.g. `.map` → `.rowmap`). Idempotent."""
+    def _sub(m: re.Match) -> str:
+        op, mod = m.group(1), m.group(2)
+        return f"{op}.{ORCH_REWRITES.get(mod, mod)}("
+    return _CALL_WITH_MOD.sub(_sub, expr)
 
 
 # stepN.output.colname  → stepN["colname"]
@@ -77,7 +84,7 @@ def normalize_expression(formula: str) -> str:
     s = (formula or "").strip()
     if s.startswith("="):
         s = s[1:].lstrip()
-    s = strip_orch_modifiers(s)
+    s = normalise_orch_modifiers(s)
     s = rewrite_step_output(s)
     return s
 
@@ -141,7 +148,22 @@ def main() -> int:
             print(f"  ! {path.relative_to(ROOT)}: invalid JSON ({e}); skipped")
             continue
         if doc.get("format_version") == 2:
-            print(f"  · {path.relative_to(ROOT)}: already v2; skipped")
+            # Re-normalise expressions in-place (e.g. to apply new
+            # orchestration aliasing rules) without changing the v2 shape.
+            changed = False
+            for step in doc.get("steps") or []:
+                old = step.get("expression") or ""
+                new = normalise_orch_modifiers(rewrite_step_output(old))
+                if new != old:
+                    step["expression"] = new
+                    changed = True
+            if changed:
+                with path.open("w") as f:
+                    json.dump(doc, f, indent=2)
+                    f.write("\n")
+                print(f"  ↻ {path.relative_to(ROOT)} (re-normalised v2)")
+            else:
+                print(f"  · {path.relative_to(ROOT)}: already v2; skipped")
             continue
         new_doc = migrate_workflow(doc)
         with path.open("w") as f:

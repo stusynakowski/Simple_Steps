@@ -36,7 +36,7 @@ interface StepToolbarProps {
   isLocked?: boolean;
   onConfigure?: (id: string) => void;
   /** Called once with a ref to the formula bar input so parents can focus it. */
-  onFormulaBarRef?: (ref: HTMLInputElement | null) => void;
+  onFormulaBarRef?: (ref: HTMLTextAreaElement | null) => void;
 }
 
 export default function StepToolbar({ 
@@ -60,10 +60,7 @@ export default function StepToolbar({
   const [formula, setFormula] = useState(initFormula);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // 🔍 DEBUG — remove after confirming fix
-  console.log(`[StepToolbar MOUNT/RENDER] step.id=${step.id} step.formula="${step.formula}" step.operation="${step.operation}" initFormula="${initFormula}" externalFormula="${externalFormula}" localFormula="${formula}"`);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Wiring context — lets prior-step grids inject references into this formula bar
   const { activateWiring, deactivateWiring } = useStepWiring();
@@ -109,7 +106,7 @@ export default function StepToolbar({
     return [];
   };
 
-  const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = async (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newVal = e.target.value;
     setFormula(newVal);
 
@@ -127,7 +124,7 @@ export default function StepToolbar({
     const el = inputRef.current;
     if (!el) return;
     const onNativeInput = (e: Event) => {
-      const newVal = (e.target as HTMLInputElement).value;
+      const newVal = (e.target as HTMLTextAreaElement).value;
       setFormula(newVal);
       const sugg = computeSuggestions(newVal);
       setSuggestions(sugg);
@@ -141,6 +138,15 @@ export default function StepToolbar({
     return () => el.removeEventListener('input', onNativeInput);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step.id]);
+
+  // Auto-grow the formula textarea so long formulas wrap and become fully
+  // visible instead of being clipped to one line.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [formula]);
 
   const handleSuggestionClick = async (op: OperationDefinition) => {
     // Stamp the operation's default orchestration type as the modifier so it's
@@ -438,14 +444,22 @@ export default function StepToolbar({
 
         {/* Formula Input + Autocomplete Dropdown */}
         <div style={{ flex: 1, position: 'relative' }}>
-          <input
+          <textarea
             ref={(el) => {
-              (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+              (inputRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
               onFormulaBarRef?.(el);
             }}
-            type="text"
+            rows={1}
             value={formula}
             onChange={handleInputChange}
+            onKeyDown={(e) => {
+              // Enter submits / closes suggestions; Shift+Enter inserts a newline.
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                setShowSuggestions(false);
+                onRun?.(step.id);
+              }
+            }}
             onBlur={() => {
               setTimeout(() => setShowSuggestions(false), 150);
               deactivateWiring();
@@ -457,7 +471,7 @@ export default function StepToolbar({
               // Register this input as the current wiring target so prior-step
               // grids can inject references into it.
               if (inputRef.current) {
-                activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLInputElement>);
+                activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLTextAreaElement>);
               }
             }}
             placeholder={availableOperations?.length
@@ -470,6 +484,11 @@ export default function StepToolbar({
               borderRadius: '4px',
               fontFamily: 'monospace',
               boxSizing: 'border-box',
+              resize: 'none',
+              overflow: 'hidden',
+              minHeight: '26px',
+              maxHeight: '240px',
+              lineHeight: 1.4,
             }}
             data-testid="formula-input"
           />

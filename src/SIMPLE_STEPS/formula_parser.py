@@ -7,7 +7,7 @@ This is the single source of truth for formula syntax, used by both backend and 
 import re
 from typing import Dict, Any, Optional, Literal, Union
 
-OrchestrationMode = Literal['source', 'map', 'filter', 'dataframe', 'expand', 'raw_output']
+OrchestrationMode = Literal['source', 'map', 'rowmap', 'filter', 'dataframe', 'expand', 'raw_output']
 
 class ParsedFormula:
     def __init__(self, operation_id: Optional[str], orchestration: Optional[str], args: Dict[str, str], is_valid: bool, raw_input: str):
@@ -26,11 +26,22 @@ class ParsedFormula:
             'rawInput': self.raw_input,
         }
 
-ORCHESTRATION_MODES = {'source', 'map', 'filter', 'dataframe', 'expand', 'raw_output'}
+ORCHESTRATION_MODES = {'source', 'map', 'rowmap', 'filter', 'dataframe', 'expand', 'raw_output'}
 
 
 def is_step_reference(value: str) -> bool:
-    return bool(re.match(r'^step[\w-]*\.\w+$', value, re.IGNORECASE)) or bool(re.match(r'^step[\w-]*\[.*\]$', value, re.IGNORECASE))
+    # Accepted forms (docs/dev_plan/102, 103):
+    #   step_id                  bare whole-step ref
+    #   step_id.col              dot-form column ref (legacy, still tolerated)
+    #   step_id["col"]           bracket-form column ref
+    #   step_id["col"][N]        bracket-form cell ref
+    if re.match(r'^step[\w-]*$', value, re.IGNORECASE):
+        return True
+    if re.match(r'^step[\w-]*\.\w+$', value, re.IGNORECASE):
+        return True
+    if re.match(r'^step[\w-]*\[.*\]$', value, re.IGNORECASE):
+        return True
+    return False
 
 
 def format_formula_value(v: Any) -> str:
