@@ -47,6 +47,7 @@ if not any("SIMPLE_STEPS" in p for p in sys.path):
 # ---------------------------------------------------------------------------
 from SIMPLE_STEPS.engine import run_operation, get_dataframe  # noqa: E402
 from SIMPLE_STEPS.models import PipelineFile                  # noqa: E402
+import SIMPLE_STEPS.operations  # noqa: F401,E402 — registers built-in ops (define_value, etc.)
 
 # ---------------------------------------------------------------------------
 # Register mock operations — importing this module triggers @simple_step
@@ -128,6 +129,8 @@ class PipelineRunner:
             raise FileNotFoundError(f"Workflow not found: {self.workflow_path}")
         with open(self.workflow_path) as f:
             data = json.load(f)
+        from SIMPLE_STEPS.file_manager import _adapt_v2_to_v1
+        data = _adapt_v2_to_v1(data)
         self.pipeline = PipelineFile(**data)
         print(f"  Loaded  : {self.pipeline.name}")
         print(f"  File    : {self.workflow_path.name}")

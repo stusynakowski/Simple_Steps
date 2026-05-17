@@ -23,6 +23,86 @@ from datetime import datetime
 
 from .models import PipelineFile, ProjectInfo
 
+
+# ── v2 → v1 adapter ──────────────────────────────────────────────────────────
+# The on-disk workflow format described in docs/dev_plan/102 is "v2":
+#   { format_version: 2, name, meta?, steps: [{ name, expression, meta? }] }
+#
+# The runtime/UI still operates on the v1 PipelineFile shape:
+#   { id, name, steps: [{ step_id, operation_id, label, config, formula }] }
+#
+# Until the rest of the stack is ported to read v2 directly, the loader
+# normalises v2 files into v1 in memory. Saves still write v1; the next
+# time we touch the writer we'll switch it to v2 and drop this shim.
+
+def _adapt_v2_to_v1(data: dict) -> dict:
+    """If `data` is a v2 workflow file, return an equivalent v1 dict.
+    Otherwise pass through unchanged. Pure / non-mutating on its input."""
+    if data.get("format_version") != 2:
+        return data
+
+    name = data.get("name", "Untitled")
+    meta = data.get("meta") or {}
+    legacy_id = meta.get("legacy_id") or name
+
+    v1_steps: list = []
+    for i, s in enumerate(data.get("steps") or []):
+        step_meta = s.get("meta") or {}
+        legacy_step_id = step_meta.get("legacy_step_id") or s.get("name") or f"step-{i}"
+        label = step_meta.get("label") or s.get("name") or f"Step {i + 1}"
+
+        expression = (s.get("expression") or "").strip()
+        formula = f"={expression}" if expression else ""
+
+        # Parse the expression to recover operation_id + config (best-effort;
+        # if it fails the StepConfig validator will still run, just with
+        # operation_id="" and config={}).
+        operation_id = ""
+        config: dict = {}
+        orchestration: Optional[str] = None
+        try:
+            from .formula_parser import parse_formula as _parse_fm
+            parsed = _parse_fm(formula)
+            if parsed.operation_id:
+                operation_id = parsed.operation_id
+            if parsed.args:
+                config = dict(parsed.args)
+            orchestration = parsed.orchestration
+        except Exception:
+            pass
+
+        # v2 expressions don't carry orchestration modifiers — fall back to the
+        # operation's default type registered in OPERATION_REGISTRY.
+        if not orchestration and operation_id:
+            try:
+                from .decorators import OPERATION_REGISTRY  # type: ignore
+                op_def = OPERATION_REGISTRY.get(operation_id)
+                if op_def:
+                    default_type = op_def.get("type") if isinstance(op_def, dict) else getattr(op_def, "type", None)
+                    if default_type and default_type != "orchestrator":
+                        orchestration = default_type
+            except Exception:
+                pass
+        if orchestration:
+            config.setdefault("_orchestrator", orchestration)
+
+        v1_steps.append({
+            "step_id": legacy_step_id,
+            "operation_id": operation_id,
+            "label": label,
+            "config": config,
+            "formula": formula,
+        })
+
+    return {
+        "id": legacy_id,
+        "name": name,
+        "created_at": data.get("created_at", ""),
+        "updated_at": data.get("updated_at", ""),
+        "steps": v1_steps,
+    }
+
+
 # ── Workspace root ───────────────────────────────────────────────────────────
 # The "workspace" is the directory the user launched simple-steps from.
 # All project/pipeline storage is relative to this root.
@@ -240,6 +320,7 @@ def list_pipelines(project_id: str) -> List[PipelineFile]:
             try:
                 with open(os.path.join(folder, fname)) as f:
                     data = json.load(f)
+                data = _adapt_v2_to_v1(data)
                 pf = PipelineFile(**data)
                 # Ensure the id matches the on-disk filename slug so that
                 # load_pipeline(_slugify(id)) will find the right file.
@@ -262,7 +343,7 @@ def load_pipeline(project_id: str, pipeline_id: str) -> Optional[PipelineFile]:
         return None
     try:
         with open(path) as f:
-            return PipelineFile(**json.load(f))
+            return PipelineFile(**_adapt_v2_to_v1(json.load(f)))
     except Exception as e:
         print(f"Error loading pipeline {pipeline_id}: {e}")
         return None

@@ -102,9 +102,18 @@ export default function DataOutputGrid({
 
   // ── Wiring helpers ──────────────────────────────────────────────────────
 
+  // Canonical reference tokens (docs/dev_plan/102, 103):
+  //   whole step:    step_id
+  //   column:        step_id["col"]
+  //   cell:          step_id["col"][row_index]
+  // The previous `.col` / `[row=N, col=C]` forms were not valid Python and
+  // could not be evaluated by safe_formula.
+  const columnRefToken = (col: string) => `${sourceStepId}["${col}"]`;
+  const cellRefToken = (cell: Cell) => `${sourceStepId}["${cell.column_id}"][${cell.row_id}]`;
+
   const handleColumnClick = (col: string) => {
     if (wiringMode && onWireColumn) {
-      onWireColumn(`${sourceStepId}.${col}`);
+      onWireColumn(columnRefToken(col));
       return;
     }
     // Non-wiring mode: notify parent with a synthetic cell so it can insert a column reference
@@ -115,7 +124,7 @@ export default function DataOutputGrid({
 
   const handleCellWireClick = (cell: Cell) => {
     if (wiringMode && onWireCell) {
-      onWireCell(`${sourceStepId}[row=${cell.row_id}, col=${cell.column_id}]`);
+      onWireCell(cellRefToken(cell));
       return;
     }
     onCellClick?.(cell);
@@ -187,14 +196,14 @@ export default function DataOutputGrid({
           className="single-value-display"
           onClick={() => {
             if (wiringMode && cell && onWireCell) {
-              onWireCell(`${sourceStepId}[row=${cell.row_id}, col=${cell.column_id}]`);
+              onWireCell(cellRefToken(cell));
             } else if (cell) {
               onCellClick?.(cell);
             }
           }}
           title={
             wiringMode
-              ? `Insert reference: ${sourceStepId}[row=${rows[0]}, col=${cols[0]}]`
+              ? `Insert reference: ${cell ? cellRefToken(cell) : sourceStepId}`
               : 'Click to inspect'
           }
           style={
@@ -296,7 +305,7 @@ export default function DataOutputGrid({
             role="columnheader"
             title={
               wiringMode
-                ? `⚡ Insert column reference: ${sourceStepId}.${col}`
+                ? `⚡ Insert column reference: ${columnRefToken(col)}`
                 : col
             }
             style={{
@@ -390,7 +399,7 @@ export default function DataOutputGrid({
                   onClick={() => cell && handleCellWireClick(cell)}
                   title={
                     wiringMode && cell
-                      ? `⚡ Insert: ${sourceStepId}[row=${r}, col=${c}]`
+                      ? `⚡ Insert: ${cell ? cellRefToken(cell) : sourceStepId}`
                       : cell?.display_value ?? ''
                   }
                   style={wiringCellStyle(cellKey, c)}

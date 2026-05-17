@@ -1,10 +1,34 @@
 from typing import List, Callable, Dict, Any, Optional
+import ast
 import pandas as pd
 import json
 from .models import OperationDefinition
 from .decorators import simple_step, OPERATION_REGISTRY, DEFINITIONS_LIST
 
 # --- Standard Library of Operations ---
+
+@simple_step(name="Literal Value", category="Variables", operation_type="source", id="literal")
+def literal(expr: str = '""') -> pd.DataFrame:
+    """
+    Create a single-cell step from a Python literal expression.
+
+    Uses ``ast.literal_eval`` — accepts only valid Python literals
+    (strings, numbers, bools, ``None``, lists, dicts, tuples). The whole
+    parsed value is stored in a single cell so dicts/lists stay opaque
+    instead of being exploded into rows.
+
+    Examples::
+
+        = "hello world"
+        = 42
+        = 3.14
+        = True
+        = [1, 2, 3, 4, 5]
+        = {"name": "alice", "age": 30}
+    """
+    cell = ast.literal_eval((expr or "").strip() or '""')
+    return pd.DataFrame({"value": [cell]})
+
 
 @simple_step(name="Load CSV", category="File IO", operation_type="source", id="load_csv")
 def load_csv(filepath: str) -> pd.DataFrame:

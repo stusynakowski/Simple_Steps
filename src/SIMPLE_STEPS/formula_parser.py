@@ -51,15 +51,18 @@ def format_formula_value(v: Any) -> str:
 
 
 def _try_parse_literal(body: str, raw_input: str) -> Optional[ParsedFormula]:
+    # Every bare-literal route maps to the core `literal` op, which uses
+    # ast.literal_eval and stores the whole value in a single cell.
     if (body.startswith('"') and body.endswith('"')) or (body.startswith("'") and body.endswith("'")):
-        inner = body[1:-1]
-        return ParsedFormula('define_value', 'source', {'value': inner, 'type': 'string', '_literal': body}, True, raw_input)
+        return ParsedFormula('literal', 'source', {'expr': body, '_literal': body}, True, raw_input)
     if re.match(r'^-?\d+(\.\d+)?$', body):
-        return ParsedFormula('define_value', 'source', {'value': body, 'type': 'number', '_literal': body}, True, raw_input)
-    if body in ('true', 'false'):
-        return ParsedFormula('define_value', 'source', {'value': body, 'type': 'auto', '_literal': body}, True, raw_input)
+        return ParsedFormula('literal', 'source', {'expr': body, '_literal': body}, True, raw_input)
+    if body in ('true', 'false', 'True', 'False'):
+        # Normalise to Python casing so ast.literal_eval accepts it.
+        canonical = body.capitalize()
+        return ParsedFormula('literal', 'source', {'expr': canonical, '_literal': body}, True, raw_input)
     if (body.startswith('[') and body.endswith(']')) or (body.startswith('{') and body.endswith('}')):
-        return ParsedFormula('define_value', 'source', {'value': body, 'type': 'auto', '_literal': body}, True, raw_input)
+        return ParsedFormula('literal', 'source', {'expr': body, '_literal': body}, True, raw_input)
     return None
 
 
@@ -138,6 +141,8 @@ def build_formula(operation_id: str, config: Dict[str, Any], orchestration: Opti
         return ''
     if operation_id == 'passthrough':
         return str(config.get('_ref', ''))
+    if operation_id == 'literal' and '_literal' in config:
+        return f"={config['_literal']}"
     if operation_id == 'define_value' and '_literal' in config:
         return f"={config['_literal']}"
     if operation_id == 'to_rows' and '_literal' in config:
