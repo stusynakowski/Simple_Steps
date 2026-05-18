@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_var",
-      "expression": "define_variable(value='[{\"name\":\"alice\",\"score\":90},{\"name\":\"bob\",\"score\":75},{\"name\":\"carol\",\"score\":88}]', type=\"json\")",
+      "expression": "[{'name': 'alice', 'score': 90}, {'name': 'bob', 'score': 75}, {'name': 'carol', 'score': 88}]",
       "meta": {
         "label": "List of Flat Dicts",
         "legacy_step_id": "step-var"

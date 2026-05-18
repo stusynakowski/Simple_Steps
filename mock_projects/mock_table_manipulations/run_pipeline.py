@@ -1,8 +1,9 @@
 """
 run_pipeline.py — Pipeline runner for mock_table_manipulations workflows.
 
-Registers both define_variable (from mock_basic_variables) and the table ops
-(expand_cell, make_table) so that multi-step workflows can chain them.
+Registers the table ops (expand_cell, make_table). Variable declarations
+now use bare-literal formula syntax (=42, =["a","b"], ={"k": "v"}),
+so no separate variable-op import is required.
 
 Usage
 -----
@@ -50,9 +51,7 @@ import SIMPLE_STEPS.operations  # Ensure core operations are registered
 # Register ops — order matters only for clarity; all ops share a global registry
 # ---------------------------------------------------------------------------
 sys.path.insert(0, str(HERE))
-sys.path.insert(0, str(HERE.parent / "mock_basic_variables"))
 
-import mock_basic_variables_ops  # noqa: F401 — registers define_variable
 import mock_table_ops             # noqa: F401 — registers expand_cell, make_table
 
 

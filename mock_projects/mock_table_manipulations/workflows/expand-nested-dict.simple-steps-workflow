@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_var",
-      "expression": "define_variable(value='{\"user\":{\"name\":\"alice\",\"age\":30},\"meta\":{\"version\":1,\"active\":true}}', type=\"json\")",
+      "expression": "{'user': {'name': 'alice', 'age': 30}, 'meta': {'version': 1, 'active': True}}",
       "meta": {
         "label": "Nested Dictionary",
         "legacy_step_id": "step-var"

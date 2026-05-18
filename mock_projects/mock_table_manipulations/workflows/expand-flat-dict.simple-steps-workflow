@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_var",
-      "expression": "define_variable(value='{\"name\":\"alice\",\"age\":30,\"active\":true}', type=\"json\")",
+      "expression": "{'name': 'alice', 'age': 30, 'active': True}",
       "meta": {
         "label": "Flat Dictionary",
         "legacy_step_id": "step-var"

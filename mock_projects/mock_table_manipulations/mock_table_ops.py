@@ -11,7 +11,8 @@ Design principles
 Operations
 ----------
   expand_cell   — dataframe op.  Reads the first cell of the incoming step
-                  (typically a 1×1 from define_variable) and recursively
+                  (typically a 1×1 from a bare-literal step like
+                  ``=[1,2,3]`` or ``={"k":"v"}``) and recursively
                   normalises it into a proper table.  Nested dicts are
                   flattened using dot-notation column names; lists become rows.
 
@@ -102,13 +103,13 @@ def expand_cell(df: pd.DataFrame, sep: str = ".") -> pd.DataFrame:
 
     Examples
     --------
-        Step 1 : =define_variable(value='[1, 2, 3]', type="json")
+        Step 1 : =[1, 2, 3]
         Step 2 : =expand_cell()           # → 3 rows × column "value"
 
-        Step 1 : =define_variable(value='[{"name":"alice","score":90}]', type="json")
+        Step 1 : =[{"name":"alice","score":90}]
         Step 2 : =expand_cell()           # → 1 row  × columns "name", "score"
 
-        Step 1 : =define_variable(value='{"user":{"name":"alice","age":30}}', type="json")
+        Step 1 : ={"user":{"name":"alice","age":30}}
         Step 2 : =expand_cell()           # → 1 row  × columns "user.name", "user.age"
     """
     if df is None or df.empty:

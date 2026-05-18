@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_var",
-      "expression": "define_variable(value='[{\"name\":\"alice\",\"address\":{\"city\":\"NYC\",\"zip\":\"10001\"}},{\"name\":\"bob\",\"address\":{\"city\":\"LA\",\"zip\":\"90001\"}},{\"name\":\"carol\",\"address\":{\"city\":\"Chicago\",\"zip\":\"60601\"}}]', type=\"json\")",
+      "expression": "[{'name': 'alice', 'address': {'city': 'NYC', 'zip': '10001'}}, {'name': 'bob', 'address': {'city': 'LA', 'zip': '90001'}}, {'name': 'carol', 'address': {'city': 'Chicago', 'zip': '60601'}}]",
       "meta": {
         "label": "List of Nested Dicts",
         "legacy_step_id": "step-var"

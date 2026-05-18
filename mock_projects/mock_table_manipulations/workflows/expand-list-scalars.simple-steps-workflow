@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_var",
-      "expression": "define_variable(value=\"[1, 2, 3, 4, 5]\", type=\"json\")",
+      "expression": "[1, 2, 3, 4, 5]",
       "meta": {
         "label": "List of Integers",
         "legacy_step_id": "step-var"
