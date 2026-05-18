@@ -14,10 +14,12 @@ import WorkspaceFileEditor from './WorkspaceFileEditor';
 import SaveModal from './SaveModal';
 import RenameModal from './RenameModal';
 import ExecutionLog from './ExecutionLog';
+import Icon from './Icon';
 import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
 import { StepWiringProvider } from '../context/StepWiringContext';
+import { fetchWorkspaceInfo, openWorkspace, type WorkspaceInfo } from '../services/api';
 import './MainLayout.css';
 
 // ── Layout constants ───────────────────────────────────────────────────────
@@ -130,6 +132,58 @@ export default function MainLayout() {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [saveAsMode, setSaveAsMode] = useState(false); // true = always show picker
   const [renameModalOpen, setRenameModalOpen] = useState(false);
+
+  // ── Workspace info (Phase A) ──────────────────────────────────────────
+  // Populated once at mount; refreshed after `Open Workspace…` succeeds.
+  const [workspaceInfo, setWorkspaceInfo] = useState<WorkspaceInfo | null>(null);
+  useEffect(() => {
+    fetchWorkspaceInfo().then(setWorkspaceInfo).catch(() => { /* ignore */ });
+  }, []);
+
+  /** Prompt the user for an absolute path, POST it to the backend, and
+   *  refresh the workspace info.  If the backend reports
+   *  ``requires_restart``, surface that via an alert so the user knows to
+   *  re-run ``./start_backend.sh`` in the new directory. */
+  const handleOpenWorkspace = useCallback(async () => {
+    const target = window.prompt(
+      'Open workspace — enter the absolute path of the folder:',
+      workspaceInfo?.workspace_root ?? '',
+    );
+    if (!target) return;
+    try {
+      const res = await openWorkspace(target);
+      const fresh = await fetchWorkspaceInfo();
+      setWorkspaceInfo(fresh);
+      if (res.requires_restart) {
+        window.alert(
+          `Workspace recorded: ${res.workspace}\n\n` +
+          `A backend restart is required for the switch to take effect.\n` +
+          `Stop the backend (Ctrl+C in the terminal) and re-run ` +
+          `./start_backend.sh from the new directory.`,
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.alert(`Failed to open workspace: ${message}`);
+    }
+  }, [workspaceInfo?.workspace_root]);
+
+  const handleOpenRecentWorkspace = useCallback(async (path: string) => {
+    try {
+      const res = await openWorkspace(path);
+      const fresh = await fetchWorkspaceInfo();
+      setWorkspaceInfo(fresh);
+      if (res.requires_restart) {
+        window.alert(
+          `Workspace recorded: ${res.workspace}\n\n` +
+          `Restart the backend to switch.`,
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.alert(`Failed to open workspace: ${message}`);
+    }
+  }, []);
 
   /** Save: if the tab already has a project+pipeline, overwrite silently; otherwise open modal. */
   const handleSave = useCallback(async () => {
@@ -274,7 +328,15 @@ export default function MainLayout() {
 
   const handleTabClose = useCallback((id: string) => {
     if (openTabs.length <= 1) return;
-    const closingActive = openTabs.find(t => t.id === id)?.isActive;
+    const closing = openTabs.find(t => t.id === id);
+    // Phase A.6 — prompt before discarding unsaved changes.
+    if (closing?.isModified) {
+      const proceed = window.confirm(
+        `"${closing.title}" has unsaved changes. Close anyway?`,
+      );
+      if (!proceed) return;
+    }
+    const closingActive = closing?.isActive;
     const next = openTabs.filter(t => t.id !== id);
     if (closingActive) {
       next[next.length - 1].isActive = true;
@@ -390,6 +452,10 @@ export default function MainLayout() {
         onSaveAs={handleSaveAs}
         onRename={() => setRenameModalOpen(true)}
         onEditFiles={handleOpenFileEditor}
+        workspaceName={workspaceInfo?.name}
+        recentWorkspaces={workspaceInfo?.recent_workspaces ?? []}
+        onOpenWorkspace={handleOpenWorkspace}
+        onOpenRecentWorkspace={handleOpenRecentWorkspace}
       />
 
       {/* Row 2: file tabs */}
@@ -416,6 +482,12 @@ export default function MainLayout() {
         availableOperations={availableOperations}
         pipelineMeta={pipelineMeta}
       />
+
+      {/* Visible drag-hint at the header's bottom edge — signals that the
+          toolbar area itself is resizable via the sash beneath it. */}
+      <div className="header-resize-hint" aria-hidden="true">
+        <span className="header-resize-hint__grip" />
+      </div>
     </header>
   );
 
@@ -471,6 +543,31 @@ export default function MainLayout() {
 
       {/* ── Three-pane shell: left sidebar | content | right chat ───────── */}
       <div className="main-layout__panes">
+        {/* Peek tabs — visible only when the matching pane is collapsed.
+            Provide a clear, clickable affordance to bring the pane back. */}
+        {!leftPaneVisible && (
+          <button
+            type="button"
+            className="pane-peek-tab pane-peek-tab--left"
+            onClick={() => setLeftPaneVisible(true)}
+            title="Show sidebar"
+            aria-label="Show sidebar"
+          >
+            <Icon name="chevron-right" size={12} />
+          </button>
+        )}
+        {!rightPaneVisible && (
+          <button
+            type="button"
+            className="pane-peek-tab pane-peek-tab--right"
+            onClick={() => setRightPaneVisible(true)}
+            title="Show chat"
+            aria-label="Show chat"
+          >
+            <Icon name="chevron-left" size={12} />
+          </button>
+        )}
+
         <Allotment onChange={handleOuterSizes} proportionalLayout={false}>
           {/* Left sidebar (Explorer / Packs / Search / History / Settings) */}
           <Allotment.Pane
@@ -493,6 +590,17 @@ export default function MainLayout() {
                 onRequestSave={handleRequestSaveFromSidebar}
                 onDeletePipeline={removePipeline}
               />
+              {/* Collapse toggle pinned to the inner edge — click to hide the
+                  sidebar.  A matching peek-tab (rendered below) brings it back. */}
+              <button
+                type="button"
+                className="pane-collapse-toggle pane-collapse-toggle--left"
+                onClick={() => setLeftPaneVisible(false)}
+                title="Hide sidebar"
+                aria-label="Hide sidebar"
+              >
+                <Icon name="chevron-left" size={12} />
+              </button>
             </div>
           </Allotment.Pane>
 
@@ -541,6 +649,15 @@ export default function MainLayout() {
                   updateStep(stepId, { formula });
                 }}
               />
+              <button
+                type="button"
+                className="pane-collapse-toggle pane-collapse-toggle--right"
+                onClick={() => setRightPaneVisible(false)}
+                title="Hide chat"
+                aria-label="Hide chat"
+              >
+                <Icon name="chevron-right" size={12} />
+              </button>
             </div>
           </Allotment.Pane>
         </Allotment>

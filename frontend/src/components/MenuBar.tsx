@@ -18,6 +18,17 @@ interface MenuBarProps {
   onSaveAs: () => void;
   onRename: () => void;
   onEditFiles?: () => void;
+  // Phase A.5 — workspace management
+  /** Display name of the active workspace (basename of its absolute path). */
+  workspaceName?: string;
+  /** Recently-opened workspace paths, newest first. */
+  recentWorkspaces?: { path: string; opened_at: string }[];
+  /** Open a directory-picker and call the backend. */
+  onOpenWorkspace?: () => void;
+  /** Open the chosen recent workspace by absolute path. */
+  onOpenRecentWorkspace?: (path: string) => void;
+  /** Reset workspace back to the launch cwd (no-op in the backend, just clears UI state). */
+  onCloseWorkspace?: () => void;
 }
 
 export default function MenuBar({
@@ -29,8 +40,14 @@ export default function MenuBar({
   onSaveAs,
   onRename,
   onEditFiles,
+  workspaceName,
+  recentWorkspaces = [],
+  onOpenWorkspace,
+  onOpenRecentWorkspace,
+  onCloseWorkspace,
 }: MenuBarProps) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const [recentMenuOpen, setRecentMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close on outside click
@@ -39,19 +56,29 @@ export default function MenuBar({
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setFileMenuOpen(false);
+        setRecentMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [fileMenuOpen]);
 
+  const closeMenus = () => {
+    setFileMenuOpen(false);
+    setRecentMenuOpen(false);
+  };
+
   const fileItems: MenuBarAction[] = [
-    { label: 'New Pipeline',     shortcut: '⌘N',  onClick: () => { setFileMenuOpen(false); onNew(); } },
+    { label: 'New Pipeline',     shortcut: '⌘N',  onClick: () => { closeMenus(); onNew(); } },
     { label: '', separator: true, onClick: () => {} },
-    { label: 'Save',             shortcut: '⌘S',  onClick: () => { setFileMenuOpen(false); onSave(); } },
-    { label: 'Save As…',         shortcut: '⇧⌘S', onClick: () => { setFileMenuOpen(false); onSaveAs(); } },
-    { label: 'Rename',                             onClick: () => { setFileMenuOpen(false); onRename(); } },
+    { label: 'Save',             shortcut: '⌘S',  onClick: () => { closeMenus(); onSave(); } },
+    { label: 'Save As…',         shortcut: '⇧⌘S', onClick: () => { closeMenus(); onSaveAs(); } },
+    { label: 'Rename',                             onClick: () => { closeMenus(); onRename(); } },
   ];
+
+  // Workspace-management section (Phase A.5).  Only shown if the host wired
+  // at least one of the handlers.
+  const showWorkspaceSection = onOpenWorkspace || onOpenRecentWorkspace || onCloseWorkspace;
 
   return (
     <div className="menubar">
@@ -82,6 +109,57 @@ export default function MenuBar({
                   )}
                 </button>
               )
+            )}
+
+            {showWorkspaceSection && <div className="menu-separator" />}
+
+            {onOpenWorkspace && (
+              <button
+                className="menu-entry"
+                onClick={() => { closeMenus(); onOpenWorkspace(); }}
+              >
+                <span className="menu-entry-label">Open Workspace…</span>
+                <span className="menu-entry-shortcut">⌘⇧O</span>
+              </button>
+            )}
+
+            {onOpenRecentWorkspace && recentWorkspaces.length > 0 && (
+              <div
+                className="menu-entry menu-entry-submenu"
+                onMouseEnter={() => setRecentMenuOpen(true)}
+                onMouseLeave={() => setRecentMenuOpen(false)}
+                style={{ position: 'relative' }}
+              >
+                <span className="menu-entry-label">Open Recent</span>
+                <span className="menu-entry-shortcut">▸</span>
+
+                {recentMenuOpen && (
+                  <div className="menubar-dropdown menubar-submenu">
+                    {recentWorkspaces.slice(0, 10).map((r) => (
+                      <button
+                        key={r.path}
+                        className="menu-entry"
+                        onClick={() => { closeMenus(); onOpenRecentWorkspace(r.path); }}
+                        title={r.path}
+                      >
+                        <span className="menu-entry-label menu-entry-recent">
+                          <span className="recent-base">{r.path.split('/').pop() || r.path}</span>
+                          <span className="recent-dir">{r.path.replace(/\/[^/]+$/, '') || '/'}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {onCloseWorkspace && workspaceName && (
+              <button
+                className="menu-entry"
+                onClick={() => { closeMenus(); onCloseWorkspace(); }}
+              >
+                <span className="menu-entry-label">Close Workspace</span>
+              </button>
             )}
           </div>
         )}

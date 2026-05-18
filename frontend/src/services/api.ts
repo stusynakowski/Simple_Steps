@@ -338,9 +338,17 @@ export async function fetchLoaderStatus(): Promise<Record<string, unknown>> {
 
 // --- Workspace Info ---
 
+/** A previously-opened workspace as recorded in ``~/.simple_steps/state.json``. */
+export interface RecentWorkspace {
+    path: string;
+    opened_at: string;  // ISO-8601 UTC
+}
+
 /** Information about the current workspace that Simple Steps was launched from. */
 export interface WorkspaceInfo {
     workspace_root: string;
+    /** Short display name (basename of workspace_root). */
+    name: string;
     projects_dir: string;
     project_count: number;
     pipeline_count: number;
@@ -351,6 +359,8 @@ export interface WorkspaceInfo {
     developer_pack_dirs: string[];
     ops_by_tier: Record<string, string[]>;
     total_operations: number;
+    /** Recently-opened workspaces, newest first.  Phase A. */
+    recent_workspaces: RecentWorkspace[];
 }
 
 /** Fetch workspace information from the backend. */
@@ -360,11 +370,37 @@ export async function fetchWorkspaceInfo(): Promise<WorkspaceInfo> {
     return r.json();
 }
 
+/** Result of ``POST /api/workspace/open``. */
+export interface OpenWorkspaceResult {
+    ok: boolean;
+    workspace: string;
+    /** True if a backend restart is required for the switch to take effect. */
+    requires_restart: boolean;
+    recent_workspaces: RecentWorkspace[];
+}
+
+/** Record ``path`` as the active workspace; pushes to recents. */
+export async function openWorkspace(path: string): Promise<OpenWorkspaceResult> {
+    const r = await fetch(`${API_BASE}/workspace/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+    });
+    if (!r.ok) {
+        const err = await r.json().catch(() => ({ detail: 'Failed to open workspace' }));
+        throw new Error(err.detail || 'Failed to open workspace');
+    }
+    return r.json();
+}
+
 // --- File Tree (IDE-like workspace browser) ---
 
 export interface FileEntry {
     name: string;
     type: 'file' | 'directory';
+    /** Discriminator added in Phase A.3.  ``pipeline`` is a workflow file under
+     *  ``projects/`` — render with a distinct glyph and open as a workflow tab. */
+    kind?: 'file' | 'directory' | 'pipeline';
     path: string;   // relative to workspace root
 }
 

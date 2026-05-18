@@ -85,8 +85,31 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
   }), [value]);
 
   // Mount-time wiring of Monaco editor.
-  const handleMount: OnMount = (editor) => {
+  const handleMount: OnMount = (editor, monaco) => {
     monacoRef.current = editor;
+
+    // Register our dark formula-bar theme once.  Matches the surrounding
+    // VS-Code-style chrome (#1e1e1e bg, #d4d4d4 text) so the bar reads as
+    // part of the dark toolbar instead of a white island.
+    try {
+      monaco.editor.defineTheme('simple-steps-dark', {
+        base: 'vs-dark',
+        inherit: true,
+        rules: [],
+        colors: {
+          'editor.background': '#1e1e1e',
+          'editor.foreground': '#d4d4d4',
+          'editorCursor.foreground': '#aeafad',
+          'editor.lineHighlightBackground': '#1e1e1e',
+          'editor.selectionBackground': '#264f78',
+          'editorWidget.background': '#252526',
+          'editorWidget.border': '#3c3c3c',
+        },
+      });
+      monaco.editor.setTheme('simple-steps-dark');
+    } catch {
+      /* theme already registered — no-op */
+    }
 
     // Push initial value into the hidden textarea (in case it was created
     // empty before Monaco mounted).
@@ -183,7 +206,7 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
         defaultLanguage={SIMPLE_STEPS_LANGUAGE_ID}
         defaultValue={value}
         onMount={handleMount}
-        theme="vs"
+        theme="simple-steps-dark"
         options={{
           // Single-line UX
           lineNumbers: 'off',

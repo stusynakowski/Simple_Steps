@@ -407,7 +407,19 @@ export default function StepToolbar({
       })()}
 
       {/* Formula Bar Section - Now on Top */}
-      <div className="formula-bar" style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
+      <div
+        className="formula-bar"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          position: 'relative',
+          background: '#1e1e1e',
+          border: '1px solid #2d2d2d',
+          borderRadius: 4,
+          padding: '4px 6px',
+        }}
+      >
         
         {/* Run/Stop Button - Moved Next to Formula Bar */}
         <button 
@@ -438,8 +450,8 @@ export default function StepToolbar({
           onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
           title="Operation Functionality"
           style={{
-            color: activeTab === 'details' ? '#3498db' : '#666',
-            background: activeTab === 'details' ? '#ebf5fb' : 'transparent',
+            color: activeTab === 'details' ? '#4ea1ff' : '#aaa',
+            background: activeTab === 'details' ? '#1f3a5f' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic', fontSize: '12px',
           }}
@@ -463,7 +475,9 @@ export default function StepToolbar({
                 style={{
                   width: '100%',
                   padding: '4px 8px',
-                  border: '1px solid #ccc',
+                  border: '1px solid #3c3c3c',
+                  background: '#1e1e1e',
+                  color: '#d4d4d4',
                   borderRadius: '4px',
                   fontFamily: 'monospace',
                   boxSizing: 'border-box',

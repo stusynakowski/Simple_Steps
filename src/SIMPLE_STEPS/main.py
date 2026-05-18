@@ -30,6 +30,7 @@ from .file_manager import (
 )
 from .agent.routes import router as agent_router
 from .pack_manager import get_manifest_pack_dirs, load_manifest
+from . import workspace_state
 import sys
 import os
 
@@ -207,6 +208,7 @@ async def workspace_info():
 
     return {
         "workspace_root": _WORKSPACE,
+        "name": os.path.basename(_WORKSPACE.rstrip(os.sep)) or _WORKSPACE,
         "projects_dir": os.path.abspath(PROJECTS_DIR),
         "project_count": project_count,
         "pipeline_count": pipeline_count,
@@ -217,6 +219,41 @@ async def workspace_info():
         "developer_pack_dirs": [os.path.abspath(p) for p in _DEVELOPER_PACK_DIRS],
         "ops_by_tier": by_tier,
         "total_operations": sum(len(ops) for ops in by_tier.values()),
+        # Multi-workspace chrome (Phase A): recent list lives in
+        # ``~/.simple_steps/state.json`` and is *not* workspace-relative.
+        "recent_workspaces": workspace_state.get_recent_workspaces(),
+    }
+
+
+class OpenWorkspaceRequest(BaseModel):
+    path: str
+
+
+@app.post("/api/workspace/open")
+async def workspace_open(body: OpenWorkspaceRequest):
+    """
+    Record ``path`` as the active workspace in ``~/.simple_steps/state.json``
+    and push it to the front of the recents list.
+
+    M0 caveat: many backend modules (`file_manager`, `pack_loader`, …)
+    captured ``WORKSPACE_ROOT`` at import time, so switching workspaces
+    *fully* requires restarting the backend process.  This endpoint returns
+    ``requires_restart: true`` so the frontend can prompt the user.
+
+    M1 will replace this with per-request workspace resolution and the flag
+    will go away.
+    """
+    target = os.path.abspath(os.path.expanduser(body.path))
+    if not os.path.isdir(target):
+        raise HTTPException(status_code=404, detail=f"Not a directory: {target}")
+
+    state = workspace_state.record_workspace_opened(target)
+
+    return {
+        "ok": True,
+        "workspace": target,
+        "requires_restart": target != _WORKSPACE,
+        "recent_workspaces": state.get("recent_workspaces", []),
     }
 
 
@@ -255,8 +292,20 @@ async def api_list_files(path: str = ""):
             rel = os.path.relpath(full, base)
             if name.endswith(".egg-info"):
                 continue
-            entry_type = "directory" if os.path.isdir(full) else "file"
-            entries.append({"name": name, "type": entry_type, "path": rel})
+            is_dir = os.path.isdir(full)
+            entry_type = "directory" if is_dir else "file"
+            # ── Phase A.3: tag pipeline files so the FileTree can render
+            # them with a distinct glyph and open them as workflow tabs
+            # instead of generic editor tabs.
+            kind = entry_type
+            if not is_dir and name.endswith((".simple-steps-workflow", ".json")):
+                # Only treat top-level project files as pipelines — anything
+                # nested inside a project folder also qualifies.  We detect
+                # this by checking that the entry is *under* projects/.
+                rel_norm = rel.replace(os.sep, "/")
+                if rel_norm.startswith("projects/") or rel_norm == "projects":
+                    kind = "pipeline"
+            entries.append({"name": name, "type": entry_type, "kind": kind, "path": rel})
     except PermissionError:
         raise HTTPException(status_code=403, detail="Permission denied")
 

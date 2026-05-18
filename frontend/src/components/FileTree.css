@@ -1,10 +1,27 @@
 /* ── FileTree — IDE-like workspace file browser ───────────────────────── */
 
 .filetree-root {
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;        /* allow inner flex child to shrink/grow */
+  height: 100%;
+  overflow: hidden;     /* the inner .filetree-entries handles scrolling */
+}
+
+/* When FileTree is rendered as the sole child of the sidebar body, the
+   wrapping section also needs to stretch — otherwise its intrinsic height
+   collapses to the row count and leaves dead space below. */
+.filetree-root .sidebar-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .filetree-entries {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
 }
 

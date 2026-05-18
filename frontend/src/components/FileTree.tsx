@@ -14,6 +14,8 @@ interface TreeNode {
   id: string;          // path (unique)
   name: string;
   type: 'file' | 'directory';
+  /** Phase A.3 — set to 'pipeline' for workflow files under projects/. */
+  kind?: 'file' | 'directory' | 'pipeline';
   children?: TreeNode[];
 }
 
@@ -21,6 +23,7 @@ const toNode = (e: FileEntry): TreeNode => ({
   id: e.path,
   name: e.name,
   type: e.type,
+  kind: e.kind,
   children: e.type === 'directory' ? undefined : undefined,
 });
 
@@ -53,18 +56,22 @@ function extIconName(name: string): string {
 
 // ── Node renderer ──────────────────────────────────────────────────────────
 
-function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
+function Node({ node, style, dragHandle, onPipelineOpen }: NodeRendererProps<TreeNode> & { onPipelineOpen?: (path: string) => void }) {
   const isDir = node.data.type === 'directory';
+  const isPipeline = node.data.kind === 'pipeline';
   const isOpen = node.isOpen;
 
   return (
     <div
       ref={dragHandle}
-      className={`filetree-row ${node.isSelected ? 'selected' : ''} ${isDir ? '' : 'filetree-file'}`}
+      className={`filetree-row ${node.isSelected ? 'selected' : ''} ${isDir ? '' : 'filetree-file'} ${isPipeline ? 'filetree-pipeline' : ''}`}
       style={style}
       onClick={() => {
         if (isDir) node.toggle();
         else node.select();
+      }}
+      onDoubleClick={() => {
+        if (isPipeline) onPipelineOpen?.(node.data.id);
       }}
       title={node.data.id}
     >
@@ -78,9 +85,14 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
         <span style={{ display: 'inline-block', width: 12 }} />
       )}
       <Icon
-        name={isDir ? (isOpen ? 'folder-opened' : 'folder') : extIconName(node.data.name)}
+        name={
+          isDir
+            ? isOpen ? 'folder-opened' : 'folder'
+            : isPipeline ? 'notebook'
+            : extIconName(node.data.name)
+        }
         size={14}
-        color={isDir ? '#dcb67a' : undefined}
+        color={isDir ? '#dcb67a' : isPipeline ? '#4ec9b0' : undefined}
       />
       <span className="filetree-label">{node.data.name}</span>
     </div>
@@ -91,9 +103,12 @@ function Node({ node, style, dragHandle }: NodeRendererProps<TreeNode>) {
 
 interface FileTreeProps {
   onFileClick?: (path: string) => void;
+  /** Phase A.4 — fired on double-click of a pipeline file (workflow JSON
+   *  under projects/).  The host opens it in a new workflow tab. */
+  onPipelineOpen?: (path: string) => void;
 }
 
-const FileTree: React.FC<FileTreeProps> = ({ onFileClick }) => {
+const FileTree: React.FC<FileTreeProps> = ({ onFileClick, onPipelineOpen }) => {
   const [data, setData] = useState<TreeNode[]>([]);
   const [workspaceName, setWorkspaceName] = useState('WORKSPACE');
   const [open, setOpen] = useState(true);
@@ -197,7 +212,7 @@ const FileTree: React.FC<FileTreeProps> = ({ onFileClick }) => {
                 disableDrag
                 disableDrop
               >
-                {Node}
+                {(props) => <Node {...props} onPipelineOpen={onPipelineOpen} />}
               </Tree>
             )}
           </div>

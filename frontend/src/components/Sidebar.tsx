@@ -527,7 +527,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
       </div>
 
       {currentView === 'explorer' && (
-        <FileTree onFileClick={handleExplorerFileClick} />
+        <FileTree
+          onFileClick={handleExplorerFileClick}
+          onPipelineOpen={handleExplorerFileClick}
+        />
       )}
 
       {currentView === 'search' && (

@@ -27,11 +27,31 @@ from .models import PipelineFile, ProjectInfo
 # ── Workspace root ───────────────────────────────────────────────────────────
 # The "workspace" is the directory the user launched simple-steps from.
 # All project/pipeline storage is relative to this root.
+#
+# Resolution order (first match wins):
+#   1. ``SIMPLE_STEPS_WORKSPACE`` env var — explicit override (start scripts).
+#   2. ``~/.simple_steps/state.json[last_workspace]`` — the folder the user
+#      most recently opened via ``POST /api/workspace/open``.
+#   3. ``os.getcwd()`` — the directory ``simple-steps`` was launched from.
 
-WORKSPACE_ROOT = os.environ.get(
-    "SIMPLE_STEPS_WORKSPACE",
-    os.getcwd(),
-)
+
+def _resolve_workspace_root() -> str:
+    env = os.environ.get("SIMPLE_STEPS_WORKSPACE")
+    if env:
+        return env
+    # Lazy import to avoid a circular reference (workspace_state is independent
+    # but other modules in this package import file_manager at startup).
+    try:
+        from . import workspace_state  # noqa: WPS433 — intentional lazy import
+        last = workspace_state.get_last_workspace()
+        if last and os.path.isdir(last):
+            return last
+    except Exception:  # pragma: no cover — never let state corruption block boot
+        pass
+    return os.getcwd()
+
+
+WORKSPACE_ROOT = _resolve_workspace_root()
 
 PROJECTS_DIR = os.environ.get(
     "SIMPLE_STEPS_PROJECTS_DIR",
