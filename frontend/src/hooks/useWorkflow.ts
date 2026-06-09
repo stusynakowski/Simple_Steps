@@ -343,7 +343,11 @@ export default function useWorkflow() {
           stepMap,
           false,
           step.formula || undefined,
-          workflowRef.current.id,
+          // Session is server-issued via the ss_session HttpOnly cookie —
+          // we never send a sessionId from JS.  Previously this slot
+          // passed `workflowRef.current.id` (the saved-pipeline slug),
+          // which conflated "saved artifact" with "running tab" and
+          // caused data leaks between concurrent users of the same file.
       );
 
           const stableMeta = await waitForStableOutput(res.output_ref_id, id, step.label, operationId);
@@ -477,7 +481,7 @@ export default function useWorkflow() {
           stepMap,
           true, // isPreview
           step.formula || undefined,
-          workflowRef.current.id,
+          // No sessionId — see runStep above.  The cookie carries identity.
       );
       
       const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];

@@ -232,7 +232,10 @@ class StepRunRequest(BaseModel):
     step_map: Optional[Dict[str, str]] = None
     is_preview: bool = False
     formula: Optional[str] = None  # raw formula string for eval-mode fallback
-    session_id: Optional[str] = None
+    # NOTE: ``session_id`` is intentionally NOT a request field.  It is
+    # resolved server-side from the ``ss_session`` HttpOnly cookie via
+    # ``SIMPLE_STEPS.session.get_session_id``.  The client cannot set,
+    # read, or spoof it.
     result_store: Optional[Literal['memory', 'parquet']] = None
 
 class StepRunResponse(BaseModel):

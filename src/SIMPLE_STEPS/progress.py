@@ -1,20 +1,24 @@
 """
 Lightweight progress reporting for long-running step executions.
 
-Uses a thread-local + dict approach so that any orchestrator can report
-progress and an SSE endpoint can stream it to the frontend.
+Trackers are scoped by ``(session_id, step_id)`` so concurrent users do
+not see each other's progress streams.  Any orchestrator that wants to
+report progress should call :func:`start_progress` at the beginning of a
+run, ``prog.update(...)`` periodically, and :func:`end_progress` when
+done (typically in a ``finally`` block).
 """
 import threading
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 from dataclasses import dataclass, field
-from queue import Queue, Empty
+from queue import Queue
 
 
 @dataclass
 class StepProgress:
-    """Tracks progress for a single running step."""
+    """Tracks progress for a single running step within one session."""
     step_id: str
+    session_id: str
     total: int = 0
     current: int = 0
     message: str = ""
@@ -38,25 +42,49 @@ class StepProgress:
         self.queue.put(None)  # sentinel
 
 
-# Global registry of active step progress trackers
-_active: Dict[str, StepProgress] = {}
+# session_id → step_id → StepProgress
+_active: Dict[str, Dict[str, StepProgress]] = {}
 _lock = threading.Lock()
 
 
-def start_progress(step_id: str) -> StepProgress:
-    prog = StepProgress(step_id=step_id)
+def start_progress(session_id: str, step_id: str) -> StepProgress:
+    """Register a new progress tracker for ``step_id`` under ``session_id``."""
+    prog = StepProgress(step_id=step_id, session_id=session_id)
     with _lock:
-        _active[step_id] = prog
+        _active.setdefault(session_id, {})[step_id] = prog
     return prog
 
 
-def get_progress(step_id: str) -> Optional[StepProgress]:
+def get_progress(session_id: str, step_id: str) -> Optional[StepProgress]:
+    """Return the live tracker for ``step_id`` within ``session_id``, or None."""
     with _lock:
-        return _active.get(step_id)
+        bucket = _active.get(session_id)
+        return bucket.get(step_id) if bucket else None
 
 
-def end_progress(step_id: str):
+def end_progress(session_id: str, step_id: str) -> None:
+    """Mark the tracker complete and remove it from the registry."""
     with _lock:
-        prog = _active.pop(step_id, None)
+        bucket = _active.get(session_id)
+        if not bucket:
+            return
+        prog = bucket.pop(step_id, None)
         if prog:
+            prog.finish()
+        # Garbage-collect the empty session bucket so long-lived servers
+        # don't accumulate one entry per ever-seen session.
+        if not bucket:
+            _active.pop(session_id, None)
+
+
+def clear_session(session_id: str) -> None:
+    """
+    Drop all progress trackers for a session — useful when a session is
+    invalidated or its WebSocket disconnects with no in-flight work.
+    """
+    with _lock:
+        bucket = _active.pop(session_id, None)
+        if not bucket:
+            return
+        for prog in bucket.values():
             prog.finish()

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Depends
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +31,7 @@ from .file_manager import (
 from .agent.routes import router as agent_router
 from .pack_manager import get_manifest_pack_dirs, load_manifest
 from . import workspace_state
+from .session import get_session_id
 import sys
 import os
 
@@ -177,6 +178,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# --- Session bootstrap ---
+@app.get("/api/session")
+async def session_ping(session_id: str = Depends(get_session_id)):
+    """
+    Idempotent endpoint that ensures the caller has a session cookie.
+
+    The frontend hits this once on app boot; if no ``ss_session`` cookie
+    is present, the dependency mints one and sets it on the response.
+    Subsequent requests carry the cookie automatically.
+
+    The session ID itself is **not** returned in the body — it lives only
+    in the HttpOnly cookie so client JS cannot read or spoof it.  We do
+    expose a stable hash prefix (``session_token``) for diagnostics so
+    logs / dev tools can show "which session am I" without leaking the
+    full identifier.
+    """
+    return {
+        "ok": True,
+        "session_token": session_id[:8],  # first 8 hex chars, for debugging only
+    }
 
 
 # --- 0. Workspace Info ---
@@ -676,11 +699,20 @@ async def remove_pipeline(project_id: str, pipeline_id: str):
 
 # --- 2. Step Execution (Command) ---
 @app.post("/api/run", response_model=StepRunResponse)
-async def execute_step(payload: StepRunRequest):
+async def execute_step(
+    payload: StepRunRequest,
+    session_id: str = Depends(get_session_id),
+):
     """
     Executes a single step.
+
     Receives: Config + Input Reference ID + Reference Map
-    Returns: New Output Reference ID
+    Returns:  New Output Reference ID
+
+    Session isolation: ``session_id`` is resolved from the ``ss_session``
+    HttpOnly cookie via :func:`SIMPLE_STEPS.session.get_session_id`.  All
+    DataFrames produced by this run are stored under that session's
+    bucket; references created in another session cannot be read here.
     """
     import asyncio as _asyncio
     try:
@@ -695,7 +727,7 @@ async def execute_step(payload: StepRunRequest):
             payload.is_preview,
             payload.formula,
             payload.step_id,
-            payload.session_id,
+            session_id,
             payload.result_store,
         ))
         
@@ -726,14 +758,22 @@ from starlette.responses import StreamingResponse
 import asyncio, json as _json
 
 @app.get("/api/progress/{step_id}")
-async def stream_progress(step_id: str):
-    """SSE stream of progress events for a running step."""
+async def stream_progress(
+    step_id: str,
+    session_id: str = Depends(get_session_id),
+):
+    """
+    SSE stream of progress events for a running step.
+
+    Progress trackers are scoped by ``(session_id, step_id)`` — a stream
+    opened by one session never receives events from another.
+    """
     async def event_generator():
         # Wait briefly for the progress tracker to be registered (the /api/run
         # endpoint starts it in a thread, so there's a small race window).
         prog = None
         for _ in range(10):
-            prog = get_progress(step_id)
+            prog = get_progress(session_id, step_id)
             if prog:
                 break
             await asyncio.sleep(0.2)
@@ -748,7 +788,7 @@ async def stream_progress(step_id: str):
                 # No event yet — send a keep-alive comment
                 yield ": keepalive\n\n"
                 # Check if progress was removed (step finished elsewhere)
-                if get_progress(step_id) is None:
+                if get_progress(session_id, step_id) is None:
                     yield f"data: {_json.dumps({'done': True})}\n\n"
                     return
                 continue
@@ -782,15 +822,20 @@ async def write_settings(body: dict = Body(...)):
 # --- 3. Data View (Query) ---
 @app.get("/api/data/{ref_id}")
 async def get_data_view(
-    ref_id: str, 
-    offset: int = 0, 
-    limit: int = 50
+    ref_id: str,
+    offset: int = 0,
+    limit: int = 50,
+    session_id: str = Depends(get_session_id),
 ):
     """
     Returns a slice of data for the Frontend Grid.
-    This is lightweight and fast.
+
+    Session isolation: the ``ref_id`` carries an embedded session token
+    (``<token>__<uuid>``).  ``get_dataframe`` rejects any lookup where
+    the cookie's session does not match the ref's session, so a leaked
+    or guessed ref from another session yields ``404``.
     """
-    df = get_dataframe(ref_id)
+    df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
     
@@ -840,12 +885,17 @@ async def get_data_view(
 
 
 @app.get("/api/data-meta/{ref_id}")
-async def get_data_meta(ref_id: str):
+async def get_data_meta(
+    ref_id: str,
+    session_id: str = Depends(get_session_id),
+):
     """
     Returns lightweight metadata for a result reference.
     Useful for UI orchestration barriers (e.g. waiting for row-count stability).
+
+    Session-scoped — same isolation rules as ``/api/data/{ref_id}``.
     """
-    df = get_dataframe(ref_id)
+    df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
 

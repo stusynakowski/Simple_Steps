@@ -21,6 +21,36 @@ function resolveApiBase(): string {
 
 export const API_BASE = resolveApiBase();
 
+// ── Session bootstrap ────────────────────────────────────────────────────────
+// Session identity is server-issued and stored in an HttpOnly cookie
+// (`ss_session`).  We never see, store, or send the session ID from JS —
+// the browser carries the cookie automatically on every request.  All
+// `fetch` and `EventSource` calls in this module set `credentials: 'include'`
+// (and `withCredentials: true`) so the cookie flows even in cross-origin
+// dev setups.
+//
+// Call `bootstrapSession()` once on app boot; subsequent requests reuse
+// the cookie transparently.
+
+export interface SessionInfo {
+  ok: boolean;
+  /** First 8 hex chars of the session id — for diagnostics only. */
+  session_token: string;
+}
+
+/**
+ * Idempotent — ensures the browser has an `ss_session` cookie.  The
+ * full session id is HttpOnly; we only get a short prefix back for
+ * display / debugging.
+ */
+export async function bootstrapSession(): Promise<SessionInfo> {
+  const r = await fetch(`${API_BASE}/session`, {
+    credentials: 'include',
+  });
+  if (!r.ok) throw new Error('Failed to bootstrap session');
+  return r.json();
+}
+
 export interface ProgressEvent {
   current: number;
   total: number;
@@ -32,6 +62,11 @@ export interface ProgressEvent {
 /**
  * Opens an SSE connection to stream progress for a running step.
  * Returns a cleanup function to close the connection.
+ *
+ * `withCredentials: true` ensures the session cookie flows on the
+ * EventSource handshake; without it, cross-origin SSE in dev would
+ * be unauthenticated and the backend would route progress to a
+ * different (anonymous) session bucket.
  */
 export function listenProgress(
   stepId: string,
@@ -39,7 +74,7 @@ export function listenProgress(
   onDone?: () => void,
 ): () => void {
   const url = `${API_BASE}/progress/${stepId}`;
-  const source = new EventSource(url);
+  const source = new EventSource(url, { withCredentials: true });
   source.onmessage = (e) => {
     try {
       const data = JSON.parse(e.data) as ProgressEvent;
@@ -118,16 +153,20 @@ export async function checkBackendStatus(): Promise<boolean> {
 /**
  * Executes a single step on the backend.
  * Returns the reference ID for the result, not the data itself.
+ *
+ * Note: there is no `sessionId` parameter.  Session identity is
+ * server-issued via the `ss_session` HttpOnly cookie and resolved
+ * from `Depends(get_session_id)` in the backend route.  Clients
+ * cannot set or spoof it.
  */
 export async function runStep(
-    stepId: string, 
+    stepId: string,
     operationId: string,
     configuration: StepConfiguration,
     inputRefId: string | null,
     stepMap?: Record<string, string>,
     isPreview: boolean = false,
     formula?: string,
-    sessionId?: string,
     resultStore?: 'memory' | 'parquet'
 ): Promise<StepRunResponse> {
   
@@ -139,13 +178,13 @@ export async function runStep(
       step_map: stepMap || {},
       is_preview: isPreview,
       formula: formula || null,
-      session_id: sessionId || null,
       result_store: resultStore || null,
   };
 
   const response = await fetch(`${API_BASE}/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(payload)
   });
 
@@ -169,13 +208,17 @@ export async function runStep(
 
 /**
  * Fetches a slice of data for the grid view using a reference ID.
+ * Session-scoped — the backend rejects refs that belong to a
+ * different session (404), preventing cross-session data leaks.
  */
 export async function fetchDataView(
     refId: string, 
     offset: number = 0, 
     limit: number = 50
 ): Promise<unknown[]> {
-    const response = await fetch(`${API_BASE}/data/${refId}?offset=${offset}&limit=${limit}`);
+    const response = await fetch(`${API_BASE}/data/${refId}?offset=${offset}&limit=${limit}`, {
+        credentials: 'include',
+    });
     if (!response.ok) {
         // If 404, maybe ref expired.
         throw new Error('Data not found');
@@ -190,7 +233,9 @@ export interface DataMeta {
 
 /** Fetches lightweight metadata (row/column counts) for a data reference. */
 export async function fetchDataMeta(refId: string): Promise<DataMeta> {
-    const response = await fetch(`${API_BASE}/data-meta/${refId}`);
+    const response = await fetch(`${API_BASE}/data-meta/${refId}`, {
+        credentials: 'include',
+    });
     if (!response.ok) {
         throw new Error('Data metadata not found');
     }
