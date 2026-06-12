@@ -278,6 +278,37 @@ def raw_output_wrapper(func: Callable) -> Callable:
         return pd.DataFrame({'output': [result]})
     return wrapper
 
+
+def step_wrapper(func: Callable) -> Callable:
+    """
+    Single-cell passthrough wrapper.
+
+    A ``step`` operation is the simplest possible thing: take some
+    keyword arguments, call the function, return whatever the function
+    returned.  No DataFrame coercion, no row iteration, no column
+    binding.  The output may be a scalar, dict, list, Pydantic model,
+    DataFrame, ``None`` — whatever the function naturally returns.
+
+    This is the v0.2 default orchestration mode.  It models a single
+    tool invocation in an agent's trace, where one call produces one
+    return value that the next step references via ``step1`` (whole
+    value) or ``step1.field`` (dict-key access).
+
+    Tabular orchestration (``map``/``filter``/``expand``/``dataframe``)
+    remains available for power users; it is just no longer the default.
+    """
+    def wrapper(*args, **kwargs) -> Any:
+        # Strip engine-injected plumbing keys before calling the user's
+        # function.  ``_input_df`` is the previous step's output that the
+        # tabular orchestrators consume; ``step`` mode ignores it because
+        # the engine resolves explicit ``step1``/``step1.field`` refs into
+        # the kwargs already.
+        clean_kwargs = {k: v for k, v in kwargs.items() if not k.startswith('_')}
+        print(f"[Orchestrator:Step] Executing {func.__name__}...")
+        return func(*args, **clean_kwargs)
+    return wrapper
+
+
 # Wrapper Registry
 ORCHESTRATORS = {
     "source": source_wrapper,
@@ -287,4 +318,5 @@ ORCHESTRATORS = {
     "expand": expand_wrapper,
     "dataframe": dataframe_op_wrapper,
     "raw_output": raw_output_wrapper,
+    "step": step_wrapper,
 }

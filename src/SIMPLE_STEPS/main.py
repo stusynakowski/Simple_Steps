@@ -18,7 +18,7 @@ from .models import (
     PipelineFile,
 )
 from .operations import DEFINITIONS as OPERATIONS
-from .engine import run_operation, get_dataframe
+from .engine import run_operation, get_dataframe, get_value, _get_raw_only, _ref_exists_in_raw_store
 from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
 from .operation_pack import PACK_REGISTRY
 from .pack_loader import PackLoader, OpTier, set_loader, get_loader
@@ -820,6 +820,123 @@ async def write_settings(body: dict = Body(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 # --- 3. Data View (Query) ---
+def _raw_to_cells(raw: object, *, offset: int = 0, limit: int = 50) -> list:
+    """
+    Serialise a raw (``step``-mode) value into the same ``Cell[]`` shape
+    that the DataFrame path returns.
+
+    This lets the existing frontend grid viewer render raw values without
+    any code changes.  Shapes:
+
+    * ``dict``           → one row, one cell per (key, value)
+    * ``list[dict]``     → N rows, one cell per (key, value) per row
+    * ``list[scalar]``   → N rows, one cell per row under column ``"value"``
+    * ``None``           → empty list
+    * scalar / object    → 1 row × 1 cell under column ``"value"``
+    """
+    def _cell(row_id: int, column_id: str, value: object) -> dict:
+        # Best-effort JSON-friendly representation.
+        if value is None:
+            return {"row_id": row_id, "column_id": column_id, "value": None, "display_value": ""}
+        if isinstance(value, (str, int, float, bool)):
+            return {
+                "row_id": row_id,
+                "column_id": column_id,
+                "value": value,
+                "display_value": str(value),
+            }
+        if isinstance(value, (list, tuple)):
+            return {
+                "row_id": row_id,
+                "column_id": column_id,
+                "value": list(value),
+                "display_value": str(value),
+            }
+        if isinstance(value, dict):
+            return {
+                "row_id": row_id,
+                "column_id": column_id,
+                "value": value,
+                "display_value": str(value),
+            }
+        # Pydantic v2 / dataclass / arbitrary object → best-effort dict
+        try:
+            if hasattr(value, "model_dump"):
+                dumped = value.model_dump()
+            elif hasattr(value, "__dataclass_fields__"):
+                from dataclasses import asdict
+                dumped = asdict(value)
+            else:
+                dumped = str(value)
+            return {
+                "row_id": row_id,
+                "column_id": column_id,
+                "value": dumped if not isinstance(dumped, str) else dumped,
+                "display_value": str(value),
+            }
+        except Exception:
+            return {
+                "row_id": row_id,
+                "column_id": column_id,
+                "value": str(value),
+                "display_value": str(value),
+            }
+
+    if raw is None:
+        return []
+
+    # list[dict] → table
+    if isinstance(raw, list) and raw and isinstance(raw[0], dict):
+        # Stable column order: dict-insertion order of the first row,
+        # then any extra keys discovered in later rows.
+        seen_cols: list = []
+        for row in raw:
+            if isinstance(row, dict):
+                for k in row.keys():
+                    if k not in seen_cols:
+                        seen_cols.append(str(k))
+
+        page = raw[offset : offset + limit]
+        cells = []
+        for i, row in enumerate(page):
+            row_id = offset + i
+            if not isinstance(row, dict):
+                cells.append(_cell(row_id, "value", row))
+                continue
+            for col in seen_cols:
+                cells.append(_cell(row_id, col, row.get(col)))
+        return cells
+
+    # list[scalar | non-dict] → single 'value' column
+    if isinstance(raw, list):
+        page = raw[offset : offset + limit]
+        return [_cell(offset + i, "value", v) for i, v in enumerate(page)]
+
+    # dict → one row, one cell per key
+    if isinstance(raw, dict):
+        if offset > 0:
+            return []
+        return [_cell(0, str(k), v) for k, v in raw.items()]
+
+    # Pydantic / dataclass / object with introspectable fields
+    if hasattr(raw, "model_dump"):
+        try:
+            return _raw_to_cells(raw.model_dump(), offset=offset, limit=limit)
+        except Exception:
+            pass
+    if hasattr(raw, "__dataclass_fields__"):
+        try:
+            from dataclasses import asdict
+            return _raw_to_cells(asdict(raw), offset=offset, limit=limit)
+        except Exception:
+            pass
+
+    # Pure scalar / unknown object
+    if offset > 0:
+        return []
+    return [_cell(0, "value", raw)]
+
+
 @app.get("/api/data/{ref_id}")
 async def get_data_view(
     ref_id: str,
@@ -828,13 +945,26 @@ async def get_data_view(
     session_id: str = Depends(get_session_id),
 ):
     """
-    Returns a slice of data for the Frontend Grid.
+    Returns a slice of data for the Frontend Grid as ``Cell[]``.
+
+    Handles both stores:
+      • ``RAW_STORE`` — single-cell ``step``-mode outputs.  Serialised
+        into ``Cell[]`` so the existing grid viewer works without
+        modification (dict → one row of cells, list-of-dicts → N rows,
+        scalar → 1×1 cell, list-of-scalars → N×1 cells).
+      • ``DATA_STORE`` — DataFrames from the legacy tabular ops.
 
     Session isolation: the ``ref_id`` carries an embedded session token
-    (``<token>__<uuid>``).  ``get_dataframe`` rejects any lookup where
-    the cookie's session does not match the ref's session, so a leaked
-    or guessed ref from another session yields ``404``.
+    (``<token>__<uuid>``).  Lookups that don't match the cookie's session
+    return 404 — no information leak about whether the ref exists.
     """
+    # ── Raw value path (step mode) ─────────────────────────────────────
+    if _ref_exists_in_raw_store(ref_id, session_id=session_id):
+        raw = _get_raw_only(ref_id, session_id=session_id)
+        cells = _raw_to_cells(raw, offset=offset, limit=limit)
+        return cells
+
+    # ── DataFrame path (legacy tabular) ────────────────────────────────
     df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
@@ -891,17 +1021,73 @@ async def get_data_meta(
 ):
     """
     Returns lightweight metadata for a result reference.
-    Useful for UI orchestration barriers (e.g. waiting for row-count stability).
+    Useful for UI orchestration barriers (e.g. waiting for row-count stability)
+    and for picking the right renderer (data grid vs. JSON tree).
 
     Session-scoped — same isolation rules as ``/api/data/{ref_id}``.
+
+    Response shape::
+
+        {
+          "kind": "dataframe" | "raw",
+          "rows": int,
+          "columns": list[str],
+          "value_type": str | None   # only present when kind == "raw"
+        }
     """
+    # Raw value path (step mode)
+    if _ref_exists_in_raw_store(ref_id, session_id=session_id):
+        raw = _get_raw_only(ref_id, session_id=session_id)
+        return _raw_meta(raw)
+
+    # DataFrame path (legacy tabular)
     df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
 
     return {
+        "kind": "dataframe",
         "rows": int(len(df)),
         "columns": [str(c) for c in df.columns],
+    }
+
+
+def _raw_meta(raw: object) -> dict:
+    """Mirror of ``engine._step_result_metrics`` for use from the data-meta endpoint.
+
+    Both functions MUST agree on ``kind`` / ``value_type`` / ``columns`` for any
+    given value so ``/api/run`` (metrics) and ``/api/data-meta`` (meta) report
+    identical shape information.
+    """
+    if isinstance(raw, dict):
+        return {
+            "kind": "raw",
+            "value_type": "dict",
+            "rows": 1,
+            "columns": [str(k) for k in raw.keys()],
+        }
+    if isinstance(raw, list):
+        if raw and isinstance(raw[0], dict):
+            cols: list = []
+            for row in raw:
+                if isinstance(row, dict):
+                    for k in row.keys():
+                        if k not in cols:
+                            cols.append(str(k))
+            return {"kind": "raw", "value_type": "list[dict]", "rows": len(raw), "columns": cols}
+        return {"kind": "raw", "value_type": "list", "rows": len(raw), "columns": ["value"]}
+    if raw is None:
+        return {"kind": "raw", "value_type": "none", "rows": 0, "columns": []}
+    cols: list = []
+    if hasattr(raw, "model_fields"):
+        cols = list(raw.model_fields.keys())
+    elif hasattr(raw, "__dataclass_fields__"):
+        cols = list(raw.__dataclass_fields__.keys())
+    return {
+        "kind": "raw",
+        "value_type": type(raw).__name__,
+        "rows": 1,
+        "columns": cols if cols else ["value"],
     }
 
 # ── Serve bundled frontend (SPA) ────────────────────────────────────────────

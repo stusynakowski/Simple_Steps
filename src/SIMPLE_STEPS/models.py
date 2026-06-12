@@ -86,7 +86,10 @@ class OperationDefinition(BaseModel):
     id: str
     label: str
     description: str
-    type: Literal['source', 'map', 'filter', 'expand', 'dataframe', 'raw_output', 'orchestrator'] = 'dataframe'
+    # 'step' is the v0.2 single-cell default — one call, one return value,
+    # no row iteration.  The other modes are tabular orchestrations kept
+    # available for power users.
+    type: Literal['step', 'source', 'map', 'filter', 'expand', 'dataframe', 'raw_output', 'orchestrator'] = 'dataframe'
     category: str = 'General'
     params: List[OperationParam]
 
