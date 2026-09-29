@@ -20,6 +20,7 @@ selection itself is the operation — applied to `identity`.
 | **C. Subscript a `StepRef` (`wf["raw"][3]`)** | Don't. It breaks the re-drive argument §11 used to settle "at most one shape verb per step" |
 | **D. Bind one cell as a tool argument** | Genuinely missing, genuinely different. Needs its own design |
 | **E. What a selection *means*** | Decided by whether the step being edited already has a tool. Both branches are expressible today — see §E |
+| **F. `StepRef` as a tool argument** | **A bug.** Silently stringified to the step id; validates clean, runs, returns garbage. Fix independently |
 
 ---
 
@@ -318,6 +319,73 @@ reference to a value unknown until upstream runs. That one is not solved by
 
 ---
 
+## F. Bug: a `StepRef` as a tool argument is silently stringified
+
+Found while checking whether a manual selection can be *referenced* rather than
+made into its own step. This is not a design question — it is a defect, and it
+produces wrong answers rather than an error.
+
+```python
+wf["raw"]    = pd.DataFrame({"n": [1, 2, 3, 4, 5]})
+wf["config"] = pd.DataFrame({"factor": [10]})
+wf["scaled"] = scale(wf["raw"], factor=wf["config"])     # factor from another step
+```
+
+Declares **valid** — `status: staged`, `problems: ()`. Runs to **completed**.
+Produces:
+
+```
+ n                          value
+ 1                         config
+ 2                   configconfig
+ 3             configconfigconfig
+ 4       configconfigconfigconfig
+ 5 configconfigconfigconfigconfig
+```
+
+`arguments` stored as `{"factor": "config"}` — the step's **id, as a string**.
+`1 * "config"` is `"config"`, and pandas is happy to do it five times.
+
+### Mechanism
+
+`_deref` (grid.py:888) maps `StepRef -> value.id`, and is applied in four
+places:
+
+| call site | what the value means | correct? |
+|---|---|---|
+| `Modifier(kind, _deref(params))` (685, 1726) | `over="raw"` — a graph edge | ✓ an id is exactly right |
+| `Operation(..., _deref(literals))` (738, 942) | a tool **argument** — a value | ✗ an id is almost never what the caller meant |
+
+The same helper serves two opposite intents. For a modifier param the step id
+*is* the payload; for a tool argument it is a stand-in for data the caller
+wanted.
+
+### Why it matters beyond this proposal
+
+The corrupted value survives serialization: the light export carries
+`{"factor": "config"}` as an ordinary string literal, so a reload cannot tell
+it from a user who genuinely meant the word "config".
+
+### Minimal fix
+
+Reject rather than coerce. A `StepRef` reaching `arguments` should be a
+declaration-time `problem`, in the house style:
+
+```
+scale() argument 'factor' is a reference to step 'config'; arguments take
+literals. Wire it with over=, or bind a value.
+```
+
+That is a one-line guard and turns a silent wrong answer into the same
+`200`-with-`problems` every other mistake produces. **It should land
+independently of anything else in this document** — it is a correctness fix,
+not a feature.
+
+Supporting it *properly* is §D: a deferred reference that resolves after
+upstream runs. The guard is what makes the gap visible until then.
+
+---
+
 ## Sequence
 
 1. `select` with `index` / `head` / `tail`, index-preserving, plus the `exact`
@@ -327,7 +395,8 @@ reference to a value unknown until upstream runs. That one is not solved by
 3. Decide whether `exact` replaces `generated` for `sweep` too.
 4. Decide the parameter↔column binding question in §E — it gates half the
    interaction model and is not a shape verb.
-5. Treat D as a separate design note. It touches `arguments`, staging and the
+5. **F's guard first** — it is a correctness fix and depends on nothing here.
+6. Treat D as a separate design note. It touches `arguments`, staging and the
    graph derivation, and should not ride along with a shape verb.
 
 ## Relationship to per-cell re-drive
