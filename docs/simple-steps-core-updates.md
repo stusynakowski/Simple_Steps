@@ -168,7 +168,13 @@ it has to become a version spec before publishing.)
 
 ---
 
-## 8. What to do while the engine migration lands
+## 8. Proposals we are sending back
+
+| | |
+|---|---|
+| [`core-proposals/001-index-selection.md`](core-proposals/001-index-selection.md) | A `select` shape verb for addressing rows by position, plus the separate (harder) case of binding one cell as a tool argument |
+
+## 9. What to do while the engine migration lands
 
 Work that is independent of which model wins, in the order it unblocks things:
 
