@@ -20,7 +20,6 @@ from .models import (
 from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe, get_value, _get_raw_only, _ref_exists_in_raw_store
 from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
-from .operation_pack import PACK_REGISTRY
 from .pack_loader import PackLoader, OpTier, set_loader, get_loader
 from .file_manager import (
     list_projects, create_project, delete_project,
@@ -29,7 +28,6 @@ from .file_manager import (
     WORKSPACE_ROOT,
 )
 from .agent.routes import router as agent_router
-from .pack_manager import get_manifest_pack_dirs, load_manifest
 from . import workspace_state
 from .session import get_session_id
 import sys
@@ -104,12 +102,6 @@ if _extra_packs:
 _extra_ops = os.environ.get("SIMPLE_STEPS_EXTRA_OPS", "")
 if _extra_ops:
     _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_ops.split(";") if p.strip())
-
-# 8. Packs declared in simple_steps.toml manifest
-_manifest_dirs = get_manifest_pack_dirs(_WORKSPACE)
-for _md in _manifest_dirs:
-    if _md not in _DEVELOPER_PACK_DIRS:
-        _DEVELOPER_PACK_DIRS.append(_md)
 
 # Discover all project directories for Tier 3
 def _discover_project_dirs() -> List[str]:
@@ -399,90 +391,6 @@ async def api_write_file(body: FileWriteRequest):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
-# --- 0b. Pack Management ---
-@app.get("/api/packs")
-async def api_list_packs():
-    """List all packs declared in the workspace manifest."""
-    from .pack_manager import list_packs
-    entries = list_packs(_WORKSPACE)
-    return [
-        {
-            "name": e.name,
-            "source": e.source.value,
-            "url": e.url,
-            "ref": e.ref,
-            "path": e.path,
-            "package": e.package,
-            "enabled": e.enabled,
-        }
-        for e in entries
-    ]
-
-
-@app.post("/api/packs")
-async def api_add_pack(body: dict = Body(...)):
-    """
-    Add a pack to the workspace manifest.
-
-    Body:
-        source: "git" | "local" | "pip"
-        url: git URL (for source=git)
-        path: local path (for source=local)
-        package: pip package name (for source=pip)
-        name: optional custom name
-        ref: optional git ref (default: main)
-    """
-    from .pack_manager import add_pack_git, add_pack_local, add_pack_pip
-
-    source = body.get("source", "")
-    name = body.get("name")
-
-    try:
-        if source == "git":
-            entry = add_pack_git(
-                _WORKSPACE, body["url"],
-                name=name, ref=body.get("ref", "main"),
-                clone=True,
-            )
-        elif source == "local":
-            entry = add_pack_local(_WORKSPACE, body["path"], name=name)
-        elif source == "pip":
-            entry = add_pack_pip(
-                _WORKSPACE, body["package"],
-                name=name, install=True,
-            )
-        else:
-            raise HTTPException(400, f"Unknown source: {source}")
-    except Exception as e:
-        raise HTTPException(400, str(e))
-
-    return {
-        "name": entry.name,
-        "source": entry.source.value,
-        "url": entry.url,
-        "path": entry.path,
-        "package": entry.package,
-    }
-
-
-@app.delete("/api/packs/{pack_name}")
-async def api_remove_pack(pack_name: str, delete_files: bool = False):
-    """Remove a pack from the manifest."""
-    from .pack_manager import remove_pack
-    removed = remove_pack(_WORKSPACE, pack_name, delete_files=delete_files)
-    if not removed:
-        raise HTTPException(404, f"Pack '{pack_name}' not found in manifest")
-    return {"removed": pack_name}
-
-
-@app.post("/api/packs/install")
-async def api_install_packs():
-    """Install/sync all packs declared in the manifest."""
-    from .pack_manager import install_all
-    issues = install_all(_WORKSPACE)
-    return {"success": len(issues) == 0, "issues": issues}
-
-
 # --- 1. Dynamic Discovery ---
 @app.get("/api/operations", response_model=List[OperationDefinition])
 async def list_operations():
@@ -522,30 +430,6 @@ async def debug_registry():
         "developer_pack_dirs": [os.path.abspath(p) for p in _DEVELOPER_PACK_DIRS],
     }
 
-
-# --- 1.2 Operation Packs Health ---
-@app.get("/api/packs")
-async def list_packs():
-    """
-    Returns status of all registered OperationPacks — useful for
-    the Resources dropdown or a developer diagnostics page.
-    """
-    result = []
-    for name, pack in PACK_REGISTRY.items():
-        health = pack.health()
-        result.append({
-            "name": pack.name,
-            "version": pack.version,
-            "description": pack.description,
-            "available": pack.is_available,
-            "operation_ids": pack.operation_ids,
-            "health": {
-                "ok": health.ok,
-                "checks": health.checks,
-                "errors": health.errors,
-            },
-        })
-    return result
 
 # --- 1.3 Pack Loader Status ---
 @app.get("/api/loader")

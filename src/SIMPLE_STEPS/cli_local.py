@@ -74,12 +74,6 @@ def _start_backend(host: str, port: int):
 
 
 def main():
-    # ── Check for subcommands ────────────────────────────────────────────
-    if len(sys.argv) > 1 and sys.argv[1] == "pack":
-        from .cli_pack import main as pack_main
-        pack_main(sys.argv[2:])
-        return
-
     parser = argparse.ArgumentParser(
         prog="simple-steps-local",
         description="Launch Simple Steps as a native desktop window (no browser)",

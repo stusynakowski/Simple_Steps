@@ -35,8 +35,6 @@ interface StepToolbarProps {
   // Tab handlers
   activeTab: 'summary' | 'details' | 'data' | 'settings';
   onTabChange: (tab: 'summary' | 'details' | 'data' | 'settings') => void;
-  onMaximize?: () => void;
-  isMaximized?: boolean;
   onLock?: (id: string) => void;
   isLocked?: boolean;
   onConfigure?: (id: string) => void;
@@ -54,8 +52,6 @@ export default function StepToolbar({
   externalFormula,
   activeTab, 
   onTabChange, 
-  onMaximize, 
-  isMaximized,
   onLock,
   isLocked,
   onFormulaBarRef,
@@ -275,34 +271,6 @@ export default function StepToolbar({
 
 
         <div style={{ flex: 1 }} />
-
-        {/* Maximize/Restore Button - Now on the Right */}
-        {onMaximize && (
-            <button
-                className="btn-icon"
-                onClick={(e) => { e.stopPropagation(); onMaximize(); }}
-                title={isMaximized ? "Restore Size" : "Maximize"}
-                style={{
-                  color: '#666',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  marginRight: 4
-                }}
-            >
-                {isMaximized ? (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path>
-                    </svg>
-                ) : (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="15 3 21 3 21 9"></polyline>
-                        <polyline points="9 21 3 21 3 15"></polyline>
-                        <line x1="21" y1="3" x2="14" y2="10"></line>
-                        <line x1="3" y1="21" x2="10" y2="14"></line>
-                    </svg>
-                )}
-            </button>
-        )}
-
         {/* Lock Button */}
         <button 
           className="btn-icon" 

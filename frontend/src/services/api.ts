@@ -483,61 +483,6 @@ export async function writeWorkspaceFile(path: string, content: string): Promise
     return r.json();
 }
 
-// --- Pack Management ---
-
-export interface PackInfo {
-    name: string;
-    source: 'git' | 'local' | 'pip';
-    url: string;
-    ref: string;
-    path: string;
-    package: string;
-    enabled: boolean;
-}
-
-/** List all packs declared in the workspace manifest. */
-export async function fetchPacks(): Promise<PackInfo[]> {
-    const r = await fetch(`${API_BASE}/packs`);
-    if (!r.ok) throw new Error('Failed to fetch packs');
-    return r.json();
-}
-
-/** Add a pack to the workspace manifest. */
-export async function addPack(body: {
-    source: 'git' | 'local' | 'pip';
-    url?: string;
-    path?: string;
-    package?: string;
-    name?: string;
-    ref?: string;
-}): Promise<PackInfo> {
-    const r = await fetch(`${API_BASE}/packs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    if (!r.ok) {
-        const err = await r.json().catch(() => ({ detail: 'Unknown error' }));
-        throw new Error(err.detail || 'Failed to add pack');
-    }
-    return r.json();
-}
-
-/** Remove a pack from the workspace manifest. */
-export async function removePack(name: string, deleteFiles = false): Promise<void> {
-    const r = await fetch(`${API_BASE}/packs/${name}?delete_files=${deleteFiles}`, {
-        method: 'DELETE',
-    });
-    if (!r.ok) throw new Error('Failed to remove pack');
-}
-
-/** Install/sync all packs declared in the manifest. */
-export async function installPacks(): Promise<{ success: boolean; issues: string[] }> {
-    const r = await fetch(`${API_BASE}/packs/install`, { method: 'POST' });
-    if (!r.ok) throw new Error('Failed to install packs');
-    return r.json();
-}
-
 // --- Settings ---
 
 export interface SimpleStepsSettings {

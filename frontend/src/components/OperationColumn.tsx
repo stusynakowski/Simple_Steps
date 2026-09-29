@@ -21,7 +21,7 @@ interface OperationColumnProps {
   color?: string;
   isActive: boolean;
   isSqueezed?: boolean;
-  isMaximized?: boolean; // New prop
+  isMaximized?: boolean;
   zIndex?: number;
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
@@ -30,7 +30,7 @@ interface OperationColumnProps {
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
   onMinimize?: () => void;
-  onMaximize?: () => void; // New callback
+  onMaximize?: () => void;
   /** Called with the pointer position when the user drags the header far enough to detach */
   onDetach?: (position: { x: number; y: number }) => void;
   /** Live progress for row-iterating operations */
@@ -411,6 +411,19 @@ export default function OperationColumn({
                     </div>
                 </>
             )}
+            {isMaximized && onMaximize && (
+              <button
+                type="button"
+                className="step-header-maximize-btn"
+                onClick={(e) => { e.stopPropagation(); onMaximize(); }}
+                title="Restore Size"
+                aria-label={`Restore ${step.label}`}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+                </svg>
+              </button>
+            )}
         </div>
       </div>
 
@@ -439,8 +452,6 @@ export default function OperationColumn({
               onTabChange={setActiveTab}
               onFormulaChange={handleFormulaUpdate}
               externalFormula={derivedFormula}
-              onMaximize={onMaximize}
-              isMaximized={isMaximized}
               isLocked={isLocked}
               onLock={() => setIsLocked(!isLocked)}
               onFormulaBarRef={(el) => { formulaBarRef.current = el; }}

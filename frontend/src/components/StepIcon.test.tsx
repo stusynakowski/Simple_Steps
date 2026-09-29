@@ -27,4 +27,15 @@ describe('StepIcon', () => {
     fireEvent.click(screen.getByTestId('step-icon-test-step-1'));
     expect(onClick).toHaveBeenCalledWith('test-step-1');
   });
+
+  it('shows restore control only when maximized', () => {
+    const onMaximize = vi.fn();
+    const { rerender } = render(<StepIcon step={sampleStep} onMaximize={onMaximize} />);
+    expect(screen.queryByRole('button', { name: 'Restore Test Step' })).not.toBeInTheDocument();
+
+    rerender(<StepIcon step={sampleStep} isMaximized onMaximize={onMaximize} />);
+    const restore = screen.getByRole('button', { name: 'Restore Test Step' });
+    fireEvent.click(restore);
+    expect(onMaximize).toHaveBeenCalledWith('test-step-1');
+  });
 });

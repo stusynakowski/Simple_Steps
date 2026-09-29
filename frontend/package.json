@@ -19,7 +19,7 @@
     "cmdk": "^1.1.1",
     "lodash": "^4.17.21",
     "lucide-react": "^0.562.0",
-    "monaco-editor": "^0.55.1",
+    "monaco-editor": "^0.57.0",
     "react": "18.3.1",
     "react-arborist": "^3.7.0",
     "react-dom": "18.3.1",

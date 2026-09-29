@@ -5,7 +5,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
 
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
+    DEFAULT_PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
+else
+    DEFAULT_PYTHON_BIN="python3"
+fi
+PYTHON_BIN="${PYTHON_BIN:-$DEFAULT_PYTHON_BIN}"
 HOST="127.0.0.1"
 PORT="8000"
 MAX_PORT_SCAN="50"
@@ -27,7 +32,7 @@ Options:
     --host <host>            Bind host (default: 127.0.0.1)
     --port <port>            Preferred port (default: 8000)
     --max-port-scan <n>      How many upward ports to try (default: 50)
-    --python <bin>           Python executable (default: python3)
+    --python <bin>           Python executable (default: repo .venv when present, else python3)
     --workspace <dir>        Workspace root (sets SIMPLE_STEPS_WORKSPACE)
     --projects-dir <dir>     Projects directory (sets SIMPLE_STEPS_PROJECTS_DIR)
     --packs <dir>            Extra pack dir; repeatable

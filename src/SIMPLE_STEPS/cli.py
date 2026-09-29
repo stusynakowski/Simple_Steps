@@ -55,13 +55,6 @@ def _find_free_port(host: str, preferred: int, max_attempts: int = 50) -> int:
 
 
 def main():
-    # ── Check for subcommands first ──────────────────────────────────────
-    # If the first positional arg is "pack", delegate to the pack CLI.
-    if len(sys.argv) > 1 and sys.argv[1] == "pack":
-        from .cli_pack import main as pack_main
-        pack_main(sys.argv[2:])
-        return
-
     parser = argparse.ArgumentParser(
         prog="simple-steps",
         description="Start the Simple Steps pipeline orchestrator",

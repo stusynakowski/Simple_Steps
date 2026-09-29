@@ -5,11 +5,13 @@ import './WorkflowSequence.css';
 interface WorkflowSequenceProps {
   steps: Step[];
   selectedStepId?: string | null;
+  maximizedStepId?: string | null;
   onSelect?: (id: string) => void;
+  onMaximize?: (id: string) => void;
   onAdd?: (index: number) => void;
 }
 
-export default function WorkflowSequence({ steps, selectedStepId, onSelect, onAdd }: WorkflowSequenceProps) {
+export default function WorkflowSequence({ steps, selectedStepId, maximizedStepId, onSelect, onMaximize, onAdd }: WorkflowSequenceProps) {
   return (
     <div className="workflow-sequence" data-testid="workflow-sequence">
       {steps.map((step, index) => (
@@ -26,7 +28,13 @@ export default function WorkflowSequence({ steps, selectedStepId, onSelect, onAd
           )}
 
           <div className="step-wrapper">
-            <StepIcon step={step} selected={selectedStepId === step.id} onClick={onSelect} />
+            <StepIcon
+              step={step}
+              selected={selectedStepId === step.id}
+              isMaximized={maximizedStepId === step.id}
+              onClick={onSelect}
+              onMaximize={onMaximize}
+            />
           </div>
         </div>
       ))}

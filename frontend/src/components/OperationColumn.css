@@ -156,6 +156,30 @@
   text-transform: uppercase;
 }
 
+.step-header-maximize-btn {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.step-header-maximize-btn:hover {
+  background: rgba(255,255,255,0.25);
+}
+
 .btn-minimize {
     background: transparent;
     border: none;

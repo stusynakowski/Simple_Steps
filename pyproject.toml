@@ -27,6 +27,7 @@ classifiers = [
     "Framework :: FastAPI",
 ]
 dependencies = [
+    "simple-steps-core @ git+https://github.com/stusynakowski/simple-steps-core.git",
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
@@ -55,6 +56,7 @@ desktop = [
 ]
 dev = [
     "pytest>=8.0",
+    "httpx2>=0.28",
     "ruff>=0.6",
     "build",
     "twine",
@@ -70,7 +72,6 @@ simple-steps = "SIMPLE_STEPS.cli:main"
 simple-steps-local = "SIMPLE_STEPS.cli_local:main"
 simple-steps-dev = "SIMPLE_STEPS.cli_dev:main"
 simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
-simple-steps-pack = "SIMPLE_STEPS.cli_pack:main"
 simple-steps-bootstrap = "SIMPLE_STEPS.bootstrap_install:main"
 
 [tool.setuptools]
