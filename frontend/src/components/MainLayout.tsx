@@ -104,26 +104,13 @@ export default function MainLayout() {
     ? runningStepIndex
     : workflow.steps.findIndex((s) => s.status !== 'completed');
 
-  // ── Pipeline meta stats — computed from live workflow steps ──────────
-  const pipelineMeta: PipelineMeta = (() => {
-    const steps = workflow.steps;
-    // Find last completed step with output for data dimensions
-    const lastDone = [...steps].reverse().find(s => s.status === 'completed' && s.outputRefId);
-    const rows = lastDone?.outputRows ?? 0;
-    const cols = lastDone?.outputColumns?.length ?? 0;
-    return {
-      rows,
-      cols,
-      cells: rows * cols,
-      counts: {
-        staged:  steps.filter(s => s.status === 'completed' && !!s.outputRefId).length,
-        queued:  steps.filter(s => s.status === 'pending').length,
-        running: steps.filter(s => s.status === 'running').length,
-        ran:     steps.filter(s => s.status === 'completed').length,
-        errors:  steps.filter(s => s.status === 'error').length,
-      },
-    };
-  })();
+  // ── Pipeline status counts — computed from live workflow steps ───────
+  const pipelineMeta: PipelineMeta = {
+    counts: {
+      running: workflow.steps.filter(s => s.status === 'running').length,
+      errors:  workflow.steps.filter(s => s.status === 'error').length,
+    },
+  };
 
   // Suppress isModified when we're switching tabs / loading (not user edits)
   const suppressModified = useRef(false);
