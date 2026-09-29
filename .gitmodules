@@ -1,0 +1,3 @@
+[submodule "external/simple-steps-core"]
+	path = external/simple-steps-core
+	url = https://github.com/stusynakowski/simple-steps-core.git
