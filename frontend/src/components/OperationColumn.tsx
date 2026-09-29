@@ -524,6 +524,7 @@ export default function OperationColumn({
                         wiringMode={isWiringSource}
                         sourceStepId={step.id}
                         onWireColumn={(token) => injectReference(token)}
+                        onWireRow={(token) => injectReference(token)}
                         onWireCell={(token) => injectReference(token)}
                         stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
                         stagedCellMode={stagedCellMode}

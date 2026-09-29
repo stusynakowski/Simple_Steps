@@ -192,10 +192,18 @@ def resolve_reference(value: Any, step_map: Dict[str, str], session_id: Optional
     Resolves a step-data reference token injected by the frontend wiring UI.
 
     Supported formats (all produced by PreviousStepDataPicker / DataOutputGrid):
-      stepId.fieldName           → dict key / attr (raw) OR pd.Series (DataFrame)
-      stepId[row=R, col=C]       → scalar cell value (DataFrame only)
-      stepId                     → raw value OR pd.DataFrame
+      stepId                     → raw value OR pd.DataFrame          (whole grid)
+      stepId.fieldName           → dict key / attr (raw) OR pd.Series (column)
+      stepId["fieldName"]        → same, bracket form — what the UI emits
+      stepId[row=R]              → one row as a pd.Series              (row)
+      stepId["col"][R]           → scalar cell value                   (cell)
+      stepId[row=R, col=C]       → scalar cell value, legacy spelling
       =Step Name!columnName      → pd.Series (Excel-style reference)
+
+    Bracket and dot spellings are equivalent; `docs/dev_plan/100-architecture.md`
+    settles that the UI always *emits* bracket form, because column names with
+    spaces or unicode need no quoting decisions, while the parser accepts both
+    because users type dot form by hand.
 
     Both ``RAW_STORE`` (single-cell ``step``-mode outputs) and ``DATA_STORE``
     (tabular DataFrames) are consulted.  ``RAW_STORE`` is checked first so a
@@ -249,6 +257,57 @@ def resolve_reference(value: Any, step_map: Dict[str, str], session_id: Optional
                 print(f"  ↳ Resolved '{value}' → column '{field_name}' from step '{step_key}'")
                 return df[field_name]
         print(f"  ⚠ Could not resolve reference '{value}' (step_map keys: {list(step_map.keys())})")
+        return value
+
+    # ── bracket column: stepId["col"] ───────────────────────────────────
+    # The canonical form the wiring UI emits.  Handled before the cell form
+    # below so a trailing [R] is not mistaken for part of the column name.
+    bracket_col = re.match(r'^([\w-]+)\[["\'](.+?)["\']\]$', value)
+    if bracket_col:
+        step_key, col_name = bracket_col.group(1), bracket_col.group(2)
+        ref_id = step_map.get(step_key)
+        if ref_id:
+            raw = _get_raw_only(ref_id, session_id=session_id)
+            if raw is not None or _ref_exists_in_raw_store(ref_id, session_id=session_id):
+                resolved = _resolve_raw_field(raw, col_name)
+                if resolved is not _FIELD_MISSING:
+                    print(f"  ↳ Resolved '{value}' → field '{col_name}' from raw step '{step_key}'")
+                    return resolved
+            df = get_dataframe(ref_id, session_id=session_id)
+            if df is not None and col_name in df.columns:
+                print(f"  ↳ Resolved '{value}' → column '{col_name}' from step '{step_key}'")
+                return df[col_name]
+        print(f"  ⚠ Could not resolve column reference '{value}'")
+        return value
+
+    # ── bracket cell: stepId["col"][R] ──────────────────────────────────
+    bracket_cell = re.match(r'^([\w-]+)\[["\'](.+?)["\']\]\[(\d+)\]$', value)
+    if bracket_cell:
+        step_key, col_name = bracket_cell.group(1), bracket_cell.group(2)
+        row_idx = int(bracket_cell.group(3))
+        ref_id = step_map.get(step_key)
+        if ref_id:
+            df = get_dataframe(ref_id, session_id=session_id)
+            if df is not None and col_name in df.columns and row_idx < len(df):
+                cell_val = df.iloc[row_idx][col_name]
+                print(f"  ↳ Resolved '{value}' → cell [{row_idx},{col_name}] = {cell_val!r}")
+                return cell_val
+        print(f"  ⚠ Could not resolve cell reference '{value}'")
+        return value
+
+    # ── row: stepId[row=R] ──────────────────────────────────────────────
+    # One horizontal slice, as a Series keyed by column name.  Distinct from
+    # a cell (which also names a column) and from the whole grid.
+    row_only = re.match(r'^([\w-]+)\[row=(\d+)\]$', value)
+    if row_only:
+        step_key, row_idx = row_only.group(1), int(row_only.group(2))
+        ref_id = step_map.get(step_key)
+        if ref_id:
+            df = get_dataframe(ref_id, session_id=session_id)
+            if df is not None and row_idx < len(df):
+                print(f"  ↳ Resolved '{value}' → row {row_idx} ({len(df.columns)} columns)")
+                return df.iloc[row_idx]
+        print(f"  ⚠ Could not resolve row reference '{value}'")
         return value
 
     # ── bracket syntax: stepId[row=R, col=C] ────────────────────────────

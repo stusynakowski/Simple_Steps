@@ -9,6 +9,7 @@ interface DataOutputGridProps {
   wiringMode?: boolean;
   sourceStepId?: string;
   onWireColumn?: (token: string) => void;
+  onWireRow?: (token: string) => void;
   onWireCell?: (token: string) => void;
   /** Staged columns to render as light-yellow pending cells alongside real data */
   stagedColumns?: StagedColumn[];
@@ -36,11 +37,13 @@ export default function DataOutputGrid({
   wiringMode = false,
   sourceStepId = '',
   onWireColumn,
+  onWireRow,
   onWireCell,
   stagedColumns = [],
   stagedCellMode = 'idle',
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [hoveredCell, setHoveredCell] = useState<string | null>(null);
 
   // Memoize grid structure calculation
@@ -103,13 +106,19 @@ export default function DataOutputGrid({
   // ── Wiring helpers ──────────────────────────────────────────────────────
 
   // Canonical reference tokens (docs/dev_plan/102, 103):
-  //   whole step:    step_id
-  //   column:        step_id["col"]
-  //   cell:          step_id["col"][row_index]
+  //   whole grid:    step_id                  ← the corner box
+  //   column:        step_id["col"]           ← a column header
+  //   row:           step_id[row=N]           ← a row number
+  //   cell:          step_id["col"][row_index]← a cell
   // The previous `.col` / `[row=N, col=C]` forms were not valid Python and
   // could not be evaluated by safe_formula.
   const columnRefToken = (col: string) => `${sourceStepId}["${col}"]`;
   const cellRefToken = (cell: Cell) => `${sourceStepId}["${cell.column_id}"][${cell.row_id}]`;
+  const rowRefToken = (rowIndex: number) => `${sourceStepId}[row=${rowIndex}]`;
+
+  const handleRowClick = (rowIndex: number) => {
+    if (wiringMode && onWireRow) onWireRow(rowRefToken(rowIndex));
+  };
 
   const handleColumnClick = (col: string) => {
     if (wiringMode && onWireColumn) {
@@ -249,7 +258,19 @@ export default function DataOutputGrid({
           >
             column header
           </span>{' '}
-          for a column, or a{' '}
+          for a column, a{' '}
+          <span
+            style={{
+              background: '#c8e6c9',
+              color: '#2e7d32',
+              borderRadius: 3,
+              padding: '0 4px',
+              fontWeight: 700,
+            }}
+          >
+            row number
+          </span>{' '}
+          for a row, or a{' '}
           <span
             style={{
               background: '#ffe082',
@@ -261,7 +282,7 @@ export default function DataOutputGrid({
           >
             cell
           </span>{' '}
-          for a specific value
+          for a single value
         </div>
       )}
 
@@ -334,8 +355,21 @@ export default function DataOutputGrid({
         {/* Data Rows */}
         {rows.map((r) => (
           <div key={r} className="grid-row" role="row">
-            {/* Row Number */}
-            <div className="grid-cell row-index">{r + 1}</div>
+            {/* Row Number — in wiring mode this selects the whole row */}
+            <div
+              className="grid-cell row-index"
+              title={wiringMode ? `⚡ Insert row reference: ${rowRefToken(r)}` : String(r + 1)}
+              style={wiringMode ? {
+                cursor: 'crosshair',
+                background: hoveredRow === r ? '#c8e6c9' : undefined,
+                transition: 'background 0.1s ease',
+              } : {}}
+              onClick={() => handleRowClick(r)}
+              onMouseEnter={() => wiringMode && setHoveredRow(r)}
+              onMouseLeave={() => wiringMode && setHoveredRow(null)}
+            >
+              {wiringMode ? `⚡${r + 1}` : r + 1}
+            </div>
 
             {/* Cells */}
             {cols.map((c) => {
