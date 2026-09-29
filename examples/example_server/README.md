@@ -1,10 +1,19 @@
-# simple_test_repo
+# example_server
 
-A self-contained tool registry for Simple Steps. Use it to install the app,
+A self-contained example server for Simple Steps. Use it to install the app,
 confirm it runs on your machine, and find out what breaks.
 
-Everything a user can do in the UI comes from [`tools.py`](tools.py). That one
-file is the whole "backend" a developer has to write.
+Two files, because the project is mid-migration between two models:
+
+| file | model | run it with |
+|---|---|---|
+| [`tools.py`](tools.py) | what the app ships **today** — `@simple_step` | `python tools.py` — starts the server + UI |
+| [`core_grid_demo.py`](core_grid_demo.py) | the **target** — `simple-steps-core`'s grid model | `python core_grid_demo.py` — prints, no server |
+
+`tools.py` is the one that answers "does the install work." Everything a user
+can do in the UI comes from it, and that one file is the whole backend a
+developer has to write. `core_grid_demo.py` runs the same ideas against the
+model core is moving to, so you can see the gap without reading the source.
 
 ## Install and run
 
