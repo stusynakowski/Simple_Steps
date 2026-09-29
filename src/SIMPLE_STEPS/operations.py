@@ -738,4 +738,3 @@ REGISTRY = RegistryProxy()
 # ``NotImplementedError`` — they exist for UI / spec review only.
 # Spec: dev_notes/stage3_formula_grammar_and_shape_vocabulary.md §11
 # ---------------------------------------------------------------------------
-from . import core_pack_v2_preview  # noqa: F401, E402
