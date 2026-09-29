@@ -19,7 +19,7 @@ selection itself is the operation — applied to `identity`.
 | **B. `project` — columns by name** | Add it. **No verb narrows columns today** — verified against every verb in the table |
 | **C. Subscript a `StepRef` (`wf["raw"][3]`)** | Don't. It breaks the re-drive argument §11 used to settle "at most one shape verb per step" |
 | **D. Bind one cell as a tool argument** | Genuinely missing, genuinely different. Needs its own design |
-| **E. What a selection *means*** | Decided by whether the step being edited already has a tool. See §E |
+| **E. What a selection *means*** | Decided by whether the step being edited already has a tool. Both branches are expressible today — see §E |
 
 ---
 
@@ -269,22 +269,52 @@ Clicking the corner selects the whole grid, which is what `over` already
 means. It needs no verb and should produce a plain reference, not an
 `identity` step that copies a grid to no purpose.
 
-### What is still ambiguous
+### The name-mismatch case already works
 
-The second row of the table has a gap, and it is the same one as §D:
+An earlier draft of this proposal claimed core had no way to feed a `temp_c`
+column into a `celsius` parameter, and that a new parameter-to-column binding
+was needed. **That was wrong.** `identity` already closes this, exactly as
+§6.3 says it should:
 
-- A **column** click with a parameter focused should bind that parameter to
-  that column. **Core has no mechanism for this.** Parameters bind to columns
-  *by name only* (`writing-tools.md` §1: "The column name is the contract"),
-  so a `temp_c` column cannot feed a `celsius` parameter. `react-api.md` §4
-  tells the UI to *show* which column feeds a parameter, never to change it.
-- A **row** or **cell** click with a parameter focused is §D — a deferred
-  reference to a value that is not known until upstream runs.
+```python
+wf["aliased"] = op("identity", column="temp_c")[mod.map(name="celsius")](wf["readings"])
+wf["f"]       = to_fahrenheit(wf["aliased"])        # binds, runs, -5 -> 23.0
+```
 
-So the "no tool yet" branch is fully served by `select` + `project`. The "tool
-already chosen" branch needs either a parameter↔column binding in `Operation`,
-or a decision that it is not supported and the UI only ever reports the
-name-matched binding.
+`op("identity", column=…)` picks which upstream column is the payload;
+`map(name=…)` lands it under the name the parameter wants. Verified against
+`52092ba`. No new mechanism, no change to `Operation`.
+
+So the rule holds for **both** branches, and a UI can always emit something
+runnable:
+
+| the click | with no tool | with a tool whose parameter wants another name |
+|---|---|---|
+| column | `identity[mod.project(...)]` | `op("identity", column=X)[mod.map(name=P)]` |
+| row | `identity[mod.select(index=[…])]` | §D |
+| cell | §D | §D |
+
+### The real limitation is ergonomic, not structural
+
+`map(name=…)` lands **one** column per step. A tool with three
+differently-named parameters therefore needs three `identity` steps before it,
+and each leaves the original column in place — `aliased` above carries `city`,
+`temp_c` *and* `celsius`.
+
+That is the strongest argument for `project` supporting renames:
+
+```python
+wf["ready"] = identity[mod.project(columns={"temp_c": "celsius", "t": "time"})](wf["raw"])
+```
+
+One step, several renames, originals dropped. It buys no new capability — only
+a much shorter chain for the common case of wiring a multi-parameter tool.
+
+### Still genuinely open
+
+Only §D: a **row** or **cell** used as a bound argument is a deferred
+reference to a value unknown until upstream runs. That one is not solved by
+`identity`, because the value is not a column.
 
 ---
 
