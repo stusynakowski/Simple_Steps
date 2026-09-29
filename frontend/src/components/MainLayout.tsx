@@ -479,7 +479,6 @@ export default function MainLayout() {
         isLogOpen={isLogOpen}
         onToggleLogs={() => setIsLogOpen(prev => !prev)}
         onClearOutputs={clearLogs}
-        availableOperations={availableOperations}
         pipelineMeta={pipelineMeta}
       />
 
@@ -582,6 +581,7 @@ export default function MainLayout() {
                 isVisible={true}
                 currentView={activeActivityView}
                 refreshTrigger={sidebarRefreshTrigger}
+                availableOperations={availableOperations}
                 onListProjects={listSavedProjects}
                 onCreateProject={createNewProject}
                 onDeleteProject={removeProject}

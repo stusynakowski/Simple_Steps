@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from './Icon';
 import './ActivityBar.css';
 
-export type ActivityView = 'explorer' | 'search' | 'docs' | 'packs' | 'settings' | 'account' | null;
+export type ActivityView = 'explorer' | 'session' | 'search' | 'docs' | 'packs' | 'settings' | 'account' | null;
 
 interface ActivityBarProps {
   activeView: ActivityView;
@@ -13,6 +13,7 @@ interface ActivityBarProps {
 // (e.g. run-history in Phase E) is a one-line change here.
 const ACTIVITY_ICONS: Record<Exclude<ActivityView, null>, string> = {
   explorer: 'files',
+  session: 'server-environment',
   search: 'search',
   docs: 'book',
   packs: 'package',
@@ -46,6 +47,7 @@ const ActivityBar: React.FC<ActivityBarProps> = ({ activeView, onViewChange }) =
     <div className="activity-bar">
       <div className="activity-bar-top">
         <ActivityItem view="explorer" active={activeView === 'explorer'} label="Explorer" onClick={onViewChange} />
+        <ActivityItem view="session"  active={activeView === 'session'}  label="Session Manager — resources & tool registry" onClick={onViewChange} />
         <ActivityItem view="search"   active={activeView === 'search'}   label="Search"   onClick={onViewChange} />
         <ActivityItem view="docs"     active={activeView === 'docs'}     label="User Docs" onClick={onViewChange} />
         <ActivityItem view="packs"    active={activeView === 'packs'}    label="Operation Packs" onClick={onViewChange} />

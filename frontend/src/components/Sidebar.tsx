@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import type { ActivityView } from './ActivityBar';
-import type { ProjectInfo, PipelineFile, DeveloperPack, SimpleStepsSettings } from '../services/api';
+import type { ProjectInfo, PipelineFile, DeveloperPack, SimpleStepsSettings, OperationDefinition } from '../services/api';
 import { fetchDeveloperPacks, readWorkspaceFile, fetchSettings, updateSettings } from '../services/api';
 import FileTree from './FileTree';
+import SessionManager from './SessionManager';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -11,6 +12,8 @@ interface SidebarProps {
   currentView: ActivityView;
   /** Increment to force the explorer to re-fetch projects/pipelines after a save */
   refreshTrigger?: number;
+  /** Registered operations — shown in the Session Manager's tool registry. */
+  availableOperations?: OperationDefinition[];
   // Project / pipeline persistence
   onListProjects?: () => Promise<ProjectInfo[]>;
   onCreateProject?: (name: string) => Promise<ProjectInfo>;
@@ -542,6 +545,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
             No results found.
           </div>
         </div>
+      )}
+
+      {currentView === 'session' && (
+        <SessionManager availableOperations={rest.availableOperations} />
       )}
 
       {currentView === 'docs' && <DocsPanel />}

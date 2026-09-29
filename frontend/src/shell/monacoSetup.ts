@@ -17,12 +17,12 @@
  * that mounts an editor.
  */
 
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import * as monaco from 'monaco-editor/editor/editor.api';
 import { loader } from '@monaco-editor/react';
 
 // Web workers via Vite. The `?worker` suffix makes Vite emit a dedicated
 // chunk and return a constructor.
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker';
 
 // Tell Monaco how to spin up workers it asks for.  We only need the base
 // `editorWorkerService` for now — no TS/JSON/CSS language workers, because

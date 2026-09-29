@@ -1,0 +1,218 @@
+/* SessionManager — left-panel view: Resource Manager + Tool Registry.
+   Colours follow the existing sidebar palette (VS Code dark). */
+
+.session-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: 12px;
+  color: #ccc;
+}
+
+/* ── Section headers ─────────────────────────────────────────────── */
+.sm-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px 8px;
+  background: #2d2d30;
+  border: none;
+  border-top: 1px solid #1e1e1e;
+  color: #ccc;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sm-section-header:hover { background: #37373d; }
+.sm-section-header:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; }
+
+.sm-section-label { flex: 1; }
+
+.sm-section-count {
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: #0e639c;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sm-section-body { padding: 8px; }
+
+/* The registry can grow tall; let it scroll rather than the whole panel. */
+.sm-registry-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ── Resource manager fields ─────────────────────────────────────── */
+.sm-field { margin-bottom: 10px; }
+
+.sm-field-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #9d9d9d;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sm-select {
+  width: 100%;
+  padding: 4px 6px;
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  color: #ccc;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.sm-select:hover { border-color: #525252; }
+.sm-select:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; }
+
+.sm-subsection {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #3c3c3c;
+}
+
+.sm-subsection-label {
+  margin-bottom: 5px;
+  color: #9d9d9d;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sm-empty {
+  padding: 6px 2px;
+  color: #6a6a6a;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* ── Registry filter ─────────────────────────────────────────────── */
+.sm-filter {
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.sm-filter-input {
+  width: 100%;
+  padding: 4px 22px 4px 6px;
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  border-radius: 2px;
+  color: #ccc;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.sm-filter-input::placeholder { color: #6a6a6a; }
+.sm-filter-input:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; }
+
+.sm-filter-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  padding: 0 4px;
+  background: none;
+  border: none;
+  color: #9d9d9d;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sm-filter-clear:hover { color: #fff; }
+
+/* ── Registry list ───────────────────────────────────────────────── */
+.sm-registry-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sm-category { margin-bottom: 1px; }
+
+.sm-category-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 4px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 11.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sm-category-row:hover { background: #2a2d2e; }
+.sm-category-row:focus-visible { outline: 1px solid #0078d4; outline-offset: -1px; }
+
+.sm-category-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sm-category-count {
+  color: #6a6a6a;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sm-ops { padding-left: 14px; }
+
+.sm-op-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px;
+  border-radius: 2px;
+  cursor: default;
+}
+
+.sm-op-row:hover { background: #2a2d2e; }
+
+.sm-op-icon {
+  flex: none;
+  color: #dcdcaa;
+  font-style: italic;
+  font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+.sm-op-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+}
+
+.sm-op-badge {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 2px;
+  color: #1e1e1e;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
