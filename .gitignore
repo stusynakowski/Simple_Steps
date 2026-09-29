@@ -54,3 +54,8 @@ frontend/build/
 
 # Simple Steps — cloned pack cache
 .packs/
+
+# Build artifacts and caches (added during cleanup)
+.pytest_cache/
+__pycache__/
+*.py[cod]

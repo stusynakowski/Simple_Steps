@@ -51,8 +51,7 @@ MOCK_BV = (
 )
 sys.path.insert(0, str(MOCK_BV))
 
-from run_pipeline import PipelineRunner          # noqa: E402 — registers ops
-import mock_basic_variables_ops                  # noqa: F401, E402
+from run_pipeline import PipelineRunner          # noqa: E402 — registers built-in ops
 
 WORKFLOWS = MOCK_BV / "workflows"
 

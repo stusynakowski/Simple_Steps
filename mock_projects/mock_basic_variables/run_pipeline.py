@@ -1,311 +1,158 @@
-""""""
+"""
+run_pipeline.py — Pipeline runner for mock_basic_variables workflows.
 
-run_pipeline.py — Pipeline runner for mock_basic_variables workflows.run_pipeline.py — Pipeline runner for mock_basic_variables workflows.
-
-
-
-mock_basic_variables exercises bare-literal formula syntax (`=42`,Usage
-
-`={"k":"v"}`, etc.) which only requires the core ``literal`` op — no-----
-
-custom ops to register.    python run_pipeline.py
-
+Usage
+-----
+    python run_pipeline.py
     python run_pipeline.py --workflow workflows/var-string.simple-steps-workflow
 
-This file mirrors the runner pattern in
-
-``mock_table_manipulations/run_pipeline.py`` so tests can import theHow it works
-
-same ``PipelineRunner`` symbol.------------
-
+How it works
+------------
 1.  Imports mock_basic_variables_ops.py so @simple_step ops are registered.
-
-Usage::2.  Loads the workflow JSON into a PipelineFile model.
-
+2.  Loads the workflow JSON into a PipelineFile model.
 3.  Runs each step through engine.run_operation() — the same path the UI uses.
-
-    python run_pipeline.py --workflow workflows/var-int.simple-steps-workflow"""
-
 """
 
 import argparse
-
-from __future__ import annotationsimport io
-
+import io
 import json
-
-import argparseimport os
-
-import jsonimport sys
-
-import sysimport time
-
-import timefrom contextlib import redirect_stderr, contextmanager
-
-from pathlib import Pathfrom pathlib import Path
-
-from typing import Dict, Optionalfrom typing import Optional, Dict
+import os
+import sys
+import time
+from contextlib import redirect_stderr, contextmanager
+from pathlib import Path
+from typing import Optional, Dict
 
 
-
-HERE = Path(__file__).resolve().parent
-
-REPO_ROOT = HERE.parent.parent@contextmanager
-
-if str(REPO_ROOT / "src") not in sys.path:def _maybe_suppress_stderr(suppress: bool):
-
-    sys.path.insert(0, str(REPO_ROOT / "src"))    if suppress:
-
+@contextmanager
+def _maybe_suppress_stderr(suppress: bool):
+    if suppress:
         with redirect_stderr(io.StringIO()):
+            yield
+    else:
+        yield
 
-from SIMPLE_STEPS.engine import run_operation, get_dataframe  # noqa: E402            yield
-
-from SIMPLE_STEPS.models import PipelineFile                  # noqa: E402    else:
-
-import SIMPLE_STEPS.operations  # noqa: F401 — registers `literal` + core ops        yield
-
-
-
-
-
-class StepResult:# ---------------------------------------------------------------------------
-
-    def __init__(self, step_id, label, ref_id, metrics, elapsed):# Path bootstrap
-
-        self.step_id = step_id# ---------------------------------------------------------------------------
-
-        self.label = labelHERE = Path(__file__).resolve().parent
-
-        self.ref_id = ref_idREPO_ROOT = HERE.parent.parent  # mock_projects/../.. = Simple_Steps/
-
-        self.rows: int = metrics.get("rows", 0)
-
-        self.columns: list = metrics.get("columns", [])if not any("SIMPLE_STEPS" in p for p in sys.path):
-
-        self.elapsed = elapsed    sys.path.insert(0, str(REPO_ROOT / "src"))
-
-
-
-    @property# ---------------------------------------------------------------------------
-
-    def df(self):# Import engine components
-
-        return get_dataframe(self.ref_id)# ---------------------------------------------------------------------------
-
-from SIMPLE_STEPS.engine import run_operation, get_dataframe  # noqa: E402
-
-    def __repr__(self) -> str:from SIMPLE_STEPS.models import PipelineFile                  # noqa: E402
-
-        return (import SIMPLE_STEPS.operations  # noqa: F401,E402 — registers built-in ops (define_value, etc.)
-
-            f"<StepResult label={self.label!r} "
-
-            f"rows={self.rows} cols={len(self.columns)} "# ---------------------------------------------------------------------------
-
-            f"elapsed={self.elapsed:.2f}s>"# Register mock operations — importing this module triggers @simple_step
-
-        )# ---------------------------------------------------------------------------
-
-sys.path.insert(0, str(HERE))
-
-import mock_basic_variables_ops  # noqa: F401 — side-effect: registers ops
-
-class PipelineRunner:
-
-    """Minimal runner shared by tests/test_basic_variables.py."""
 
 # ---------------------------------------------------------------------------
+# Path bootstrap
+# ---------------------------------------------------------------------------
+HERE = Path(__file__).resolve().parent
+REPO_ROOT = HERE.parent.parent  # mock_projects/../.. = Simple_Steps/
 
-    def __init__(# PipelineRunner
+if not any("SIMPLE_STEPS" in p for p in sys.path):
+    sys.path.insert(0, str(REPO_ROOT / "src"))
 
-        self,# ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Import engine components
+# ---------------------------------------------------------------------------
+from SIMPLE_STEPS.engine import run_operation, get_dataframe  # noqa: E402
+from SIMPLE_STEPS.models import PipelineFile                  # noqa: E402
+import SIMPLE_STEPS.operations  # noqa: F401,E402 — registers built-in ops (define_value, etc.)
 
-        workflow_path: str,
-
-        stop_after: Optional[int] = None,class StepResult:
-
-        on_error: str = "warn",    """Holds the outcome of a single executed step."""
-
-        continue_on_error: bool = False,
-
-    ):    def __init__(
-
-        self.workflow_path = Path(workflow_path).resolve()        self,
-
-        self.stop_after = stop_after        step_id: str,
-
-        self.on_error = on_error        label: str,
-
-        self.continue_on_error = continue_on_error        ref_id: str,
-
-        self.pipeline: Optional[PipelineFile] = None        metrics: dict,
-
-        self.results: Dict[str, StepResult] = {}        elapsed: float,
-
-        self.errors: Dict[str, str] = {}    ):
-
-        self._step_map: Dict[str, str] = {}        self.step_id = step_id
-
-        self._stage: Dict[str, str] = {}        self.label = label
-
-        self.ref_id = ref_id
-
-    def load(self) -> "PipelineRunner":        self.rows: int = metrics.get("rows", 0)
-
-        if not self.workflow_path.exists():        self.columns: list = metrics.get("columns", [])
-
-            raise FileNotFoundError(f"Workflow not found: {self.workflow_path}")        self.elapsed = elapsed
-
-        with open(self.workflow_path) as f:
-
-            data = json.load(f)    @property
-
-        self.pipeline = PipelineFile(**data)    def df(self):
-
-        return self        return get_dataframe(self.ref_id)
+# ---------------------------------------------------------------------------
+# No custom ops needed — this project exercises bare-literal formula syntax
+# (`=42`, `={"k":"v"}`), which only requires the built-in ``literal`` op
+# registered by the SIMPLE_STEPS.operations import above.
+# ---------------------------------------------------------------------------
+sys.path.insert(0, str(HERE))
 
 
+# ---------------------------------------------------------------------------
+# PipelineRunner
+# ---------------------------------------------------------------------------
 
-    def run(self) -> "PipelineRunner":    def __repr__(self):
-
-        if self.pipeline is None:        return (
-
-            self.load()            f"<StepResult label={self.label!r} "
-
-            f"rows={self.rows} cols={len(self.columns)} "
-
-        steps = self.pipeline.steps            f"elapsed={self.elapsed:.2f}s>"
-
-        if self.stop_after is not None:        )
-
-            steps = steps[: self.stop_after]
-
-
-
-        self._stage = {}class PipelineRunner:
-
-        self._step_map = {}    """
-
-    Loads and runs a Simple Steps workflow file via the backend engine.
-
-        for i, step_cfg in enumerate(steps):
-
-            label = step_cfg.label or f"Step {i}"    Example
-
-            op_id = step_cfg.operation_id    -------
-
-            config = dict(step_cfg.config)        runner = PipelineRunner("workflows/var-string.simple-steps-workflow")
-
-        runner.load()
-
-            input_ref_id: Optional[str] = None        runner.run()
-
-            if i > 0:        df = runner.results["step-var"].df
-
-                prev_cfg = steps[i - 1]        assert df.shape == (1, 1)
-
-                prev_key = prev_cfg.step_id    """
-
-                input_ref_id = self._stage.get(prev_key)
+class StepResult:
+    """Holds the outcome of a single executed step."""
 
     def __init__(
+        self,
+        step_id: str,
+        label: str,
+        ref_id: str,
+        metrics: dict,
+        elapsed: float,
+    ):
+        self.step_id = step_id
+        self.label = label
+        self.ref_id = ref_id
+        self.rows: int = metrics.get("rows", 0)
+        self.columns: list = metrics.get("columns", [])
+        self.elapsed = elapsed
 
-            t0 = time.time()        self,
+    @property
+    def df(self):
+        return get_dataframe(self.ref_id)
 
-            try:        workflow_path: str,
+    def __repr__(self):
+        return (
+            f"<StepResult label={self.label!r} "
+            f"rows={self.rows} cols={len(self.columns)} "
+            f"elapsed={self.elapsed:.2f}s>"
+        )
 
-                out_ref, metrics = run_operation(        stop_after: Optional[int] = None,
 
-                    op_id=op_id,        on_error: str = "warn",
+class PipelineRunner:
+    """
+    Loads and runs a Simple Steps workflow file via the backend engine.
 
-                    config=config,        continue_on_error: bool = False,
+    Example
+    -------
+        runner = PipelineRunner("workflows/var-string.simple-steps-workflow")
+        runner.load()
+        runner.run()
+        df = runner.results["step-var"].df
+        assert df.shape == (1, 1)
+    """
 
-                    input_ref_id=input_ref_id,    ):
+    def __init__(
+        self,
+        workflow_path: str,
+        stop_after: Optional[int] = None,
+        on_error: str = "warn",
+        continue_on_error: bool = False,
+    ):
+        self.workflow_path = Path(workflow_path).resolve()
+        self.stop_after = stop_after
+        self.on_error = on_error
+        self.continue_on_error = continue_on_error
+        self.pipeline: Optional[PipelineFile] = None
+        self.results: Dict[str, StepResult] = {}
+        self.errors: Dict[str, str] = {}
+        self._step_map: Dict[str, str] = {}
+        self._stage: Dict[str, str] = {}
 
-                    session_id=None,        self.workflow_path = Path(workflow_path).resolve()
-
-                    step_id=step_cfg.step_id,        self.stop_after = stop_after
-
-                    step_map=self._step_map,        self.on_error = on_error
-
-                )        self.continue_on_error = continue_on_error
-
-            except Exception as e:        self.pipeline: Optional[PipelineFile] = None
-
-                msg = f"{op_id}: {e}"        self.results: Dict[str, StepResult] = {}
-
-                self.errors[step_cfg.step_id] = msg        self.errors: Dict[str, str] = {}
-
-                if self.on_error == "raise":        self._step_map: Dict[str, str] = {}
-
-                    raise        self._stage: Dict[str, str] = {}
-
-                continue
-
-            elapsed = time.time() - t0    # ------------------------------------------------------------------
-
+    # ------------------------------------------------------------------
     # Load
+    # ------------------------------------------------------------------
 
-            self._stage[step_cfg.step_id] = out_ref    # ------------------------------------------------------------------
-
-            self._step_map[step_cfg.step_id] = out_ref
-
-            self.results[step_cfg.step_id] = StepResult(    def load(self) -> "PipelineRunner":
-
-                step_id=step_cfg.step_id,        if not self.workflow_path.exists():
-
-                label=label,            raise FileNotFoundError(f"Workflow not found: {self.workflow_path}")
-
-                ref_id=out_ref,        with open(self.workflow_path) as f:
-
-                metrics=metrics,            data = json.load(f)
-
-                elapsed=elapsed,        self.pipeline = PipelineFile(**data)
-
-            )        print(f"  Loaded  : {self.pipeline.name}")
-
-        return self        print(f"  File    : {self.workflow_path.name}")
-
+    def load(self) -> "PipelineRunner":
+        if not self.workflow_path.exists():
+            raise FileNotFoundError(f"Workflow not found: {self.workflow_path}")
+        with open(self.workflow_path) as f:
+            data = json.load(f)
+        self.pipeline = PipelineFile(**data)
+        print(f"  Loaded  : {self.pipeline.name}")
+        print(f"  File    : {self.workflow_path.name}")
         print(f"  Steps   : {len(self.pipeline.steps)}")
-
         return self
 
-def _main(argv: Optional[list] = None) -> int:
+    # ------------------------------------------------------------------
+    # Run
+    # ------------------------------------------------------------------
 
-    parser = argparse.ArgumentParser(description=__doc__)    # ------------------------------------------------------------------
+    def run(self) -> "PipelineRunner":
+        if self.pipeline is None:
+            self.load()
 
-    parser.add_argument(    # Run
-
-        "--workflow",    # ------------------------------------------------------------------
-
-        default=str(HERE / "workflows" / "basic-variables-literals.simple-steps-workflow"),
-
-    )    def run(self) -> "PipelineRunner":
-
-    parser.add_argument("--steps", type=int, default=None)        if self.pipeline is None:
-
-    args = parser.parse_args(argv)            self.load()
-
-
-
-    runner = PipelineRunner(args.workflow, stop_after=args.steps, on_error="raise")        steps = self.pipeline.steps
-
-    runner.load().run()        if self.stop_after is not None:
-
-    for sid, res in runner.results.items():            steps = steps[: self.stop_after]
-
-        print(f"  {sid}: rows={res.rows} cols={res.columns}")
-
-    return 0        print()
-
-        print(f"  Running {len(steps)} step(s)…")
+        steps = self.pipeline.steps
+        if self.stop_after is not None:
+            steps = steps[: self.stop_after]
 
         print()
+        print(f"  Running {len(steps)} step(s)…")
+        print()
 
-if __name__ == "__main__":
-
-    raise SystemExit(_main())        self._stage = {}
-
+        self._stage = {}
         self._step_map = {}
 
         for i, step_cfg in enumerate(steps):
