@@ -21,6 +21,7 @@ selection itself is the operation — applied to `identity`.
 | **D. Bind one cell as a tool argument** | Genuinely missing, genuinely different. Needs its own design |
 | **E. What a selection *means*** | Decided by whether the step being edited already has a tool. Both branches are expressible today — see §E |
 | **F. `StepRef` as a tool argument** | **A bug.** Silently stringified to the step id; validates clean, runs, returns garbage. Fix independently |
+| **G. `align` / `join`** | Add. The way to use two steps at once, and it likely removes the need for D. First two-input verb, so the graph derivation changes |
 
 ---
 
@@ -386,6 +387,119 @@ upstream runs. The guard is what makes the gap visible until then.
 
 ---
 
+## G. Combining two steps: `align` and `join`
+
+§F says a second step cannot be referenced as an argument. The way out is not
+a deferred reference — it is an explicit verb that **combines two steps into
+one grid**, after which every existing binding rule works unchanged.
+
+No such verb exists: there is no join, merge, align or zip in `grid.py`.
+
+### The index makes this cheap
+
+Verified against `52092ba`, branching preserves the index and `filter` subsets
+the same address space rather than renumbering:
+
+```
+raw  index=[0, 1, 2, 3, 4]
+a    index=[0, 1, 2, 3, 4]      double(raw)
+b    index=[0, 1, 2, 3, 4]      label(raw)
+c    index=[0, 2, 4]            filter(raw)
+```
+
+Because §1 makes the index "a row's stable address, preserved across steps",
+two steps descended from a common ancestor are **already aligned**. Combining
+them is a zip on an address both sides agree on — no key, no matching
+heuristic, no chance of a silent mis-pairing.
+
+### Two operations, not one
+
+Conflating these is how a join silently returns the wrong rows, so they should
+be separate verbs with separate names:
+
+| | when | matches on | result index |
+|---|---|---|---|
+| **`align`** | both steps share an ancestor | the index itself | the shared index (or its intersection) |
+| **`join`** | unrelated index spaces | a named key column | a **new** index space |
+
+`align` is the one this proposal recommends building first. It covers the case
+that actually arises — a user branches a workflow, does two things, and wants
+them side by side — and it cannot mis-pair, because the index is an identity
+rather than a value that happens to be equal.
+
+`join` is the general case and deserves the caution: it produces a new index,
+which breaks the "stable address preserved across steps" property that
+`select`, the ledger's `unit` column and per-cell re-drive all depend on. Worth
+building, worth building second, and worth documenting that downstream
+addresses restart there.
+
+```python
+wf["side_by_side"] = identity[mod.align(over="a", with_="b")](...)
+wf["enriched"]     = identity[mod.join(over="orders", with_="customers", on="customer_id")](...)
+```
+
+### This probably removes the need for §D
+
+The motivating case for a deferred reference was "a scalar from step A
+parameterises work over step B." `align` against a one-row step broadcasts it:
+
+```python
+wf["ready"]  = identity[mod.align(over="raw", with_="config", broadcast=True)](...)
+wf["scaled"] = scale(wf["ready"])      # `factor` is now a column; binds by name
+```
+
+Once `factor` is a column, the ordinary name-binding rule applies and nothing
+new is needed in `Operation` or the export format. That is a much smaller
+change than a deferred-reference value type, and it keeps the rule that
+**arguments are literals** intact rather than carving an exception into it.
+
+### The structural cost: the first two-input verb
+
+Every verb today reads exactly one upstream. The dependency graph is derived
+from a single token, in eight places, all spelled `modifier.params.get("over")`.
+A two-input verb is the first thing to break that assumption, and the cost
+lands in three spots:
+
+1. **Graph derivation** — either `over` becomes a list, or a second parameter
+   is also recognised as an edge. Every one of those eight sites needs to agree.
+2. **The client.** `react-api.md` §3 promises "the client can draw the DAG from
+   the workflow payload alone, with no `/dag` call". That promise holds only if
+   the client knows *every* source of an edge, so a second one has to be part
+   of the documented contract, not an implementation detail.
+3. **`GET /modifiers`.** The vocabulary entry needs to say a verb takes two
+   inputs, so a stack editor can render two step-pickers instead of one.
+
+None of that is hard. It is worth naming because it is the first place the
+one-input assumption is load-bearing, and quietly adding a `with_` parameter
+would leave the DAG wrong on the client while every server-side test passed.
+
+### Ledger and staging
+
+`align` and `join` apply to `identity` and invoke no user function, so like
+`select` and `project` there is no per-row work and the ledger is trivially
+complete. Cardinality:
+
+| | `expected` | `rows_rule` |
+|---|---|---|
+| `align`, both upstreams run | size of the index intersection | `exact` |
+| `align`, not yet run | `null` | `exact` |
+| `join` | unknown before running | `unknown` |
+
+### Validation
+
+"Ensure the indices match" should be a declaration-time `problem` wherever both
+upstreams have already run:
+
+```
+align over 'a' and 'c': indices differ (a has 0..4, c has 0, 2, 4).
+Use how="inner" to keep the 3 shared rows.
+```
+
+That is the difference between this and a silent mis-join — the same lesson as
+§F, applied before the bug exists rather than after.
+
+---
+
 ## Sequence
 
 1. `select` with `index` / `head` / `tail`, index-preserving, plus the `exact`
@@ -396,7 +510,8 @@ upstream runs. The guard is what makes the gap visible until then.
 4. Decide the parameter↔column binding question in §E — it gates half the
    interaction model and is not a shape verb.
 5. **F's guard first** — it is a correctness fix and depends on nothing here.
-6. Treat D as a separate design note. It touches `arguments`, staging and the
+6. `align`, then `join` (§G) — `align` first; it is unambiguous and covers the real case.
+7. Revisit D only if §G leaves something genuinely unexpressible. It touches `arguments`, staging and the
    graph derivation, and should not ride along with a shape verb.
 
 ## Relationship to per-cell re-drive
