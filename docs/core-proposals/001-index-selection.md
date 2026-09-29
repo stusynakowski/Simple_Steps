@@ -1,4 +1,4 @@
-# Proposal: index selection in the grid model
+# Proposal: selection verbs in the grid model
 
 > **For `simple-steps-core`.** Written against submodule `52092ba`.
 > Status: proposal, not agreed. Companion to
@@ -7,18 +7,19 @@
 
 ## The ask
 
-Select a particular row of a step's output, or a set of rows, and use the
-result downstream.
+Select rows, columns or a single value from a step's output by clicking the
+grid, and use the result downstream. When no tool has been chosen yet, the
+selection itself is the operation — applied to `identity`.
 
 ## Summary
 
-It splits into three requests that deserve different answers:
-
 | | verdict |
 |---|---|
-| **A. Select rows by index as a step** | Add it. A reshaping verb over `identity` — costs one `MODIFIERS` entry and one function, and breaks no invariant |
-| **B. Subscript a `StepRef` (`wf["raw"][3]`)** | Don't. It breaks the re-drive argument that §11 used to settle "at most one shape verb per step" |
-| **C. Bind one cell as a tool argument** | Genuinely missing, genuinely different. Needs its own design — §5 below |
+| **A. `select` — rows by index** | Add it. A reshaping verb over `identity`; one `MODIFIERS` entry and one function, breaking no invariant |
+| **B. `project` — columns by name** | Add it. **No verb narrows columns today** — verified against every verb in the table |
+| **C. Subscript a `StepRef` (`wf["raw"][3]`)** | Don't. It breaks the re-drive argument §11 used to settle "at most one shape verb per step" |
+| **D. Bind one cell as a tool argument** | Genuinely missing, genuinely different. Needs its own design |
+| **E. What a selection *means*** | Decided by whether the step being edited already has a tool. See §E |
 
 ---
 
@@ -136,7 +137,43 @@ implementation could quietly get it wrong, and worth a test.
 
 ---
 
-## B. Why not subscript a `StepRef`
+## B. `project` — a column verb
+
+Verified against `52092ba`: **no verb narrows columns.**
+
+| verb | rows | columns |
+|---|---|---|
+| `source` | lifts a literal | — |
+| `map` | unchanged | **adds one** |
+| `filter` | fewer | unchanged |
+| `group` | unchanged | adds a key |
+| `expand` | more | unchanged |
+| `collapse` | one | restructured |
+| `sweep` | generated | generated |
+
+So clicking a column header has no verb to compile to. `project` fills that
+hole and is smaller than `select`: it never touches the index, so
+`rows_rule` is `same` and every alignment invariant is untouched.
+
+```python
+wf["trimmed"] = identity[mod.project(columns=["city", "celsius"])](wf["raw"])
+```
+
+An unknown column is a declaration-time `problem`, in the same style as the
+rest:
+
+```
+project column 'tmp', which 'raw' does not have (it has celsius, city)
+```
+
+One open question: should `project` preserve the *requested* column order or
+the source order? Requested is more useful (it doubles as reordering) and more
+surprising (a round-trip through `project` can silently reorder). Lean:
+requested, because a user who named the columns in an order meant it.
+
+---
+
+## C. Why not subscript a `StepRef`
 
 `wf["raw"][3]` is the tempting spelling. Today `StepRef` carries only `id` and
 `workflow` and is not subscriptable, and I think that should stay true.
@@ -161,9 +198,9 @@ ledger row and a line in the export.
 
 ---
 
-## C. The genuinely missing piece: a cell as a bound argument
+## D. The genuinely missing piece: a cell as a bound argument
 
-This is the part `select` does **not** solve, and it is worth naming separately
+This is the part `select` and `project` do **not** solve, and it is worth naming separately
 rather than folding into the same proposal.
 
 Core binds literals today:
@@ -202,12 +239,65 @@ decision depends on the client knowing every edge source.
 
 ---
 
+## E. What a selection means: `identity` is the default tool
+
+A click on a previous step's grid is ambiguous on its own. The step being
+**edited** disambiguates it, with no mode switch and nothing for the user to
+choose:
+
+| the step being edited | a selection means | compiles to |
+|---|---|---|
+| **no tool chosen yet** | the selection *is* the operation | `identity[mod.select(...)]` / `identity[mod.project(...)]` |
+| **a tool is chosen, a parameter focused** | feed this data to that parameter | a binding on the existing step |
+
+That is the whole rule: **select before you pick a tool, and you get
+`identity`.** It falls out of §6.3 rather than being bolted on — a step that
+only reshapes has no tool of its own, so it applies its verb to `identity`.
+
+### Why this is implementable today
+
+The focused-input half already exists on the client. `StepWiringContext`
+tracks `receivingStepId` and `inputRef` — which step is receiving and which of
+its inputs has focus — so "which parameter does this bind to" is already
+answered by whatever the user is typing in. The context does not disappear
+under this design; its job changes from *injecting a text token* to *resolving
+what a selection means*.
+
+### The corner is not a verb
+
+Clicking the corner selects the whole grid, which is what `over` already
+means. It needs no verb and should produce a plain reference, not an
+`identity` step that copies a grid to no purpose.
+
+### What is still ambiguous
+
+The second row of the table has a gap, and it is the same one as §D:
+
+- A **column** click with a parameter focused should bind that parameter to
+  that column. **Core has no mechanism for this.** Parameters bind to columns
+  *by name only* (`writing-tools.md` §1: "The column name is the contract"),
+  so a `temp_c` column cannot feed a `celsius` parameter. `react-api.md` §4
+  tells the UI to *show* which column feeds a parameter, never to change it.
+- A **row** or **cell** click with a parameter focused is §D — a deferred
+  reference to a value that is not known until upstream runs.
+
+So the "no tool yet" branch is fully served by `select` + `project`. The "tool
+already chosen" branch needs either a parameter↔column binding in `Operation`,
+or a decision that it is not supported and the UI only ever reports the
+name-matched binding.
+
+---
+
 ## Sequence
 
 1. `select` with `index` / `head` / `tail`, index-preserving, plus the `exact`
    `rows_rule` and the declaration-time range check.
-2. Decide whether `exact` replaces `generated` for `sweep` too.
-3. Treat C as a separate design note. It touches `arguments`, staging and the
+2. `project` with `columns`, requested-order, with the unknown-column check.
+   Independent of 1 and smaller.
+3. Decide whether `exact` replaces `generated` for `sweep` too.
+4. Decide the parameter↔column binding question in §E — it gates half the
+   interaction model and is not a shape verb.
+5. Treat D as a separate design note. It touches `arguments`, staging and the
    graph derivation, and should not ride along with a shape verb.
 
 ## Relationship to per-cell re-drive

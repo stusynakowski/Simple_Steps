@@ -172,7 +172,7 @@ it has to become a version spec before publishing.)
 
 | | |
 |---|---|
-| [`core-proposals/001-index-selection.md`](core-proposals/001-index-selection.md) | A `select` shape verb for addressing rows by position, plus the separate (harder) case of binding one cell as a tool argument |
+| [`core-proposals/001-index-selection.md`](core-proposals/001-index-selection.md) | `select` (rows) and `project` (columns) shape verbs, why `identity` is the default tool when no tool is chosen, and the separate case of binding one cell as a tool argument |
 
 ## 9. What to do while the engine migration lands
 
