@@ -2,9 +2,9 @@
 Simple Steps — Visual pipeline orchestrator for Python functions.
 
 Usage:
-    from SIMPLE_STEPS import simple_step, step
+    from SIMPLE_STEPS import simple_step_tool, step
 
-    @simple_step(name="My Op", category="Demo")
+    @simple_step_tool(name="My Op", category="Demo")
     def my_operation(text: str) -> str:
         return text.upper()
 
@@ -28,7 +28,8 @@ import sys as _sys
 
 __version__ = "0.1.0"
 
-from .decorators import simple_step, register_operation  # noqa: F401
+from .decorators import simple_step, simple_step_tool, register_operation  # noqa: F401
+from .core_bridge import simple_step_resource  # noqa: F401
 from .step_proxy import step, StepProxy, ColumnProxy, raw, RawValue  # noqa: F401
 from .helpers import map_each, apply_to, filter_by, expand_each, val, col  # noqa: F401
 

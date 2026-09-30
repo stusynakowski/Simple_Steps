@@ -114,19 +114,45 @@ export interface BackendError {
 
 export interface OperationParam {
   name: string;
-  type: 'string' | 'number' | 'boolean' | 'list';
+  type: 'string' | 'number' | 'boolean' | 'list' | 'object' | 'dataframe';
+  /** From the tool's docstring Args: section. Empty when undocumented. */
   description: string;
   default?: unknown;
+  /** True when the parameter has no default. Mirrors core's ToolParam.required. */
+  required?: boolean;
+  /**
+   * 'resource' params are injected by the engine from the resource container
+   * and must NOT be rendered as user-editable form fields.
+   * Mirrors core's ToolParam.kind.
+   */
+  kind?: 'data' | 'resource';
+}
+
+/** What a tool returns, derived from its return annotation + docstring. */
+export interface OperationReturn {
+  type: string;
+  /** core's cardinality word for tabular returns. */
+  form?: 'grid' | 'column' | 'scalar' | null;
+  description: string;
 }
 
 export interface OperationDefinition {
   id: string;
   label: string;
   description: string;
-  /** The default orchestration mode registered by the @simple_step decorator. */
-  type: 'source' | 'map' | 'filter' | 'dataframe' | 'expand' | 'raw_output' | 'orchestrator';
+  /**
+   * The default orchestration mode registered by the @simple_step_tool
+   * decorator. 'step' is the v0.2 single-cell default.
+   */
+  type: 'step' | 'source' | 'map' | 'filter' | 'dataframe' | 'expand' | 'raw_output' | 'orchestrator';
   category: string;
   params: OperationParam[];
+  /** Output contract. Null when the tool has no return annotation. */
+  returns?: OperationReturn | null;
+  /** The resource this tool is bound to, if any ('reshape', 'file_system', …). */
+  resource?: string | null;
+  /** Resource container keys the engine injects for this tool. */
+  dependencies?: string[];
 }
 
 /**

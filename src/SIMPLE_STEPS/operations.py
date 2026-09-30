@@ -3,11 +3,11 @@ import ast
 import pandas as pd
 import json
 from .models import OperationDefinition
-from .decorators import simple_step, OPERATION_REGISTRY, DEFINITIONS_LIST
+from .decorators import simple_step_tool, OPERATION_REGISTRY, DEFINITIONS_LIST
 
 # --- Standard Library of Operations ---
 
-@simple_step(name="Literal Value", category="Variables", operation_type="source", id="literal")
+@simple_step_tool(name="Literal Value", category="Variables", operation_type="source", id="literal")
 def literal(expr: str = '""') -> pd.DataFrame:
     """
     Create a single-cell step from a Python literal expression.
@@ -30,7 +30,7 @@ def literal(expr: str = '""') -> pd.DataFrame:
     return pd.DataFrame({"value": [cell]})
 
 
-@simple_step(name="Load CSV", category="File IO", operation_type="source", id="load_csv")
+@simple_step_tool(name="Load CSV", category="File IO", operation_type="source", id="load_csv")
 def load_csv(filepath: str) -> pd.DataFrame:
     """Load a standard CSV file from a path"""
     if not filepath:
@@ -38,7 +38,7 @@ def load_csv(filepath: str) -> pd.DataFrame:
     return pd.read_csv(filepath)
 
 
-@simple_step(name="To Rows", category="Data Sources", operation_type="source", id="to_rows")
+@simple_step_tool(name="To Rows", category="Data Sources", operation_type="source", id="to_rows")
 def to_rows(data: str = '{"column1": ["a", "b", "c"]}') -> pd.DataFrame:
     """
     Expand inline data into rows. Accepts a JSON string — a list, an object
@@ -71,7 +71,7 @@ def to_rows(data: str = '{"column1": ["a", "b", "c"]}') -> pd.DataFrame:
         return pd.DataFrame({"value": [parsed]})
 
 
-@simple_step(name="Define Value", category="Data Sources", operation_type="source", id="define_value")
+@simple_step_tool(name="Define Value", category="Data Sources", operation_type="source", id="define_value")
 def define_value(value: str = "", type: str = "auto") -> pd.DataFrame:
     """
     Create a step from a single raw value. The value is stored in a
@@ -142,7 +142,7 @@ def define_value(value: str = "", type: str = "auto") -> pd.DataFrame:
             return pd.DataFrame({"value": [value]})
 
 
-@simple_step(name="Extract JSON", category="Data Reshaping", operation_type="map", id="extract_json")
+@simple_step_tool(name="Extract JSON", category="Data Reshaping", operation_type="map", id="extract_json")
 def extract_json(cell: str, path: str = "", fallback: str = "") -> str:
     """
     Parse a JSON string and extract a value at a dot-separated path.
@@ -190,7 +190,7 @@ def extract_json(cell: str, path: str = "", fallback: str = "") -> str:
     return json.dumps(obj) if isinstance(obj, (dict, list)) else str(obj)
 
 
-@simple_step(name="Flatten JSON", category="Data Reshaping", operation_type="dataframe", id="flatten_json")
+@simple_step_tool(name="Flatten JSON", category="Data Reshaping", operation_type="dataframe", id="flatten_json")
 def flatten_json(df: pd.DataFrame, column: str, prefix: str = "", max_depth: int = 1) -> pd.DataFrame:
     """
     Take a column of JSON strings and flatten it into multiple columns.
@@ -231,7 +231,7 @@ def flatten_json(df: pd.DataFrame, column: str, prefix: str = "", max_depth: int
     return pd.concat([df.drop(columns=[column]), expanded], axis=1)
 
 
-@simple_step(name="Filter Rows", category="Data Cleaning", operation_type="dataframe", id="filter_rows")
+@simple_step_tool(name="Filter Rows", category="Data Cleaning", operation_type="dataframe", id="filter_rows")
 def filter_rows(df: pd.DataFrame, column: str, value: str, mode: str = "equals") -> pd.DataFrame:
     """Keep rows where a column matches a condition"""
     if df is None: raise ValueError("No input data")
@@ -245,7 +245,7 @@ def filter_rows(df: pd.DataFrame, column: str, value: str, mode: str = "equals")
             return df[df[column].astype(str).str.contains(value, na=False)]
     return df
 
-@simple_step(name="Clean Missing Values", category="Data Cleaning", operation_type="dataframe", id="drop_na")
+@simple_step_tool(name="Clean Missing Values", category="Data Cleaning", operation_type="dataframe", id="drop_na")
 def drop_na(df: pd.DataFrame) -> pd.DataFrame:
     """Drop rows with missing data"""
     if df is None: return pd.DataFrame()
@@ -254,7 +254,7 @@ def drop_na(df: pd.DataFrame) -> pd.DataFrame:
 
 # ─── Data Reshaping & Transformation Operations ─────────────────────────────
 
-@simple_step(name="Select Columns", category="Data Reshaping", operation_type="dataframe", id="select_columns")
+@simple_step_tool(name="Select Columns", category="Data Reshaping", operation_type="dataframe", id="select_columns")
 def select_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
     """
     Keep only the specified columns (drop everything else).
@@ -292,7 +292,7 @@ def select_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
     return df[cols]
 
 
-@simple_step(name="Select Rows", category="Data Reshaping", operation_type="dataframe", id="select_rows")
+@simple_step_tool(name="Select Rows", category="Data Reshaping", operation_type="dataframe", id="select_rows")
 def select_rows(df: pd.DataFrame, row_indices: str = "") -> pd.DataFrame:
     """
     Select specific row indices from the DataFrame.
@@ -324,7 +324,7 @@ def select_rows(df: pd.DataFrame, row_indices: str = "") -> pd.DataFrame:
     return df.iloc[valid].reset_index(drop=True)
 
 
-@simple_step(name="Select Cell", category="Data Reshaping", operation_type="dataframe", id="select_cell")
+@simple_step_tool(name="Select Cell", category="Data Reshaping", operation_type="dataframe", id="select_cell")
 def select_cell(df: pd.DataFrame, row_index: int = 0, column: str = "") -> pd.DataFrame:
     """
     Return a single cell value as a 1x1 DataFrame.
@@ -344,7 +344,7 @@ def select_cell(df: pd.DataFrame, row_index: int = 0, column: str = "") -> pd.Da
     return pd.DataFrame([[val]])
 
 
-@simple_step(name="Drop Columns", category="Data Reshaping", operation_type="dataframe", id="drop_columns")
+@simple_step_tool(name="Drop Columns", category="Data Reshaping", operation_type="dataframe", id="drop_columns")
 def drop_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
     """
     Remove the specified columns, keep everything else.
@@ -364,7 +364,7 @@ def drop_columns(df: pd.DataFrame, columns: str = "") -> pd.DataFrame:
     return df.drop(columns=[c for c in cols if c in df.columns])
 
 
-@simple_step(name="Rename Columns", category="Data Reshaping", operation_type="dataframe", id="rename_columns")
+@simple_step_tool(name="Rename Columns", category="Data Reshaping", operation_type="dataframe", id="rename_columns")
 def rename_columns(df: pd.DataFrame, mapping: str = "") -> pd.DataFrame:
     """
     Rename columns using old=new pairs.
@@ -389,7 +389,7 @@ def rename_columns(df: pd.DataFrame, mapping: str = "") -> pd.DataFrame:
     return df.rename(columns=rename_map)
 
 
-@simple_step(name="Sort By", category="Data Reshaping", operation_type="dataframe", id="sort_by")
+@simple_step_tool(name="Sort By", category="Data Reshaping", operation_type="dataframe", id="sort_by")
 def sort_by(df: pd.DataFrame, column: str = "", direction: str = "asc") -> pd.DataFrame:
     """
     Sort rows by one or more columns.
@@ -412,7 +412,7 @@ def sort_by(df: pd.DataFrame, column: str = "", direction: str = "asc") -> pd.Da
     return df.sort_values(by=cols, ascending=ascending).reset_index(drop=True)
 
 
-@simple_step(name="Group By", category="Data Reshaping", operation_type="dataframe", id="group_by")
+@simple_step_tool(name="Group By", category="Data Reshaping", operation_type="dataframe", id="group_by")
 def group_by(df: pd.DataFrame, column: str = "", agg: str = "count") -> pd.DataFrame:
     """
     Group rows by a column and aggregate the rest.
@@ -440,7 +440,7 @@ def group_by(df: pd.DataFrame, column: str = "", agg: str = "count") -> pd.DataF
     return df.groupby(cols).agg(agg_fn).reset_index()
 
 
-@simple_step(name="Pivot", category="Data Reshaping", operation_type="dataframe", id="pivot")
+@simple_step_tool(name="Pivot", category="Data Reshaping", operation_type="dataframe", id="pivot")
 def pivot(df: pd.DataFrame, index: str = "", columns: str = "", values: str = "", agg: str = "first") -> pd.DataFrame:
     """
     Pivot rows into columns (like a spreadsheet pivot table).
@@ -465,7 +465,7 @@ def pivot(df: pd.DataFrame, index: str = "", columns: str = "", values: str = ""
     return result.reset_index()
 
 
-@simple_step(name="Aggregate", category="Data Reshaping", operation_type="dataframe", id="aggregate")
+@simple_step_tool(name="Aggregate", category="Data Reshaping", operation_type="dataframe", id="aggregate")
 def aggregate(df: pd.DataFrame, column: str = "", functions: str = "count") -> pd.DataFrame:
     """
     Compute summary statistics on a column (or all numeric columns).
@@ -495,7 +495,7 @@ def aggregate(df: pd.DataFrame, column: str = "", functions: str = "count") -> p
         return result.reset_index().rename(columns={"index": "statistic"})
 
 
-@simple_step(name="Merge Steps", category="Data Reshaping", operation_type="dataframe", id="merge_steps")
+@simple_step_tool(name="Merge Steps", category="Data Reshaping", operation_type="dataframe", id="merge_steps")
 def merge_steps(df: pd.DataFrame, right_data: str = "", on: str = "", how: str = "inner") -> pd.DataFrame:
     """
     Join/merge two datasets on a shared key column.
@@ -520,7 +520,7 @@ def merge_steps(df: pd.DataFrame, right_data: str = "", on: str = "", how: str =
     return pd.merge(df, right, on=on.strip(), how=how.strip())
 
 
-@simple_step(name="Cast Column", category="Data Reshaping", operation_type="dataframe", id="cast_column")
+@simple_step_tool(name="Cast Column", category="Data Reshaping", operation_type="dataframe", id="cast_column")
 def cast_column(df: pd.DataFrame, column: str = "", to_type: str = "string") -> pd.DataFrame:
     """
     Convert a column's data type.
@@ -561,7 +561,7 @@ def cast_column(df: pd.DataFrame, column: str = "", to_type: str = "string") -> 
     return result
 
 
-@simple_step(name="Add Column", category="Data Reshaping", operation_type="dataframe", id="add_column")
+@simple_step_tool(name="Add Column", category="Data Reshaping", operation_type="dataframe", id="add_column")
 def add_column(df: pd.DataFrame, name: str = "new_col", expression: str = "") -> pd.DataFrame:
     """
     Add a new column computed from an expression referencing existing columns.
@@ -592,7 +592,7 @@ def add_column(df: pd.DataFrame, name: str = "new_col", expression: str = "") ->
     return result
 
 
-@simple_step(name="Unpivot / Melt", category="Data Reshaping", operation_type="dataframe", id="unpivot")
+@simple_step_tool(name="Unpivot / Melt", category="Data Reshaping", operation_type="dataframe", id="unpivot")
 def unpivot(df: pd.DataFrame, id_columns: str = "", value_name: str = "value", var_name: str = "variable") -> pd.DataFrame:
     """
     Unpivot (melt) columns into rows — the inverse of pivot.
@@ -612,7 +612,7 @@ def unpivot(df: pd.DataFrame, id_columns: str = "", value_name: str = "value", v
     return pd.melt(df, id_vars=id_cols or None, value_name=value_name, var_name=var_name)
 
 
-@simple_step(name="Deduplicate", category="Data Cleaning", operation_type="dataframe", id="deduplicate")
+@simple_step_tool(name="Deduplicate", category="Data Cleaning", operation_type="dataframe", id="deduplicate")
 def deduplicate(df: pd.DataFrame, columns: str = "", keep: str = "first") -> pd.DataFrame:
     """
     Remove duplicate rows.
@@ -635,7 +635,7 @@ def deduplicate(df: pd.DataFrame, columns: str = "", keep: str = "first") -> pd.
     return df.drop_duplicates(subset=cols, keep=keep_val).reset_index(drop=True)
 
 
-@simple_step(name="Sample Rows", category="Data Reshaping", operation_type="dataframe", id="sample_rows")
+@simple_step_tool(name="Sample Rows", category="Data Reshaping", operation_type="dataframe", id="sample_rows")
 def sample_rows(df: pd.DataFrame, n: int = 5, random: str = "false") -> pd.DataFrame:
     """
     Take a subset of rows — either the first N or a random sample.
@@ -657,7 +657,7 @@ def sample_rows(df: pd.DataFrame, n: int = 5, random: str = "false") -> pd.DataF
     return df.head(n).reset_index(drop=True)
 
 
-@simple_step(name="Pandas", category="Data Reshaping", operation_type="dataframe", id="pandas_eval")
+@simple_step_tool(name="Pandas", category="Data Reshaping", operation_type="dataframe", id="pandas_eval")
 def pandas_eval(df: pd.DataFrame, expr: str = "df") -> pd.DataFrame:
     """
     Run any pandas expression directly on the incoming DataFrame.
@@ -688,7 +688,7 @@ def pandas_eval(df: pd.DataFrame, expr: str = "df") -> pd.DataFrame:
     return pd.DataFrame({"value": [result]})
 
 
-@simple_step(name="Format String", category="Data Reshaping", operation_type="map", id="format_string")
+@simple_step_tool(name="Format String", category="Data Reshaping", operation_type="map", id="format_string")
 def format_string(cell: str = "", template: str = "{value}") -> str:
     """
     Format a cell value into a string template.

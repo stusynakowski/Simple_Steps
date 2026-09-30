@@ -2,7 +2,7 @@ import functools
 import inspect
 import pandas as pd
 from typing import Callable, Any, get_type_hints, Dict, List, Optional
-from .models import OperationParam, OperationDefinition
+from .models import OperationParam, OperationDefinition, OperationReturn
 
 # Global registry for operations
 # We will use this to replace the old REGISTRY and DEFINITIONS
@@ -249,81 +249,140 @@ def _unwrap(obj):
 
 def simple_step(name: str = None, category: str = "General", operation_type: str = "map", id: str = None, apply: str = None):
     """
-    Decorator to transform a vanilla Python function into a SimpleSteps operation.
-    
-    Args:
-        name: Display name for the UI.
-        category: For sidebar grouping.
-        operation_type: Default orchestration recommendation.
-        id: Optional explicit ID. If None, uses function name.
-        apply: Optional implicit list behavior for non-proxy calls ("map" or
-            "flatmap"). Can be overridden per call with __mode.
+    Deprecated alias for :func:`simple_step_tool`.
 
-    Broadcast table (current):
-    - Default: `fn(x)`
-    - Raw: `fn(x, __mode="raw")` or `fn.run_raw(x)`
-    - Map list: `fn(xs, __mode="map")`, `fn(xs, __mode="apply_across_rows")`, `fn.apply_across_rows(xs)`
-    - Flatmap list: `fn(xs, __mode="flatmap")`, `fn(xs, __mode="apply_and_flatten")`, `fn.apply_and_flatten(xs)`
+    Kept so existing tool modules keep importing cleanly. New code should say
+    ``@simple_step_tool`` for a tool, and declare objects tools *use* with
+    ``simple_step_resource``. This delegates rather than duplicating the
+    registration path — there is exactly one place a contract is derived.
+    """
+    return simple_step_tool(
+        name=name,
+        category=category,
+        operation_type=operation_type,
+        id=id,
+        apply=apply,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# simple_step_tool — the core-backed decorator                                #
+# --------------------------------------------------------------------------- #
+
+# core's ToolParam.type_name is a human-readable annotation ("str", "int",
+# "DataFrame"). The UI needs its own coarser vocabulary for form widgets.
+_UI_TYPE_BY_ANNOTATION = {
+    "int": "number", "float": "number", "complex": "number",
+    "bool": "boolean",
+    "list": "list", "tuple": "list", "set": "list",
+    "dict": "object", "Mapping": "object",
+    "DataFrame": "dataframe", "Series": "dataframe",
+}
+
+
+def _ui_type(type_name: str) -> str:
+    """Map a core annotation name onto the UI's widget type."""
+    base = (type_name or "").split("[")[0].strip()
+    if base in _UI_TYPE_BY_ANNOTATION:
+        return _UI_TYPE_BY_ANNOTATION[base]
+    lowered = base.lower()
+    for key, ui in _UI_TYPE_BY_ANNOTATION.items():
+        if lowered == key.lower():
+            return ui
+    return "string"
+
+
+def simple_step_tool(
+    name: str = None,
+    category: str = "General",
+    operation_type: str = "map",
+    id: str = None,
+    apply: str = None,
+    description: str = None,
+    resource: str = None,
+):
+    """
+    Register a function as a Simple Steps **tool**.
+
+    This is the explicit successor to ``@simple_step``: a tool is a function the
+    user can call from the formula bar. Objects that tools *use* are declared
+    with :func:`~SIMPLE_STEPS.core_bridge.simple_step_resource` instead.
+
+    The tool's contract — parameters, types, required flags, input/output
+    schema, resource dependencies — comes from ``simple_steps_core``'s
+    ``ToolRegistry``. Core is the heart; this decorator is the adapter that
+    also keeps the local engine's registry populated during the migration.
+
+    Args:
+        name: display label for the UI. Defaults to a title-cased function name.
+        category: sidebar grouping.
+        operation_type: default orchestration ("map", "source", "dataframe", …).
+        id: explicit tool id. Defaults to the function name.
+        apply: implicit list behaviour for non-proxy Python calls.
+        description: overrides the docstring summary, which is used otherwise.
+        resource: the resource this tool is bound to, if any.
+
+    Returns:
+        The auto-broadcasting wrapper, so direct Python calls and eval-mode
+        formulas keep working exactly as they did under ``@simple_step``.
     """
     def decorator(func: Callable):
-        # 1. Register Metadata
+        from .core_bridge import core_contract
+
         op_name = name or func.__name__.replace("_", " ").title()
         op_id = id or func.__name__
 
-        
-        # Infer parameters from type hints
-        sig = inspect.signature(func)
-        type_hints = get_type_hints(func)
-        params = []
-        for param_name, param in sig.parameters.items():
-            if param_name == 'return': continue
-            # Skip *args and **kwargs — they don't map to UI fields
-            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-                continue
-            # Map python types to UI types
-            py_type = type_hints.get(param_name, Any)
-            ui_type = "string"
-            if py_type == int: ui_type = "number"
-            elif py_type == float: ui_type = "number"
-            elif py_type == bool: ui_type = "boolean"
-            elif py_type == list or py_type == List: ui_type = "list"
-            elif py_type == dict or py_type == Dict: ui_type = "object"
-            elif py_type == pd.DataFrame: ui_type = "dataframe"
-            
-            default_val = param.default if param.default is not inspect.Parameter.empty else None
-            params.append(OperationParam(
-                name=param_name, 
-                type=ui_type, 
-                description="No description provided",
-                default=default_val
-            ))
-            
-        # 2. Register Metadata and Raw Function
+        # Core registers the tool and derives the contract; core_bridge fills
+        # the fields core cannot express yet (see its module docstring).
+        contract = core_contract(
+            func,
+            op_id,
+            category=category,
+            operation_type=operation_type,
+            description=description,
+            resource=resource,
+        )
+
+        params = [
+            OperationParam(
+                name=p["name"],
+                type=_ui_type(p["type_name"]),
+                description=p["description"],
+                default=p["default"],
+                required=p["required"],
+                kind=p["kind"],
+            )
+            for p in contract.params
+        ]
+
         definition = OperationDefinition(
             id=op_id,
-            label=op_name, 
-            description=func.__doc__ or "", 
-            type=operation_type, # This becomes the "Default Recommendation"
+            label=op_name,
+            description=contract.description or (func.__doc__ or ""),
+            type=operation_type,
             category=category,
-            params=params
+            params=params,
+            returns=OperationReturn(
+                type=contract.output_type,
+                form=contract.output_form,
+                description=contract.output_description,
+            ),
+            resource=contract.resource,
+            dependencies=contract.dependencies,
         )
-        
-        # Store in registry — always store the RAW unwrapped function so the
-        # engine's orchestrators (map_wrapper, filter_wrapper, etc.) work as before.
+
         OPERATION_REGISTRY[op_id] = {
             "definition": definition,
-            "func": func,  # The raw, unwrapped function
+            "func": func,            # raw, unwrapped — the engine calls this
             "category": category,
-            "type": operation_type
+            "type": operation_type,
+            "contract": contract,    # core's view, for the registry API
         }
         DEFINITIONS_LIST.append(definition)
-        
-        # Return the auto-broadcasting wrapper so that direct Python calls
-        # (and eval-mode formula bar calls) get automatic row-wise mapping
-        # when ColumnProxy arguments are passed.  The raw function is still
-        # accessible via wrapper._raw_func and through the registry.
+
         wrapped = _auto_broadcast(func, operation_type=operation_type)
         wrapped._apply = apply
+        wrapped._tool_id = op_id
         return wrapped
 
     return decorator

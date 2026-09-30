@@ -174,6 +174,7 @@ it has to become a version spec before publishing.)
 |---|---|
 | [`core-proposals/002-shaping-params.md`](core-proposals/002-shaping-params.md) | Reference: every shape verb's real parameters and shape effects, and the open choice between new verbs and restriction on `over` |
 | [`core-proposals/001-index-selection.md`](core-proposals/001-index-selection.md) | `select` (rows) and `project` (columns) shape verbs, why `identity` is the default tool when no tool is chosen, and the separate case of binding one cell as a tool argument |
+| [`core-proposals/003-app-adoption.md`](core-proposals/003-app-adoption.md) | What core must close before `App` can replace our backend: `ToolParam.description`, docstring-derived contracts, the two-thirds of `AppConfig` still unbuilt, and a tabular `output_schema`. Records why built-ins become a namespace-only `ResourceSpec` |
 
 ## 9. What to do while the engine migration lands
 

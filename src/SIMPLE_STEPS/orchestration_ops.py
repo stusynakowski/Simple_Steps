@@ -25,7 +25,7 @@ import inspect
 import pandas as pd
 from typing import Any, Dict, Optional
 
-from .decorators import simple_step, OPERATION_REGISTRY
+from .decorators import simple_step_tool, OPERATION_REGISTRY
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ def _col_val(df: pd.DataFrame, row: pd.Series, v: Any) -> Any:
 # ss_map  — apply fn row-by-row, append result columns
 # ──────────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     id="ss_map",
     name="Map",
     category="Orchestration",
@@ -125,7 +125,7 @@ def ss_map(df: pd.DataFrame, fn: str = "", **kwargs) -> pd.DataFrame:
 # ss_filter  — keep rows where fn returns True
 # ──────────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     id="ss_filter",
     name="Filter",
     category="Orchestration",
@@ -158,7 +158,7 @@ def ss_filter(df: pd.DataFrame, fn: str = "", **kwargs) -> pd.DataFrame:
 # ss_expand  — apply fn row-by-row, explode list results into new rows
 # ──────────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     id="ss_expand",
     name="Expand",
     category="Orchestration",
@@ -200,7 +200,7 @@ def ss_expand(df: pd.DataFrame, fn: str = "", **kwargs) -> pd.DataFrame:
 # ss_reduce  — pass the entire DataFrame to fn, return aggregated result
 # ──────────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     id="ss_reduce",
     name="Reduce",
     category="Orchestration",

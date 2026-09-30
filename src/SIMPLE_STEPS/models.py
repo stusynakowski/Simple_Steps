@@ -79,8 +79,22 @@ def build_formula_from_fields(
 class OperationParam(BaseModel):
     name: str
     type: Literal['string', 'number', 'boolean', 'list', 'object', 'dataframe']
-    description: str
+    description: str = ""
     default: Optional[Any] = None
+    # Whether the parameter has no default — read off core's ToolParam.required.
+    required: bool = False
+    # 'resource' params are injected by the engine from the resource container
+    # and are not user-editable form fields. Mirrors core's ToolParam.kind.
+    kind: Literal['data', 'resource'] = 'data'
+
+
+class OperationReturn(BaseModel):
+    """What a tool gives back. Derived from its return annotation + docstring."""
+    type: str = "Any"
+    # core's cardinality word for tabular returns: 'grid' | 'column' | None.
+    form: Optional[Literal['grid', 'column', 'scalar']] = None
+    description: str = ""
+
 
 class OperationDefinition(BaseModel):
     id: str
@@ -92,6 +106,14 @@ class OperationDefinition(BaseModel):
     type: Literal['step', 'source', 'map', 'filter', 'expand', 'dataframe', 'raw_output', 'orchestrator'] = 'dataframe'
     category: str = 'General'
     params: List[OperationParam]
+    # ── Contract fields sourced from simple_steps_core's ToolDefinition ──
+    # See core_bridge.core_contract(). `returns` and per-param descriptions
+    # are shimmed locally — docs/core-proposals/003-app-adoption.md §A/§B/§E.
+    returns: Optional[OperationReturn] = None
+    # The resource this tool is bound to, if any ('reshape', 'file_system', …).
+    resource: Optional[str] = None
+    # Resource container keys the engine must inject for this tool to run.
+    dependencies: List[str] = Field(default_factory=list)
 
 # --- 2. Blueprint / Execution ---
 class StepConfig(BaseModel):

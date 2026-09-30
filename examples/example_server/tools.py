@@ -29,14 +29,14 @@ from typing import Literal
 
 import pandas as pd
 
-from SIMPLE_STEPS import simple_step
+from SIMPLE_STEPS import simple_step_tool
 
 
 # ──────────────────────────────────────────────────────────────────────────
 # Sources — produce a table from nothing. These start a workflow.
 # ──────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     name="Make Range",
     category="Sources",
     operation_type="source",
@@ -52,7 +52,7 @@ def make_range(n: int = 10, start: int = 0) -> pd.DataFrame:
     return pd.DataFrame({"n": list(range(start, start + n))})
 
 
-@simple_step(
+@simple_step_tool(
     name="Sample People",
     category="Sources",
     operation_type="source",
@@ -79,7 +79,7 @@ def sample_people(count: int = 8, seed: int = 0) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-@simple_step(
+@simple_step_tool(
     name="Split Text",
     category="Sources",
     operation_type="source",
@@ -94,7 +94,7 @@ def split_text(text: str = "alpha,beta,gamma", separator: str = ",") -> pd.DataF
     return pd.DataFrame({"part": parts})
 
 
-@simple_step(
+@simple_step_tool(
     name="Empty Table",
     category="Sources",
     operation_type="source",
@@ -114,7 +114,7 @@ def empty_table(columns: str = "a,b,c") -> pd.DataFrame:
 # Per-cell tools — the engine runs these once per cell of an upstream column.
 # ──────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     name="Word Count",
     category="Text",
     operation_type="map",
@@ -125,7 +125,7 @@ def word_count(text: str) -> int:
     return len(str(text).split())
 
 
-@simple_step(
+@simple_step_tool(
     name="To Upper",
     category="Text",
     operation_type="map",
@@ -136,7 +136,7 @@ def to_upper(text: str) -> str:
     return str(text).upper()
 
 
-@simple_step(
+@simple_step_tool(
     name="Reverse Text",
     category="Text",
     operation_type="map",
@@ -147,7 +147,7 @@ def reverse_text(text: str) -> str:
     return str(text)[::-1]
 
 
-@simple_step(
+@simple_step_tool(
     name="Classify Age",
     category="Analysis",
     operation_type="map",
@@ -170,7 +170,7 @@ def classify_age(age: int) -> str:
     return "senior"
 
 
-@simple_step(
+@simple_step_tool(
     name="Bucket Score",
     category="Analysis",
     operation_type="map",
@@ -199,7 +199,7 @@ def bucket_score(
     return "low"
 
 
-@simple_step(
+@simple_step_tool(
     name="Slow Double",
     category="Diagnostics",
     operation_type="map",
@@ -216,7 +216,7 @@ def slow_double(n: int, delay_ms: int = 250) -> int:
     return int(n) * 2
 
 
-@simple_step(
+@simple_step_tool(
     name="Sometimes Fails",
     category="Diagnostics",
     operation_type="map",
@@ -239,7 +239,7 @@ def sometimes_fails(n: int, fail_on_multiples_of: int = 3) -> int:
 # Whole-table tools — the engine passes the entire upstream table.
 # ──────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     name="Add Computed Column",
     category="Table",
     operation_type="dataframe",
@@ -269,7 +269,7 @@ def add_computed(
     return out
 
 
-@simple_step(
+@simple_step_tool(
     name="Top N",
     category="Table",
     operation_type="dataframe",
@@ -287,7 +287,7 @@ def top_n(df: pd.DataFrame, column: str = "", n: int = 5,
     return df.sort_values(column, ascending=not descending).head(int(n))
 
 
-@simple_step(
+@simple_step_tool(
     name="Summarize",
     category="Table",
     operation_type="dataframe",
@@ -317,7 +317,7 @@ def summarize(df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-@simple_step(
+@simple_step_tool(
     name="Count By",
     category="Table",
     operation_type="dataframe",
@@ -340,7 +340,7 @@ def count_by(df: pd.DataFrame, column: str = "") -> pd.DataFrame:
 # Non-tabular payloads — a cell holding something that is not a scalar.
 # ──────────────────────────────────────────────────────────────────────────
 
-@simple_step(
+@simple_step_tool(
     name="Build Record",
     category="Shapes",
     operation_type="map",
@@ -361,7 +361,7 @@ def build_record(value: str) -> dict:
     }
 
 
-@simple_step(
+@simple_step_tool(
     name="Make Series",
     category="Shapes",
     operation_type="map",
