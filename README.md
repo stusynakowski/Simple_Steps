@@ -246,23 +246,6 @@ simple-steps --local --port 9000
 | `--packs DIR [DIR ...]` | Extra developer pack directories | none |
 | `--projects-dir DIR` | Directory for saved workflows | `<workspace>/projects` |
 
-### Pack management
-
-```bash
-simple-steps pack list                           # list declared packs
-simple-steps pack add <git-url>                  # import a pack from git
-simple-steps pack add <local-path>               # import a local directory pack
-simple-steps pack add <package> --pip            # import a pip-published pack
-simple-steps pack create <name>                  # scaffold a new local pack
-simple-steps pack create <name> --pip            # scaffold a pip-installable pack
-simple-steps pack remove <name>                  # remove a pack from manifest
-simple-steps pack install                        # install/sync all declared packs
-```
-
-Packs are tracked in `simple_steps.toml` at the workspace root. Commit this file — teammates can run `simple-steps pack install` after cloning to fetch everything.
-
-See [`usage_docs/developers/managing-packs.md`](usage_docs/developers/managing-packs.md) for the full guide.
-
 ### Examples
 
 ```bash
@@ -289,10 +272,6 @@ simple-steps --workspace ~/my-analysis-repo
 
 # Desktop window from a specific directory with custom size
 simple-steps-local --workspace ~/my-analysis-repo --width 1600 --height 1000
-
-# Import a pack from GitHub, then start
-simple-steps pack add https://github.com/org/youtube-ops.git
-simple-steps
 ```
 
 ### Environment variables
@@ -338,7 +317,7 @@ The Vite dev server proxies API requests to `http://localhost:8000/api`. Both se
 After making frontend changes, rebuild the production bundle that ships with the pip package:
 
 ```bash
-simple-steps-build
+python -m SIMPLE_STEPS.build_frontend
 ```
 
 This runs `npm run build`, patches the API URL for same-origin serving, and copies the output into `src/SIMPLE_STEPS/frontend_dist/`.
@@ -459,46 +438,42 @@ The `formula` field is the canonical source of truth — `operation_id` and `con
 ```
 Simple_Steps/
 ├── src/
-│   ├── SIMPLE_STEPS/              # Core framework (pip-installable package)
-│   │   ├── cli.py                 # `simple-steps` CLI entry point
-│   │   ├── cli_local.py           # `simple-steps-local` desktop mode (pywebview)
-│   │   ├── cli_pack.py            # `simple-steps pack` subcommand
-│   │   ├── build_frontend.py      # `simple-steps-build` helper
-│   │   ├── main.py                # FastAPI app + plugin auto-scanner + SPA serving
-│   │   ├── engine.py              # Orchestration engine (reference passing)
-│   │   ├── decorators.py          # @simple_step + register_operation
-│   │   ├── orchestrators.py       # map / filter / expand / dataframe wrappers
-│   │   ├── orchestration_ops.py   # Built-in ss_map, ss_filter, ss_expand, ss_reduce
-│   │   ├── operation_pack.py      # OperationPack failsafe bundle system
-│   │   ├── pack_loader.py         # Three-tier operation discovery
-│   │   ├── pack_manager.py        # Pack manifest, git clone, scaffold, install
-│   │   ├── models.py              # Pydantic models
-│   │   ├── file_manager.py        # Workflow JSON persistence
-│   │   ├── agent/                 # LangGraph chat agent (optional)
-│   │   └── frontend_dist/         # Bundled production frontend (auto-generated)
-│   ├── youtube_operations/        # Example domain operations
-│   ├── llm_operations/
-│   └── webscraping_operations/
-├── mock_operations/               # Demo / development mock ops
+│   └── SIMPLE_STEPS/              # The pip-installable package
+│       ├── cli.py                 # `simple-steps` entry point
+│       ├── cli_dev.py             # `simple-steps-dev` — backend + Vite together
+│       ├── cli_local.py           # `simple-steps-local` desktop mode (pywebview)
+│       ├── build_frontend.py      # Bundle builder (python -m SIMPLE_STEPS.build_frontend)
+│       ├── main.py                # FastAPI app, REST endpoints, SPA serving
+│       ├── core_bridge.py         # The seam to simple-steps-core (contracts, resources)
+│       ├── decorators.py          # @simple_step_tool + register_operation
+│       ├── engine.py              # Execution engine (reference passing)
+│       ├── orchestrators.py       # map / filter / expand / dataframe wrappers
+│       ├── orchestration_ops.py   # Built-in ss_map, ss_filter, ss_expand, ss_reduce
+│       ├── operations.py          # Built-in tools (reshaping, cleaning, sources, file IO)
+│       ├── safe_formula.py        # The formula grammar: parse + validate, no eval
+│       ├── formula_parser.py      # Legacy shape adapter over safe_formula
+│       ├── step_proxy.py          # StepProxy / ColumnProxy for Python-side chaining
+│       ├── models.py              # Pydantic models
+│       ├── file_manager.py        # Workflow JSON persistence
+│       ├── pack_loader.py         # Operation discovery (being retired — see docs)
+│       ├── agent/                 # LangGraph chat agent (optional extra)
+│       └── frontend_dist/         # Bundled production frontend (generated)
 ├── frontend/                      # React + TypeScript app (source)
 │   └── src/
-│       ├── components/            # UnifiedToolbar, OperationColumn, StepDetailView …
+│       ├── components/            # UnifiedToolbar, OperationColumn, Sidebar …
 │       ├── hooks/                 # useWorkflow (central state)
 │       ├── services/              # api.ts (REST client)
 │       └── utils/                 # formulaParser.ts
-├── pack_template/                 # Template for pip-installable packs
-├── packs/                         # Workspace developer packs (Tier 2)
-├── projects/                      # Saved workflow JSON files
-├── .packs/                        # Cloned git packs (gitignored)
-├── simple_steps.toml              # Pack manifest (commit this)
+├── external/
+│   └── simple-steps-core/         # Submodule. The backend's heart; read-only here
+├── examples/
+│   ├── tools.py                   # The one example — the whole backend you write
+│   └── README.md
 ├── tests/                         # pytest tests
-├── usage_docs/                    # Developer documentation
-│   └── developers/
-│       ├── adding-operations.md
-│       ├── creating_packs.md
-│       ├── creating_pip_packs.md
-│       ├── creating-operation-packs.md
-│       └── managing-packs.md
+│   └── fixtures/                  # Workflow fixtures + the PipelineRunner harness
+├── docs/                          # Architecture, specs, ADRs, core proposals
+├── usage_docs/                    # User + developer guides (served in the UI)
+├── scripts/                       # Guardrails, coverage, install smoke test
 └── pyproject.toml                 # Package config, dependencies, CLI entry points
 ```
 
@@ -538,13 +513,12 @@ Notes:
 |---|---|
 | [`usage_docs/developers/adding-operations.md`](usage_docs/developers/adding-operations.md) | How to define and register operations |
 | [`usage_docs/developers/desktop-mode.md`](usage_docs/developers/desktop-mode.md) | Running Simple Steps as a native desktop app (no browser) |
-| [`usage_docs/developers/creating_packs.md`](usage_docs/developers/creating_packs.md) | How to create developer packs (three-tier overview) |
-| [`usage_docs/developers/creating-operation-packs.md`](usage_docs/developers/creating-operation-packs.md) | How to create failsafe Operation Packs |
-| [`usage_docs/developers/creating_pip_packs.md`](usage_docs/developers/creating_pip_packs.md) | How to create pip-installable packs |
-| [`usage_docs/developers/managing-packs.md`](usage_docs/developers/managing-packs.md) | How to import, create, share, and sync packs (`simple-steps pack` CLI) |
 | [`docs/introduction.md`](docs/introduction.md) | Product overview and problem statement |
 | [`docs/spec/`](docs/spec/) | Feature specifications |
 | [`docs/adr/`](docs/adr/) | Architecture decision records |
+| [`docs/core-adoption-status.md`](docs/core-adoption-status.md) | Status of the `simple-steps-core` adoption and what is next |
+| [`docs/core-proposals/`](docs/core-proposals/) | Changes requested of `simple-steps-core` |
+| [`docs/cleanup-map.md`](docs/cleanup-map.md) | What was removed, what is staged for removal |
 
 ---
 
@@ -557,13 +531,9 @@ Notes:
 | `❌ pywebview is not installed` | Run `pip install simple-steps[desktop]` or `pip install pywebview` |
 | Desktop window is blank or won't open | On macOS, pywebview uses WebKit (built-in). On Linux, install `python3-gi gir1.2-webkit2-4.0`. On Windows, it works out of the box. |
 | Desktop window: right-click doesn't show Inspect | Launch with `--debug` flag: `simple-steps-local --debug` |
-| Frontend shows "no frontend build found" JSON | Run `simple-steps-build` to compile the React app into the package |
+| Frontend shows "no frontend build found" JSON | Run `python -m SIMPLE_STEPS.build_frontend` to compile the React app into the package |
 | Port already in use | Use `--port` to pick a different port, or `kill $(lsof -t -i:8000)`. Desktop mode auto-picks a free port. |
 | Operations not appearing in the UI | Ensure your file ends in `_ops.py` and is in a scanned directory (see `--ops`) |
-| Pack shows as unavailable | Check `http://localhost:8000/api/packs` for health details (missing packages, env vars) |
-| Imported pack ops not showing | Restart Simple Steps — pack discovery happens at startup |
-| `simple-steps pack install` fails | Check `git` is installed and you have repo access; for pip packs, check network |
-| `simple_steps.toml` parse error | Install `tomli` for Python <3.11: `pip install tomli` |
 
 ---
 

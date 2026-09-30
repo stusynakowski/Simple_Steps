@@ -1,19 +1,18 @@
-# example_server
+# The Simple Steps example
 
-A self-contained example server for Simple Steps. Use it to install the app,
-confirm it runs on your machine, and find out what breaks.
+One file, [`tools.py`](tools.py), and it is the whole backend a developer has
+to write. Everything a user can do in the UI comes from the tools registered
+there. Use it to install the app, confirm it runs, and find out what breaks.
 
-Two files, because the project is mid-migration between two models:
+```bash
+python tools.py        # registers the tools, starts the server + UI
+```
 
-| file | model | run it with |
-|---|---|---|
-| [`tools.py`](tools.py) | what the app ships **today** — `@simple_step` | `python tools.py` — starts the server + UI |
-| [`core_grid_demo.py`](core_grid_demo.py) | the **target** — `simple-steps-core`'s grid model | `python core_grid_demo.py` — prints, no server |
-
-`tools.py` is the one that answers "does the install work." Everything a user
-can do in the UI comes from it, and that one file is the whole backend a
-developer has to write. `core_grid_demo.py` runs the same ideas against the
-model core is moving to, so you can see the gap without reading the source.
+Each tool is a plain Python function with a `@simple_step_tool` decorator. The
+decorator reads the signature and the docstring to build the tool's contract —
+parameter types, which are required, what it returns — so the UI form, the
+formula-bar autocomplete and the tool registry all come from the function
+itself. Nothing else has to be declared.
 
 ## Install and run
 

@@ -3,11 +3,11 @@ import sys
 import pytest
 from pathlib import Path
 
-# Import PipelineRunner from the table manipulations mock project
-sys.path.insert(0, str(Path(__file__).parent.parent / "mock_projects" / "mock_table_manipulations"))
+# Shared fixture harness lives beside the tests.
+sys.path.insert(0, str(Path(__file__).parent / "fixtures"))
 from run_pipeline import PipelineRunner
 
-WORKFLOW_DIR = Path(__file__).parent.parent / "mock_projects" / "mock_tabular_selection" / "workflows"
+WORKFLOW_DIR = Path(__file__).parent / "fixtures" / "selection_workflows"
 
 def test_select_table():
     runner = PipelineRunner(str(WORKFLOW_DIR / "select-table.simple-steps-workflow"))

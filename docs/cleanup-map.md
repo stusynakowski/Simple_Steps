@@ -103,6 +103,74 @@ which makes this new material rather than a file move.
 
 ---
 
+## Round 2 — examples, fixtures, docs (2026-09-30)
+
+Driven by three decisions: no packs, **one** example, and docs that close their
+ideas rather than leave them open.
+
+### One example
+
+`examples/` is now two files: `tools.py` (17 tools — the whole backend a
+developer writes) and `README.md`. Removed `my_project/`, `youtube_operations/`,
+and `core_grid_demo.py` — the last for the same reason as the notebooks: it
+demos core's grid model, so it belongs in core.
+
+### Test fixtures moved, not deleted
+
+`mock_projects/` is gone, but **its fixtures were not thrown away** — the
+harness and workflows moved to `tests/fixtures/`, where test fixtures belong
+(they were never examples). `test_table_manipulations.py` and
+`test_tabular_selection.py` were retargeted and still pass, preserving 32 tests.
+
+Deleted outright: `mock_basic_variables/` and `test_basic_variables.py` — 62 of
+its 63 tests could never pass for want of the 8 `var-*` fixtures. Also
+`mock_youtube_analysis/` and `tests/basic_mock_youtube_operations.py` (a helper
+script pytest never collected).
+
+**The failure wall is gone.** Backend tests went from **30 failed / 33 errors**
+to **1 failed / 0 errors** across 161 tests. The one remaining failure is
+`test_tabular_selection.py::test_select_cell` — the real `KeyError: 0` bug in
+cell selection, now the only red in the suite and no longer hidden.
+
+### Removed, and why
+
+| removed | reason |
+|---|---|
+| `projects/` | Sample workflow data. `test_formula_alignment` skips cleanly without it; op count went 31 → 29 (the 2 project ops lived here) |
+| `prompts/` | Asked for. Only `AGENTIC_README.md` referenced it |
+| `AGENTIC_README.md` | Its workflow depended on `prompts/`. `CLAUDE.md` and `docs/context.md` carry the phase rules and never referenced it |
+| `docs/current_status/` (316 lines) | Closed build log, untouched since 2026-01-22 |
+| `docs/dev_notes/` (142 lines) | Closed notes, untouched since 2026-02-16 |
+| `usage_docs/developers/creating-operation-packs.md`, `managing-packs.md` | No packs. Their two Docs-panel links were removed from `Sidebar.tsx` with them |
+| `docs/system_design/README.md` — Pack System row | Linked `05-pack-system.md`, which was already absent |
+
+### Kept deliberately
+
+`docs/dev_plan/` — its README says "active as of 2026-05-16" and it is a
+curated index of how the system works *today*, not a historical log.
+`docs/system_design/` is live but stale in places (`04-operation-registration.md`
+still says `@simple_step`). Neither is dead; both want an accuracy pass rather
+than deletion.
+
+### The README described a system that does not exist
+
+Worth calling out separately, because it was the least obvious rot. `README.md`
+documented:
+
+- A **`simple-steps pack` CLI** — eight subcommands, a `simple_steps.toml`
+  manifest, and four troubleshooting rows. There is no `cli_pack.py` and no
+  `pack` subcommand in `cli.py`. It was entirely fictional. (The `--packs`
+  *flag* does exist and stayed.)
+- A project tree listing ten paths that are all absent: `operation_pack.py`,
+  `pack_manager.py`, `pack_template/`, `.packs/`, `simple_steps.toml`,
+  `src/youtube_operations/`, `src/llm_operations/`,
+  `src/webscraping_operations/`, `mock_operations/`, `packs/`.
+- `simple-steps-build`, which was never registered as a console script.
+
+All corrected against what is actually on disk.
+
+---
+
 ## Tier 2 — dead on arrival of a staged item, not before
 
 Do not delete these yet. Each is live today and becomes dead when a specific

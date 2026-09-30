@@ -98,16 +98,6 @@ const docSections: { category: string; docs: DocEntry[] }[] = [
         url: '/usage_docs/developers/adding-operations.md',
       },
       {
-        title: 'Creating Operation Packs',
-        description: 'Bundle functions with dependency validation, health checks, and graceful degradation.',
-        url: '/usage_docs/developers/creating-operation-packs.md',
-      },
-      {
-        title: 'Managing Packs',
-        description: 'Import packs from git/local/pip, the simple_steps.toml manifest, and the pack CLI.',
-        url: '/usage_docs/developers/managing-packs.md',
-      },
-      {
         title: 'Desktop Mode',
         description: 'Run Simple Steps as a native desktop window with pywebview — no browser needed.',
         url: '/usage_docs/developers/desktop-mode.md',

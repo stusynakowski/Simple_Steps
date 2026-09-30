@@ -36,17 +36,13 @@ import pytest
 # ---------------------------------------------------------------------------
 # Path bootstrap
 # ---------------------------------------------------------------------------
-MOCK_TBL = (
-    Path(__file__).resolve().parent.parent
-    / "mock_projects"
-    / "mock_table_manipulations"
-)
-sys.path.insert(0, str(MOCK_TBL))
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+sys.path.insert(0, str(FIXTURES))
 
 from run_pipeline import PipelineRunner   # noqa: E402 — registers ops
 import mock_table_ops                     # noqa: F401, E402
 
-WORKFLOWS = MOCK_TBL / "workflows"
+WORKFLOWS = FIXTURES / "table_workflows"
 
 
 # ---------------------------------------------------------------------------
