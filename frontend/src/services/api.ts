@@ -357,25 +357,6 @@ export async function deletePipeline(projectId: string, pipelineId: string): Pro
 
 // --- Debug / Diagnostics ---
 
-// --- Developer Packs ---
-
-/** A developer pack directory with its loaded operations. */
-export interface DeveloperPack {
-    id: string;
-    name: string;
-    path: string;
-    operations: string[];
-    errors: string[];
-    enabled: boolean;
-}
-
-/** Fetch all known developer pack directories and their operations. */
-export async function fetchDeveloperPacks(): Promise<DeveloperPack[]> {
-    const r = await fetch(`${API_BASE}/developer-packs`);
-    if (!r.ok) return [];
-    return r.json();
-}
-
 // --- Workspace Info ---
 
 /** A previously-opened workspace as recorded in ``~/.simple_steps/state.json``. */

@@ -33,31 +33,6 @@ export interface ParsedFormula {
 // These stubs call the backend API for all formula operations.
 import { API_BASE } from '../services/api';
 
-export async function isStepReference(value: unknown): Promise<boolean> {
-  if (typeof value !== 'string') return false;
-  // Use the backend's parser for canonical check
-  const resp = await fetch(`${API_BASE}/parse_formula`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ formula: `=${value}` }),
-  });
-  const parsed = await resp.json();
-  return parsed.operationId === 'passthrough';
-}
-
-/**
- * Format a config value for inclusion in a formula string.
- *
- * - Step references (e.g. step1.url) are left UNQUOTED so they read like
- *   Python variable attribute access: `=op.map(url=step1.url)`
- * - Numbers and booleans are unquoted.
- * - Everything else is double-quoted.
- */
-// No-op: always use backend for formula building
-export function formatFormulaValue(_v: unknown): string {
-  throw new Error('formatFormulaValue is now handled by the backend. Use buildFormula().');
-}
-
 // No-op: always use backend for formula parsing
 
 

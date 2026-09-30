@@ -20,7 +20,7 @@ from .models import (
 from .operations import DEFINITIONS as OPERATIONS
 from .engine import run_operation, get_dataframe, get_value, _get_raw_only, _ref_exists_in_raw_store
 from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
-from .pack_loader import PackLoader, OpTier, set_loader, get_loader
+from .pack_loader import PackLoader, set_loader, get_loader
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
@@ -40,9 +40,9 @@ import os
 # discovers:
 #
 #   <workspace>/projects/   → project folders containing pipeline JSON files
-#   <workspace>/packs/      → developer packs (Tier 2) with @simple_step functions
+#   <workspace>/packs/      → developer packs (Tier 2) with @simple_step_tool functions
 #   <workspace>/ops/        → workspace-level custom operations
-#   <workspace>/*.py        → top-level .py files with @simple_step functions
+#   <workspace>/*.py        → top-level .py files with @simple_step_tool functions
 #
 # This means any repo that contains a projects/ folder "just works" when you
 # run `simple-steps` from inside it.
@@ -78,23 +78,7 @@ _ws_has_py = any(
 if _ws_has_py:
     _DEVELOPER_PACK_DIRS.append(_WORKSPACE)
 
-# 4. Package-bundled packs/ directory (ships with the simple-steps repo itself)
-_bundled_packs = os.path.abspath(os.path.join(_PKG_DIR, "../../packs"))
-if os.path.isdir(_bundled_packs) and os.path.abspath(_bundled_packs) != os.path.abspath(_ws_packs):
-    _DEVELOPER_PACK_DIRS.append(_bundled_packs)
-
-# 5. Legacy sibling directories inside the simple-steps source tree
-for _legacy_name in ("youtube_operations", "llm_operations", "webscraping_operations"):
-    _legacy = os.path.join(_PKG_DIR, "..", _legacy_name)
-    if os.path.isdir(_legacy):
-        _DEVELOPER_PACK_DIRS.append(os.path.abspath(_legacy))
-
-# 6. Mock operations (only when running from the simple-steps repo itself)
-_mock_dir = os.path.abspath(os.path.join(_PKG_DIR, "../../mock_operations"))
-if os.path.isdir(_mock_dir):
-    _DEVELOPER_PACK_DIRS.append(_mock_dir)
-
-# 7. Additional pack dirs from environment / CLI flags
+# 4. Additional pack dirs from environment / CLI flags
 _extra_packs = os.environ.get("SIMPLE_STEPS_PACKS_DIR", "")
 if _extra_packs:
     _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_packs.split(";") if p.strip())
@@ -485,53 +469,7 @@ async def load_project_ops(project_id: str):
     }
 
 
-# --- 1.5 Developer Packs Directory Listing ---
-@app.get("/api/developer-packs")
-async def list_developer_packs():
-    """
-    Returns every known developer pack directory with the operations
-    it contributed.  The UI uses this to show which packs are available
-    and let users toggle them.
-    """
-    loader = get_loader()
-    if not loader:
-        return []
-
-    results = loader.get_results()
-    # Group load results by top-level developer-pack directory
-    pack_map: dict = {}
-    for r in results:
-        if r.tier != OpTier.DEVELOPER_PACK:
-            continue
-        # Identify which developer pack dir this file belongs to
-        abs_file = os.path.abspath(r.file_path) if r.file_path else ""
-        parent_pack_dir = None
-        for d in _DEVELOPER_PACK_DIRS:
-            abs_d = os.path.abspath(d)
-            if abs_file.startswith(abs_d):
-                parent_pack_dir = abs_d
-                break
-        if not parent_pack_dir:
-            parent_pack_dir = os.path.dirname(abs_file) if abs_file else "unknown"
-
-        if parent_pack_dir not in pack_map:
-            pack_map[parent_pack_dir] = {
-                "id": os.path.basename(parent_pack_dir),
-                "name": os.path.basename(parent_pack_dir).replace("_", " ").title(),
-                "path": parent_pack_dir,
-                "operations": [],
-                "errors": [],
-                "enabled": True,  # currently all discovered packs are auto-loaded
-            }
-        if r.success:
-            pack_map[parent_pack_dir]["operations"].extend(r.ops_registered)
-        if r.error:
-            pack_map[parent_pack_dir]["errors"].append(r.error)
-
-    return list(pack_map.values())
-
-
-# --- 1.6 Project / Pipeline Management ---
+# --- 1.5 Project / Pipeline Management ---
 
 # Projects (folders)
 @app.get("/api/projects", response_model=List[ProjectInfo])
