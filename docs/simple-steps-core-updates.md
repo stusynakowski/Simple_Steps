@@ -1,6 +1,9 @@
 # simple-steps-core — what changed, and what it means here
 
 > Reviewed against submodule commit `52092ba` (2026-09-29).
+> **Submodule now pinned to `1c30e03` (2026-10-01)** — see
+> `core-proposals/003-app-adoption.md` for what the update changed about our
+> findings, and core's own new `docs/status.md` for its consolidated view.
 > Companion to `external/simple-steps-core/docs/`, which is the authority;
 > this document records only what the changes mean for **this** repo.
 

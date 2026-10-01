@@ -1,11 +1,13 @@
 # Proposal: what core needs before the app can adopt `App`
 
-> **For `simple-steps-core`.** Written against submodule `52092ba`.
-> Status: proposal, not agreed. Companion to
-> `external/simple-steps-core/docs/app-config.md` and
-> `external/simple-steps-core/docs/writing-tools.md`.
+> **For `simple-steps-core`.** Written against `52092ba`, **re-verified against
+> `1c30e03`** (2026-10-01). Status: proposal, not agreed. Companion to
+> `external/simple-steps-core/docs/app-config.md`,
+> `docs/writing-tools.md` and the new `docs/status.md`.
 >
-> Every claim below was run against `52092ba`, not read off the docs.
+> Every claim below was run against the code, not read off the docs. The
+> re-verification **retracted one section (§B) and narrowed two others
+> (§E, §H)** — see each.
 
 ## The ask
 
@@ -19,13 +21,14 @@ things block that, and one is only a wrong type annotation.
 | | verdict |
 |---|---|
 | **A. `ToolParam` has no `description`** | **Add it.** Per-argument docs are unreachable today, so no UI can label a form field. The one real modelling gap |
-| **B. `description` ignores `__doc__`** | **Fix.** `register_tool` takes the decorator's `description=` and never falls back to the function docstring. Every tool we have documents itself in a docstring |
+| **B. ~~`description` ignores `__doc__`~~** | **Retracted — this already works.** The narrower real finding: `register_orchestrator` lacks the docstring fallback that `register` has |
 | **C. `AppConfig` is missing 9 of its 14 designed fields** | **Build the rest.** `cors_origins`, `tool_modules`, `resources` and the ceilings are all in `app-config.md` §2 and absent from the class |
 | **D. `register_tool(type=...)` annotation is wrong** | **Annotation-only.** It advertises 3 of the 7 legal values. Runtime accepts all 7 — verified. Cosmetic, but it misleads every author and every type checker |
-| **E. `output_schema` is `None` for `DataFrame` / `Series`** | **Add a tabular schema.** Silently empty for the two return types a tabular product uses most — 18 of our 24 built-ins |
+| **E. `output_schema` is `None` for `DataFrame` / `Series`** | **Narrowed.** `grid.catalog()` already reports `returns='DataFrame'` and `typed`. The ask is now just to bring the engine's `output_schema` up to it — or declare it superseded |
 | **F. Built-in tool grouping** | **Nothing needed.** Core already settled this with the namespace-only `ResourceSpec`. We adopt its precedent — see §F |
 | **G. `ToolDefinition.type` has no `'step'`** | **Add it, or tell us the right member.** `'step'` is this repo's v0.2 *default* type. Registering one raises `literal_error`. Shimmed to `'raw_output'` — found while building the bridge |
-| **H. Duplicate tool ids overwrite silently** | **Warn or raise.** Registering an id twice replaces the first with no signal. Two tool modules shipping the same name means last-import-wins, undebuggable |
+| **H. Duplicate tool ids overwrite silently** | **Deferring to core.** `status.md` §3 already lists it and recommends a *warning*, for a better reason than our original "raise" — see §H |
+| **I. Our 46 tools pass core's declaration contract** | **Nothing needed — a green light.** All four silent-failure rules clean, and `STRICT_TYPES` would accept every one. See §I |
 
 ---
 
@@ -71,54 +74,44 @@ and `frozen = True` is unaffected.
 
 ---
 
-## B. `description` should fall back to `__doc__`
+## B. Retracted: the docstring fallback already works
 
-### The behaviour
+**This section was wrong and is kept as a correction rather than deleted.**
+
+The original claim was that `register_tool` discards `fn.__doc__`. It does not.
+`registry.py:260` has always done the right thing, at `52092ba` and now:
 
 ```python
-@register_tool("demo", "Demo tool.", category="X")
-def demo(path: str, n: int = 3, fs = Resource("file_system")) -> dict:
-    """Do a thing.
-
-    Args:
-        path: where to read from.
-        n: how many.
-    """
+resolved_description = description or (inspect.getdoc(fn) or "").split("\n\n")[0].strip()
 ```
 
-```
-description : 'Demo tool.'          ← the decorator argument
-```
+The error was in the test, not the code: the probe passed an explicit
+`description="Demo tool."`, so an explicit argument correctly won and the
+docstring was never consulted. Re-tested properly:
 
-The docstring is discarded — body, `Args:` and all. Omit `description=` and
-`ToolDefinition.description` is `""`, even though the function documents itself
-three lines down.
+| declaration | `description` |
+|---|---|
+| `@register_tool("d_none")` + docstring | `'Docstring summary line.'` ✓ |
+| `@register_tool("d_explicit", "Explicit wins.")` + docstring | `'Explicit wins.'` ✓ |
+| `@register_tool("d_nodoc")`, no docstring | `''` ✓ |
 
-### Why it matters beyond tidiness
+Exactly the behaviour §B asked for. No change needed.
 
-The docstring is where authors actually write. All 17 tools in
-`examples/example_server/tools.py` and all 24 in `src/SIMPLE_STEPS/operations.py`
-document themselves that way, several with worked `=formula(...)` examples in
-the body. A contract derived from signatures but not docstrings throws away the
-only prose that exists.
+### The narrower finding that is real
 
-It also feeds the agent layer: `input_schema` is what grounds a tool call, and
-an unlabelled schema is an ungrounded agent.
+`register_orchestrator` does **not** share the fallback. Compare:
 
-### Proposed
+| | line | description |
+|---|---|---|
+| `ToolRegistry.register` | 260 | `description or inspect.getdoc(fn)…` |
+| `ToolRegistry.register_orchestrator` | ~320 | `description=description` — raw |
 
-1. `description` falls back to the first paragraph of `fn.__doc__` when the
-   decorator argument is omitted. An explicit argument still wins.
-2. Parse the `Args:` / `Parameters:` section (Google and NumPy styles — both
-   appear in this repo) into §A's `ToolParam.description`.
-3. Copy both into `input_schema` / `output_schema` as JSON Schema
-   `description` keys, so the derived schema carries the prose too.
+So an orchestrator declared with a docstring and no `description=` registers
+with an empty one, while a plain tool does not. Small, and an inconsistency
+rather than a design gap — one line to align.
 
-Worth stating explicitly: **the parser must not fail a registration.** A
-malformed docstring yields empty descriptions, never an import-time error. Tool
-registration happens at startup; a docstring typo must not take the server down.
-
----
+Still worth doing from §A: parse the `Args:` section into per-parameter text.
+That is the part no amount of summary fallback covers.
 
 ## C. `AppConfig` is a third of its design
 
@@ -201,25 +194,40 @@ Of the 24 built-ins we are migrating, 18 return `DataFrame`.
 case a UI most wants to tell apart: an unannotated tool should read as *unknown*,
 a `DataFrame` tool as *a table*.
 
-### Proposed
+### The grid model already solved this — the engine lags behind it
 
-Emit a schema for tabular returns rather than `None`. The minimum that is
-honest:
+Re-checked at `1c30e03`: `grid.catalog()` does what this section was going to
+ask for, and does it better.
 
-```python
-{"title": "<tool>_Output", "type": "object", "x-form": "grid"}     # DataFrame
-{"title": "<tool>_Output", "type": "object", "x-form": "column"}   # Series
+```
+tool                    returns       typed
+reshape  -> DataFrame   'DataFrame'   True
+to_series -> Series     'Series'      True
+untyped  (no annotation) None         False
 ```
 
-`form` is already core's own word for this — `Output.form` is the cardinality
-class, `"scalar" | "column" | "grid"` (`grid-model.md` §1). So the value to
-report is one core already defines; this only carries it into the derived
-schema.
+Against the engine's `output_schema`, which is `None` for all three.
 
-Column names and dtypes are deliberately **not** proposed here. They are not
-knowable from a signature — they are a property of the data, which is what
-`Output.shape` reports after a run. A schema that promised them would be
-guessing.
+Two things the grid version gets right:
+
+1. **A pandas return is reported**, as the annotation's own name.
+2. **`typed: False` separates "unannotated" from "annotated but not
+   JSON-Schema-able"** — exactly the distinction argued for above, and the one a
+   UI most wants: an unannotated tool should read as *unknown*, a `DataFrame`
+   tool as *a table*.
+
+So the ask is no longer "design a tabular schema" but the narrower **bring
+`ToolDefinition.output_schema` up to what `grid.catalog()` already publishes**
+— or, since `status.md` §6 says the two models should converge, treat the
+engine's `output_schema` as superseded and have consumers read the catalog.
+
+`core_bridge` already reports `output_type` and `output_form`, so our shim is
+shaped like the grid version rather than the engine's. When the models converge
+it should read `catalog()` directly.
+
+Column names and dtypes stay deliberately out of scope: not knowable from a
+signature, since they are a property of the data — which is what `Output.shape`
+reports after a run. A contract that promised them would be guessing.
 
 ---
 
@@ -331,16 +339,59 @@ several modules at startup; two of them choosing `clean` or `parse` means the
 survivor depends on import order, with no signal anywhere. The symptom is a
 tool that runs the wrong code, which is about the worst shape a bug can take.
 
-### Proposed
+### Core got there first, and chose better
 
-Raise on a duplicate id by default, with `replace=True` for the deliberate
-case (a notebook re-running a cell, which is presumably why overwrite is
-permissive today). A warning would be the softer option, but a raise is right:
-registration happens at startup, where failing loudly is cheap.
+`status.md` §3 (new at `1c30e03`) already lists this, and recommends a
+**warning, not an error** — with a reason we did not have:
 
-Note this interacts with §F's aliases — `qualify()` is documented as
-idempotent so re-registering a bound tool passes through, and that path must
-stay silent.
+> Recommended as a **warning**, not an error: re-declaration is legitimate in
+> notebooks and in tests (this suite re-declares `again` five times), so a hard
+> refusal would make the model painful where tools are actually written.
+
+That is more persuasive than our original recommendation here, which was to
+raise by default with `replace=True` for the deliberate case. We were reasoning
+from a server that loads tool modules once at startup; core is also the library
+someone drives from a notebook, where re-running a cell re-declares. A raise
+would be right for our process and wrong for the library — and the library's
+constraint is the binding one.
+
+**Deferring to core's call: a warning.** Our startup can escalate it if we want
+strictness in the server, which is the right place for that policy to live.
+
+Noting the interaction with §F's aliases regardless: `qualify()` is documented
+as idempotent so re-registering a bound tool passes through, and that path
+should stay silent either way.
+
+---
+
+## I. Our tools already satisfy the declaration contract
+
+`writing-tools.md` §2.2 (new at `1c30e03`) names four declaration rules that
+currently fail **silently**, and core notes it verified no tool in *its* repo
+violates them. We ran the same audit over **all 46 of ours** — the 29 system
+tools plus the 17 in `examples/tools.py`:
+
+| rule | violations |
+|---|---|
+| no positional-only parameters (`/`) | **0** |
+| no `*args` | **0** |
+| id must be an identifier (no `<lambda>`) | **0** |
+| no mutable defaults | **0** |
+| fully annotated (what `STRICT_TYPES` requires) | **0 of 46** |
+
+The checker was validated against deliberately broken declarations first, so
+the clean result is real and not a vacuous pass.
+
+Two consequences worth stating:
+
+1. **We can turn `grid.STRICT_TYPES` on from day one.** It is off by default so
+   pre-existing tools keep working, but it costs us nothing and it is the rule
+   core says "pays for itself" — the annotations are what let declaration
+   compare a parameter against the upstream column's real dtype.
+2. **Enforcing the §2.2 rules cannot break us.** Core ranks this its top next
+   change (`status.md` §7) precisely because the `*args` case "returns a
+   plausible wrong answer with no error." We have no exposure, so we have no
+   reason to argue for a gentle rollout.
 
 ---
 
