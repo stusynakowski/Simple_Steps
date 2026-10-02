@@ -48,6 +48,7 @@ FRONTEND_SRC = REPO / "frontend" / "src"
 
 PASSED: list[str] = []
 FAILED: list[tuple[str, str]] = []
+SKIPPED: list[tuple[str, str]] = []
 
 
 def ok(name: str) -> None:
@@ -60,6 +61,12 @@ def bad(name: str, detail: str) -> None:
     print(f"  [FAIL] {name}")
     for line in detail.strip().splitlines():
         print(f"         {line}")
+
+
+def skip(name: str, why: str) -> None:
+    """A check that could not run. Tracked, so a skip never reads as clean."""
+    SKIPPED.append((name, why))
+    print(f"  [SKIP] {name} ({why})")
 
 
 def _git(*args: str, cwd: Path = REPO) -> str | None:
@@ -131,18 +138,18 @@ def check_installed_core() -> None:
     name = "the installed core matches the pin"
     pin = pinned_commit()
     if pin is None:
-        print(f"  [SKIP] {name} (no pin to compare)")
+        skip(name, "no pin to compare")
         return
 
     try:
         import importlib.metadata as md
         raw = md.distribution("simple-steps-core").read_text("direct_url.json")
     except Exception:
-        print(f"  [SKIP] {name} (core not installed in this interpreter)")
+        skip(name, "core not installed in this interpreter")
         return
 
     if not raw:
-        print(f"  [SKIP] {name} (no direct_url.json)")
+        skip(name, "no direct_url.json")
         return
 
     info = json.loads(raw)
@@ -157,7 +164,7 @@ def check_installed_core() -> None:
         return
 
     if not commit:
-        print(f"  [SKIP] {name} (installed core records no commit)")
+        skip(name, "installed core records no commit")
         return
 
     n = min(len(pin), len(commit))
@@ -175,6 +182,30 @@ def check_installed_core() -> None:
 # --------------------------------------------------------------------------- #
 # 3. Bundle freshness                                                         #
 # --------------------------------------------------------------------------- #
+
+def _load_build_frontend():
+    """
+    Load `build_frontend.py` straight off disk, by path.
+
+    Deliberately NOT ``from SIMPLE_STEPS.build_frontend import ...``: that
+    executes ``SIMPLE_STEPS/__init__``, which pulls in pandas, so it only works
+    inside the project venv. Under a bare ``python3`` the import failed and this
+    check was skipped — while the script still printed "preflight clean". A gate
+    that silently passes on the wrong interpreter is worse than no gate.
+
+    Loaded by path, it needs nothing but the standard library, so preflight
+    gives the same verdict under any Python 3.
+    """
+    import importlib.util
+
+    path = REPO / "src" / "SIMPLE_STEPS" / "build_frontend.py"
+    spec = importlib.util.spec_from_file_location("_ss_build_frontend", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"cannot load {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.SOURCE_STAMP, mod.source_hash
+
 
 def check_bundle_fresh(fix: bool = False) -> None:
     """
@@ -196,14 +227,13 @@ def check_bundle_fresh(fix: bool = False) -> None:
         return
 
     if not FRONTEND_SRC.is_dir():
-        print(f"  [SKIP] {name} (no frontend/src — installed, not a checkout)")
+        skip(name, "no frontend/src — installed, not a checkout")
         return
 
-    sys.path.insert(0, str(REPO / "src"))
     try:
-        from SIMPLE_STEPS.build_frontend import SOURCE_STAMP, source_hash
-    except ImportError as exc:
-        print(f"  [SKIP] {name} (cannot import build_frontend: {exc})")
+        SOURCE_STAMP, source_hash = _load_build_frontend()
+    except Exception as exc:
+        bad(name, f"could not load build_frontend's hashing helpers: {exc}")
         return
 
     stamp_file = BUNDLE / SOURCE_STAMP
@@ -263,8 +293,15 @@ def main() -> int:
     check_installed_core()
     check_bundle_fresh(fix=args.fix)
 
-    total = len(PASSED) + len(FAILED)
-    print(f"\n  {len(PASSED)}/{total} checks passed")
+    total = len(PASSED) + len(FAILED) + len(SKIPPED)
+    tail = f", {len(SKIPPED)} skipped" if SKIPPED else ""
+    print(f"\n  {len(PASSED)}/{total} checks passed{tail}")
+    if SKIPPED and not FAILED:
+        print("\n  Some checks could not run, so this is not a clean bill of health:")
+        for n, why in SKIPPED:
+            print(f"    - {n} ({why})")
+        print("\n  Run it with the project venv so every check applies:")
+        print("    .venv/bin/python scripts/preflight.py")
     if FAILED:
         print("\n  Not ready to push:")
         for n, _ in FAILED:
@@ -272,7 +309,8 @@ def main() -> int:
         print("\n  For the full install test (builds a wheel, installs it into a")
         print("  clean venv, drives a workflow): python scripts/smoke_install.py")
         return 1
-    print("  preflight clean\n")
+    if not SKIPPED:
+        print("  preflight clean\n")
     return 0
 
 

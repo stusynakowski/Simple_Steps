@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "statusMessage": "Running preflight before push\u2026",
+            "timeout": 60,
+            "command": "cd \"${CLAUDE_PROJECT_DIR:-.}\" || exit 0; PY=.venv/bin/python; [ -x \"$PY\" ] || PY=python3; OUT=$(\"$PY\" scripts/preflight.py 2>&1) || jq -n --arg r \"$OUT\" '{hookSpecificOutput:{hookEventName:\"PreToolUse\",permissionDecision:\"deny\",permissionDecisionReason:(\"preflight failed - push blocked.\\n\\n\" + $r)}}'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$f\" in */frontend/src/*) jq -n '{hookSpecificOutput:{hookEventName:\"PostToolUse\",additionalContext:\"frontend/src changed, so the shipped bundle in src/SIMPLE_STEPS/frontend_dist/ is now stale. Rebuild before pushing: python -m SIMPLE_STEPS.build_frontend (or scripts/preflight.py --fix).\"}}';; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

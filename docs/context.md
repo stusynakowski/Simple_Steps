@@ -64,6 +64,19 @@ python scripts/smoke_install.py        # wheel → clean venv → run a workflow
 broken this repo. `smoke_install` is the slow one that proves a user's install
 works; run it when packaging or dependencies changed.
 
+Two hooks in `.claude/settings.json` make this automatic rather than
+remembered, so neither depends on anyone reading this file:
+
+- **`git push` is blocked when preflight fails.** A `PreToolUse` hook scoped to
+  `Bash(git push*)` runs preflight and denies the push with the full failure
+  text. Override by fixing the failure, not by bypassing the hook.
+- **Editing `frontend/src` warns that the bundle is stale.** A `PostToolUse`
+  hook on `Write|Edit` says so immediately, rather than letting it surface at
+  push time.
+
+Run `/hooks` to review or disable them. Preflight deliberately needs nothing
+but the standard library, so the hook gives the same verdict under any Python 3.
+
 ### The frontend bundle is a build artifact that ships
 
 `src/SIMPLE_STEPS/frontend_dist/` is committed because the wheel ships it.
