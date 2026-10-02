@@ -29,6 +29,7 @@ things block that, and one is only a wrong type annotation.
 | **G. `ToolDefinition.type` has no `'step'`** | **Add it, or tell us the right member.** `'step'` is this repo's v0.2 *default* type. Registering one raises `literal_error`. Shimmed to `'raw_output'` — found while building the bridge |
 | **H. Duplicate tool ids overwrite silently** | **Deferring to core.** `status.md` §3 already lists it and recommends a *warning*, for a better reason than our original "raise" — see §H |
 | **I. Our 46 tools pass core's declaration contract** | **Nothing needed — a green light.** All four silent-failure rules clean, and `STRICT_TYPES` would accept every one. See §I |
+| **J. One `DataFrame` param empties the whole `input_schema`** | **Fix — the most damaging one here.** Every property becomes `{}` and every `type_name` becomes `"Any"`, so a table tool's contract carries no types, no enums and no required flags. `input_schema` is what grounds the agent |
 
 ---
 
@@ -392,6 +393,65 @@ Two consequences worth stating:
    change (`status.md` §7) precisely because the `*args` case "returns a
    plausible wrong answer with no error." We have no exposure, so we have no
    reason to argue for a gentle rollout.
+
+---
+
+## J. One `DataFrame` parameter empties the entire `input_schema`
+
+The sharpest finding in this document, and it was found by trying to read an
+enum out of the schema rather than by reading code.
+
+### Reproduction
+
+```python
+@register_tool("no_df", "x")
+def no_df(mode: Literal["a","b"] = "a", n: int = 1) -> str: ...
+
+@register_tool("with_df", "x")
+def with_df(df: pd.DataFrame, mode: Literal["a","b"] = "a", n: int = 1) -> str: ...
+```
+
+```
+no_df   -> {"mode": {"default":"a","enum":["a","b"],"type":"string"},
+            "n": {"default":1,"type":"integer"}}
+with_df -> {"df": {}, "mode": {}, "n": {}}
+```
+
+The DataFrame parameter does not merely fail to describe *itself* — it empties
+`mode` and `n` too. `ToolParam.type_name` degrades the same way: every
+parameter of such a tool reports `"Any"`, including the `str` and `int` ones.
+
+### Why it matters more than it looks
+
+`input_schema` is the derived contract: it is what a UI builds form widgets
+from, and what grounds an agent's tool call. **Most tabular tools take a
+DataFrame**, so for the majority of a tabular product's tools that contract is
+empty — no types, no enums, no required flags.
+
+It is also silent. A tool with no schema looks identical to a tool whose
+parameters genuinely have no constraints, so nothing surfaces until a form
+renders a text box where a dropdown belonged.
+
+### Proposed
+
+Describe what can be described and skip what cannot, rather than discarding the
+lot:
+
+1. Build the schema per parameter, so one unrepresentable annotation costs only
+   its own entry.
+2. Give a DataFrame / Series parameter the same treatment §E proposes for the
+   return — `{"type": "object", "x-form": "grid"}` — so it reads as *a table*
+   rather than as *unknown*.
+3. Keep `type_name` per parameter for the same reason: a failure on `df` should
+   not erase that `n` is an `int`.
+
+### What we did meanwhile
+
+`core_bridge.literal_options()` and `annotation_type_names()` resolve the
+function's annotations with `get_type_hints` and ignore the schema. Tagged
+`SHIM(core §J)`. Note `get_type_hints` is required rather than
+`inspect.signature`: with `from __future__ import annotations` the raw
+annotation is the *string* `"Literal['a','b']"`, which carries nothing.
 
 ---
 

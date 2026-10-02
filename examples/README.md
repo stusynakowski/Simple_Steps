@@ -133,23 +133,51 @@ grid renders it and that clicking a cell shows the contents.
 **Rename a step.** Rename step 1 and check that formulas referencing it still
 resolve. References are supposed to survive a rename.
 
-## Known gap: enum arguments render as free text
+## Enum arguments: dropdown in the form, rejected in the formula bar
 
-`bucket_score` declares its argument properly:
+`bucket_score` and `add_computed` both declare a constrained argument:
 
 ```python
-scheme: Literal["thirds", "halves", "pass_fail"] = "thirds"
+scheme:    Literal["thirds", "halves", "pass_fail"] = "thirds"
+operation: Literal["double", "square", "negate", "abs"] = "double"
 ```
 
-That should give you a dropdown with three options and reject anything else
-before the step runs. Today the decorator flattens it to a plain string field,
-so you get a text box and a typo only surfaces as a crash at run time.
-`add_computed`'s `operation` argument has the same problem.
+Both are now honored in both places a value can be entered:
 
-This matters more than it looks: the JSON Schema the UI builds its forms from —
-and the schema an agent is grounded on — is derived from these annotations. If
-every parameter is a string, forms stay untyped and an agent has nothing to
-constrain it. Fixing the decorator to honor `Literal` fixes both at once.
+- **The parameter form gives a dropdown** of exactly those values. If a step
+  already holds something else — a wired reference, or a value from an older
+  save file — it is kept as an extra option labelled `(not a valid choice)`
+  rather than silently replaced.
+- **The formula bar rejects an invalid constant** before the step runs:
+
+  ```
+  =bucket_score(score=step1["score"], scheme="typo_here")
+  → 'typo_here' is not a valid value for 'scheme'.
+    Choose one of: 'thirds', 'halves', 'pass_fail'
+  ```
+
+A value that is a reference rather than a constant — `scheme=step1["x"]` — is
+deliberately **not** flagged. What it holds is unknowable until the step runs,
+and guessing would invent errors.
+
+### Why this needed a local workaround
+
+The allowed values are already in the JSON Schema core derives, and reading
+them from there would have been the clean route. It does not work, for a reason
+worth knowing if you write tools:
+
+**A single `pd.DataFrame` parameter empties a tool's entire `input_schema`.**
+Pydantic cannot model a DataFrame field, and core falls back to a bare `{}` for
+*every* property rather than just that one. Verified directly: a tool with
+`(mode: Literal["a","b"], n: int)` gets a complete schema; add
+`df: pd.DataFrame` and all three properties become `{}`. Core also reports
+`type_name="Any"` for every parameter of such a tool.
+
+Most table tools take a DataFrame, so for them the schema carries no types, no
+enums and no required flags — and `input_schema` is what grounds the agent
+layer. So both the dropdown and the validator read the function's resolved
+annotations instead. Recorded as §J in
+[`docs/core-proposals/003-app-adoption.md`](../docs/core-proposals/003-app-adoption.md).
 
 ## Uninstalling
 

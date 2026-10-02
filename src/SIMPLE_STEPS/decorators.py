@@ -280,9 +280,27 @@ _UI_TYPE_BY_ANNOTATION = {
 }
 
 
-def _ui_type(type_name: str) -> str:
-    """Map a core annotation name onto the UI's widget type."""
+# JSON Schema type -> the UI's widget vocabulary. Used to resolve annotations
+# whose Python name says nothing useful, above all "Literal": the values decide
+# the type, so Literal["a","b"] is a string and Literal[1,2] a number.
+_UI_TYPE_BY_SCHEMA = {
+    "string": "string", "integer": "number", "number": "number",
+    "boolean": "boolean", "array": "list", "object": "object",
+}
+
+
+def _ui_type(type_name: str, schema_type: str = None) -> str:
+    """
+    Map a core annotation name onto the UI's widget type.
+
+    ``schema_type`` is the JSON Schema type core derived for the same
+    parameter. It wins when the annotation name is uninformative — a
+    ``Literal`` reports its name as just "Literal", which would otherwise
+    fall through to "string" and mistype ``Literal[1, 2]``.
+    """
     base = (type_name or "").split("[")[0].strip()
+    if base in ("Literal", "Any", "", "Optional", "Union") and schema_type:
+        return _UI_TYPE_BY_SCHEMA.get(schema_type, "string")
     if base in _UI_TYPE_BY_ANNOTATION:
         return _UI_TYPE_BY_ANNOTATION[base]
     lowered = base.lower()
@@ -346,11 +364,12 @@ def simple_step_tool(
         params = [
             OperationParam(
                 name=p["name"],
-                type=_ui_type(p["type_name"]),
+                type=_ui_type(p["type_name"], p.get("schema_type")),
                 description=p["description"],
                 default=p["default"],
                 required=p["required"],
                 kind=p["kind"],
+                options=p.get("options"),
             )
             for p in contract.params
         ]

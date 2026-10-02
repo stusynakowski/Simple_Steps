@@ -232,6 +232,48 @@ def _node_range(node: ast.AST) -> Tuple[Optional[int], Optional[int]]:
     return col, end
 
 
+def _resolved_hints(func) -> Dict[str, Any]:
+    """
+    *func*'s type hints with string annotations resolved.
+
+    ``inspect.signature`` reports the raw annotation, which is a *string* in any
+    module using ``from __future__ import annotations`` — as the example's
+    ``tools.py`` does. Reading ``param.annotation`` therefore sees
+    ``"Literal['a','b']"`` and learns nothing. ``get_type_hints`` evaluates it.
+
+    Never raises: an unresolvable annotation yields no hints, so validation
+    simply checks less rather than failing.
+    """
+    try:
+        from typing import get_type_hints
+        return get_type_hints(getattr(func, "_raw_func", func))
+    except Exception:
+        return {}
+
+
+def _literal_choices(hint: Any) -> Optional[tuple]:
+    """
+    The allowed values of a ``Literal`` hint, or None if it is not one.
+
+    Reads the annotation rather than the derived JSON Schema: that schema is
+    empty for any tool taking a DataFrame (see core_bridge, SHIM core §J), and
+    most table tools take one. Looks through ``Optional[Literal[...]]``.
+    """
+    import typing
+
+    if hint is None or hint is inspect.Parameter.empty:
+        return None
+
+    origin = typing.get_origin(hint)
+    if origin is typing.Literal:
+        return typing.get_args(hint)
+    if origin is typing.Union:
+        for arg in typing.get_args(hint):
+            if typing.get_origin(arg) is typing.Literal:
+                return typing.get_args(arg)
+    return None
+
+
 def _signature_diagnostics(
     call: ast.Call,
     func,
@@ -274,6 +316,35 @@ def _signature_diagnostics(
                     col_offset=col,
                     end_col_offset=end,
                 ))
+
+    # ── Literal values outside the allowed set ──
+    # The UI gives a Literal parameter a dropdown, so a typo cannot get in that
+    # way. The formula bar is the other door, and it is the canonical one — a
+    # value typed here must be checked or an invalid choice reaches the engine
+    # and surfaces as a crash at run time instead of a red formula.
+    #
+    # Only literal constants are checked. A step reference or an expression is
+    # not knowable until the step runs, and guessing would invent errors.
+    hints = _resolved_hints(func)
+    for kw in call.keywords:
+        if not kw.arg or kw.arg not in params:
+            continue
+        allowed = _literal_choices(hints.get(kw.arg))
+        if not allowed:
+            continue
+        node = kw.value
+        if not isinstance(node, ast.Constant):
+            continue
+        if node.value not in allowed:
+            col, end = _node_range(node)
+            shown = ", ".join(repr(a) for a in allowed)
+            diags.append(Diagnostic(
+                message=f"{node.value!r} is not a valid value for "
+                        f"'{kw.arg}'. Choose one of: {shown}",
+                code="invalid_literal_value",
+                col_offset=col,
+                end_col_offset=end,
+            ))
 
     # ── Required kwargs missing ──
     # A parameter is "required" if it has no default AND is not VAR_*.

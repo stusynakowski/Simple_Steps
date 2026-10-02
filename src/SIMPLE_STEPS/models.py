@@ -86,6 +86,10 @@ class OperationParam(BaseModel):
     # 'resource' params are injected by the engine from the resource container
     # and are not user-editable form fields. Mirrors core's ToolParam.kind.
     kind: Literal['data', 'resource'] = 'data'
+    # Allowed values for a Literal-annotated parameter, read off core's
+    # derived input_schema. None means unconstrained (render a text field);
+    # a list means render a dropdown and reject anything else.
+    options: Optional[List[Any]] = None
 
 
 class OperationReturn(BaseModel):

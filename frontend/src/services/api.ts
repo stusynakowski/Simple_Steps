@@ -126,6 +126,11 @@ export interface OperationParam {
    * Mirrors core's ToolParam.kind.
    */
   kind?: 'data' | 'resource';
+  /**
+   * Allowed values for a Literal-annotated parameter. Present means render a
+   * dropdown restricted to these; absent/null means a free-text field.
+   */
+  options?: (string | number | boolean)[] | null;
 }
 
 /** What a tool returns, derived from its return annotation + docstring. */

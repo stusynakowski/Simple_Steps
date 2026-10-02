@@ -610,7 +610,35 @@ export default function OperationColumn({
                             <div key={param.name} className="config-item">
                               <label title={param.description}>{param.name}:</label>
                               <div style={{ position: 'relative', flex: 1 }}>
-                                <input 
+                                {/* A parameter annotated Literal[...] carries its allowed
+                                    values, so it gets a dropdown instead of a free-text box
+                                    and a typo can no longer reach the engine. The current
+                                    value is kept as an extra option when it is not one of
+                                    them — a wired reference or a value from an older save
+                                    must never be silently replaced. */}
+                                {param.options && param.options.length > 0 ? (
+                                  <select
+                                    value={paramVal}
+                                    title={param.description}
+                                    onChange={(e) => {
+                                      handleUiUpdate({
+                                        configuration: { ...step.configuration, [param.name]: e.target.value },
+                                      });
+                                      onPreview?.(step.id);
+                                    }}
+                                    style={{ width: '100%', boxSizing: 'border-box' }}
+                                  >
+                                    {!param.options.map(String).includes(paramVal) && (
+                                      <option value={paramVal}>
+                                        {paramVal === '' ? '— choose —' : `${paramVal} (not a valid choice)`}
+                                      </option>
+                                    )}
+                                    {param.options.map((opt) => (
+                                      <option key={String(opt)} value={String(opt)}>{String(opt)}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                <input
                                     ref={(el) => { paramInputRefs.current[param.name] = el; }}
                                     type="text"
                                     value={paramVal}
@@ -649,6 +677,7 @@ export default function OperationColumn({
                                       } : {}),
                                     }}
                                 />
+                                )}
                                 {isWiredValue && (
                                   <span
                                     title="This parameter references another step's output"

@@ -11,8 +11,10 @@ something we need, the gap is shimmed here and recorded in
 Every shim below is tagged with the proposal section that removes it::
 
     SHIM(core §A)  ToolParam has no `description` field
-    SHIM(core §B)  register_tool ignores fn.__doc__
     SHIM(core §E)  output_schema is None for DataFrame / Series
+    SHIM(core §G)  ToolDefinition.type has no 'step' member
+    SHIM(core §J)  one DataFrame param empties the whole input_schema, and
+                   reports every parameter's type_name as "Any"
 
 When core lands one of those, delete the tagged block and read the value off
 the :class:`ToolDefinition` instead. Nothing else should need to change — that
@@ -254,6 +256,147 @@ def _describe_return(fn: Callable) -> str:
 # The enriched contract                                                       #
 # --------------------------------------------------------------------------- #
 
+def literal_options(fn: Callable) -> Dict[str, List[Any]]:
+    """
+    The allowed values of every ``Literal``-annotated parameter of *fn*.
+
+    Read from the function's own resolved annotations rather than from core's
+    ``input_schema``, because that schema is unreliable here:
+
+    SHIM(core §J): a single ``pd.DataFrame`` parameter empties the WHOLE
+    ``input_schema`` — pydantic cannot model a DataFrame field, and core falls
+    back to a bare ``{}`` for *every* property rather than just that one.
+    Verified: a tool with ``(mode: Literal["a","b"], n: int)`` gets a complete
+    schema; add ``df: pd.DataFrame`` and all three properties become ``{}``.
+    Most of our table tools take a DataFrame, so for them the schema carries
+    no types, no enums and no required flags.
+
+    Resolving annotations directly is immune to that, and also handles
+    ``Optional[Literal[...]]`` by dropping the ``None`` branch.
+
+    Never raises: an unresolvable annotation yields no options rather than
+    failing a registration.
+    """
+    import typing
+
+    try:
+        hints = get_type_hints(getattr(fn, "_raw_func", fn))
+    except Exception:
+        return {}
+
+    found: Dict[str, List[Any]] = {}
+    for name, hint in hints.items():
+        if name == "return":
+            continue
+        values = _literal_values(hint)
+        if values:
+            found[name] = values
+    return found
+
+
+def annotation_type_names(fn: Callable) -> Dict[str, str]:
+    """
+    A readable type name per parameter, from *fn*'s resolved annotations.
+
+    SHIM(core §J): for a tool that takes a ``pd.DataFrame``, core reports
+    ``type_name='Any'`` for **every** parameter — the same failure that empties
+    ``input_schema`` (see :func:`literal_options`). Without this, a DataFrame
+    argument renders as a free-text box instead of a table picker, and an
+    ``int`` argument loses its numeric widget.
+
+    Never raises.
+    """
+    try:
+        hints = get_type_hints(getattr(fn, "_raw_func", fn))
+    except Exception:
+        return {}
+
+    names: Dict[str, str] = {}
+    for key, hint in hints.items():
+        if key == "return":
+            continue
+        name = getattr(hint, "__name__", None)
+        if not name:
+            # Literal[...], Optional[...] and friends have no __name__.
+            name = str(hint).replace("typing.", "").split("[")[0]
+        if name:
+            names[key] = name
+    return names
+
+
+def _literal_values(hint: Any) -> Optional[List[Any]]:
+    """Allowed values of a Literal, looking through Optional/Union wrappers."""
+    import typing
+
+    origin = typing.get_origin(hint)
+    if origin is typing.Literal:
+        return list(typing.get_args(hint))
+
+    # Optional[Literal[...]] / Union[Literal[...], None]
+    if origin is typing.Union:
+        merged: List[Any] = []
+        for arg in typing.get_args(hint):
+            if arg is type(None):
+                continue
+            inner = _literal_values(arg)
+            if inner:
+                merged.extend(v for v in inner if v not in merged)
+        return merged or None
+    return None
+
+
+def _type_of_options(values: Optional[List[Any]]) -> Optional[str]:
+    """
+    The JSON Schema type of a Literal's values, inferred from the values.
+
+    Needed when core's schema is empty (see :func:`literal_options`), so the
+    UI still knows that ``Literal[1, 2]`` is a number and ``Literal["a"]`` a
+    string. ``bool`` is checked before ``int`` because it is a subclass.
+    """
+    if not values:
+        return None
+    first = values[0]
+    if isinstance(first, bool):
+        return "boolean"
+    if isinstance(first, int):
+        return "integer"
+    if isinstance(first, float):
+        return "number"
+    if isinstance(first, str):
+        return "string"
+    return None
+
+
+def _schema_options(prop: Dict[str, Any]) -> Optional[List[Any]]:
+    """
+    The allowed values of a parameter, from its JSON Schema fragment.
+
+    Handles the two shapes pydantic emits for a ``Literal``: a direct ``enum``
+    list, and a one-element ``const``. Also looks inside ``anyOf``, which is
+    how ``Optional[Literal[...]]`` arrives — the ``None`` branch is dropped so
+    the dropdown offers only real choices.
+
+    Returns ``None`` (not ``[]``) when the parameter is unconstrained, so a
+    caller can tell "no options" from "an empty enum".
+    """
+    if not isinstance(prop, dict):
+        return None
+
+    if isinstance(prop.get("enum"), list) and prop["enum"]:
+        return list(prop["enum"])
+    if "const" in prop:
+        return [prop["const"]]
+
+    merged: List[Any] = []
+    for branch in prop.get("anyOf") or prop.get("oneOf") or []:
+        if not isinstance(branch, dict) or branch.get("type") == "null":
+            continue
+        inner = _schema_options(branch)
+        if inner:
+            merged.extend(v for v in inner if v not in merged)
+    return merged or None
+
+
 @dataclass
 class CoreContract:
     """A core :class:`ToolDefinition`, plus what core cannot yet carry."""
@@ -309,10 +452,26 @@ def core_contract(
     definition = REGISTRY.get_definition(getattr(tool, "operation_id", tool_id))
 
     params: List[Dict[str, Any]] = []
+    # Core derives a correct JSON Schema for the data params, including `enum`
+    # for a Literal annotation. ToolParam.type_name flattens that to the bare
+    # word "Literal", so the allowed values are read off the schema instead —
+    # they are the difference between a dropdown and a free-text box.
+    schema_props = (definition.input_schema or {}).get("properties", {}) or {}
+    # Annotations first: the schema is empty for any tool taking a DataFrame
+    # (SHIM core §J, see literal_options).
+    annotated_options = literal_options(fn)
+    annotated_types = annotation_type_names(fn)
+
     for p in definition.params:
+        prop = schema_props.get(p.name, {}) or {}
         params.append({
             "name": p.name,
-            "type_name": p.type_name,
+            # Core's type_name is "Any" for every param of a DataFrame-taking
+            # tool, so prefer the resolved annotation when core gives up.
+            "type_name": (
+                annotated_types.get(p.name, p.type_name)
+                if p.type_name in ("Any", "", None) else p.type_name
+            ),
             "required": p.required,
             "default": p.default,
             "kind": p.kind,
@@ -320,6 +479,14 @@ def core_contract(
             # SHIM(core §A): ToolParam has no `description` field, so the
             # docstring text is attached here instead of read off the param.
             "description": docs.params.get(p.name, ""),
+            # The allowed values of a Literal, or None when unconstrained.
+            "options": annotated_options.get(p.name) or _schema_options(prop),
+            # The schema's own type, which resolves what "Literal" means:
+            # Literal["a","b"] is a string, Literal[1,2] an integer. Falls back
+            # to the type of the first allowed value when the schema is empty.
+            "schema_type": prop.get("type") or _type_of_options(
+                annotated_options.get(p.name)
+            ),
         })
 
     form = tabular_output_form(fn)
