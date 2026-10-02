@@ -30,23 +30,65 @@ python -m pip install /path/to/Simple_Steps
 python tools.py                    # opens http://127.0.0.1:8000
 ```
 
-`python tools.py` registers the 17 tools and launches the server with the UI
-attached. Add `--no-browser` to stay in the terminal, or `--port 8123` if 8000
-is taken.
+`python tools.py` registers these 17 tools and launches the server with the UI
+attached. The 29 built-in tools load alongside them, so the formula bar offers
+46 in total. Add `--no-browser` to stay in the terminal, or `--port 8123` if
+8000 is taken.
 
-## What's in here
+## What you should see in the formula bar
 
-17 tools across five categories, chosen to cover every orchestration mode and
-every failure shape rather than to be useful.
+**46 tools: these 17, plus 29 built-ins that load whether or not you run this
+file.** Worth knowing before you go looking for a typo — if a name you don't
+recognise appears in autocomplete, it is probably a built-in (listed further
+down), not a stray.
 
-| Category | Tools | What they exercise |
-|---|---|---|
-| **Sources** | `make_range` · `sample_people` · `split_text` · `empty_table` | Starting a workflow with no upstream input |
-| **Text** | `word_count` · `to_upper` · `reverse_text` | Per-cell application across a column |
-| **Analysis** | `classify_age` · `bucket_score` | Per-cell with arguments; enum parameters |
-| **Table** | `add_computed` · `top_n` · `summarize` · `count_by` | Whole-table transforms |
-| **Diagnostics** | `slow_double` · `sometimes_fails` | Progress reporting and partial failure |
-| **Shapes** | `build_record` · `make_series` | Cells holding a dict or a list, not a scalar |
+Every entry below was read out of the live registry, and all 46 were checked
+against the formula parser: 46/46 recognised, none unknown.
+
+### The 17 in `tools.py`
+
+Chosen to cover every orchestration mode and every failure shape rather than to
+be useful. An argument shown without `=` is required; the rest show their
+default.
+
+| Category | Formula | Returns | What it exercises |
+|---|---|---|---|
+| **Sources** | `=make_range(n=10, start=0)` | DataFrame | Starting a workflow with no upstream input |
+| | `=sample_people(count=8, seed=0)` | DataFrame | A richer source — names, ages, scores, cities |
+| | `=split_text(text='alpha,beta,gamma', separator=',')` | DataFrame | One string in, many rows out |
+| | `=empty_table(columns='a,b,c')` | DataFrame | The zero-row case, with columns intact |
+| **Text** | `=word_count(text)` | int | Per-cell application across a column |
+| | `=to_upper(text)` | str | |
+| | `=reverse_text(text)` | str | |
+| **Analysis** | `=classify_age(age)` | str | Per-cell with a derived label |
+| | `=bucket_score(score, scheme='thirds')` | str | Enum parameters — see the known gap below |
+| **Diagnostics** | `=slow_double(n, delay_ms=250)` | int | Progress reporting on a slow step |
+| | `=sometimes_fails(n, fail_on_multiples_of=3)` | int | Partial failure: some rows raise, others don't |
+| **Table** | `=add_computed(df, source_column='', new_column='computed', operation='double')` | DataFrame | Whole-table transforms |
+| | `=top_n(df, column='', n=5, descending=True)` | DataFrame | |
+| | `=summarize(df)` | DataFrame | Collapsing a table to one summary row |
+| | `=count_by(df, column='')` | DataFrame | Grouping |
+| **Shapes** | `=build_record(value)` | dict | A cell holding a dict, not a scalar |
+| | `=make_series(n, length=4)` | list | A cell holding a list — feed it to an Expand |
+
+### The 29 built-ins, available either way
+
+These ship with the package. You get them from a bare `simple-steps` with no
+tools file at all, which is why that is enough to confirm an install works.
+
+| Category | Tools |
+|---|---|
+| **Data Reshaping** (18) | `add_column` · `aggregate` · `cast_column` · `drop_columns` · `extract_json` · `flatten_json` · `format_string` · `group_by` · `merge_steps` · `pandas_eval` · `pivot` · `rename_columns` · `sample_rows` · `select_cell` · `select_columns` · `select_rows` · `sort_by` · `unpivot` |
+| **Data Cleaning** (3) | `deduplicate` · `drop_na` · `filter_rows` |
+| **Data Sources** (2) | `define_value` · `to_rows` |
+| **File IO** (1) | `load_csv` |
+| **Variables** (1) | `literal` |
+| **Orchestration** (4) | `ss_map` · `ss_filter` · `ss_expand` · `ss_reduce` |
+
+> **`select_cell` currently has a real bug** — it raises `KeyError: 0`. It is
+> the single failing test in the suite
+> (`tests/test_tabular_selection.py::test_select_cell`). Avoid it until that is
+> fixed; `select_rows` and `select_columns` are fine.
 
 ## A first workflow
 
