@@ -107,6 +107,12 @@ time.
 
 ## Commands
 - Install (dev): `python -m pip install -e ".[dev]"`
+- **Update a pip install elsewhere**: both packages are permanently `0.1.0`, so
+  a plain `pip install git+...` is a NO-OP on a machine that already has them —
+  pip reports the old copy as satisfying the requirement. Use
+  `pip install --upgrade --force-reinstall --no-cache-dir "git+https://github.com/stusynakowski/Simple_Steps.git"`,
+  and check the result with `simple-steps --version`, which prints each
+  package's git commit rather than its (meaningless) version.
 - Run backend tests: `pytest -q`
 - Run frontend tests: `cd frontend && npx vitest run`
 - Run the app in dev: `simple-steps-dev` (backend :8000 + Vite :5173 — use :5173)

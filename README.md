@@ -45,6 +45,60 @@ The formula bar is the single source of truth. The UI controls (dropdowns, param
 
 ## Installation
 
+### From GitHub
+
+```bash
+pip install git+https://github.com/stusynakowski/Simple_Steps.git
+simple-steps
+```
+
+### Updating an existing install — read this
+
+Both `simple-steps` and `simple-steps-core` are permanently version `0.1.0`, so
+**a plain `pip install git+...` on a machine that already has them does
+nothing** — pip sees the installed copy as satisfying the requirement and keeps
+your old code. `pip install --upgrade` does not help either, for the same
+reason.
+
+To actually update:
+
+```bash
+pip install --upgrade --force-reinstall --no-cache-dir \
+  "git+https://github.com/stusynakowski/Simple_Steps.git"
+```
+
+Check what you really have — the commit, not the version:
+
+```bash
+simple-steps --version
+#   simple-steps       0.1.0 (git 5597c025ae78)
+#   simple-steps-core  0.1.0 (git 1c30e03c9a10)
+```
+
+If `simple-steps-core` is older than `1c30e03`, you will see
+`ImportError: cannot import name 'ResourceSpec'` — that is the symptom of a
+stale install, and the force-reinstall above is the fix.
+
+### Running the example
+
+`examples/tools.py` is **not shipped in the wheel** — only the `SIMPLE_STEPS`
+package is. A pip install gives you the 29 built-in tools, which is enough to
+confirm the install works:
+
+```bash
+simple-steps                      # built-in tools only
+```
+
+To run the 17-tool example, you need the repo:
+
+```bash
+git clone https://github.com/stusynakowski/Simple_Steps.git
+cd Simple_Steps
+pip install -e .
+python examples/tools.py          # registers the example tools, starts the app
+```
+
+
 ### Prerequisites
 
 - **Python 3.9+**

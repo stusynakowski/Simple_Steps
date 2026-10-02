@@ -54,6 +54,53 @@ def _find_free_port(host: str, preferred: int, max_attempts: int = 50) -> int:
         return s.getsockname()[1]
 
 
+def print_versions() -> None:
+    """
+    Report what is actually installed, including each package's git commit.
+
+    The version string never changes (both packages sit at 0.1.0), so pip
+    treats any installed copy as satisfying a fresh `pip install git+...` and
+    silently leaves the old code in place. The commit is the only way to tell
+    what you really have — which is what this prints.
+    """
+    import json
+
+    try:
+        import importlib.metadata as md
+    except ImportError:  # pragma: no cover - Python < 3.8
+        print("  (importlib.metadata unavailable)")
+        return
+
+    for name in ("simple-steps", "simple-steps-core"):
+        try:
+            dist = md.distribution(name)
+        except Exception:
+            print(f"  {name:18} NOT INSTALLED")
+            continue
+
+        commit = source = ""
+        try:
+            raw = dist.read_text("direct_url.json")
+            if raw:
+                info = json.loads(raw)
+                commit = (info.get("vcs_info") or {}).get("commit_id", "")
+                if info.get("dir_info", {}).get("editable"):
+                    source = "editable"
+                elif commit:
+                    source = "git"
+        except Exception:
+            pass
+
+        detail = f" ({source} {commit[:12]})" if commit else (f" ({source})" if source else "")
+        print(f"  {name:18} {dist.version}{detail}")
+
+    print()
+    print("  Both packages are version 0.1.0 always, so `pip install` sees an")
+    print("  existing copy as up to date. To genuinely update:")
+    print("    pip install --upgrade --force-reinstall --no-cache-dir \\")
+    print('      "git+https://github.com/stusynakowski/Simple_Steps.git"')
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="simple-steps",
@@ -66,6 +113,11 @@ def main():
     parser.add_argument(
         "--host", type=str, default="127.0.0.1",
         help="Host to bind to (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--version", action="store_true",
+        help="Print the installed simple-steps and simple-steps-core versions, "
+             "including which git commit each came from, then exit.",
     )
     parser.add_argument(
         "--dev", action="store_true",
@@ -98,6 +150,10 @@ def main():
         help="Directory for project/pipeline storage (default: <workspace>/projects)",
     )
     args = parser.parse_args()
+
+    if args.version:
+        print_versions()
+        return
 
     # ── Delegate to native desktop mode if --local ───────────────────────
     if args.local:
