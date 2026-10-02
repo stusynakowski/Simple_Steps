@@ -472,7 +472,10 @@ class PackLoader:
             if new_ops:
                 print(f"    ✅ {os.path.basename(abs_path)}: {', '.join(new_ops)}")
             else:
-                print(f"    ⏭  {os.path.basename(abs_path)}: no @simple_step functions found")
+                # Detection is a registry diff, not a text scan, so "nothing
+                # new" is the honest wording: the file may well define tools
+                # that some earlier import already registered.
+                print(f"    ⏭  {os.path.basename(abs_path)}: registered no new tools")
 
         except Exception as e:
             self._results.append(LoadResult(
