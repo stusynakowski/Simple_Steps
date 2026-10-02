@@ -31,8 +31,33 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, get_type_hints
 
 import pandas as pd
 
-from simple_steps_core import REGISTRY, ResourceSpec
 from simple_steps_core import register_tool as _core_register_tool
+
+# `simple-steps-core` is declared as a git dependency, so an environment can
+# end up with a core older than this app expects. Fail with the fix rather than
+# a bare ImportError from four frames down: SIMPLE_STEPS/__init__ imports this
+# module, so an older core otherwise makes the whole package unimportable and
+# the traceback points here instead of at the install.
+try:
+    from simple_steps_core import REGISTRY, ResourceSpec
+except ImportError as exc:  # pragma: no cover - environment-dependent
+    import simple_steps_core as _core
+
+    # `name_from` is the name that could not be imported; `name` is the module
+    # it was wanted from, which is not the useful half here.
+    _missing = getattr(exc, "name_from", None) or "ResourceSpec"
+    raise ImportError(
+        "This version of simple-steps needs a newer simple-steps-core.\n"
+        f"  missing: {_missing}\n"
+        f"  found core at: {getattr(_core, '__file__', '?')}\n"
+        "\nResourceSpec landed in core on 2026-09-22. Upgrade it with:\n"
+        "  pip install --upgrade --force-reinstall "
+        '"simple-steps-core @ git+https://github.com/stusynakowski/simple-steps-core.git"\n'
+        "\nIf you are working from a checkout of this repo, point core at the\n"
+        "submodule instead so the two cannot drift:\n"
+        "  git submodule update --init external/simple-steps-core\n"
+        "  pip install -e external/simple-steps-core"
+    ) from exc
 
 __all__ = [
     "ToolDocs",
