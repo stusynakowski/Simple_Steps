@@ -126,9 +126,14 @@ class PackLoader:
         self,
         developer_pack_dirs: Optional[List[str]] = None,
         project_dirs: Optional[List[str]] = None,
+        workspace_root: Optional[str] = None,
     ):
         self.developer_pack_dirs: List[str] = developer_pack_dirs or []
         self.project_dirs: List[str] = project_dirs or []
+        # The workspace root is scanned **top level only**. It is whatever
+        # directory the user happened to launch from, so recursing it would
+        # import every .py file in their tree — see load_all().
+        self.workspace_root: Optional[str] = workspace_root
 
         # Audit trail
         self._results: List[LoadResult] = []
@@ -157,6 +162,17 @@ class PackLoader:
         # Tier 2b: Developer packs (filesystem directories)
         for pack_dir in self.developer_pack_dirs:
             self._load_directory(pack_dir, OpTier.DEVELOPER_PACK)
+
+        # Tier 2c: the workspace root's own top-level *.py files.
+        #   Deliberately NOT recursive. The workspace root is just the
+        #   directory the user launched from, and importing a file runs it, so
+        #   recursing would execute every .py file under their cwd. Running
+        #   `simple-steps` from a directory of unrelated Python used to import
+        #   thousands of files and register junk operations.
+        if self.workspace_root:
+            self._load_directory(
+                self.workspace_root, OpTier.DEVELOPER_PACK, recursive=False
+            )
 
         # Tier 3: Project ops
         for proj_dir in self.project_dirs:
@@ -315,12 +331,16 @@ class PackLoader:
 
     # ── Tier 2b & 3: File scanning ──────────────────────────────────────
 
-    def _load_directory(self, dir_path: str, tier: OpTier):
+    def _load_directory(self, dir_path: str, tier: OpTier, recursive: bool = True):
         """
-        Recursively scan a directory for Python files and import them.
-        Any file containing ``@simple_step`` or ``@pack.step`` decorated
-        functions will have those functions auto-registered into the
-        global OPERATION_REGISTRY upon import.
+        Scan a directory for Python files and import them. Any file containing
+        ``@simple_step_tool`` decorated functions will have those functions
+        auto-registered into the global OPERATION_REGISTRY upon import.
+
+        ``recursive=False`` scans only the directory's own files. Use it for
+        any directory the user did not explicitly nominate as a pack dir —
+        importing a module executes it, so recursing an arbitrary working
+        directory is both slow and unsafe.
         """
         abs_path = os.path.abspath(dir_path)
 
@@ -337,7 +357,12 @@ class PackLoader:
             if p not in sys.path:
                 sys.path.insert(0, p)
 
-        for root, _dirs, files in os.walk(abs_path):
+        if recursive:
+            walker = os.walk(abs_path)
+        else:
+            walker = [(abs_path, [], os.listdir(abs_path))]
+
+        for root, _dirs, files in walker:
             for filename in sorted(files):
                 if not filename.endswith(".py"):
                     continue
@@ -345,6 +370,8 @@ class PackLoader:
                     continue  # skip __init__.py, __pycache__, etc.
 
                 full_path = os.path.join(root, filename)
+                if not os.path.isfile(full_path):
+                    continue
                 self._import_file(full_path, tier)
 
     def _load_project_ops(self, project_dir: str):

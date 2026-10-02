@@ -68,15 +68,16 @@ _ws_ops = os.path.join(_WORKSPACE, "ops")
 if os.path.isdir(_ws_ops):
     _DEVELOPER_PACK_DIRS.append(_ws_ops)
 
-# 3. Workspace root itself — pick up any top-level *.py files with decorators
-#    (treated as a pack dir so the loader scans .py files in it)
+# 3. The workspace root's own top-level *.py files are picked up separately,
+#    via PackLoader(workspace_root=...), because that scan must NOT recurse.
+#    The workspace root is just wherever the user launched from; importing a
+#    module executes it, so walking the whole tree would run every .py file
+#    under their cwd.
 _ws_has_py = any(
     f.endswith(".py") and not f.startswith("__")
     for f in os.listdir(_WORKSPACE)
     if os.path.isfile(os.path.join(_WORKSPACE, f))
 )
-if _ws_has_py:
-    _DEVELOPER_PACK_DIRS.append(_WORKSPACE)
 
 # 4. Additional pack dirs from environment / CLI flags
 _extra_packs = os.environ.get("SIMPLE_STEPS_PACKS_DIR", "")
@@ -114,6 +115,7 @@ def _discover_project_dirs() -> List[str]:
 _loader = PackLoader(
     developer_pack_dirs=_DEVELOPER_PACK_DIRS,
     project_dirs=_discover_project_dirs(),
+    workspace_root=_WORKSPACE if _ws_has_py else None,
 )
 _loader.load_all()
 set_loader(_loader)
