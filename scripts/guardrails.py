@@ -17,6 +17,8 @@ PHASE_ALLOWLIST = {
         "docs/spec/**",
         "docs/adr/*",
         "docs/adr/**",
+        "docs/core-proposals/*",
+        "docs/core-proposals/**",
         "docs/context.md",
     ],
     "tests": [
@@ -26,20 +28,29 @@ PHASE_ALLOWLIST = {
         "docs/testplan/**",
         "docs/context.md",
     ],
+    # Keep in sync with docs/context.md "Phase edit rules". That doc is what a
+    # human or agent reads; this list is what is enforced. They drifted once --
+    # this one still allowed mock_projects/ and start_backend.sh, neither of
+    # which exists any more.
     "impl": [
         "src/*",
         "src/**",
         "frontend/*",
         "frontend/**",
-        "mock_projects/*",
-        "mock_projects/**",
+        "examples/*",
+        "examples/**",
         "tests/*",
         "tests/**",
-        "scripts/guardrails.py",
-        "start_backend.sh",
-        "docs/context.md",
+        "scripts/*",
+        "scripts/**",
+        "docs/*",
+        "docs/**",
+        "CLAUDE.md",
         "README.md",
         "pyproject.toml",
+        "MANIFEST.in",
+        ".gitmodules",
+        "external/simple-steps-core",
     ],
 }
 

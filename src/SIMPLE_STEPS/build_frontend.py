@@ -13,6 +13,42 @@ import subprocess
 import sys
 
 
+# Name of the stamp file written into frontend_dist/ recording which sources
+# the bundle was built from. scripts/preflight.py reads it.
+SOURCE_STAMP = ".source-hash"
+
+# Extensions that actually affect the built bundle.
+_SOURCE_SUFFIXES = (".ts", ".tsx", ".js", ".jsx", ".css", ".html")
+
+
+def source_hash(src_dir: str) -> str:
+    """
+    A stable hash of every build-relevant file under *src_dir*.
+
+    Content-based on purpose — mtimes are unusable here, since the build
+    rewrites api.ts and restores it after the bundle is copied. Returns "" if
+    the directory is absent (an installed package has no frontend/ tree).
+    """
+    import hashlib
+
+    if not os.path.isdir(src_dir):
+        return ""
+
+    digest = hashlib.sha256()
+    for root, dirnames, filenames in os.walk(src_dir):
+        dirnames[:] = sorted(
+            d for d in dirnames if d != "node_modules" and not d.startswith(".")
+        )
+        for name in sorted(filenames):
+            if not name.endswith(_SOURCE_SUFFIXES):
+                continue
+            path = os.path.join(root, name)
+            digest.update(os.path.relpath(path, src_dir).encode())
+            with open(path, "rb") as f:
+                digest.update(f.read())
+    return digest.hexdigest()
+
+
 def main():
     # ── Paths ────────────────────────────────────────────────────────────
     pkg_dir = os.path.dirname(__file__)                        # src/SIMPLE_STEPS/
@@ -95,6 +131,16 @@ def main():
 
     print(f"  📋 Copying {dist_src} → {dist_dest}")
     shutil.copytree(dist_src, dist_dest)
+
+    # Stamp the bundle with a hash of the sources it was built from, so
+    # staleness can be checked exactly. Timestamps cannot do this: this script
+    # patches api.ts for the production build and restores it afterwards, which
+    # leaves the source newer than the bundle it produced.
+    stamp = source_hash(os.path.join(frontend_dir, "src"))
+    if stamp:
+        with open(os.path.join(dist_dest, SOURCE_STAMP), "w") as f:
+            f.write(stamp)
+        print(f"  🔖 Stamped bundle with source hash {stamp[:12]}")
 
     print()
     print("  ✅ Frontend bundled into package successfully!")
