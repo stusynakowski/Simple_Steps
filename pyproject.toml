@@ -71,6 +71,9 @@ simple-steps = "SIMPLE_STEPS.cli:main"
 simple-steps-local = "SIMPLE_STEPS.cli_local:main"
 simple-steps-dev = "SIMPLE_STEPS.cli_dev:main"
 simple-steps-bootstrap = "SIMPLE_STEPS.bootstrap_install:main"
+# Rebuilds the bundled frontend. Needs the repo checkout (frontend/ is not
+# shipped in the wheel); exits with a clear message otherwise.
+simple-steps-build = "SIMPLE_STEPS.build_frontend:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
