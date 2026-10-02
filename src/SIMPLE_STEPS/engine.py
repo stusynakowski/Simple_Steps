@@ -1,6 +1,8 @@
 import pandas as pd
 import uuid
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, get_type_hints
+import inspect
+import typing
 from .decorators import OPERATION_REGISTRY
 import re
 import os
@@ -186,6 +188,129 @@ def get_value(ref_id: str, session_id: Optional[str] = None) -> Any:
 
     # Fall back to DataFrame storage (which has its own parquet cache logic)
     return get_dataframe(ref_id, session_id=session_id)
+
+# --------------------------------------------------------------------------- #
+# Argument coercion                                                           #
+# --------------------------------------------------------------------------- #
+# A step's stored `configuration` holds argument values as TEXT. The formula
+# parser returns each argument as its source text by contract, and the UI form
+# writes strings too, so `=sample_people(count=8, seed=0)` arrives as
+# {"count": "8", "seed": "0"}. Passed straight through, a tool annotated
+# `count: int` then fails deep inside its own body with
+# "'str' object cannot be interpreted as an integer" — an error that names
+# neither the parameter nor the step.
+#
+# So coerce each text value to the parameter's annotated type before calling.
+# Only strings are touched: anything already resolved to a DataFrame, a list or
+# a number is passed through untouched.
+
+
+def _coerce_text_to_bool(text: str) -> Optional[bool]:
+    """Interpret a form/formula string as a bool, or None if it is not one."""
+    lowered = text.strip().lower()
+    if lowered in ("true", "1", "yes", "y", "on"):
+        return True
+    if lowered in ("false", "0", "no", "n", "off"):
+        return False
+    return None
+
+
+def coerce_config_to_signature(
+    func: Any,
+    config: Dict[str, Any],
+    column_names: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """
+    Return *config* with text values converted to each parameter's annotated type.
+
+    Rules, each there for a case that actually occurs:
+
+    * A value naming a **column of the input frame** is left alone. In a
+      per-row orchestration (map / rowmap / filter / expand) a string argument
+      is a column reference that the orchestrator replaces with that row's
+      cell — so `=keep_popular(views="views")` must keep "views" as the column
+      name, even though the parameter is annotated `int`. Pass
+      ``column_names`` whenever an input frame exists; without it, such a step
+      would be rejected as a bad int.
+    * Non-strings are left alone — a resolved DataFrame must not be stringified.
+    * An **empty string** for a parameter that has a default is dropped, so the
+      default applies. The UI form writes "" for every untouched optional
+      argument; without this, `int("")` would fail on a parameter the user
+      never set.
+    * A value that cannot be converted raises a message naming the parameter
+      and the expected type, instead of letting the tool fail on its own with
+      a message that names neither.
+    * Unannotated parameters, `str`, and anything not handled are passed
+      through unchanged.
+    """
+    try:
+        hints = get_type_hints(getattr(func, "_raw_func", func))
+    except Exception:
+        return config
+
+    try:
+        params = inspect.signature(getattr(func, "_raw_func", func)).parameters
+    except (TypeError, ValueError):
+        params = {}
+
+    columns = set()
+    if column_names is not None:
+        try:
+            columns = {str(c) for c in column_names}
+        except TypeError:
+            columns = set()
+
+    out: Dict[str, Any] = {}
+    for key, value in config.items():
+        if key.startswith("_") or not isinstance(value, str):
+            out[key] = value
+            continue
+        if value in columns:
+            out[key] = value      # a column reference, resolved per row later
+            continue
+
+        target = hints.get(key)
+        param = params.get(key)
+        has_default = param is not None and param.default is not inspect.Parameter.empty
+
+        if value == "" and has_default:
+            continue   # let the function's own default apply
+
+        origin = typing.get_origin(target)
+        if origin is typing.Literal:
+            # Already checked by the validator; coerce only if the choices are
+            # numeric, so Literal[1, 2] does not arrive as "1".
+            choices = typing.get_args(target)
+            if choices and isinstance(choices[0], bool):
+                target = bool
+            elif choices and isinstance(choices[0], int):
+                target = int
+            else:
+                out[key] = value
+                continue
+
+        try:
+            if target is bool:
+                parsed = _coerce_text_to_bool(value)
+                if parsed is None:
+                    raise ValueError("not a boolean")
+                out[key] = parsed
+            elif target is int:
+                # int("8.0") raises, which is unhelpful for a value that came
+                # from a numeric input, so go through float first.
+                out[key] = int(value) if value.strip().lstrip("+-").isdigit() else int(float(value))
+            elif target is float:
+                out[key] = float(value)
+            else:
+                out[key] = value
+        except (TypeError, ValueError):
+            name = getattr(target, "__name__", str(target))
+            raise ValueError(
+                f"Argument '{key}' expects {name}, but got {value!r}."
+            ) from None
+
+    return out
+
 
 def resolve_reference(value: Any, step_map: Dict[str, str], session_id: Optional[str] = None) -> Any:
     """
@@ -684,6 +809,12 @@ def run_operation(
                 continue
             resolved_config[k] = resolve_reference(v, step_map, session_id=session_id)
 
+        # Text values -> the parameter's annotated type (see
+        # coerce_config_to_signature).
+        # Coerce against the RAW function: it carries the real annotations,
+        # whereas the orchestrator wrapper takes _input_df and **kwargs.
+        resolved_config = coerce_config_to_signature(func, resolved_config)
+
         wrapper = ORCHESTRATORS.get('step')
         executable = wrapper(func)
         print(f"Running '{op_id}' as step (single-cell)")
@@ -715,6 +846,15 @@ def run_operation(
             continue
         resolved_val = resolve_reference(v, step_map, session_id=session_id)
         resolved_config[k] = resolved_val
+
+    # Coerce against the RAW function: it carries the real annotations,
+    # whereas the orchestrator wrapper takes _input_df and **kwargs. The input
+    # frame's columns are passed so a column reference is not mistaken for a
+    # badly typed literal.
+    resolved_config = coerce_config_to_signature(
+        func, resolved_config,
+        column_names=None if df_in is None else df_in.columns,
+    )
 
     if df_in is not None:
         resolved_config['_input_df'] = df_in
