@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Allotment } from 'allotment';
+import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
@@ -13,7 +13,7 @@ import MenuBar from './MenuBar';
 import WorkspaceFileEditor from './WorkspaceFileEditor';
 import SaveModal from './SaveModal';
 import RenameModal from './RenameModal';
-import ExecutionLog from './ExecutionLog';
+import ExecutionLog, { type LogMode } from './ExecutionLog';
 import Icon from './Icon';
 import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
@@ -31,6 +31,10 @@ const DEFAULT_HEADER_HEIGHT = 110;
 const MIN_HEADER_HEIGHT = 44;
 const MAX_HEADER_HEIGHT = 600;
 const SIDEBAR_SNAP_THRESHOLD = 80; // dragging below this pixel width collapses the pane
+const DEFAULT_LOG_HEIGHT = 220;
+// The log's header is 36px; collapsing clamps the pane to exactly that, so the
+// expander leaves its title bar docked and nothing else.
+const LOG_HEADER_HEIGHT = 36;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -52,14 +56,25 @@ interface DetachedWindow {
 export default function MainLayout() {
   const [activeActivityView, setActiveActivityView] = useState<ActivityView>('explorer');
   const [isLogOpen, setIsLogOpen] = useState(false);
+  // The log is a bottom pane by default and can be popped out into a window.
+  const [logMode, setLogMode] = useState<LogMode>('docked');
+  const [logCollapsed, setLogCollapsed] = useState(false);
   const [isFileEditorOpen, setIsFileEditorOpen] = useState(false);
 
   // Pane visibility — Allotment handles the actual width animation via `visible`.
   const [leftPaneVisible, setLeftPaneVisible] = useState(true);
   const [rightPaneVisible, setRightPaneVisible] = useState(true);
 
-  // Live right-pane width so the floating ExecutionLog overlay can offset itself.
+  // Live right-pane width so a popped-out ExecutionLog clears the chat pane.
   const [rightPaneWidth, setRightPaneWidth] = useState(DEFAULT_RIGHT_SIDEBAR_WIDTH);
+
+  // The centre column's vertical split (header / canvas / log). Allotment only
+  // reads minSize and maxSize when a pane is first created, so collapsing the
+  // log has to go through the imperative handle rather than a prop change.
+  const centerSplitRef = useRef<AllotmentHandle>(null);
+  const centerSizes = useRef<number[]>([]);
+  // Height to restore when the log is expanded again.
+  const preCollapseLogHeight = useRef<number>(DEFAULT_LOG_HEIGHT);
 
   const {
     workflow,
@@ -408,6 +423,52 @@ export default function MainLayout() {
     setSaveModalOpen(true);
   }, []);
 
+  // ── Execution-log placement ───────────────────────────────────────────
+  // Collapsing clamps the log pane to its header and gives the reclaimed
+  // height back to the canvas; expanding reverses it. Allotment.resize()
+  // takes a size for every pane, so both branches rebuild the whole array.
+  const setLogPaneHeight = useCallback((next: number) => {
+    const sizes = centerSizes.current;
+    if (!centerSplitRef.current || sizes.length < 3) return;
+    const [headerH, canvasH, logH] = sizes;
+    const delta = logH - next;
+    centerSplitRef.current.resize([headerH, canvasH + delta, next]);
+  }, []);
+
+  const toggleLogCollapsed = useCallback(() => {
+    setLogCollapsed((wasCollapsed) => {
+      if (wasCollapsed) {
+        setLogPaneHeight(preCollapseLogHeight.current);
+      } else {
+        // Remember the height we had, but never restore to a sliver.
+        const current = centerSizes.current[2] ?? DEFAULT_LOG_HEIGHT;
+        preCollapseLogHeight.current = Math.max(current, DEFAULT_LOG_HEIGHT);
+        setLogPaneHeight(LOG_HEADER_HEIGHT);
+      }
+      return !wasCollapsed;
+    });
+  }, [setLogPaneHeight]);
+
+  // Popping out hands the pane's height back to the canvas; docking restores
+  // it, so the canvas doesn't jump a second time when the log returns.
+  const popLogOut = useCallback(() => {
+    const current = centerSizes.current[2] ?? DEFAULT_LOG_HEIGHT;
+    if (current > LOG_HEADER_HEIGHT) preCollapseLogHeight.current = current;
+    setLogMode('floating');
+  }, []);
+
+  const dockLog = useCallback(() => {
+    setLogMode('docked');
+    setLogCollapsed(false);
+    // The pane is re-shown this render; size it on the next frame, once
+    // Allotment has restored its cached visible size.
+    requestAnimationFrame(() => setLogPaneHeight(preCollapseLogHeight.current));
+  }, [setLogPaneHeight]);
+
+  const handleCenterSizes = useCallback((sizes: number[]) => {
+    centerSizes.current = sizes;
+  }, []);
+
   // ── Allotment pane-size handlers ──────────────────────────────────────
   // Snap to "collapsed" when the user drags the divider very small, so the
   // sidebar can never get stuck in a sliver state.
@@ -594,7 +655,12 @@ export default function MainLayout() {
           {/* Center content: header (vertical split) over canvas */}
           <Allotment.Pane minSize={400}>
             <div className="content-area">
-              <Allotment vertical proportionalLayout={false}>
+              <Allotment
+                vertical
+                proportionalLayout={false}
+                ref={centerSplitRef}
+                onChange={handleCenterSizes}
+              >
                 <Allotment.Pane
                   preferredSize={DEFAULT_HEADER_HEIGHT}
                   minSize={MIN_HEADER_HEIGHT}
@@ -605,16 +671,31 @@ export default function MainLayout() {
                 <Allotment.Pane minSize={200}>
                   {canvasBlock}
                 </Allotment.Pane>
-              </Allotment>
 
-              {/* ExecutionLog is a fixed-position overlay; offset by current right-pane width */}
-              <ExecutionLog
-                logs={executionLogs}
-                onClear={clearLogs}
-                isOpen={isLogOpen}
-                onClose={() => setIsLogOpen(false)}
-                rightOffset={(rightPaneVisible ? rightPaneWidth : 0) + 30}
-              />
+                {/* The execution log docks here, below the canvas and between
+                    the two sidebars. The pane stays mounted while the log is
+                    popped out (Allotment sizes a hidden pane to 0 rather than
+                    unmounting it), which is what lets ExecutionLog portal
+                    itself out without losing its state. */}
+                <Allotment.Pane
+                  preferredSize={DEFAULT_LOG_HEIGHT}
+                  minSize={LOG_HEADER_HEIGHT}
+                  visible={isLogOpen && logMode === 'docked'}
+                >
+                  <ExecutionLog
+                    logs={executionLogs}
+                    onClear={clearLogs}
+                    isOpen={isLogOpen}
+                    onClose={() => setIsLogOpen(false)}
+                    mode={logMode}
+                    collapsed={logCollapsed}
+                    onToggleCollapse={toggleLogCollapsed}
+                    onPopOut={popLogOut}
+                    onDock={dockLog}
+                    rightOffset={(rightPaneVisible ? rightPaneWidth : 0) + 30}
+                  />
+                </Allotment.Pane>
+              </Allotment>
             </div>
           </Allotment.Pane>
 
