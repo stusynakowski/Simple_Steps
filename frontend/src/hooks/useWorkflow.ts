@@ -10,6 +10,9 @@ import { runStep as runStepApi, fetchDataView, getOperations,
 import type { OperationDefinition, PipelineFile, BackendError, ProgressEvent } from '../services/api';
 import { parseFormula, buildFormula } from '../utils/formulaParser';
 import type { LogEntry, LogLevel } from '../components/ExecutionLog';
+import type { WorkflowCommand } from '../types/commands';
+import { formatCommand } from '../types/commands';
+import { emitConsoleRecord } from '../context/ConsoleContext';
 
 /**
  * Hydrate a saved StepConfig into a runtime Step.
@@ -108,6 +111,55 @@ export default function useWorkflow() {
 
   useEffect(() => {
     getOperations().then(setAvailableOperations).catch(console.error);
+  }, []);
+
+  // ── Command bus ──────────────────────────────────────────────────────────
+  // Every *user-intent* mutation is announced here in its canonical form, so
+  // the console transcript is a replayable record of the session. Consequences
+  // of a run (status, outputRefId, output_preview) deliberately do NOT pass
+  // through: a transcript of consequences cannot be replayed.
+  // See docs/dev_plan/118-console-and-gui-parity.md.
+
+  // Whether the command currently being applied came from the console or a
+  // click. Set for the duration of dispatchCommand so the emitted record is
+  // attributed correctly without threading an argument through every mutator.
+  const commandOrigin = useRef<'gui' | 'console'>('gui');
+
+  const announce = useCallback((cmd: WorkflowCommand) => {
+    emitConsoleRecord({
+      stream: 'command',
+      origin: commandOrigin.current,
+      text: formatCommand(cmd),
+    });
+  }, []);
+
+  // Steps are addressed positionally (step1, step2, …) to match the formula
+  // bar and step_map, with the label accepted as an alias. Resolution happens
+  // now and the id is what gets used — a stored position would silently
+  // rewire the graph the moment a step is inserted.
+  // Ref to always access the latest workflow state (avoids stale closures in
+  // pipeline runs, and lets the command bus resolve step aliases synchronously).
+  const workflowRef = useRef(workflow);
+  useEffect(() => {
+    workflowRef.current = workflow;
+  }, [workflow]);
+
+  const resolveStepId = useCallback((name: string): string | null => {
+    const steps = workflowRef.current.steps;
+    const positional = name.match(/^step(\d+)$/i);
+    if (positional) {
+      const idx = Number(positional[1]) - 1;
+      return steps[idx]?.id ?? null;
+    }
+    const byLabel = steps.find((st) => st.label === name);
+    if (byLabel) return byLabel.id;
+    return steps.find((st) => st.id === name)?.id ?? null;
+  }, []);
+
+  /** The positional alias a step is addressed by, for emitted commands. */
+  const stepAlias = useCallback((id: string): string => {
+    const idx = workflowRef.current.steps.findIndex((st) => st.id === id);
+    return idx >= 0 ? `step${idx + 1}` : id;
   }, []);
 
   // ── Execution log state ──────────────────────────────────────────────────
@@ -218,11 +270,21 @@ export default function useWorkflow() {
       status: 'pending',
     };
 
-    const newSteps = [...workflow.steps];
-    newSteps.splice(index, 0, newStep);
+    announce({
+      kind: 'add',
+      name: newStep.label,
+      after: index > 0 ? `step${index}` : null,
+    });
 
-    const reindexed = newSteps.map((s, i) => ({ ...s, sequence_index: i }));
-    setWorkflow({ ...workflow, steps: reindexed });
+    // Functional form, not `workflow` from the render closure. dispatchCommand
+    // is memoised and captures this function, so a closure read here served a
+    // workflow snapshot from before the last run — adding a step from the
+    // console reverted completed steps to pending and dropped their output.
+    setWorkflow((prev) => {
+      const newSteps = [...prev.steps];
+      newSteps.splice(index, 0, newStep);
+      return { ...prev, steps: newSteps.map((s, i) => ({ ...s, sequence_index: i })) };
+    });
     setExpandedStepIds(prev => new Set(prev).add(newStep.id));
   }
 
@@ -257,13 +319,13 @@ export default function useWorkflow() {
     if (maximizedStepId === id) setMaximizedStepId(null);
   }
 
-  // Ref to always access the latest workflow state (avoids stale closures in pipeline runs)
-  const workflowRef = useRef(workflow);
-  useEffect(() => {
-    workflowRef.current = workflow;
-  }, [workflow]);
-
   const runStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
+    // Announce only a directly requested run. runPipeline drives this same
+    // function per step and announces once for the whole pipeline, so without
+    // this guard a 5-step run would emit six commands.
+    if (pipelineStatusRef.current !== 'running') {
+      announce({ kind: 'run', target: stepAlias(id) });
+    }
     // Use the ref to always get the LATEST workflow state — critical for pipeline
     // sequential execution where React state updates may not have flushed yet.
     const currentSteps = workflowRef.current.steps;
@@ -433,6 +495,7 @@ export default function useWorkflow() {
   }, [addLog, waitForStableOutput]);
 
   const previewStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
+    announce({ kind: 'preview', target: stepAlias(id) });
      // Similar to runStep but with isPreview=true
     const currentSteps = workflowRef.current.steps;
     const step = currentSteps.find((s) => s.id === id);
@@ -530,6 +593,7 @@ export default function useWorkflow() {
 
   const runPipeline = useCallback(() => {
     if (pipelineStatusRef.current === 'running') return;
+    announce({ kind: 'run', target: null });
     
     setPipelineStatus('running');
     const steps = workflowRef.current.steps;
@@ -637,6 +701,7 @@ export default function useWorkflow() {
   }, [setPipelineStatus]);
 
   function deleteStep(id: string) {
+    announce({ kind: 'remove', target: stepAlias(id) });
     setWorkflow((prev) => {
       const newSteps = prev.steps.filter((s) => s.id !== id).map((s, i) => ({ ...s, sequence_index: i }));
       return { ...prev, steps: newSteps };
@@ -649,6 +714,18 @@ export default function useWorkflow() {
   }
 
   function updateStep(id: string, updates: Partial<Step>) {
+    // `formula` and `label` are intent; everything else in a Partial<Step>
+    // (status, outputRefId, outputRows, output_preview) is a consequence of a
+    // run and must not reach the transcript.
+    if (updates.formula !== undefined) {
+      announce({ kind: 'set', target: stepAlias(id), formula: updates.formula });
+    }
+    if (updates.label !== undefined) {
+      const before = workflowRef.current.steps.find((s) => s.id === id)?.label;
+      if (before !== undefined && before !== updates.label) {
+        announce({ kind: 'rename', target: stepAlias(id), to: updates.label });
+      }
+    }
     setWorkflow((prev) => {
       const nextSteps = prev.steps.map((s) => (s.id === id ? { ...s, ...updates } : s));
       return { ...prev, steps: nextSteps };
@@ -737,6 +814,99 @@ export default function useWorkflow() {
   const listProjectPipelines = useCallback((projectId: string) => listPipelines(projectId), []);
   const removePipeline    = useCallback((projectId: string, pipelineId: string) => deletePipeline(projectId, pipelineId), []);
 
+  // ── Console → GUI ────────────────────────────────────────────────────────
+  /**
+   * Apply a command that came from the console.
+   *
+   * Every branch calls the *same* mutator a click calls. That is what makes
+   * parity structural rather than mirrored: there is one path into workflow
+   * state, so the two directions cannot drift apart. The only difference is
+   * `commandOrigin`, which tags the emitted record so the transcript shows
+   * where the command came from.
+   *
+   * Returns a human-readable confirmation, or throws with a usable message.
+   */
+  const dispatchCommand = useCallback(async (cmd: WorkflowCommand): Promise<string> => {
+    const prevOrigin = commandOrigin.current;
+    commandOrigin.current = 'console';
+    try {
+      const need = (name: string): string => {
+        const id = resolveStepId(name);
+        if (!id) {
+          const known = workflowRef.current.steps.map((_, i) => `step${i + 1}`).join(', ');
+          throw new Error(`No step named '${name}'. Known steps: ${known || '(none)'}`);
+        }
+        return id;
+      };
+
+      switch (cmd.kind) {
+        case 'set': {
+          const id = need(cmd.target);
+          // Route through the formula path so process_type and configuration
+          // are re-derived exactly as a formula-bar edit would derive them.
+          const parsed = await parseFormula(cmd.formula);
+          const updates: Partial<Step> = { formula: cmd.formula, operation: cmd.formula };
+          if (parsed.isValid && parsed.operationId) {
+            updates.process_type = parsed.operationId;
+            updates.configuration = { ...parsed.args };
+          } else if (cmd.formula && !cmd.formula.startsWith('=')) {
+            updates.process_type = 'passthrough';
+            updates.configuration = { _ref: cmd.formula };
+          }
+          updateStep(id, updates);
+          return `${cmd.target} = ${cmd.formula}`;
+        }
+        case 'add': {
+          // Hoisted so the narrowing survives into the callback below.
+          const after = cmd.after ?? null;
+          const anchorId = after ? need(after) : null;
+          const index = anchorId
+            ? workflowRef.current.steps.findIndex((st) => st.id === anchorId) + 1
+            : workflowRef.current.steps.length;
+          addStepAt(index);
+          return `added step${index + 1}`;
+        }
+        case 'remove': {
+          const id = need(cmd.target);
+          deleteStep(id);
+          return `removed ${cmd.target}`;
+        }
+        case 'rename': {
+          const id = need(cmd.target);
+          updateStep(id, { label: cmd.to });
+          return `${cmd.target} renamed to '${cmd.to}'`;
+        }
+        case 'run': {
+          if (cmd.target === null) { runPipeline(); return 'pipeline started'; }
+          const id = need(cmd.target);
+          await runStep(id);
+          return `ran ${cmd.target}`;
+        }
+        case 'preview': {
+          const id = need(cmd.target);
+          await previewStep(id);
+          return `previewed ${cmd.target}`;
+        }
+      }
+    } finally {
+      commandOrigin.current = prevOrigin;
+    }
+  }, [resolveStepId, runStep, previewStep, runPipeline]);
+
+  /** The step_map the console sends with an expression, so the backend
+   *  namespace matches what the GUI is showing. Same shape as a run's. */
+  const consoleStepMap = useCallback((): Record<string, string> => {
+    const map: Record<string, string> = {};
+    workflowRef.current.steps.forEach((st, i) => {
+      if (st.outputRefId) {
+        map[st.id] = st.outputRefId;
+        map[st.label] = st.outputRefId;
+        map[`step${i + 1}`] = st.outputRefId;
+      }
+    });
+    return map;
+  }, []);
+
   return { 
     workflow, 
     availableOperations,
@@ -749,6 +919,9 @@ export default function useWorkflow() {
     toggleMaximizeStep,
     collapseStep, 
     updateStep,
+    dispatchCommand,
+    consoleStepMap,
+    resolveStepId,
     runStep, 
     previewStep,
     runPipeline,

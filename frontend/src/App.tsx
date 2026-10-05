@@ -3,6 +3,7 @@ import './App.css'
 import MainLayout from './components/MainLayout'
 import CommandPalette from './shell/CommandPalette'
 import { bootstrapSession } from './services/api'
+import { ConsoleProvider } from './context/ConsoleContext'
 
 function App() {
   // Mint the session cookie once on app boot.  All subsequent API
@@ -17,10 +18,10 @@ function App() {
   }, [])
 
   return (
-    <>
+    <ConsoleProvider>
       <MainLayout />
       <CommandPalette />
-    </>
+    </ConsoleProvider>
   )
 }
 

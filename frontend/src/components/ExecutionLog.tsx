@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import ConsoleView from './ConsoleView';
+import { useConsole } from '../context/ConsoleContext';
+import type { WorkflowCommand } from '../types/commands';
 import './ExecutionLog.css';
 
 export type LogLevel = 'info' | 'warn' | 'error' | 'success' | 'debug';
@@ -30,6 +33,14 @@ export interface LogEntry {
  */
 export type LogMode = 'docked' | 'floating';
 
+/**
+ * The panel's tabs. `log` is the execution log that has always been here; the
+ * rest are the console surfaces from
+ * `docs/dev_plan/118-console-and-gui-parity.md` §3, kept as separate streams
+ * rather than merged into one feed.
+ */
+export type PanelTab = 'log' | 'commands' | 'wire' | 'python';
+
 interface ExecutionLogProps {
   logs: LogEntry[];
   onClear?: () => void;
@@ -47,6 +58,10 @@ interface ExecutionLogProps {
   onDock?: () => void;
   /** Width of the right-hand pane, so a new floating window clears it. */
   rightOffset?: number;
+  /** Apply a command typed into the console — the same path a click takes. */
+  dispatchCommand?: (cmd: WorkflowCommand) => Promise<string>;
+  /** Step aliases → output refs, so expressions see what the GUI sees. */
+  consoleStepMap?: () => Record<string, string>;
 }
 
 const LEVEL_ICONS: Record<LogLevel, string> = {
@@ -75,6 +90,13 @@ const DOCK_SNAP_PX = 72;
 
 const RESIZE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
 
+const TABS: { id: PanelTab; label: string; title: string }[] = [
+  { id: 'log', label: 'Log', title: 'What the pipeline did' },
+  { id: 'commands', label: 'Commands', title: 'Every action in its canonical form — from the GUI and the console alike' },
+  { id: 'wire', label: 'Wire', title: 'The exact payloads sent to the backend' },
+  { id: 'python', label: 'Python', title: 'Run commands and evaluate expressions against live data' },
+];
+
 function formatTime(iso: string): string {
   try {
     const d = new Date(iso);
@@ -96,7 +118,11 @@ export default function ExecutionLog({
   onPopOut,
   onDock,
   rightOffset = 16,
+  dispatchCommand,
+  consoleStepMap,
 }: ExecutionLogProps) {
+  const [tab, setTab] = useState<PanelTab>('log');
+  const { records: consoleRecords } = useConsole();
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<LogLevel | 'all'>('all');
   const [autoScroll, setAutoScroll] = useState(true);
@@ -223,6 +249,13 @@ export default function ExecutionLog({
   const errorCount = logs.filter(l => l.level === 'error').length;
   const warnCount = logs.filter(l => l.level === 'warn').length;
 
+  const counts: Record<PanelTab, number> = {
+    log: logs.length,
+    commands: consoleRecords.filter((r) => r.stream === 'command').length,
+    wire: consoleRecords.filter((r) => r.stream === 'wire').length,
+    python: 0,
+  };
+
   const header = (
     <div
       className={`execution-log-header${isFloating ? ' is-draggable' : ''}`}
@@ -240,17 +273,29 @@ export default function ExecutionLog({
             {isCollapsed ? '▸' : '▾'}
           </button>
         )}
-        <span className="execution-log-title">Execution Log</span>
-        <span className="execution-log-count">{logs.length} entries</span>
-        {errorCount > 0 && (
+        <div className="panel-tabs" onMouseDown={(e) => e.stopPropagation()}>
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`panel-tab${tab === t.id ? ' active' : ''}`}
+              onClick={() => { setTab(t.id); if (isCollapsed) onToggleCollapse?.(); }}
+              title={t.title}
+              data-testid={`panel-tab-${t.id}`}
+            >
+              {t.label}
+              {counts[t.id] > 0 && <span className="panel-tab-count">{counts[t.id]}</span>}
+            </button>
+          ))}
+        </div>
+        {tab === 'log' && errorCount > 0 && (
           <span className="execution-log-badge error-badge">{errorCount} error{errorCount > 1 ? 's' : ''}</span>
         )}
-        {warnCount > 0 && (
+        {tab === 'log' && warnCount > 0 && (
           <span className="execution-log-badge warn-badge">{warnCount} warning{warnCount > 1 ? 's' : ''}</span>
         )}
       </div>
       <div className="execution-log-header-right">
-        {!isCollapsed && (
+        {!isCollapsed && tab === 'log' && (
           <>
             <select
               className="log-filter-select"
@@ -292,7 +337,17 @@ export default function ExecutionLog({
     </div>
   );
 
-  const body = (
+  const consoleBody = (view: 'command' | 'wire' | 'prompt') => (
+    <div className="execution-log-body execution-log-body--console">
+      <ConsoleView
+        view={view}
+        dispatchCommand={dispatchCommand ?? (async () => 'no workflow attached')}
+        consoleStepMap={consoleStepMap ?? (() => ({}))}
+      />
+    </div>
+  );
+
+  const logBody = (
     <div className="execution-log-body" ref={scrollContainerRef}>
       {filtered.length === 0 && (
         <div className="execution-log-empty">
@@ -338,6 +393,12 @@ export default function ExecutionLog({
       <div ref={bottomRef} />
     </div>
   );
+
+  const body =
+    tab === 'log' ? logBody
+      : tab === 'commands' ? consoleBody('command')
+        : tab === 'wire' ? consoleBody('wire')
+          : consoleBody('prompt');
 
   // ── Docked: fill the pane MainLayout gave us ──────────────────────────────
   if (!isFloating) {

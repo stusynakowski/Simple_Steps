@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from .formula_parser import parse_formula, build_formula
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
@@ -137,6 +137,89 @@ async def api_parse_formula(payload: dict = Body(...)):
     formula = payload.get("formula", "")
     parsed = parse_formula(formula)
     return parsed.as_dict()
+
+@app.post("/api/console/eval")
+async def api_console_eval(
+    payload: dict = Body(...),
+    session_id: str = Depends(get_session_id),
+):
+    """
+    Evaluate one console expression against this session's live step data.
+
+    This is the read-only half of the console (see
+    ``docs/dev_plan/118-console-and-gui-parity.md`` §5). It runs through
+    :mod:`safe_formula`, the AST-allowlist interpreter whose calls must
+    target a registered operation — **not** ``eval_engine``, which is
+    ``exec()`` and gated behind ``eval_mode``. That is what lets the
+    console be "an interactive Python session narrowed to Simple Steps"
+    without handing the browser arbitrary code execution.
+
+    Mutations never arrive here: workflow commands are applied
+    client-side through the same dispatch the GUI uses, so there is
+    exactly one path into workflow state.
+    """
+    from . import safe_formula
+    from .engine import get_dataframe
+    from .step_proxy import StepProxy, ColumnProxy
+
+    source = (payload.get("source") or "").strip()
+    step_map = payload.get("step_map") or {}
+    if not source:
+        return {"ok": False, "error": "Empty expression."}
+
+    # Resolve every step the caller knows about to its DataFrame, so the
+    # expression's namespace matches what the GUI is showing.
+    env: Dict[str, Any] = {}
+    for key, ref_id in step_map.items():
+        df = get_dataframe(ref_id, session_id=session_id)
+        if df is not None:
+            env[key] = df
+
+    try:
+        result = safe_formula.run_formula(source, steps=env)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": str(exc),
+            "error_type": type(exc).__name__,
+            "available_steps": sorted(env.keys()),
+        }
+
+    # Unwrap proxies so the rendering below sees pandas objects.
+    if isinstance(result, StepProxy):
+        result = result._df
+    elif isinstance(result, ColumnProxy):
+        result = result._series
+
+    if isinstance(result, pd.DataFrame):
+        preview = result.head(20)
+        return {
+            "ok": True,
+            "kind": "dataframe",
+            "shape": f"{len(result)} rows x {len(result.columns)} cols",
+            "columns": [str(c) for c in result.columns],
+            "repr": preview.to_string(max_cols=12, max_colwidth=40),
+            "truncated": len(result) > 20,
+        }
+    if isinstance(result, pd.Series):
+        preview = result.head(20)
+        return {
+            "ok": True,
+            "kind": "series",
+            "shape": f"{len(result)} values"
+                     + (f", name={result.name!r}" if result.name is not None else ""),
+            "repr": preview.to_string(max_rows=20),
+            "truncated": len(result) > 20,
+        }
+
+    return {
+        "ok": True,
+        "kind": type(result).__name__,
+        "shape": "",
+        "repr": repr(result)[:4000],
+        "truncated": False,
+    }
+
 
 @app.post("/api/build_formula")
 async def api_build_formula(payload: dict = Body(...)):

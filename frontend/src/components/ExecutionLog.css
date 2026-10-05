@@ -350,3 +350,13 @@
   background: #555;
   border-radius: 2px;
 }
+
+/* The console tabs manage their own scrolling (list + pinned prompt), so the
+   shared body must not add a second scroll container around them. */
+.execution-log-body--console {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}

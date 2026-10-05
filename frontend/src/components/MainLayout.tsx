@@ -107,6 +107,8 @@ export default function MainLayout() {
     removePipeline,
     executionLogs,
     clearLogs,
+    dispatchCommand,
+    consoleStepMap,
   } = useWorkflow();
 
   // ── Tab state ────────────────────────────────────────────────────────────
@@ -745,6 +747,8 @@ export default function MainLayout() {
                     onPopOut={popLogOut}
                     onDock={dockLog}
                     rightOffset={(rightPaneVisible ? rightPaneWidth : 0) + 30}
+                    dispatchCommand={dispatchCommand}
+                    consoleStepMap={consoleStepMap}
                   />
                 </Allotment.Pane>
                 )}

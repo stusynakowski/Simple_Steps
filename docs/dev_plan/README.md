@@ -19,6 +19,7 @@ been superseded by the unified-expression model documented here.
 | [`104-equals-sign-convention.md`](./104-equals-sign-convention.md) | Where the leading `=` lives and where it doesn't. |
 | [`105-validation-flow.md`](./105-validation-flow.md) | How validation flows between UI and backend, and what "commit on run" means. |
 | [`117-referencing-previous-steps.md`](./117-referencing-previous-steps.md) | Suggestions for the step-reference selection UI (Excel-style cell/row/column/range picking). |
+| [`118-console-and-gui-parity.md`](./118-console-and-gui-parity.md) | Plan for a console, and for keeping GUI actions and console commands in exact correspondence. |
 
 ## One-paragraph summary
 

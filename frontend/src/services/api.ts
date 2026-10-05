@@ -19,6 +19,8 @@ function resolveApiBase(): string {
   return '/api';
 }
 
+import { emitConsoleRecord } from '../context/ConsoleContext';
+
 export const API_BASE = resolveApiBase();
 
 // ── Session bootstrap ────────────────────────────────────────────────────────
@@ -212,6 +214,18 @@ export async function runStep(
       result_store: resultStore || null,
   };
 
+  // Wire tap. This records the payload at the fetch boundary — the bytes that
+  // actually go out — rather than reconstructing it from workflow state. A
+  // reconstruction is a *model* of the request; if it drifts it reports a
+  // parity that does not exist, which is the failure mode the console exists
+  // to rule out. See docs/dev_plan/118-console-and-gui-parity.md §3.
+  const startedAt = performance.now();
+  emitConsoleRecord({
+    stream: 'wire',
+    text: `POST /api/run  ${payload.operation_id || '(none)'}  step=${payload.step_id}${payload.is_preview ? '  [preview]' : ''}`,
+    detail: JSON.stringify(payload, null, 2),
+  });
+
   const response = await fetch(`${API_BASE}/run`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -231,10 +245,24 @@ export async function runStep(
       if (errorInfo) {
         err.backendError = errorInfo;
       }
+      emitConsoleRecord({
+        stream: 'wire',
+        level: 'error',
+        text: `  ← ${response.status} ${response.statusText}  ${err.message}`,
+        detail: errorInfo?.traceback ?? undefined,
+        durationMs: Math.round(performance.now() - startedAt),
+      });
       throw err;
   }
 
-  return response.json();
+  const body = await response.json();
+  emitConsoleRecord({
+    stream: 'wire',
+    text: `  ← 200  ref=${body.output_ref_id ?? '(none)'}`
+        + (body.metrics ? `  ${body.metrics.rows} rows x ${body.metrics.columns ?? '?'} cols` : ''),
+    durationMs: Math.round(performance.now() - startedAt),
+  });
+  return body;
 }
 
 /**
@@ -487,4 +515,42 @@ export async function updateSettings(updates: Partial<SimpleStepsSettings>): Pro
     });
     if (!r.ok) throw new Error('Failed to update settings');
     return r.json();
+}
+
+
+// ── Console ────────────────────────────────────────────────────────────────
+
+export interface ConsoleEvalResult {
+  ok: boolean;
+  kind?: string;
+  shape?: string;
+  columns?: string[];
+  repr?: string;
+  truncated?: boolean;
+  error?: string;
+  error_type?: string;
+  available_steps?: string[];
+}
+
+/**
+ * Evaluate one console expression against live session data.
+ *
+ * Read-only: the backend runs this through `safe_formula`, the AST-allowlist
+ * interpreter, so an expression can neither mutate the workflow nor reach
+ * outside the registered operations.
+ */
+export async function evalConsole(
+  source: string,
+  stepMap: Record<string, string>,
+): Promise<ConsoleEvalResult> {
+  const response = await fetch(`${API_BASE}/console/eval`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ source, step_map: stepMap }),
+  });
+  if (!response.ok) {
+    return { ok: false, error: `Backend error: ${response.status} ${response.statusText}` };
+  }
+  return response.json();
 }
