@@ -472,45 +472,6 @@ export default function OperationColumn({
                 </StepWidget>
               )}
 
-              {/* Data Tab Content */}
-              {isOpen('data') && (
-                <StepWidget id="data" collapsed={collapsedPanels.has('data')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
-                  <div
-                    className="tab-content status-content"
-                    onMouseEnter={() => { if (isWiringSource) setIsWiringHovered(true); }}
-                    onMouseLeave={() => setIsWiringHovered(false)}
-                    style={isWiringSource && isWiringHovered ? { outline: '2px solid #ffc107', outlineOffset: -2, borderRadius: 4 } : {}}
-                  >
-                    <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
-                      <DataOutputGrid
-                        cells={step.output_preview}
-                        onCellClick={(cell) => {
-                          // If this is a wiring source, the wiring callbacks handle it.
-                          // Otherwise, clicking a cell/column inserts a reference into
-                          // the current step's formula bar.
-                          if (!isWiringSource) {
-                            if (cell.row_id === -1) {
-                              // Column header click → column reference
-                              handlePickerTokenSelect(`${step.id}.${cell.column_id}`);
-                            } else {
-                              // Cell click → specific cell reference
-                              handlePickerTokenSelect(`${step.id}[row=${cell.row_id}, col=${cell.column_id}]`);
-                            }
-                          }
-                        }}
-                        wiringMode={isWiringSource}
-                        sourceStepId={step.id}
-                        onWireColumn={(token) => injectReference(token)}
-                        onWireRow={(token) => injectReference(token)}
-                        onWireCell={(token) => injectReference(token)}
-                        stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
-                        stagedCellMode={stagedCellMode}
-                      />
-                    </div>
-                  </div>
-              </StepWidget>
-              )}
-
               {/* Settings Tab Content - Miscellaneous Editing */}
               {isOpen('settings') && isEditMode && (
                 <StepWidget id="settings" collapsed={collapsedPanels.has('settings')} onToggleCollapse={toggleCollapsed} background="#fff" maxHeight={widgetMaxHeight}>
@@ -691,6 +652,45 @@ export default function OperationColumn({
                           })}
                         </div>
                       )}
+                    </div>
+                  </div>
+              </StepWidget>
+              )}
+
+              {/* Data Tab Content */}
+              {isOpen('data') && (
+                <StepWidget id="data" collapsed={collapsedPanels.has('data')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
+                  <div
+                    className="tab-content status-content"
+                    onMouseEnter={() => { if (isWiringSource) setIsWiringHovered(true); }}
+                    onMouseLeave={() => setIsWiringHovered(false)}
+                    style={isWiringSource && isWiringHovered ? { outline: '2px solid #ffc107', outlineOffset: -2, borderRadius: 4 } : {}}
+                  >
+                    <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
+                      <DataOutputGrid
+                        cells={step.output_preview}
+                        onCellClick={(cell) => {
+                          // If this is a wiring source, the wiring callbacks handle it.
+                          // Otherwise, clicking a cell/column inserts a reference into
+                          // the current step's formula bar.
+                          if (!isWiringSource) {
+                            if (cell.row_id === -1) {
+                              // Column header click → column reference
+                              handlePickerTokenSelect(`${step.id}.${cell.column_id}`);
+                            } else {
+                              // Cell click → specific cell reference
+                              handlePickerTokenSelect(`${step.id}[row=${cell.row_id}, col=${cell.column_id}]`);
+                            }
+                          }
+                        }}
+                        wiringMode={isWiringSource}
+                        sourceStepId={step.id}
+                        onWireColumn={(token) => injectReference(token)}
+                        onWireRow={(token) => injectReference(token)}
+                        onWireCell={(token) => injectReference(token)}
+                        stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
+                        stagedCellMode={stagedCellMode}
+                      />
                     </div>
                   </div>
               </StepWidget>

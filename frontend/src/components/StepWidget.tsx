@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { PANEL_META } from './stepPanels';
+import { PANEL_META, PANEL_ORDER } from './stepPanels';
 import type { PanelId } from './stepPanels';
 
 interface Props {
@@ -17,7 +17,11 @@ interface Props {
 export default function StepWidget({ id, collapsed, onToggleCollapse, background, maxHeight, children }: Props) {
   const { name, accent } = PANEL_META[id];
   return (
-    <section className={`step-widget step-widget--${id}`} data-testid={`step-widget-${id}`}>
+    <section
+      className={`step-widget step-widget--${id}`}
+      data-testid={`step-widget-${id}`}
+      style={{ order: PANEL_ORDER.indexOf(id) }}
+    >
       <button
         type="button"
         className="step-widget-header"
