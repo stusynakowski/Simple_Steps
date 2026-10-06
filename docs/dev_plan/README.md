@@ -21,6 +21,8 @@ been superseded by the unified-expression model documented here.
 | [`117-referencing-previous-steps.md`](./117-referencing-previous-steps.md) | Suggestions for the step-reference selection UI (Excel-style cell/row/column/range picking). |
 | [`118-console-and-gui-parity.md`](./118-console-and-gui-parity.md) | Plan for a console, and for keeping GUI actions and console commands in exact correspondence. |
 | [`119-grid-integration.md`](./119-grid-integration.md) | Step execution on simple-steps-core's grid model: how a UI step becomes a core operation, what changed for users, and what is still shimmed. |
+| [`120-literals-and-references.md`](./120-literals-and-references.md) | The rule that only `wf["step"]` is a reference and everything else is a literal; the canonical `tool[modifiers](input, arguments)` formula; requirements, tests and asks for core. |
+| [`121-ui-and-core-changes.md`](./121-ui-and-core-changes.md) | What to change in the UI (reference picking, the formula bar), in core, and in the app backend, with the evidence for each and an order of work. |
 
 ## One-paragraph summary
 

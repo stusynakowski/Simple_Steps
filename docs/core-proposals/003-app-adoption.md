@@ -458,6 +458,8 @@ annotation is the *string* `"Literal['a','b']"`, which carries nothing.
 
 ## K. Grid: no verb hands a tool the whole table
 
+> Consolidated into [`005-core-changes.md`](005-core-changes.md) as **K12**; §L below is **K10**.
+
 *Added 2026-10-05, against core `d8b6979`, while moving step execution onto
 the grid model (`src/SIMPLE_STEPS/grid_runner.py`). Not yet in core's
 `004-grid-adoption.md`.*
