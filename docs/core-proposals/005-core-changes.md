@@ -1,7 +1,9 @@
 # 005 — Every change the app needs from simple-steps-core
 
-> **For `simple-steps-core`.** Status: proposal. Checked against core
-> `d8b6979` on 2026-10-05.
+> **For `simple-steps-core`.** Status: proposal. First checked against core
+> `d8b6979` on 2026-10-05; **re-checked against `c73f6f8` on 2026-10-06**:
+> K10 is done, K11 regressed, the other 16 are unchanged (see "Re-check at
+> c73f6f8" below).
 >
 > This is the one list. It replaces the open items scattered across
 > `003-app-adoption.md` (§K, §L), `docs/dev_plan/120` §8, `docs/dev_plan/121`
@@ -16,7 +18,7 @@ python scripts/core_asks.py
 
 It runs one probe per ask against the installed core and prints **OPEN** or
 **DONE** with what it observed. Every "Today" line below is that script's
-output at `d8b6979`, where all 18 are OPEN. An ask is finished when its line
+output at `d8b6979`, where all 18 were OPEN. An ask is finished when its line
 says DONE. K17 is the exception: it needs a manual check.
 
 ## Summary
@@ -28,7 +30,7 @@ says DONE. K17 is the exception: it needs a manual check.
 | **K3** | Refuse an operation used where a step reference belongs | **1: wrong results** | the formula's inline-operation check |
 | **K4** | Refuse `over` given in both the modifier and the call | **1: wrong results** | — |
 | **K9** | One `select` for rows and columns | **2: needed for the UI** | two-step cells and blocks |
-| **K10** | A value from another step as a tool argument (P5) | **2: needed for the UI** | `SHIM(core §L)` |
+| **K10** | A value from another step as a tool argument (P5) | ✅ **done in `c73f6f8`** | `SHIM(core §L)`, for whole-step values |
 | **K12** | A whole-table verb | **2: needed for the UI** | `SHIM(core §K)` |
 | **K6** | Declare a source in call form | **2: needed for the UI** | `.bind()` spelling for sources |
 | **K7** | Declare a sweep in call form | **2: needed for the UI** | — |
@@ -38,12 +40,39 @@ says DONE. K17 is the exception: it needs a manual check.
 | **K14** | Progress callback on `run` | 3: features | — |
 | **K15** | Re-run only the failed rows | 3: features | — |
 | **K16** | A pluggable results store | 3: features | the app's own result store |
-| **K11** | A step reading two steps (`stack`, `zip`, `join`) | 4: later | `merge_steps` |
+| **K11** | A step reading two steps (`stack`, `zip`, `join`) — **and a regression to fix now** | 4: later (the crash: 1) | `merge_steps` |
 | **K17** | Keep the workflow JSON loadable across P0 | 4: later | — |
 | **K18** | Enforce `timeout` | 4: later | the "not enforced" note in the UI |
 
 Priority 1 asks are cases where core accepts something and **silently
 produces a wrong result**. They come first, whatever else is planned.
+
+---
+
+## Re-check at `c73f6f8` (2026-10-06)
+
+`c73f6f8` moves a step's input out of its modifiers into its own slot,
+`Operation.input`, and writes references as typed JSON: `"input": {"$ref":
+"readings"}`, and `{"$ref": …}` in `arguments`. Modifiers now hold only
+literal settings, and `over` is no longer in `modifier_catalog()`. This is the
+literal/reference split from `docs/dev_plan/120`, done in core.
+
+| Ask | Result |
+|---|---|
+| **K10** | **DONE.** `scale[mod.map()](wf["readings"], weight=wf["params"])` gives `[20, 40, 60, 40]`. Also checked: the argument serialises as `{"$ref": "w"}` and survives a JSON round trip; changing `w` marks the reader `stale`; `remove("w")` is refused while it's read; `rename` rewrites the argument. |
+| **K11** | **Regressed.** `scale[mod.map(over=[wf["a"], wf["b"]])]` used to give a clear *"not an earlier step"* problem. Adding it to a workflow now **raises** `TypeError: __str__ returned non-string (type list)`: `Operation._add` wraps any non-`StepRef` `over` in `StepRef(over)`, a list included. **Fix:** in `_add`, accept only a `StepRef` or a string, and raise *"one step reads one input; combining two needs a merge verb"* for anything else. |
+| K4 | Unchanged: `over` in the modifier plus a call input — the call still wins silently (now into `Operation.input`). |
+| K5 | Unchanged: `mod.map(over="readings")` still accepts a string as a reference in Python. |
+| the other 14 | Unchanged. |
+
+Old saved operations with `over` inside a modifier still load: `from_dict`
+moves it into `input`. Core's own tests: 437 passed.
+
+**What it changed in the app** (fixed alongside): the palette's verb
+operations built their `over` field from the catalog, so they lost it; the
+app now adds it itself. `grid_runner` now writes the `input` slot directly
+rather than relying on core moving `over` for it. The app's tests and the
+`all_orchestrations` check (38/38) pass on `c73f6f8`.
 
 ---
 
@@ -149,9 +178,9 @@ index, so cells stay addressable. `slice` can remain as the rows-only form.
 
 **Done when:** `identity[mod.select(columns=["n"], rows=[0, 2])](wf["readings"])` gives `{'n': [1, 3]}`.
 
-### K10. A value from another step as a tool argument (P5)
+### K10. A value from another step as a tool argument (P5) — ✅ done in `c73f6f8`
 
-**Today:** `TypeError: cannot bind 'weight' to a step reference: a bound literal is a constant…`
+**Before `c73f6f8`:** `TypeError: cannot bind 'weight' to a step reference: a bound literal is a constant…`
 
 ```python
 wf["params"] = 2

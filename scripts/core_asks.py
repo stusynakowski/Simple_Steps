@@ -67,6 +67,15 @@ def _wf() -> grid.Workflow:
     return wf
 
 
+def _input_of(operation) -> str:
+    """The step an operation reads: the `input` slot (core c73f6f8+), else legacy `over`."""
+    blob = operation.to_dict()
+    ref = blob.get("input")
+    if isinstance(ref, dict):
+        return ref.get("$ref")
+    return blob["modifiers"][-1]["params"].get("over")
+
+
 def _try(fn: Callable):
     try:
         return fn(), None
@@ -118,7 +127,7 @@ def k4_over_twice():
     if err:
         return True, f"refused: {err[:120]}"
     wf["x"] = built
-    return False, f"accepted; over = {wf.steps['x'].operation.to_dict()['modifiers'][-1]['params']['over']!r} (the call won)"
+    return False, f"accepted; input = {_input_of(wf.steps['x'].operation)!r} (the call won)"
 
 
 def k5_string_over():
@@ -129,7 +138,7 @@ def k5_string_over():
     if err:
         return True, f"mod.map(over='readings') refused: {err[:100]}"
     wf["x"] = scale[built]
-    return False, (f"mod.map(over='readings') -> reference to step {wf.steps['x'].operation.to_dict()['modifiers'][-1]['params']['over']!r}; "
+    return False, (f"mod.map(over='readings') -> reference to step {_input_of(wf.steps['x'].operation)!r}; "
                    f"scale[mod.map()]('readings') -> {source_kind} (the string as data)")
 
 
@@ -186,7 +195,9 @@ def k11_multi_input():
     built, err = _try(lambda: scale[mod.map(over=[wf["readings"], wf["other"]])])
     if err:
         return False, f"over=[a, b] -> {err[:110]}"
-    wf["x"] = built
+    _, err = _try(lambda: wf.__setitem__("x", built))
+    if err:
+        return False, f"over=[a, b] declared, then adding the step raised {err[:110]}"
     probs = wf.step("x").problems
     return not probs, f"over=[a, b] -> {probs or 'accepted'}"
 

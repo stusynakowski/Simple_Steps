@@ -121,9 +121,8 @@ def run_grid_step(
         if plan.renames:
             _check_renames(plan.renames, data)
             wf[_BOUND] = grid.Operation.from_dict({
-                "tool_id": "identity", "arguments": {},
-                "modifiers": [{"kind": "rename",
-                               "params": {"over": _INTERNAL, "columns": plan.renames}}],
+                "tool_id": "identity", "input": _ref(_INTERNAL), "arguments": {},
+                "modifiers": [{"kind": "rename", "params": {"columns": plan.renames}}],
             })
             over = _BOUND
 
@@ -379,14 +378,23 @@ def _infer(func, plan: _Plan, literals: Dict[str, Any], session_id: Optional[str
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _operation(plan: _Plan, over: Optional[str]) -> dict:
-    params = dict(plan.verb_settings)
-    if over is not None and plan.verb != "source":
-        params["over"] = over
+    """Core's operation JSON. The input has its own slot, as a typed reference
+    (core c73f6f8+); modifiers carry only literal settings."""
     if plan.verb == "source" and plan.tool_id == "identity":
         raise GridStepError("a source step needs a tool to call")
     # Innermost first: retry/timeout wrap each unit, the shape verb is outermost.
-    modifiers = list(plan.execution) + [{"kind": plan.verb, "params": params}]
-    return {"tool_id": plan.tool_id, "arguments": plan.arguments, "modifiers": modifiers}
+    modifiers = list(plan.execution) + [{"kind": plan.verb, "params": dict(plan.verb_settings)}]
+    return {
+        "tool_id": plan.tool_id,
+        "input": _ref(over) if over is not None and plan.verb != "source" else None,
+        "arguments": plan.arguments,
+        "modifiers": modifiers,
+    }
+
+
+def _ref(step_id: str) -> dict:
+    """A step reference in core's operation JSON — distinct from a string literal."""
+    return {"$ref": step_id}
 
 
 def _tools() -> Dict[str, Any]:
@@ -615,7 +623,13 @@ def register_verb_operations() -> None:
         entry = catalog.get(verb)
         if entry is None or verb in OPERATION_REGISTRY:
             continue
-        params: List[Any] = []
+        # The step this verb reads. Core c73f6f8 moved it out of the modifier's
+        # settings into the operation's input slot, so the catalog no longer
+        # lists it; the palette entry still needs the field.
+        params: List[Any] = [OperationParam(
+            name="over", type="dataframe", required=verb != "sweep", default=None,
+            description="the step this reads",
+        )]
         if verb in TOOL_VERBS:
             params.append(OperationParam(
                 name="tool", type="string", required=verb in ("map", "filter", "group", "sweep"),
@@ -663,10 +677,10 @@ def _verb_callable(verb: str):
         wf = grid.Workflow()
         if data is not None:
             wf[_INTERNAL] = data
-            params["over"] = _INTERNAL
         tools = _tools()
         wf["step"] = grid.Operation.from_dict({
             "tool_id": (tool or _default_tool(verb)) if verb in TOOL_VERBS else "identity",
+            "input": _ref(_INTERNAL) if data is not None else None,
             "arguments": arguments,
             "modifiers": [{"kind": verb, "params": params}],
         }, tools)
