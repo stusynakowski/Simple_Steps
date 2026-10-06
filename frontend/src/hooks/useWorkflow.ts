@@ -10,6 +10,7 @@ import { runStep as runStepApi, fetchDataView, getOperations,
 import type { OperationDefinition, PipelineFile, BackendError, ProgressEvent } from '../services/api';
 import { parseFormula, buildFormula } from '../utils/formulaParser';
 import { errorCell, withRowErrors } from '../utils/errorCells';
+import { columnsToShow } from '../utils/stepColumns';
 import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 import type { WorkflowCommand } from '../types/commands';
 import { formatCommand } from '../types/commands';
@@ -480,15 +481,14 @@ export default function useWorkflow() {
       // Fetch preview — backend returns Cell[] directly ({row_id, column_id, value, display_value})
       const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
 
-      // Determine which columns are NEW to this step.
+      // Which columns the Data panel shows: all of a core-syntax step's grid,
+      // or the columns an older formula added (see columnsToShow).
       // Use prevStep.outputColumns (full accumulated column list), not output_preview (filtered).
-      const inputCols = new Set(prevStep?.outputColumns ?? []);
       const outputCols: string[] = stableMeta.columns.length > 0
         ? stableMeta.columns
         : (res.metrics.columns ?? []);
-      const newCols = outputCols.filter((c) => !inputCols.has(c));
-      // Fall back to all output columns for source steps (no previous step)
-      const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
+      const displayCols = columnsToShow(outputCols, prevStep?.outputColumns, !!parsed?.operation);
+      const newCols = outputCols.filter((c) => !(prevStep?.outputColumns ?? []).includes(c));
 
       // rawData is already Cell[] — just filter to this step's own columns
       const previewCells = withRowErrors(
@@ -636,11 +636,9 @@ export default function useWorkflow() {
       
       const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
 
-      // Same column-diff logic as runStep — use outputColumns (full list), not output_preview
-      const inputCols = new Set(prevStep?.outputColumns ?? []);
+      // Same column choice as runStep — use outputColumns (full list), not output_preview
       const outputCols: string[] = res.metrics.columns ?? [];
-      const newCols = outputCols.filter((c) => !inputCols.has(c));
-      const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
+      const displayCols = columnsToShow(outputCols, prevStep?.outputColumns, !!parsed?.operation);
 
       // rawData is already Cell[] — just filter to this step's own columns
       const previewCells = withRowErrors(
