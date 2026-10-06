@@ -31,7 +31,9 @@ nothing leaks into ``grid.TOOLS``.
 
 What core cannot do yet is shimmed in ``core_bridge`` and tagged there:
 whole-table tools (``SHIM(core §A6)``) and steps that read two earlier steps
-(core 004 §B6) fall back or fail with a pointer, never silently.
+fall back or fail with a pointer, never silently. Reading several steps is
+core's combine verbs (``join`` / ``stack`` / ``zip_``), which only formulas in
+core's syntax reach (``run_formula``).
 """
 
 from __future__ import annotations
@@ -235,7 +237,7 @@ def run_canonical_step(formula: str, step_map: Dict[str, str],
 
     step, operation = run_formula(formula, load)
     output = step.output
-    if operation["modifiers"][-1]["kind"] == "source" and len(output.failed):
+    if _verb_of(operation) == "source" and len(output.failed):
         # One call, so one unit: if it failed there is no output to show.
         raise GridStepError(str(output.failed.iloc[0].get("error", "the tool failed")))
     frame = output.data.reset_index(drop=True)
@@ -324,8 +326,9 @@ def _plan(op_id: str, config: Dict[str, Any], step_map: Dict[str, str],
         return plan
     if len(upstreams) > 1:
         raise GridStepError(
-            "this step reads more than one earlier step; core's grid model reads "
-            "exactly one upstream per step until multi-input lands (core 004 §B6)"
+            "this step reads more than one earlier step, which a tool step can't; "
+            'combine them first with join(wf["a"], wf["b"], on=…), '
+            'stack(wf["a"], wf["b"]) or zip_(wf["a"], wf["b"]) and read that'
         )
     plan.upstream_ref = next(iter(upstreams), None)
     if plan.upstream_ref is None and input_ref_id and plan.verb not in ("source", "sweep"):
@@ -640,10 +643,11 @@ def _engine_metrics(operation: dict, step, output) -> dict:
     failed = output.failed
     errors = [{"unit": str(unit), "error": str(row.get("error", ""))}
               for unit, row in failed.head(5).iterrows()]
-    payload = operation["modifiers"][-1]["params"].get("name") or grid.PAYLOAD
+    outer = operation["modifiers"][-1] if operation["modifiers"] else {"params": {}}
+    payload = outer["params"].get("name") or grid.PAYLOAD
     return {
         "engine": "grid",
-        "verb": operation["modifiers"][-1]["kind"],
+        "verb": _verb_of(operation),
         "operation": json.loads(json.dumps(operation, default=str)),
         "describe": step.describe(),
         "units": len(ledger),
@@ -657,6 +661,13 @@ def _engine_metrics(operation: dict, step, output) -> dict:
         "payload_column": payload if payload in output.data.columns else None,
         "row_errors": _row_errors(output, failed),
     }
+
+
+def _verb_of(operation: dict) -> str:
+    """The outermost shape verb — or, for a combine (no modifiers), its kind."""
+    if operation.get("inputs") or not operation["modifiers"]:
+        return operation["tool_id"]
+    return operation["modifiers"][-1]["kind"]
 
 
 _ROW_ERROR_CAP = 1000

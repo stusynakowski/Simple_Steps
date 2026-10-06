@@ -267,6 +267,48 @@
       }
     },
     {
+      "name": "city_info",
+      "expression": "to_rows[mod.source()](data='{\"city\": [\"SF\", \"NYC\", \"LA\"], \"region\": [\"west\", \"east\", \"west\"]}')",
+      "meta": {
+        "label": "city_info"
+      }
+    },
+    {
+      "name": "more",
+      "expression": "to_rows[mod.source()](data='{\"city\": [\"BOS\", \"SEA\"], \"n\": [5, 6]}')",
+      "meta": {
+        "label": "more"
+      }
+    },
+    {
+      "name": "enriched",
+      "expression": "join(wf[\"readings\"], wf[\"city_info\"], on=\"city\", how=\"left\")",
+      "meta": {
+        "label": "enriched"
+      }
+    },
+    {
+      "name": "all_readings",
+      "expression": "stack(wf[\"readings\"], wf[\"more\"])",
+      "meta": {
+        "label": "all_readings"
+      }
+    },
+    {
+      "name": "scores_only",
+      "expression": "identity[mod.select(columns=[\"score\"])](wf[\"scored\"])",
+      "meta": {
+        "label": "scores_only"
+      }
+    },
+    {
+      "name": "zipped",
+      "expression": "zip_(wf[\"ns\"], wf[\"scores_only\"])",
+      "meta": {
+        "label": "zipped"
+      }
+    },
+    {
       "name": "failure",
       "expression": "risky[mod.map(name=\"out\"), mod.retry(times=1)](wf[\"readings\"])",
       "meta": {

@@ -27,7 +27,16 @@ Forms:
 ``tool[mod.source()](k=v)``                 a source: no input
 ``tool[mod.sweep(a=[…], b=[…])]``           a sweep: no input, no call needed
 ``tool(wf["x"], k=v)``                      the verb is inferred from the tool
+``join(wf["a"], wf["b"], on="k")``          a combine: reads several steps
+``stack(wf["a"], wf["b"], …)``              (``join`` / ``stack`` / ``zip_``)
+``zip_(wf["a"], wf["b"], …)``
 ==========================================  ===================================
+
+A combine is core's own constructor (``grid.join`` / ``stack`` / ``zip_``),
+not a tool: it takes no modifiers, its positional arguments are the steps it
+reads, and its keyword settings are literals. Those names are therefore
+reserved — a tool called ``join`` can still be written with brackets,
+``join[mod.map()](wf["x"])``, but not called bare.
 
 Built-in tools are written by name: ``identity[mod.select(…)]``,
 ``count[mod.collapse()]``, ``gather``, ``total``, ``first``, ``last``.
@@ -50,6 +59,10 @@ from simple_steps_core import grid
 #: Shape verbs that read no step.
 NO_INPUT_VERBS = ("source", "sweep")
 
+#: Combine verbs (core 005 B), as written → core's constructor. ``zip`` is
+#: accepted too: core's tool_id is ``zip``; ``zip_`` is only Python's spelling.
+COMBINES = {"join": grid.join, "stack": grid.stack, "zip_": grid.zip_, "zip": grid.zip_}
+
 
 class FormulaError(ValueError):
     """A formula in core's syntax that can't be compiled, with the reason."""
@@ -66,10 +79,20 @@ class Compiled:
     input: Optional[str]
     #: Literals, or ``{"$ref": name}`` for a value read from another step.
     arguments: Dict[str, Any] = field(default_factory=dict)
+    #: Every step a combine reads, primary first (``input`` is the first);
+    #: empty for an ordinary single-input step.
+    inputs: List[str] = field(default_factory=list)
+
+    @property
+    def is_combine(self) -> bool:
+        """A ``join`` / ``stack`` / ``zip`` — reads several steps, applies no tool."""
+        return bool(self.inputs)
 
     @property
     def verb(self) -> Optional[str]:
-        """The shape verb, or ``None`` when it is to be inferred."""
+        """The shape verb (a combine's kind), or ``None`` when it is to be inferred."""
+        if self.is_combine:
+            return self.tool_id
         if self.modifiers is None:
             return None
         shapes = [m["kind"] for m in self.modifiers if m["kind"] in grid.SHAPE_VERBS]
@@ -77,8 +100,8 @@ class Compiled:
 
     @property
     def reads(self) -> List[str]:
-        """Every step this reads: its input, then any argument references."""
-        names = [self.input] if self.input is not None else []
+        """Every step this reads: its input(s), then any argument references."""
+        names = list(self.inputs) or ([self.input] if self.input is not None else [])
         names += [v["$ref"] for v in self.arguments.values() if _is_ref(v)]
         return list(dict.fromkeys(names))
 
@@ -87,12 +110,15 @@ class Compiled:
         modifiers = self.modifiers
         if modifiers is None:
             modifiers = [{"kind": inferred_verb or "map", "params": {}}]
-        return {
+        operation = {
             "tool_id": self.tool_id,
             "input": {"$ref": self.input} if self.input is not None else None,
             "arguments": dict(self.arguments),
             "modifiers": [dict(m) for m in modifiers],
         }
+        if self.inputs:
+            operation["inputs"] = [{"$ref": name} for name in self.inputs]
+        return operation
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -138,6 +164,8 @@ def compile_formula(formula: str) -> Compiled:
                     f'tool[mod.map()]({ast.unparse(func)})'
                 )
             return _with_call(_tool_name(func.value), _modifiers(func.slice), tree)
+        if isinstance(func, ast.Name) and func.id in COMBINES:   # join(wf["a"], wf["b"], …)
+            return _combine(func.id, tree)
         if isinstance(func, ast.Name):                   # tool(wf["x"], …): inferred
             return _with_call(func.id, None, tree)
         raise FormulaError(f"{ast.unparse(func)} is not a tool")
@@ -171,8 +199,8 @@ def _with_call(tool: str, modifiers: Optional[List[dict]], call: ast.Call) -> Co
         raise FormulaError("*args and **kwargs aren't allowed in a formula")
     if len(call.args) > 1:
         raise FormulaError(
-            "a step reads one input; combining two steps needs a merge verb, "
-            "which core doesn't have yet"
+            "a step reads one input; to combine steps use join(wf[\"a\"], wf[\"b\"], on=…), "
+            "stack(wf[\"a\"], wf[\"b\"]) or zip_(wf[\"a\"], wf[\"b\"])"
         )
     input_name = _input_ref(call.args[0]) if call.args else None
     arguments = {kw.arg: _argument(kw.value, kw.arg) for kw in call.keywords}
@@ -190,6 +218,52 @@ def _with_call(tool: str, modifiers: Optional[List[dict]], call: ast.Call) -> Co
         if verb not in NO_INPUT_VERBS and input_name is None:
             raise FormulaError(f'{verb} reads a step: {tool}[{_written(modifiers)}](wf["…"])')
     return compiled
+
+
+def _combine(name: str, call: ast.Call) -> Compiled:
+    """``join(wf["a"], wf["b"], on="k")`` → core's combine operation.
+
+    Built with core's own constructor, so its defaults (``how="inner"``,
+    ``join="outer"``, …) and its signature are core's, never a copy.
+    """
+    if any(isinstance(a, ast.Starred) for a in call.args) or any(k.arg is None for k in call.keywords):
+        raise FormulaError("*args and **kwargs aren't allowed in a formula")
+    if not call.args:
+        raise FormulaError(f'{name} reads steps: {name}(wf["a"], wf["b"], …)')
+    inputs = [_combine_input(arg, name) for arg in call.args]
+    settings = {kw.arg: _setting_of(name, kw.arg, kw.value) for kw in call.keywords}
+    try:
+        operation = COMBINES[name](*inputs, **settings)
+    except TypeError as exc:
+        raise FormulaError(f"{name}: {exc}") from None
+    return Compiled(operation.tool_id, [], inputs[0], dict(operation.arguments), inputs)
+
+
+def _combine_input(node: ast.AST, name: str) -> str:
+    """A combine's positional argument: a step, ``wf["x"]``."""
+    ref = _wf_name(node)
+    if ref is not None:
+        return ref
+    _reject_column_ref(node)
+    raise FormulaError(
+        f'{name} combines steps; each positional argument is wf["…"], '
+        f"not {ast.unparse(node)}. Settings go by keyword, e.g. on=\"city\""
+    )
+
+
+def _setting_of(name: str, key: str, node: ast.AST) -> Any:
+    """A combine setting: a literal, like a modifier's."""
+    if _wf_name(node) is not None:
+        raise FormulaError(
+            f"{name}({key}=…) is a setting, and settings are literals. The steps "
+            f"it combines go first, as positional wf[\"…\"]"
+        )
+    if isinstance(node, ast.Name) and node.id not in ("True", "False", "None"):
+        raise FormulaError(f'{name}({key}={node.id}): text needs quotes, "{node.id}"')
+    try:
+        return ast.literal_eval(node)
+    except ValueError:
+        raise FormulaError(f"{name}({key}=…) must be a literal, not {ast.unparse(node)}") from None
 
 
 def _modifiers(node: ast.AST) -> List[dict]:

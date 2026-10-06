@@ -317,6 +317,17 @@ isn't plain data raises `PayloadError` on `to_session_json()`.
 **Ask:** core's planned multi-input verbs, `stack` and `zip` first, then
 `join`. The app's `merge_steps` waits on `join`.
 
+**Re-checked on `66afce2` (2026-10-06): DONE**, as core 005 B's combine
+constructors `join(a, b, on=…)`, `stack(a, b, …)` and `zip_(a, b, …)`. Run in
+core: `stack(wf["a"], wf["b"])` over 2 + 1 rows stages as `stack · 3 cells`,
+runs to `n = [1, 2, 3]`, and its `inputs` survive `to_json` → `from_json` as
+`(<a>, <b>)`. The app compiles `join(wf["a"], wf["b"], on="k")`,
+`stack(…)` and `zip_(…)` formulas to these operations
+(`operation_formula._combine`) and the `all_orchestrations` check is 44/44.
+**Still open:** the `over=[wf["a"], wf["b"]]` regression above —
+`TypeError: __str__ returned non-string (type list)`. The app's compiler never
+produces that form, so it does not reach users.
+
 ### K17. Keep the workflow JSON loadable across P0
 
 **Today:** `to_json version = 1`. Checked by hand.

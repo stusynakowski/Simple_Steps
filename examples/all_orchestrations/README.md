@@ -8,11 +8,11 @@ dataset, and one step per step of core's workflow, each written as a formula.
 | file | what it is |
 |---|---|
 | [`tools.py`](tools.py) | core's registry, declared with `@simple_step_tool` |
-| [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 38-step workflow |
+| [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow |
 | [`check.py`](check.py) | runs the workflow the way the UI does and compares every step with core |
 
 ```bash
-python examples/all_orchestrations/check.py        # 38/38 steps match simple-steps-core
+python examples/all_orchestrations/check.py        # 44/44 steps match simple-steps-core
 simple-steps --workspace examples/all_orchestrations
                                                     # open the workflow in the UI and press Run
 ```
@@ -40,6 +40,11 @@ formula reads the same as the Python in core's `pipeline.py`:
   named directly: `=count[mod.collapse()](wf["readings"])`.
 - **`=scale(wf["readings"])` lets core infer the verb** from the tool.
 - **A plain value is a one-cell source:** `=[1, 2, 3, 4]`.
+- **Combines read several steps and apply no tool:**
+  `=join(wf["readings"], wf["city_info"], on="city", how="left")`,
+  `=stack(wf["readings"], wf["more"])`, `=zip_(wf["ns"], wf["scores_only"])`.
+  They take no brackets; every positional argument is a step and every
+  setting is a literal keyword (core 005 B).
 
 | core (`pipeline.py`) | formula |
 |---|---|
@@ -49,6 +54,10 @@ formula reads the same as the Python in core's `pipeline.py`:
 | `grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` | `=grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` |
 | `scale(wf["readings"])`, verb inferred | `=scale(wf["readings"])` |
 | `wf["a_list"] = [1, 2, 3, 4]` | `=[1, 2, 3, 4]` |
+| `join(wf["readings"], wf["city_info"], on="city", how="left")` | `=join(wf["readings"], wf["city_info"], on="city", how="left")` |
+| `stack(wf["readings"], wf["more"])` | `=stack(wf["readings"], wf["more"])` |
+| `zip_(wf["ns"], wf["scores_only"])` | `=zip_(wf["ns"], wf["scores_only"])` |
+| `wf["city_info"] = pd.DataFrame({...})` | `=to_rows[mod.source()](data='{...}')` |
 
 The verb is part of the formula, so the saved file is the whole workflow.
 The app compiles each formula to core's operation JSON

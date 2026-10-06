@@ -501,6 +501,11 @@ earlier step"`), so a step reads exactly one upstream.
 these to the legacy path, which resolves the value and calls the tool. Steps
 that read two upstream *tables* fail with a message naming 004 §B6.
 
+**Two tables: closed for core-syntax formulas on `66afce2`.** Core's combine
+verbs (005 B) read several grids: `join(wf["a"], wf["b"], on="k")`,
+`stack(…)`, `zip_(…)`. The legacy `step1["col"]` form still reads one
+upstream, and its error now points at those verbs.
+
 ---
 
 ## What this leaves on our side
