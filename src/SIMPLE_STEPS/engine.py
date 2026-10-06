@@ -727,6 +727,18 @@ def _step_result_metrics(result: Any) -> dict:
     }
 
 
+def _runs_on_grid(op_id: str) -> bool:
+    """Core verb operations always run on the grid; tools do when the
+    ``engine`` setting says so."""
+    entry = OPERATION_REGISTRY.get(op_id) or {}
+    if entry.get("type") == "verb":
+        return True
+    if not entry:
+        return False
+    from .settings import get_settings
+    return get_settings().engine == "grid"
+
+
 def run_operation(
     op_id: str, 
     config: Any, 
@@ -765,6 +777,20 @@ def run_operation(
         result_df = run_eval(code, df_in, step_map, orchestrator_type, session_id=session_id)
         out_ref = save_dataframe(result_df, session_id=session_id, store_mode=result_store)
         return out_ref, {"rows": len(result_df), "columns": list(result_df.columns)}
+
+    # 2c. Core's grid model. Returns None for what core cannot run yet
+    # (whole-table tools — core_bridge.needs_whole_frame_shim), which then
+    # falls through to the legacy orchestrators below.
+    if _runs_on_grid(op_id):
+        from .grid_runner import run_grid_step
+        try:
+            ran = run_grid_step(op_id, config, step_map, input_ref_id,
+                                session_id, result_store)
+        except Exception as e:
+            # Same wording as the legacy path, so the UI log reads alike.
+            raise ValueError(f"Error executing step {op_id}: {e}") from e
+        if ran is not None:
+            return ran
 
     # 3. Find Operation
     op_def = OPERATION_REGISTRY.get(op_id)

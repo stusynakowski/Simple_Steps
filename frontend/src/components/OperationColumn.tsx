@@ -7,6 +7,7 @@ import StepToolbar from './StepToolbar';
 import PreviousStepDataPicker from './PreviousStepDataPicker';
 import { buildFormula, parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula, OrchestrationMode } from '../utils/formulaParser';
+import OrchestrationControl from './OrchestrationControl';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useStagedPreview } from '../hooks/useStagedPreview';
 import './OperationColumn.css';
@@ -573,30 +574,13 @@ export default function OperationColumn({
                         />
                       )}
 
-                      {/* Orchestration Strategy Override */}
-                      {currentOp && (
-                        <div className="config-item" style={{ borderTop: '1px solid #eee', paddingTop: '10px', marginTop: '10px' }}>
-                          <label>Orchestration:</label>
-                          <select
-                            value={String(step.configuration._orchestrator || '')}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              const newConfig = { ...step.configuration };
-                              if (e.target.value) newConfig._orchestrator = e.target.value;
-                              else delete newConfig._orchestrator;
-                              handleUiUpdate({ configuration: newConfig });
-                            }}
-                          >
-                            <option value="">⚙️ Default — Use the operation's built-in mode ({currentOp.type || 'dataframe'})</option>
-                            <option value="source">🌱 Source — Generate a brand-new DataFrame from scratch (no input needed)</option>
-                            <option value="dataframe">🗂️ DataFrame — Pass the entire DataFrame directly into the function</option>
-                            <option value="map">🔁 Row Map — Run the function once per row, adding results as new columns</option>
-                            <option value="filter">🔍 Filter — Keep only rows where the function returns True</option>
-                            <option value="expand">↕️ Expand — Explode list results so each item becomes its own row</option>
-                            <option value="raw_output">🔬 Raw Output — Call the function directly with no orchestration</option>
-                          </select>
-                        </div>
+                      {/* Orchestration: core's verb for this tool, and its settings */}
+                      {currentOp && currentOp.type !== 'verb' && (
+                        <OrchestrationControl
+                          configuration={step.configuration}
+                          defaultType={currentOp.type}
+                          onChange={(newConfig) => handleUiUpdate({ configuration: newConfig })}
+                        />
                       )}
                       
                       {/* Parameters */}

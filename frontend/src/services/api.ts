@@ -101,6 +101,15 @@ interface StepRunResponse {
   metrics: {
     rows: number;
     columns: string[];
+    /** Set when the step ran on simple_steps_core's grid model. */
+    engine?: 'grid';
+    /** The shape verb core ran (map, filter, select, …). */
+    verb?: string;
+    /** Units of work (rows, groups, …) and how many of them failed. */
+    units?: number;
+    failed?: number;
+    /** The first few per-unit errors from core's ledger. */
+    errors?: { unit: string; error: string }[];
   };
   error?: string;
 }
@@ -151,7 +160,7 @@ export interface OperationDefinition {
    * The default orchestration mode registered by the @simple_step_tool
    * decorator. 'step' is the v0.2 single-cell default.
    */
-  type: 'step' | 'source' | 'map' | 'filter' | 'dataframe' | 'expand' | 'raw_output' | 'orchestrator';
+  type: 'step' | 'source' | 'map' | 'filter' | 'dataframe' | 'expand' | 'raw_output' | 'orchestrator' | 'verb';
   category: string;
   params: OperationParam[];
   /** Output contract. Null when the tool has no return annotation. */
@@ -169,6 +178,45 @@ export async function getOperations(): Promise<OperationDefinition[]> {
   const response = await fetch(`${API_BASE}/operations`);
   if (!response.ok) throw new Error("Failed to fetch operations");
   return response.json();
+}
+
+/** One setting of a core verb, from ``grid.modifier_catalog()``. */
+export interface ModifierSetting {
+  name: string;
+  type: string | null;
+  required: boolean;
+  default: unknown;
+  description?: string;
+}
+
+/** A core verb (shape) or execution modifier, from ``GET /api/modifiers``. */
+export interface ModifierInfo {
+  name: string;
+  class: 'shape' | 'execution';
+  row_rule: string | null;
+  settings: ModifierSetting[];
+}
+
+let modifiersCache: Promise<Record<string, ModifierInfo>> | null = null;
+
+/**
+ * Core's verb vocabulary. Fetched once per page load: it only changes when
+ * simple-steps-core is upgraded, which restarts the server.
+ */
+export function getModifiers(): Promise<Record<string, ModifierInfo>> {
+  if (!modifiersCache) {
+    modifiersCache = fetch(`${API_BASE}/modifiers`)
+      .then((r) => {
+        if (!r.ok) throw new Error('Failed to fetch modifiers');
+        return r.json();
+      })
+      .then((body) => body.modifiers as Record<string, ModifierInfo>)
+      .catch((err) => {
+        modifiersCache = null;   // let the next caller retry
+        throw err;
+      });
+  }
+  return modifiersCache;
 }
 
 /**

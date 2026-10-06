@@ -8,6 +8,8 @@ toggled via the API at runtime.
     from the formula bar. Only enable in trusted development environments.
 """
 
+import os
+
 from pydantic import BaseModel
 from typing import Dict, Any, Literal
 
@@ -30,6 +32,15 @@ class SimpleStepsSettings(BaseModel):
     # - memory: in-process RAM only
     # - parquet: RAM + parquet files under SIMPLE_STEPS_RESULT_CACHE_DIR
     result_store: Literal['memory', 'parquet'] = 'memory'
+    # Which engine runs a step:
+    # - grid:   simple_steps_core's grid model (the default; see grid_runner.py)
+    # - legacy: the app's own orchestrators — an escape hatch until they are
+    #           deleted (SIMPLE_STEPS_ENGINE=legacy)
+    # Core verb operations (=select(...), =map(tool=...)) always run on grid.
+    engine: Literal['legacy', 'grid'] = (
+        'legacy' if os.environ.get('SIMPLE_STEPS_ENGINE', '').strip().lower() == 'legacy'
+        else 'grid'
+    )
 
     class Config:
         # Allow mutation so we can toggle at runtime

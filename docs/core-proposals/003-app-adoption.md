@@ -453,6 +453,52 @@ function's annotations with `get_type_hints` and ignore the schema. Tagged
 `inspect.signature`: with `from __future__ import annotations` the raw
 annotation is the *string* `"Literal['a','b']"`, which carries nothing.
 
+
+---
+
+## K. Grid: no verb hands a tool the whole table
+
+*Added 2026-10-05, against core `d8b6979`, while moving step execution onto
+the grid model (`src/SIMPLE_STEPS/grid_runner.py`). Not yet in core's
+`004-grid-adoption.md`.*
+
+Every grid verb hands a tool one row (or an accumulator and a row). A tool
+written as `f(df: pd.DataFrame) -> pd.DataFrame` has no verb to run under —
+and this repo has several: `pivot`, `unpivot`, `pandas_eval`, `merge_steps`,
+`select_cell`, plus any user tool of that shape.
+
+```python
+@tool
+def piv(df: pd.DataFrame) -> pd.DataFrame:
+    return df.groupby("city", as_index=False)["n"].sum()
+
+w["x"] = piv[mod.collapse(over=w["r"])]   # failed: AttributeError: 'NoneType'
+                                          #   object has no attribute 'groupby'
+w["x"] = piv[mod.map(over=w["r"])]        # invalid: piv() needs 'df', which 'r'
+                                          #   does not have (it has city, n)
+```
+
+**Ask:** a verb that passes the upstream grid whole and treats a returned
+DataFrame as the step's grid — the mirror image of A3's tool-backed `source`.
+
+**Shimmed:** `SHIM(core §K)` in `core_bridge.needs_whole_frame_shim` routes
+these steps to the legacy `dataframe` orchestrator.
+
+## L. Grid: a step cannot take a value from another step
+
+*Added 2026-10-05, against `d8b6979`. Core's 004 §B6 already plans this as P5;
+recorded here because it is now shimmed.*
+
+A bound argument is a literal. Nothing lets it be a value *from another
+step*: a single-call tool reading `step1` when `step1` holds a dict, or a
+`values: list[float]` parameter reading a whole column (`=Step 1!COLA`).
+`over=[a, b]` is also refused (`"map over '[<a>, <b>]', which is not an
+earlier step"`), so a step reads exactly one upstream.
+
+**Shimmed:** `SHIM(core §L)` in `core_bridge.needs_whole_frame_shim` routes
+these to the legacy path, which resolves the value and calls the tool. Steps
+that read two upstream *tables* fail with a message naming 004 §B6.
+
 ---
 
 ## What this leaves on our side

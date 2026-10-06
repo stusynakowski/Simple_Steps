@@ -51,9 +51,11 @@ async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise
         Object.entries(s.config ?? {}).filter(([k]) => !k.startsWith('_'))
       );
 
-  // --- Enforce reference to previous step (if not first step) ---
-  // If not the first step, inject a 'data' reference to the previous step if not present
-  if (i > 0) {
+  // --- Wire legacy saves to the previous step ---
+  // Only for old saves with no usable formula. A formula says what it reads
+  // (`over=readings`, `n=step1["n"]`) or is a source; injecting `data=stepN`
+  // into it adds an argument the tool does not take.
+  if (i > 0 && !formulaIsUsable) {
     const prevStepId = `step${i}`; // step1, step2, ... (1-based)
     // Only inject if no step reference is present in any arg
     const hasStepRef = Object.values(formulaArgs).some(v => typeof v === 'string' && v.startsWith('step'));
@@ -438,8 +440,20 @@ export default function useWorkflow() {
         stepLabel: step.label,
         operationId,
         durationMs: elapsed,
-        detail: `Output Ref: ${res.output_ref_id}\nColumns: ${outputCols.join(', ')}\nNew columns: ${newCols.join(', ') || '(none)'}`,
+        detail: `Output Ref: ${res.output_ref_id}\nColumns: ${outputCols.join(', ')}\nNew columns: ${newCols.join(', ') || '(none)'}`
+          + (res.metrics.engine === 'grid' ? `\nCore: ${res.metrics.verb} · ${res.metrics.units ?? '?'} units` : ''),
       });
+
+      // Core records a failing row instead of failing the step: say so, with
+      // the errors, rather than letting None cells pass as results.
+      if (res.metrics.failed) {
+        addLog('warn', `Step "${step.label}": ${res.metrics.failed} of ${res.metrics.units ?? '?'} units failed`, {
+          stepId: id,
+          stepLabel: step.label,
+          operationId,
+          detail: (res.metrics.errors ?? []).map((e) => `row ${e.unit}: ${e.error}`).join('\n'),
+        });
+      }
 
       {
         const latest = workflowRef.current;

@@ -15,6 +15,9 @@ Every shim below is tagged with the proposal section that removes it::
     SHIM(core §G)  ToolDefinition.type has no 'step' member
     SHIM(core §J)  one DataFrame param empties the whole input_schema, and
                    reports every parameter's type_name as "Any"
+    SHIM(core §K)  grid: no verb hands a tool the whole table
+    SHIM(core §L)  grid: a step cannot take a value from another step
+                   (core 004 §B6, P5)
 
 When core lands one of those, delete the tagged block and read the value off
 the :class:`ToolDefinition` instead. Nothing else should need to change — that
@@ -68,6 +71,7 @@ __all__ = [
     "core_contract",
     "register_with_core",
     "simple_step_resource",
+    "needs_whole_frame_shim",
 ]
 
 
@@ -603,3 +607,33 @@ def simple_step_resource(
         description=description,
         registry=REGISTRY,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Grid execution gaps                                                         #
+# --------------------------------------------------------------------------- #
+
+def needs_whole_frame_shim(verb: str, table_args: list, value_args: list) -> bool:
+    """Whether a step must run on the legacy engine instead of core's grid.
+
+    SHIM(core §K): every grid verb hands a tool one *row* (or a row and an
+    accumulator); none hands it the whole table. Tools written as
+    ``f(df: pd.DataFrame) -> pd.DataFrame`` — ``pivot``, ``unpivot``,
+    ``pandas_eval``, ``merge_steps``, and any user tool of that shape — have
+    no verb to run under, so they keep running on the legacy ``dataframe``
+    orchestrator. Probe::
+
+        piv[mod.collapse(over=w["r"])]  # failed: 'NoneType' has no 'groupby'
+        piv[mod.map(over=w["r"])]       # invalid: piv() needs 'df', which 'r'
+                                        #          does not have
+
+    SHIM(core §L): a bound argument is a literal; nothing lets it be a value
+    *from another step* — a single-call tool reading ``step1`` when ``step1``
+    holds a dict, or ``values: list[float]`` reading a whole column
+    (``=Step 1!COLA``). Core 004 §B6 plans this as P5. Until then the legacy
+    path resolves the value and calls the tool.
+
+    Delete this function, and its call in ``grid_runner.run_grid_step``, once
+    core has a whole-table verb and P5.
+    """
+    return verb == "dataframe" or bool(table_args) or bool(value_args)

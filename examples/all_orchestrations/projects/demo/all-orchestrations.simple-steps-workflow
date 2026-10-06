@@ -1,0 +1,276 @@
+{
+  "format_version": 2,
+  "id": "all-orchestrations",
+  "name": "All orchestrations",
+  "meta": {
+    "source": "simple-steps-core examples/all_orchestrations/pipeline.py"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows(data='{\"city\": [\"SF\", \"NYC\", \"SF\", \"LA\"], \"n\": [1, 2, 3, 2]}')",
+      "meta": {
+        "label": "readings"
+      }
+    },
+    {
+      "name": "records",
+      "expression": "to_rows(data='{\"value\": [{\"city\": \"SF\", \"temp\": 18.0}, {\"city\": \"NYC\", \"temp\": 31.0}]}')",
+      "meta": {
+        "label": "records"
+      }
+    },
+    {
+      "name": "scored",
+      "expression": "map(tool=\"scale\", over=readings, name=\"score\")",
+      "meta": {
+        "label": "scored"
+      }
+    },
+    {
+      "name": "kept",
+      "expression": "filter(tool=\"is_big\", over=scored)",
+      "meta": {
+        "label": "kept"
+      }
+    },
+    {
+      "name": "head2",
+      "expression": "slice(over=scored, stop=2)",
+      "meta": {
+        "label": "head2"
+      }
+    },
+    {
+      "name": "ranked",
+      "expression": "sort(over=scored, by=\"score\", ascending=False)",
+      "meta": {
+        "label": "ranked"
+      }
+    },
+    {
+      "name": "unique_city",
+      "expression": "distinct(over=scored, columns=[\"city\"])",
+      "meta": {
+        "label": "unique_city"
+      }
+    },
+    {
+      "name": "picked",
+      "expression": "select(over=scored, columns=[\"city\", \"score\"])",
+      "meta": {
+        "label": "picked"
+      }
+    },
+    {
+      "name": "dropped",
+      "expression": "drop(over=scored, columns=[\"score\"])",
+      "meta": {
+        "label": "dropped"
+      }
+    },
+    {
+      "name": "renamed",
+      "expression": "rename(over=scored, columns={\"n\": \"count\"})",
+      "meta": {
+        "label": "renamed"
+      }
+    },
+    {
+      "name": "bucketed",
+      "expression": "group(tool=\"label_city\", over=scored, name=\"bucket\")",
+      "meta": {
+        "label": "bucketed"
+      }
+    },
+    {
+      "name": "per_city",
+      "expression": "collapse(tool=\"add_n\", over=bucketed, by=\"bucket\", initial=0)",
+      "meta": {
+        "label": "per_city"
+      }
+    },
+    {
+      "name": "n_rows",
+      "expression": "collapse(tool=\"count\", over=readings)",
+      "meta": {
+        "label": "n_rows"
+      }
+    },
+    {
+      "name": "sum_n",
+      "expression": "collapse(tool=\"add_n\", over=readings, initial=0)",
+      "meta": {
+        "label": "sum_n"
+      }
+    },
+    {
+      "name": "bursts",
+      "expression": "expand(tool=\"fan_out\", over=readings, name=\"item\")",
+      "meta": {
+        "label": "bursts"
+      }
+    },
+    {
+      "name": "coords",
+      "expression": "expand(tool=\"make_coords\", over=readings)",
+      "meta": {
+        "label": "coords"
+      }
+    },
+    {
+      "name": "spread",
+      "expression": "widen(over=coords, columns=[\"axis\", \"val\"])",
+      "meta": {
+        "label": "spread"
+      }
+    },
+    {
+      "name": "wide",
+      "expression": "widen(over=records, columns=[\"city\", \"temp\"])",
+      "meta": {
+        "label": "wide"
+      }
+    },
+    {
+      "name": "grid_search",
+      "expression": "sweep(tool=\"grid_cell\", model=[\"a\", \"b\"], window=[7, 30])",
+      "meta": {
+        "label": "grid_search"
+      }
+    },
+    {
+      "name": "robust",
+      "expression": "map(tool=\"scale\", over=readings, name=\"score\", retries=2)",
+      "meta": {
+        "label": "robust"
+      }
+    },
+    {
+      "name": "auto_map",
+      "expression": "scale(n=readings[\"n\"])",
+      "meta": {
+        "label": "auto_map"
+      }
+    },
+    {
+      "name": "auto_filter",
+      "expression": "is_big(n=readings[\"n\"])",
+      "meta": {
+        "label": "auto_filter"
+      }
+    },
+    {
+      "name": "auto_collapse",
+      "expression": "add_n(n=readings[\"n\"])",
+      "meta": {
+        "label": "auto_collapse"
+      }
+    },
+    {
+      "name": "auto_expand",
+      "expression": "fan_out(n=readings[\"n\"])",
+      "meta": {
+        "label": "auto_expand"
+      }
+    },
+    {
+      "name": "a_list",
+      "expression": "literal(expr=\"[1, 2, 3, 4]\")",
+      "meta": {
+        "label": "a_list"
+      }
+    },
+    {
+      "name": "a_dict",
+      "expression": "literal(expr=\"{'x': 10, 'y': 20}\")",
+      "meta": {
+        "label": "a_dict"
+      }
+    },
+    {
+      "name": "a_scalar",
+      "expression": "literal(expr=\"7\")",
+      "meta": {
+        "label": "a_scalar"
+      }
+    },
+    {
+      "name": "from_list",
+      "expression": "expand(over=a_list)",
+      "meta": {
+        "label": "from_list"
+      }
+    },
+    {
+      "name": "from_dict",
+      "expression": "widen(over=a_dict, columns=[\"x\", \"y\"])",
+      "meta": {
+        "label": "from_dict"
+      }
+    },
+    {
+      "name": "pairs",
+      "expression": "map(tool=\"make_pair\", over=readings)",
+      "meta": {
+        "label": "pairs"
+      }
+    },
+    {
+      "name": "split",
+      "expression": "widen(over=pairs)",
+      "meta": {
+        "label": "split"
+      }
+    },
+    {
+      "name": "ns",
+      "expression": "select(over=readings, columns=[\"n\"])",
+      "meta": {
+        "label": "ns"
+      }
+    },
+    {
+      "name": "gathered",
+      "expression": "collapse(tool=\"gather\", over=ns)",
+      "meta": {
+        "label": "gathered"
+      }
+    },
+    {
+      "name": "total_n",
+      "expression": "collapse(tool=\"total\", over=ns)",
+      "meta": {
+        "label": "total_n"
+      }
+    },
+    {
+      "name": "first_n",
+      "expression": "collapse(tool=\"first\", over=ns)",
+      "meta": {
+        "label": "first_n"
+      }
+    },
+    {
+      "name": "last_n",
+      "expression": "collapse(tool=\"last\", over=ns)",
+      "meta": {
+        "label": "last_n"
+      }
+    },
+    {
+      "name": "again",
+      "expression": "map(tool=\"scale\", over=scored, name=\"again\")",
+      "meta": {
+        "label": "again"
+      }
+    },
+    {
+      "name": "failure",
+      "expression": "map(tool=\"risky\", over=readings, name=\"out\", retries=1)",
+      "meta": {
+        "label": "failure"
+      }
+    }
+  ]
+}

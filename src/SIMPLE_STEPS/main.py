@@ -120,6 +120,11 @@ _loader = PackLoader(
 _loader.load_all()
 set_loader(_loader)
 
+# Core's shape verbs as palette operations (=select(...), =map(tool=...)),
+# built from grid.modifier_catalog() so the palette cannot drift from core.
+from .grid_runner import register_verb_operations
+register_verb_operations()
+
 
 # --- App Initialize ---
 app = FastAPI(
@@ -470,6 +475,18 @@ async def list_operations():
     return OPERATIONS
 
 
+@app.get("/api/modifiers")
+async def list_modifiers():
+    """Core's verb vocabulary — every shape verb and execution modifier with
+    its class, row rule and typed settings. Served straight from
+    ``grid.modifier_catalog()`` so the UI's Orchestration control cannot drift
+    from what core runs (core react-api.md, ``GET /modifiers``).
+    """
+    from simple_steps_core import grid
+    from .settings import get_settings
+    return {"engine": get_settings().engine, "modifiers": grid.modifier_catalog()}
+
+
 # --- 1.1 Diagnostics / Debug ---
 @app.get("/api/debug/registry")
 async def debug_registry():
@@ -583,13 +600,14 @@ async def get_pipelines(project_id: str):
     """List all pipeline definitions in a project."""
     return list_pipelines(project_id)
 
-@app.get("/api/projects/{project_id}/pipelines/{pipeline_id}", response_model=PipelineFile)
+@app.get("/api/projects/{project_id}/pipelines/{pipeline_id}")
 async def get_pipeline(project_id: str, pipeline_id: str):
-    """Load a single pipeline definition."""
+    """Load a single pipeline definition, with each step in the shape the UI
+    hydrates from (see ``StepConfig.ui_dict``)."""
     pipeline = load_pipeline(project_id, pipeline_id)
     if not pipeline:
         raise HTTPException(status_code=404, detail="Pipeline not found")
-    return pipeline
+    return {**pipeline.model_dump(), "steps": [s.ui_dict() for s in pipeline.steps]}
 
 @app.post("/api/projects/{project_id}/pipelines", response_model=PipelineFile)
 async def upsert_pipeline(project_id: str, pipeline: PipelineFile):

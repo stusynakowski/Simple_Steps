@@ -1,4 +1,9 @@
-export type OrchestrationMode = 'source' | 'map' | 'filter' | 'dataframe' | 'expand' | 'raw_output';
+/**
+ * The verb a step runs under. Core's shape verbs come from ``GET /api/modifiers``
+ * (map, filter, group, expand, collapse, sweep, select, …); 'dataframe' and
+ * 'raw_output' are the app's older modes, still accepted by the backend.
+ */
+export type OrchestrationMode = string;
 
 export interface ParsedFormula {
   operationId: string | null;

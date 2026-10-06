@@ -20,6 +20,7 @@ been superseded by the unified-expression model documented here.
 | [`105-validation-flow.md`](./105-validation-flow.md) | How validation flows between UI and backend, and what "commit on run" means. |
 | [`117-referencing-previous-steps.md`](./117-referencing-previous-steps.md) | Suggestions for the step-reference selection UI (Excel-style cell/row/column/range picking). |
 | [`118-console-and-gui-parity.md`](./118-console-and-gui-parity.md) | Plan for a console, and for keeping GUI actions and console commands in exact correspondence. |
+| [`119-grid-integration.md`](./119-grid-integration.md) | Step execution on simple-steps-core's grid model: how a UI step becomes a core operation, what changed for users, and what is still shimmed. |
 
 ## One-paragraph summary
 

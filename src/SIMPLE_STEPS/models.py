@@ -107,7 +107,7 @@ class OperationDefinition(BaseModel):
     # 'step' is the v0.2 single-cell default — one call, one return value,
     # no row iteration.  The other modes are tabular orchestrations kept
     # available for power users.
-    type: Literal['step', 'source', 'map', 'filter', 'expand', 'dataframe', 'raw_output', 'orchestrator'] = 'dataframe'
+    type: Literal['step', 'source', 'map', 'filter', 'expand', 'dataframe', 'raw_output', 'orchestrator', 'verb'] = 'dataframe'
     category: str = 'General'
     params: List[OperationParam]
     # ── Contract fields sourced from simple_steps_core's ToolDefinition ──
@@ -120,6 +120,10 @@ class OperationDefinition(BaseModel):
     dependencies: List[str] = Field(default_factory=list)
 
 # --- 2. Blueprint / Execution ---
+# Keys the formula parser adds to `args` itself; they are re-derived on load.
+_PARSER_KEYS = {"_literal", "_ref"}
+
+
 class StepConfig(BaseModel):
     """
     Canonical step shape (v2). A step is just a name + a Python expression::
@@ -158,6 +162,13 @@ class StepConfig(BaseModel):
             meta.setdefault("label", data["label"])
         if data.get("step_id"):
             meta.setdefault("legacy_step_id", data["step_id"])
+        # Settings the expression cannot carry — the Orchestration choice and
+        # its verb settings (`_orchestrator`, `_name`, `_retry`, …). Without
+        # this they were dropped on save and lost on reopen.
+        settings = {k: v for k, v in (data.get("config") or {}).items()
+                    if k.startswith("_") and k not in _PARSER_KEYS}
+        if settings:
+            meta["settings"] = settings
 
         formula = (data.get("formula") or "").strip()
         if not formula and data.get("operation_id"):
@@ -204,7 +215,22 @@ class StepConfig(BaseModel):
         cfg: Dict[str, Any] = dict(p.args or {})
         if p.orchestration:
             cfg["_orchestrator"] = p.orchestration
+        cfg.update(self.meta.get("settings") or {})
         return cfg
+
+    def ui_dict(self) -> Dict[str, Any]:
+        """The on-disk v2 fields plus the v1 fields the UI hydrates from
+        (`useWorkflow.hydrateStep` reads `formula`, `label`, `step_id`,
+        `config`). Properties are not serialised by pydantic, so without this
+        a reopened step arrived with no formula and fell back to `noop`."""
+        return {
+            **self.model_dump(),
+            "step_id": self.step_id,
+            "label": self.label,
+            "formula": self.formula,
+            "operation_id": self.operation_id,
+            "config": self.config,
+        }
 
 
 class PipelineFile(BaseModel):
