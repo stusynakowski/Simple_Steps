@@ -9,6 +9,7 @@ import { runStep as runStepApi, fetchDataView, getOperations,
 } from '../services/api';
 import type { OperationDefinition, PipelineFile, BackendError, ProgressEvent } from '../services/api';
 import { parseFormula, buildFormula } from '../utils/formulaParser';
+import { errorCell, withRowErrors } from '../utils/errorCells';
 import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 import type { WorkflowCommand } from '../types/commands';
 import { formatCommand } from '../types/commands';
@@ -102,6 +103,14 @@ async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise
     // Keep legacy 'operation' field in sync so the formula bar picks it up
     operation: formula,
   };
+}
+
+/** Throw the parser's reason when a non-empty formula doesn't parse. */
+function assertFormulaParses(formula: string | undefined, parsed: { isValid: boolean; error?: string } | null) {
+  const body = (formula ?? '').trim().replace(/^=/, '').trim();
+  if (body && parsed && !parsed.isValid) {
+    throw new Error(parsed.error ?? `Invalid expression: ${formula}`);
+  }
 }
 
 function genId(prefix = 'step') {
@@ -398,6 +407,9 @@ export default function useWorkflow() {
     );
 
     try {
+      // An expression that doesn't parse fails here, as one error cell —
+      // never by running the step's previous operation.
+      assertFormulaParses(step.formula, parsed);
       // Execute the step — use operationId and resolvedConfig derived from the formula
       const res = await runStepApi(
           id, 
@@ -432,7 +444,11 @@ export default function useWorkflow() {
       const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
 
       // rawData is already Cell[] — just filter to this step's own columns
-      const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
+      const previewCells = withRowErrors(
+        rawData.filter((cell) => displayCols.has(cell.column_id)),
+        res.metrics.row_errors,
+        res.metrics.payload_column,
+      );
 
       // ── Log: Step succeeded ──
       addLog('success', `Step "${step.label}" completed — ${stableMeta.rows} rows, ${outputCols.length} columns`, {
@@ -496,8 +512,17 @@ export default function useWorkflow() {
       });
 
       {
+        // The step has no valid output: show the error as its one cell, and
+        // drop the previous output so later steps can't read stale data.
         const latest = workflowRef.current;
-        const next = latest.steps.map((s) => (s.id === id ? { ...s, status: 'error' as const } : s));
+        const next = latest.steps.map((s) => (s.id === id ? {
+          ...s,
+          status: 'error' as const,
+          output_preview: [errorCell(errorMessage)],
+          outputRefId: undefined,
+          outputRows: undefined,
+          outputColumns: undefined,
+        } : s));
         const updated = { ...latest, steps: next };
         workflowRef.current = updated;
         setWorkflow(updated);
@@ -550,6 +575,7 @@ export default function useWorkflow() {
     });
 
     try {
+      assertFormulaParses(step.formula, parsed);
       const res = await runStepApi(
           id, 
           previewOperationId, 
@@ -570,7 +596,11 @@ export default function useWorkflow() {
       const displayCols = new Set(newCols.length > 0 ? newCols : outputCols);
 
       // rawData is already Cell[] — just filter to this step's own columns
-      const previewCells = rawData.filter((cell) => displayCols.has(cell.column_id));
+      const previewCells = withRowErrors(
+        rawData.filter((cell) => displayCols.has(cell.column_id)),
+        res.metrics.row_errors,
+        res.metrics.payload_column,
+      );
 
       addLog('success', `Preview for "${step.label}" ready — ${res.metrics.rows} rows`, {
         stepId: id,
@@ -602,6 +632,10 @@ export default function useWorkflow() {
          detail: backendErr?.traceback || undefined,
        });
        console.error("Preview failed", error);
+       setWorkflow((prev) => ({
+         ...prev,
+         steps: prev.steps.map((s) => (s.id === id ? { ...s, output_preview: [errorCell(errorMessage)] } : s)),
+       }));
     }
   }, [addLog]);
 

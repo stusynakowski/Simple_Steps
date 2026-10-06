@@ -16,6 +16,8 @@ export interface ParsedFormula {
   orchestration: OrchestrationMode | null;
   args: Record<string, string>;
   isValid: boolean;
+  /** Why the formula is invalid, when it is (`/api/parse_formula`). */
+  error?: string;
   rawInput: string;
 }
 

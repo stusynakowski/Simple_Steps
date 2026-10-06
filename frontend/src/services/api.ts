@@ -110,6 +110,10 @@ interface StepRunResponse {
     failed?: number;
     /** The first few per-unit errors from core's ledger. */
     errors?: { unit: string; error: string }[];
+    /** The column the step wrote its result to, when it is in the output. */
+    payload_column?: string | null;
+    /** Each failed unit's error, keyed by its row position in the output. */
+    row_errors?: Record<string, string>;
   };
   error?: string;
 }

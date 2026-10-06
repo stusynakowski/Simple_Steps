@@ -140,8 +140,24 @@ app.include_router(agent_router)
 async def api_parse_formula(payload: dict = Body(...)):
     """Parse a formula string and return the parsed structure."""
     formula = payload.get("formula", "")
-    parsed = parse_formula(formula)
-    return parsed.as_dict()
+    parsed = parse_formula(formula).as_dict()
+    if not parsed.get("isValid") and formula.strip().lstrip("=").strip():
+        # Say why, so the step can show it in its output cell instead of
+        # running whatever operation it had before.
+        parsed["error"] = f"Invalid expression: {_why_invalid(formula)}"
+    return parsed
+
+
+def _why_invalid(formula: str) -> str:
+    """Python's own syntax message, or a plain reason when it parses."""
+    import ast
+
+    expr = formula.strip().lstrip("=").strip()
+    try:
+        ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        return exc.msg
+    return "it isn't a call to an operation"
 
 @app.post("/api/console/eval")
 async def api_console_eval(

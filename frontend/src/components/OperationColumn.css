@@ -821,3 +821,30 @@
 .step-widget-body {
   overflow-x: hidden;
 }
+
+
+/* ── Errors in the output grid ─────────────────────────────────────────── */
+/* A failed step's single error cell, and a failed row's result cell. */
+.output-container.error {
+  padding: 6px;
+}
+
+.output-container.error .error-cell {
+  background: #ffebee;
+  color: #b71c1c;
+  border: 1px solid #ffcdd2;
+  border-radius: 3px;
+  padding: 8px 10px;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.grid-cell.error-cell {
+  background: #ffebee !important;
+  color: #b71c1c;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 0.72rem;
+}

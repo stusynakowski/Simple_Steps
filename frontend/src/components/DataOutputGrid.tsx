@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { isErrorCell } from '../utils/errorCells';
 import type { Cell } from '../types/models';
 import type { StagedColumn } from '../hooks/useStagedPreview';
 import './OperationColumn.css'; // Ensure grid styles are available
@@ -185,6 +186,19 @@ export default function DataOutputGrid({
         )}
         <div className="single-value-display empty">
           <span className="placeholder-text">Empty</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SCENARIO 0: the step failed — its output is one error cell ─────────
+  // `errorCell()` (utils/errorCells.ts) builds it when a run or preview fails,
+  // including an expression that doesn't parse.
+  if (cells && cells.length === 1 && isErrorCell(cells[0])) {
+    return (
+      <div className="output-container error">
+        <div className="error-cell" role="alert" data-testid="step-error-cell">
+          {cells[0].display_value}
         </div>
       </div>
     );
@@ -428,7 +442,7 @@ export default function DataOutputGrid({
               return (
                 <div
                   key={cellKey}
-                  className={`grid-cell ${cell ? 'has-value' : 'empty'}`}
+                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}`}
                   role="gridcell"
                   onClick={() => cell && handleCellWireClick(cell)}
                   title={

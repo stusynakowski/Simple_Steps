@@ -553,6 +553,7 @@ def _engine_metrics(operation: dict, step, output) -> dict:
     failed = output.failed
     errors = [{"unit": str(unit), "error": str(row.get("error", ""))}
               for unit, row in failed.head(5).iterrows()]
+    payload = operation["modifiers"][-1]["params"].get("name") or grid.PAYLOAD
     return {
         "engine": "grid",
         "verb": operation["modifiers"][-1]["kind"],
@@ -562,7 +563,32 @@ def _engine_metrics(operation: dict, step, output) -> dict:
         "failed": int(len(failed)),
         "status_counts": {str(k): int(v) for k, v in ledger["status"].value_counts().items()},
         "errors": errors,
+        # Where each failed unit's error belongs in the output, so the grid
+        # can show it in the cell itself: {row position: error}, for units
+        # whose row is still in the output (map, group, … — not a dropped
+        # filter row). Capped so a mass failure can't bloat the response.
+        "payload_column": payload if payload in output.data.columns else None,
+        "row_errors": _row_errors(output, failed),
     }
+
+
+_ROW_ERROR_CAP = 1000
+
+
+def _row_errors(output, failed) -> Dict[str, str]:
+    """``{output row position: error}`` for failed units still in the output."""
+    index = output.data.index
+    row_errors: Dict[str, str] = {}
+    for label, row in failed.iterrows():
+        if label not in index:
+            continue
+        position = index.get_loc(label)
+        if not isinstance(position, int):   # a duplicated label — no single row
+            continue
+        row_errors[str(position)] = str(row.get("error", ""))
+        if len(row_errors) >= _ROW_ERROR_CAP:
+            break
+    return row_errors
 
 
 # ─────────────────────────────────────────────────────────────────────────────
