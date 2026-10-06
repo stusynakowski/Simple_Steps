@@ -22,7 +22,7 @@ describe('StepToolbar', () => {
     render(
       <StepWiringProvider>
         <StepToolbar step={sampleStep} onRun={onRun} onDelete={onDelete}
-          activeTab="summary" onTabChange={() => {}} />
+          openPanels={[]} onTogglePanel={() => {}} />
       </StepWiringProvider>
     );
 

@@ -13,7 +13,7 @@ dataset, and one step per step of core's workflow, each written as a formula.
 
 ```bash
 python examples/all_orchestrations/check.py        # 38/38 steps match simple-steps-core
-python examples/all_orchestrations/tools.py --workspace examples/all_orchestrations
+simple-steps --workspace examples/all_orchestrations
                                                     # open the workflow in the UI and press Run
 ```
 

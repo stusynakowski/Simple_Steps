@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import type { PanelId } from './stepPanels';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import { parseFormula } from '../utils/formulaParser';
@@ -32,9 +33,9 @@ interface StepToolbarProps {
   onFormulaChange?: (id: string, formula: string, parsed: ParsedFormula) => void;
   // Allow parent to push a formula update (from UI config changes → formula bar)
   externalFormula?: string;
-  // Tab handlers
-  activeTab: 'summary' | 'details' | 'data' | 'settings';
-  onTabChange: (tab: 'summary' | 'details' | 'data' | 'settings') => void;
+  // Widget toggles — any number of widgets can be open at once
+  openPanels: PanelId[];
+  onTogglePanel: (panel: PanelId) => void;
   onLock?: (id: string) => void;
   isLocked?: boolean;
   onConfigure?: (id: string) => void;
@@ -50,8 +51,8 @@ export default function StepToolbar({
   onDelete, 
   onFormulaChange,
   externalFormula,
-  activeTab, 
-  onTabChange, 
+  openPanels,
+  onTogglePanel,
   onLock,
   isLocked,
   onFormulaBarRef,
@@ -169,8 +170,7 @@ export default function StepToolbar({
     }, 0);
   };
 
-  // Local toggle for the step overview panel
-  const [showMeta, setShowMeta] = useState(false);
+  const isOpen = (panel: PanelId) => openPanels.includes(panel);
 
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
@@ -179,13 +179,13 @@ export default function StepToolbar({
 
         {/* Summary Button (Levels Icon) — toggles the step overview panel */}
         <button
-          className={`btn-icon tab-icon ${showMeta ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); setShowMeta(v => !v); }}
+          className={`btn-icon tab-icon ${isOpen('overview') ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTogglePanel('overview'); }}
           title="Step Overview"
           style={{
             position: 'relative',
-            color: showMeta ? '#f39c12' : '#95a5a6',
-            background: showMeta ? '#fef9e7' : 'transparent',
+            color: isOpen('overview') ? '#f39c12' : '#95a5a6',
+            background: isOpen('overview') ? '#fef9e7' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
@@ -194,7 +194,7 @@ export default function StepToolbar({
                 <line x1="12" y1="20" x2="12" y2="4"></line>
                 <line x1="6" y1="20" x2="6" y2="14"></line>
             </svg>
-            {showMeta && (
+            {isOpen('overview') && (
                 <div style={{
                     position: 'absolute',
                     bottom: '-4px',
@@ -209,13 +209,13 @@ export default function StepToolbar({
 
         {/* Data Button (Database Icon) */}
         <button
-          className={`btn-icon tab-icon ${activeTab === 'data' ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTabChange('data'); }}
+          className={`btn-icon tab-icon ${isOpen('data') ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTogglePanel('data'); }}
           title="Data View"
           style={{
             position: 'relative',
-            color: activeTab === 'data' ? '#9b59b6' : '#95a5a6',
-            background: activeTab === 'data' ? '#f4ecf7' : 'transparent',
+            color: isOpen('data') ? '#9b59b6' : '#95a5a6',
+            background: isOpen('data') ? '#f4ecf7' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
@@ -224,7 +224,7 @@ export default function StepToolbar({
                 <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
                 <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
             </svg>
-            {activeTab === 'data' && (
+            {isOpen('data') && (
                 <div style={{
                     position: 'absolute',
                     bottom: '-4px', 
@@ -241,13 +241,13 @@ export default function StepToolbar({
 
          {/* Settings Button (Gear Icon) - Activated Settings */}
          <button
-          className={`btn-icon tab-icon ${activeTab === 'settings' ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTabChange('settings'); }}
+          className={`btn-icon tab-icon ${isOpen('settings') ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTogglePanel('settings'); }}
           title="Miscellaneous Settings"
           style={{
             position: 'relative',
-            color: activeTab === 'settings' ? '#7f8c8d' : '#95a5a6',
-            background: activeTab === 'settings' ? '#f0f3f4' : 'transparent',
+            color: isOpen('settings') ? '#7f8c8d' : '#95a5a6',
+            background: isOpen('settings') ? '#f0f3f4' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}
         >
@@ -255,7 +255,7 @@ export default function StepToolbar({
                 <circle cx="12" cy="12" r="3"></circle>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
-            {activeTab === 'settings' && (
+            {isOpen('settings') && (
                 <div style={{
                     position: 'absolute',
                     bottom: '-4px', // Connect to content below
@@ -322,58 +322,6 @@ export default function StepToolbar({
         </button>
       </div>
 
-      {/* ── Step overview panel — toggled by info button ─────────────────── */}
-      {showMeta && (() => {
-        const opDef = availableOperations.find(o => o.id === step.process_type);
-        const opLabel = opDef?.label ?? step.process_type;
-        const hasParams = Object.keys(step.configuration ?? {}).filter(k => !k.startsWith('_')).length > 0;
-        const hasOutput = !!step.outputRefId && (step.outputColumns?.length ?? 0) > 0;
-        const statusLabel: Record<string, string> = {
-          pending: 'Queued', running: 'Running', completed: 'Completed',
-          error: 'Error', paused: 'Paused', stopped: 'Stopped',
-        };
-        return (
-          <div className="step-overview-panel">
-            <div className="step-overview-grid">
-              <span className="sop-key">Step</span>
-              <span className="sop-val">{step.label}</span>
-
-              <span className="sop-key">Operation</span>
-              <span className="sop-val">{opLabel}</span>
-
-              <span className="sop-key">Status</span>
-              <span className={`sop-val sop-status sop-status--${step.status}`}>
-                {statusLabel[step.status] ?? step.status}
-              </span>
-
-              <span className="sop-key">Execution ID</span>
-              <span className="sop-val sop-mono">{step.id}</span>
-
-              {hasParams && (
-                <>
-                  <span className="sop-key">Parameters</span>
-                  <span className="sop-val sop-params">Configured</span>
-                </>
-              )}
-
-              {hasOutput && (
-                <>
-                  <span className="sop-key">Output</span>
-                  <span className="sop-val">
-                    <span className="sop-chip sop-rows">{(step.outputRows ?? 0).toLocaleString()} rows</span>
-                    <span className="sop-x">×</span>
-                    <span className="sop-chip sop-cols">{step.outputColumns!.length} cols</span>
-                    <span className="sop-x">=</span>
-                    <span className="sop-chip sop-cells">{((step.outputRows ?? 0) * step.outputColumns!.length).toLocaleString()} cells</span>
-                    <span className="sop-staged">staged</span>
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Formula Bar Section - Now on Top */}
       <div
         className="formula-bar"
@@ -414,12 +362,12 @@ export default function StepToolbar({
 
         {/* Function Button (Fx Icon) - Activated Details */}
         <button
-          className={`btn-icon tab-icon ${activeTab === 'details' ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTabChange('details'); }}
+          className={`btn-icon tab-icon ${isOpen('details') ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTogglePanel('details'); }}
           title="Operation Functionality"
           style={{
-            color: activeTab === 'details' ? '#4ea1ff' : '#aaa',
-            background: activeTab === 'details' ? '#1f3a5f' : 'transparent',
+            color: isOpen('details') ? '#4ea1ff' : '#aaa',
+            background: isOpen('details') ? '#1f3a5f' : 'transparent',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic', fontSize: '12px',
           }}

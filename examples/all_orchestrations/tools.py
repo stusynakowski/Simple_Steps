@@ -6,7 +6,11 @@ declared for the app. Bodies and annotations match core's on purpose: core
 infers a step's verb from them (``-> bool`` filters, ``-> list`` expands,
 ``(acc, n)`` collapses), so the same signals have to be here.
 
-    python tools.py --workspace .        # open the app on this folder
+    simple-steps --workspace examples/all_orchestrations
+
+The app imports this file from the workspace. (Running ``python tools.py``
+would import it twice — once as the script, once from the workspace scan —
+and list every tool twice.)
 
 Then open ``projects/demo/all-orchestrations.simple-steps-workflow`` and run
 it. ``check.py`` runs the same workflow headlessly and compares every step
@@ -112,8 +116,3 @@ def make_pair(n):
     """
     return (n * 10, n * n)
 
-
-if __name__ == "__main__":
-    from SIMPLE_STEPS.cli import main
-
-    main()

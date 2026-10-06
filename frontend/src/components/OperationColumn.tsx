@@ -8,6 +8,9 @@ import PreviousStepDataPicker from './PreviousStepDataPicker';
 import { buildFormula, parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula, OrchestrationMode } from '../utils/formulaParser';
 import OrchestrationControl from './OrchestrationControl';
+import StepWidget from './StepWidget';
+import type { PanelId } from './stepPanels';
+import StepOverview from './StepOverview';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useStagedPreview } from '../hooks/useStagedPreview';
 import './OperationColumn.css';
@@ -62,8 +65,20 @@ export default function OperationColumn({
   pipelineStatus = 'idle',
   pipelineCursorIndex = -1,
 }: OperationColumnProps) {
-  // Tab State
-  const [activeTab, setActiveTab] = useState<'summary' | 'details' | 'data' | 'settings'>('data');
+  const widgetMaxHeight = isMaximized ? 'calc(100vh - 200px)' : '400px';
+  // Widgets: any number open at once (toolbar buttons toggle them); each
+  // open one can be collapsed to its name bar.
+  const [openPanels, setOpenPanels] = useState<PanelId[]>(['data']);
+  const [collapsedPanels, setCollapsedPanels] = useState<Set<PanelId>>(new Set());
+  const isOpen = (panel: PanelId) => openPanels.includes(panel);
+  const togglePanel = (panel: PanelId) =>
+    setOpenPanels((open) => open.includes(panel) ? open.filter((p) => p !== panel) : [...open, panel]);
+  const toggleCollapsed = (panel: PanelId) =>
+    setCollapsedPanels((collapsed) => {
+      const next = new Set(collapsed);
+      if (next.has(panel)) next.delete(panel); else next.add(panel);
+      return next;
+    });
   const [isEditMode] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
 
@@ -326,18 +341,6 @@ export default function OperationColumn({
     }
   };
 
-  // Calculate display name for the operation summary
-  const getOperationDisplayName = () => {
-    if (!step.process_type || step.process_type === 'noop') return 'None';
-    if (step.process_type === 'passthrough') {
-      const ref = String(step.configuration._ref || step.operation || '');
-      return ref ? `↳ ${ref}` : 'Pass-through';
-    }
-    if (currentOp) return currentOp.label;
-    return step.process_type; // Fallback to ID
-  };
-  const opDisplayName = getOperationDisplayName();
-
   const handleColumnClick = () => {
     if (isActive) {
       if (onMinimize) onMinimize();
@@ -449,8 +452,8 @@ export default function OperationColumn({
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
               onDelete={() => onDelete(step.id)}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
+              openPanels={openPanels}
+              onTogglePanel={togglePanel}
               onFormulaChange={handleFormulaUpdate}
               externalFormula={derivedFormula}
               isLocked={isLocked}
@@ -459,46 +462,19 @@ export default function OperationColumn({
             />
           )}
 
-          {isActive && (
-            <div className={`op-content-section ${activeTab}`} style={{ 
-                background: activeTab === 'summary' ? '#fef9e7' : 
-                            activeTab === 'details' ? '#ebf5fb' : 
-                            activeTab === 'data' ? '#1e1e1e' : '#fff',
-                border: 'none', 
-                borderTop: 'none',
-                marginTop: 0, 
-                maxHeight: isMaximized ? 'calc(100vh - 200px)' : '400px', 
-                overflowY: 'auto' 
-            }}>
-              {/* Summary Tab Content - Read-Only Overview */}
-              {activeTab === 'summary' && (
-                  <div className="tab-content summary-content">
-                    <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
-                       <div className="summary-item">
-                          <span className="label">Step:</span>
-                          <span className="value">{step.label}</span>
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Operation:</span>
-                          <span className="value">{opDisplayName}</span>
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Status:</span>
-                          <span className={`status-badge status-${step.status}`}>{step.status}</span>
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Execution ID:</span>
-                          <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em', color: '#888' }}>{step.id.substring(0, 8)}</span>
-                       </div>
-                       <div style={{ marginTop: 8, fontSize: '0.8rem', color: '#666' }}>
-                          {hasParams ? 'Configured with parameters.' : 'No parameters configured.'}
-                       </div>
-                    </div>
-                  </div>
+          {isActive && openPanels.length > 0 && (
+            // `op-content-section` is kept so the detached window's taller cap applies.
+            <div className="op-content-section step-widget-stack">
+              {/* Analytics */}
+              {isOpen('overview') && (
+                <StepWidget id="overview" collapsed={collapsedPanels.has('overview')} onToggleCollapse={toggleCollapsed} background="transparent" maxHeight={widgetMaxHeight}>
+                  <StepOverview step={step} availableOperations={availableOperations} />
+                </StepWidget>
               )}
 
               {/* Data Tab Content */}
-              {activeTab === 'data' && (
+              {isOpen('data') && (
+                <StepWidget id="data" collapsed={collapsedPanels.has('data')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
                   <div
                     className="tab-content status-content"
                     onMouseEnter={() => { if (isWiringSource) setIsWiringHovered(true); }}
@@ -532,10 +508,41 @@ export default function OperationColumn({
                       />
                     </div>
                   </div>
+              </StepWidget>
+              )}
+
+              {/* Settings Tab Content - Miscellaneous Editing */}
+              {isOpen('settings') && isEditMode && (
+                <StepWidget id="settings" collapsed={collapsedPanels.has('settings')} onToggleCollapse={toggleCollapsed} background="#fff" maxHeight={widgetMaxHeight}>
+                  <div className="tab-content settings-content">
+                    <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
+                       <div className="config-item">
+                          <label>Step Name</label>
+                          <input 
+                            type="text" 
+                            value={step.label} 
+                            onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
+                            placeholder="Enter step name..."
+                            disabled={!isEditMode}
+                            style={{ opacity: isEditMode ? 1 : 0.8, cursor: isEditMode ? 'text' : 'default'  }}
+                          />
+                       </div>
+                       <div className="summary-item">
+                          <span className="label">Step ID:</span>
+                          <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
+                       </div>
+                       <div className="summary-item">
+                          <span className="label">Status:</span>
+                          <span className={`status-badge status-${step.status}`}>{step.status}</span>
+                       </div>
+                    </div>
+                  </div>
+              </StepWidget>
               )}
 
               {/* Details (Function) Tab Content - Edit Functionality */}
-              {activeTab === 'details' && isEditMode && (
+              {isOpen('details') && isEditMode && (
+                <StepWidget id="details" collapsed={collapsedPanels.has('details')} onToggleCollapse={toggleCollapsed} background="#ebf5fb" maxHeight={widgetMaxHeight}>
                   <div className="tab-content details-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                       {/* Operation Selector */}
@@ -686,34 +693,9 @@ export default function OperationColumn({
                       )}
                     </div>
                   </div>
+              </StepWidget>
               )}
 
-              {/* Settings Tab Content - Miscellaneous Editing */}
-              {activeTab === 'settings' && isEditMode && (
-                  <div className="tab-content settings-content">
-                    <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
-                       <div className="config-item">
-                          <label>Step Name</label>
-                          <input 
-                            type="text" 
-                            value={step.label} 
-                            onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
-                            placeholder="Enter step name..."
-                            disabled={!isEditMode}
-                            style={{ opacity: isEditMode ? 1 : 0.8, cursor: isEditMode ? 'text' : 'default'  }}
-                          />
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Step ID:</span>
-                          <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Status:</span>
-                          <span className={`status-badge status-${step.status}`}>{step.status}</span>
-                       </div>
-                    </div>
-                  </div>
-              )}
             </div>
           )}
         </div>

@@ -767,3 +767,57 @@
   border-radius: 8px;
   margin-left: 2px;
 }
+
+
+/* ── Step widgets (Analytics / Data / Settings / Formula) ──────────────── */
+/* Any number open at once, stacked in toolbar order; each collapses to its
+   name bar. The bar is deliberately thin — a label, not a header. */
+.step-widget-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 0;
+}
+
+.step-widget-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 14px;
+  padding: 0 6px;
+  margin: 0;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  background: #2a2a2a;
+  color: #9a9a9a;
+  font-size: 9px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+}
+
+.step-widget-header:hover {
+  background: #333;
+  color: #d0d0d0;
+}
+
+.step-widget-chevron {
+  width: 9px;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* Mouse clicks toggle without leaving a ring; keyboard focus still shows. */
+.step-widget-header:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.step-widget-body {
+  overflow-x: hidden;
+}
