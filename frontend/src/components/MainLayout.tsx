@@ -90,6 +90,8 @@ export default function MainLayout() {
     toggleStep,
     toggleMaximizeStep,
     collapseStep,
+    minimizedStepIds,
+    minimizeStep,
     updateStep,
     runStep,
     runPipeline,
@@ -116,6 +118,20 @@ export default function MainLayout() {
   const [openTabs, setOpenTabs] = useState<OpenTab[]>([
     { id: 'initial', title: initialWorkflow.name, isActive: true, workflow: initialWorkflow },
   ]);
+
+  // The visible width of the step canvas — what a maximized step fills, so it
+  // widens within the main layout instead of under the side panels.
+  const canvasRef = useRef<HTMLElement | null>(null);
+  const [canvasWidth, setCanvasWidth] = useState(900);
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const measure = () => setCanvasWidth(el.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const activeTab = openTabs.find(t => t.isActive) ?? openTabs[0];
   const projectName = activeTab?.projectDisplayName ?? activeTab?.projectId ?? '';
@@ -581,15 +597,21 @@ export default function MainLayout() {
   );
 
   const canvasBlock = (
-    <main className="main-content horizontal-scroll-area">
+    <main className="main-content horizontal-scroll-area" ref={canvasRef}>
       <StepWiringProvider>
-        <div className="columns-container" data-testid="columns-container">
+        <div
+          className="columns-container"
+          data-testid="columns-container"
+          style={{ '--canvas-width': `${canvasWidth}px` } as React.CSSProperties}
+        >
           {workflow.steps.map((step, index) => {
             const isExpanded = expandedStepIds.has(step.id);
             const isMaximized = maximizedStepId === step.id;
+            const isMinimized = !isExpanded && minimizedStepIds.has(step.id);
             const previousSteps = workflow.steps.slice(0, index);
+            const size = isMaximized ? 'maximized' : isExpanded ? 'expanded' : isMinimized ? 'minimized' : 'collapsed';
             return (
-              <div key={step.id} className={`column-wrapper ${isMaximized ? 'maximized' : (isExpanded ? 'expanded' : 'collapsed')}`}>
+              <div key={step.id} className={`column-wrapper ${size}`}>
                 <OperationColumn
                   step={step}
                   stepIndex={index}
@@ -598,6 +620,7 @@ export default function MainLayout() {
                   isActive={isExpanded}
                   isSqueezed={!isExpanded}
                   isMaximized={isMaximized}
+                  isMinimized={isMinimized}
                   zIndex={isExpanded ? 100 : workflow.steps.length - index}
                   availableOperations={availableOperations}
                   progress={stepProgress[step.id]}
@@ -611,6 +634,7 @@ export default function MainLayout() {
                   onDelete={deleteStep}
                   onMinimize={() => collapseStep(step.id)}
                   onMaximize={() => toggleMaximizeStep(step.id)}
+                  onMinimizeStep={() => minimizeStep(step.id)}
                   onDetach={(pos) => handleDetach(step.id, pos)}
                 />
               </div>

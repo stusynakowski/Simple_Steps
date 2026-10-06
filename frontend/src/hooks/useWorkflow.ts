@@ -203,6 +203,16 @@ export default function useWorkflow() {
   );
   
   const [maximizedStepId, setMaximizedStepId] = useState<string | null>(null);
+  // Steps shrunk to a tight header (the header's minimize button). Opening or
+  // maximizing a step clears it.
+  const [minimizedStepIds, setMinimizedStepIds] = useState<Set<string>>(new Set());
+  const unminimize = (id: string) =>
+    setMinimizedStepIds(prev => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   
   // Progress tracking — keyed by step ID
   const [stepProgress, setStepProgress] = useState<Record<string, ProgressEvent>>({});
@@ -311,6 +321,7 @@ export default function useWorkflow() {
         if (maximizedStepId === id) setMaximizedStepId(null);
       } else {
         next.add(id);
+        unminimize(id);
       }
       return next;
     });
@@ -322,7 +333,14 @@ export default function useWorkflow() {
     } else {
       setExpandedStepIds(prev => new Set(prev).add(id));
       setMaximizedStepId(id);
+      unminimize(id);
     }
+  }
+
+  /** Hide the step's UI and shrink its header to fit its name. */
+  function minimizeStep(id: string) {
+    collapseStep(id);
+    setMinimizedStepIds(prev => new Set(prev).add(id));
   }
 
   function collapseStep(id: string) {
@@ -969,6 +987,8 @@ export default function useWorkflow() {
     addStepAt, 
     toggleStep, 
     toggleMaximizeStep,
+    minimizedStepIds,
+    minimizeStep,
     collapseStep, 
     updateStep,
     dispatchCommand,

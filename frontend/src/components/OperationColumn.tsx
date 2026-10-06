@@ -26,6 +26,8 @@ interface OperationColumnProps {
   isActive: boolean;
   isSqueezed?: boolean;
   isMaximized?: boolean;
+  /** Shrunk to a tight header by the header's minimize button. */
+  isMinimized?: boolean;
   zIndex?: number;
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
@@ -35,6 +37,8 @@ interface OperationColumnProps {
   onDelete: (id: string) => void;
   onMinimize?: () => void;
   onMaximize?: () => void;
+  /** The header's minimize button: hide the step UI, shrink the header. */
+  onMinimizeStep?: () => void;
   /** Called with the pointer position when the user drags the header far enough to detach */
   onDetach?: (position: { x: number; y: number }) => void;
   /** Live progress for row-iterating operations */
@@ -52,6 +56,7 @@ export default function OperationColumn({
   isActive,
   isSqueezed = false,
   isMaximized = false,
+  isMinimized = false,
   zIndex = 1,
   onActivate,
   onUpdate,
@@ -60,6 +65,7 @@ export default function OperationColumn({
   onDelete,
   onMinimize,
   onMaximize,
+  onMinimizeStep,
   onDetach,
   progress,
   pipelineStatus = 'idle',
@@ -267,6 +273,23 @@ export default function OperationColumn({
     pipelineCursorIndex >= 0 &&
     stepIndex >= pipelineCursorIndex;
 
+  // The status pill shows a spinner while the step runs, and a dimmer one
+  // while it waits its turn in a running pipeline.
+  const isRunning = step.status === 'running';
+  const isQueued = !isRunning && isScheduledInPipeline;
+  const statusLabel = isQueued ? 'queued' : step.status;
+  const statusSpinner = (isRunning || isQueued) && (
+    <span className={`status-spinner${isQueued ? ' queued' : ''}`} aria-hidden="true" />
+  );
+
+  // A maximized step scrolls into view, so the wider step is what you see.
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (isMaximized) {
+      columnRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    }
+  }, [isMaximized]);
+
   const stagedCellMode: 'idle' | 'scheduled' | 'running' =
     step.status === 'running'
       ? 'running'
@@ -395,7 +418,8 @@ export default function OperationColumn({
 
   return (
     <div
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} status-${step.status}`}
+      ref={columnRef}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status}`}
       style={{ 
         '--step-color': color,
         zIndex: zIndex,
@@ -406,28 +430,51 @@ export default function OperationColumn({
         <div className="arrow-background" />
         <div className="arrow-content">
             {isSqueezed ? (
-                 <span className="vertical-label">{step.label}</span>
+                 <span className="vertical-label">{statusSpinner}{step.label}</span>
             ) : (
                 <>
                     <div className="header-titles">
                         <h3 className="op-name">{step.label}</h3>
-                        <span className="op-status-indicator">{step.status}</span>
+                        <span className="op-status-indicator">{statusSpinner}{statusLabel}</span>
                     </div>
                 </>
             )}
-            {isMaximized && onMaximize && (
-              <button
-                type="button"
-                className="step-header-maximize-btn"
-                onClick={(e) => { e.stopPropagation(); onMaximize(); }}
-                title="Restore Size"
-                aria-label={`Restore ${step.label}`}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        </div>
+        {/* Hover controls — top right of the header. They stop mousedown so a
+            click never starts the header's drag-to-detach. */}
+        <div className="step-header-controls" onMouseDown={(e) => e.stopPropagation()}>
+          {!isMinimized && onMinimizeStep && (
+            <button
+              type="button"
+              className="step-header-btn"
+              onClick={(e) => { e.stopPropagation(); onMinimizeStep(); }}
+              title="Minimize"
+              aria-label={`Minimize ${step.label}`}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+          )}
+          {onMaximize && (
+            <button
+              type="button"
+              className="step-header-btn"
+              onClick={(e) => { e.stopPropagation(); onMaximize(); }}
+              title={isMaximized ? 'Restore size' : 'Maximize'}
+              aria-label={`${isMaximized ? 'Restore' : 'Maximize'} ${step.label}`}
+            >
+              {isMaximized ? (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
                 </svg>
-              </button>
-            )}
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
 

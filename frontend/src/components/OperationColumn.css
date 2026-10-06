@@ -848,3 +848,80 @@
   font-family: Menlo, Monaco, Consolas, monospace;
   font-size: 0.72rem;
 }
+
+
+/* ── Step header: hover controls and status spinner ────────────────────── */
+/* Minimize / maximize, top right of the header, shown on hover. Kept clear of
+   the arrow's 28px tip. */
+.step-header-controls {
+  position: absolute;
+  top: 4px;
+  right: 34px;
+  z-index: 3;
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.op-header:hover .step-header-controls,
+.step-header-controls:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.step-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  cursor: pointer;
+}
+
+.step-header-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Spinner in the status pill (and before a collapsed step's name). */
+.status-spinner {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 5px;
+  vertical-align: -1px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: status-spin 0.8s linear infinite;
+}
+
+.status-spinner.queued {
+  opacity: 0.55;
+  animation-duration: 1.6s;
+}
+
+@keyframes status-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Minimized: only the header, tight around the step's name. */
+.operation-column.minimized {
+  min-width: 0;
+}
+
+.operation-column.minimized .arrow-content {
+  padding: 0 34px;
+}
+
+/* A minimized header has no room for controls beside its name, and clicking
+   it already opens the step again. */
+.operation-column.minimized .step-header-controls {
+  display: none;
+}

@@ -431,10 +431,17 @@
     width: 450px;
 }
 
+/* As wide as the visible canvas (measured in MainLayout), never narrower
+   than an expanded step — so it widens within the main layout. */
 .column-wrapper.maximized {
-    flex: 0 0 calc(100vw - 100px);
-    width: calc(100vw - 100px);
-    max-width: 1200px; /* Optional cap */
+    flex: 0 0 max(450px, calc(var(--canvas-width, 900px) - 24px));
+    width: max(450px, calc(var(--canvas-width, 900px) - 24px));
+}
+
+/* Minimized: just the header, as narrow as the step's name allows. */
+.column-wrapper.minimized {
+    flex: 0 0 auto;
+    width: auto;
 }
 
 .column-wrapper.collapsed {

@@ -40,7 +40,7 @@
  *     the visible caret).
  */
 
-import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { SIMPLE_STEPS_LANGUAGE_ID } from '../shell/monacoSetup';
@@ -68,6 +68,11 @@ export interface FormulaEditorRef {
   getValue(): string;
 }
 
+/** One line: the height of the bar when it isn't being edited. */
+const COLLAPSED_HEIGHT = 28;
+/** While editing, grow to fit the formula up to about ten wrapped lines, then scroll. */
+const MAX_EXPANDED_HEIGHT = 200;
+
 const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function FormulaEditor(
   { value, onChange, onEnter, onFocus, onBlur, placeholder, shadowRef, testId },
   ref,
@@ -77,6 +82,15 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
   // Suppress feedback loop: when we push value Monaco → textarea (or vice
   // versa) we don't want the other side to bounce the change right back.
   const syncingRef = useRef(false);
+  // While focused the bar wraps and grows with its content, inside its own
+  // step column (it's in normal flow, so it pushes that step's widgets down
+  // rather than overlapping other steps). Unfocused, it's one line again.
+  const [height, setHeight] = useState(COLLAPSED_HEIGHT);
+  // State, not just a ref: @monaco-editor/react re-applies the `options` prop
+  // on every render, so wrapping has to live in those options — set
+  // imperatively, the next render would switch it straight back off.
+  const [focused, setFocused] = useState(false);
+  const focusedRef = useRef(false);
 
   // Expose imperative API.
   useImperativeHandle(ref, () => ({
@@ -158,9 +172,28 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       },
     );
 
+    // Grow to fit while editing; one line otherwise.
+    const fit = () => {
+      if (!focusedRef.current) return;
+      const next = Math.min(MAX_EXPANDED_HEIGHT, Math.max(COLLAPSED_HEIGHT, editor.getContentHeight()));
+      setHeight((prev) => (prev === next ? prev : next));
+    };
+    editor.onDidContentSizeChange(fit);
+
     // Focus / blur bubble up for autocomplete + wiring activation.
-    editor.onDidFocusEditorText(() => onFocus?.());
-    editor.onDidBlurEditorText(() => onBlur?.());
+    editor.onDidFocusEditorText(() => {
+      focusedRef.current = true;
+      setFocused(true);            // wraps; the content-size event then fits the height
+      onFocus?.();
+    });
+    editor.onDidBlurEditorText(() => {
+      focusedRef.current = false;
+      setFocused(false);
+      setHeight(COLLAPSED_HEIGHT);
+      // Show the start of the formula — the tool and its verb — when collapsed.
+      editor.setScrollPosition({ scrollTop: 0, scrollLeft: 0 });
+      onBlur?.();
+    });
   };
 
   // Parent prop changed → push into Monaco model (only if different).
@@ -202,7 +235,7 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
   return (
     <div className="formula-editor" style={{ position: 'relative', width: '100%' }}>
       <Editor
-        height="28px"
+        height={`${height}px`}
         defaultLanguage={SIMPLE_STEPS_LANGUAGE_ID}
         defaultValue={value}
         onMount={handleMount}
@@ -222,11 +255,16 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
           overviewRulerBorder: false,
           renderLineHighlight: 'none',
           scrollbar: {
-            vertical: 'hidden',
+            vertical: focused ? 'auto' : 'hidden',
             horizontal: 'hidden',
-            handleMouseWheel: false,
+            handleMouseWheel: focused,
           },
-          wordWrap: 'off',
+          // Wrap while editing so the whole formula is visible; one line otherwise.
+          wordWrap: focused ? 'on' : 'off',
+          // Wrap at the editor's width (the step column), not at a column count.
+          wrappingStrategy: 'advanced',
+          // Re-measure when the height changes between one line and expanded.
+          automaticLayout: true,
           fontFamily: '"SF Mono", Menlo, Monaco, "Courier New", monospace',
           fontSize: 13,
           padding: { top: 4, bottom: 4 },
