@@ -1,6 +1,12 @@
 # 120 — Literals and references
 
-> Status: proposed, 2026-10-05. Core pinned at `d8b6979`. Every core
+> Status: **partly implemented, 2026-10-06.** The canonical syntax (§2.3)
+> compiles and runs: `src/SIMPLE_STEPS/operation_formula.py` turns it into
+> core's operation JSON with typed `{"$ref": …}` references, and the
+> `all_orchestrations` demo is written in it (38/38 match core). Older formula
+> forms still run through the legacy parser; rejecting them (§2.1) and the UI's
+> reference picker (121) are next.
+> First proposed 2026-10-05. Core pinned at `d8b6979`. Every core
 > behaviour quoted here was run against that commit, not read from its docs.
 
 ## The rule

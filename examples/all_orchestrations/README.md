@@ -17,27 +17,47 @@ simple-steps --workspace examples/all_orchestrations
                                                     # open the workflow in the UI and press Run
 ```
 
-## How core's Python reads as formulas
+## The formulas are core's own syntax
 
-Steps are named after core's step ids, so a formula refers to an earlier
-step by name, just as core's `over=wf["readings"]` does.
+Each step is written the way simple-steps-core writes an operation, so a
+formula reads the same as the Python in core's `pipeline.py`:
 
-| core | formula |
+```
+=scale[mod.map(name="score")](wf["readings"], weight=2)
+ tool  modifier stack          the input       arguments
+```
+
+- **`wf["readings"]` is the only way to refer to a step.** Every quoted
+  string is just text (`docs/dev_plan/120-literals-and-references.md`).
+- **The verb goes in the brackets.** `mod.map`, `mod.filter`, `mod.select`,
+  `mod.collapse`, …, optionally followed by `mod.retry(…)` / `mod.timeout(…)`.
+- **The step it reads goes in the call.** Keyword arguments are the tool's
+  arguments.
+- **Sources and sweeps have no input:** `=to_rows[mod.source()](data='…')`,
+  `=grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]`.
+- **Verbs that apply no tool use `identity`:**
+  `=identity[mod.select(columns=["n"])](wf["readings"])`. Built-in reducers are
+  named directly: `=count[mod.collapse()](wf["readings"])`.
+- **`=scale(wf["readings"])` lets core infer the verb** from the tool.
+- **A plain value is a one-cell source:** `=[1, 2, 3, 4]`.
+
+| core (`pipeline.py`) | formula |
 |---|---|
-| `scale[mod.map(over=wf["readings"], name="score")]` | `=map(tool="scale", over=readings, name="score")` |
-| `mod.sort(over=wf["scored"], by="score", ascending=False)` | `=sort(over=scored, by="score", ascending=False)` |
-| `add_n[mod.collapse(by="bucket", over=wf["bucketed"], initial=0)]` | `=collapse(tool="add_n", over=bucketed, by="bucket", initial=0)` |
-| `grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` | `=sweep(tool="grid_cell", model=["a", "b"], window=[7, 30])` |
-| `scale(wf["readings"])` — verb inferred | `=scale(n=readings["n"])` |
-| `wf["a_list"] = [1, 2, 3, 4]` | `=literal(expr="[1, 2, 3, 4]")` |
+| `scale[mod.map(over=wf["readings"], name="score")]` | `=scale[mod.map(name="score")](wf["readings"])` |
+| `mod.sort(over=wf["scored"], by="score", ascending=False)` | `=identity[mod.sort(by="score", ascending=False)](wf["scored"])` |
+| `add_n[mod.collapse(by="bucket", over=wf["bucketed"], initial=0)]` | `=add_n[mod.collapse(by="bucket", initial=0)](wf["bucketed"])` |
+| `grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` | `=grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` |
+| `scale(wf["readings"])`, verb inferred | `=scale(wf["readings"])` |
+| `wf["a_list"] = [1, 2, 3, 4]` | `=[1, 2, 3, 4]` |
 
 The verb is part of the formula, so the saved file is the whole workflow.
+The app compiles each formula to core's operation JSON
+(`src/SIMPLE_STEPS/operation_formula.py`) and core runs it.
 
 ## Differences from core's example
 
-- **`robust`** uses map's `retries=2` setting. Core's version stacks the
-  `retry` and `timeout` modifiers; a formula has no spelling for `timeout`
-  (core records it but does not enforce it yet).
+- **`timeout`** is written as in core (`mod.timeout(seconds=5)`) but isn't
+  enforced yet; core records it (core 005 K18).
 - **`failure`** is a step here rather than a separate workflow. Its two
   failed rows are reported in the run log, not raised.
 - **Not reproduced:** core's `validation()` and `roundtrip()` helpers. They

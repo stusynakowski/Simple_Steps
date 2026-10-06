@@ -16,7 +16,7 @@
 | U4 | UI | Show references as coloured chips; drop the banner and ⚡ markers | Wiring mode is noisy |
 | U5 | UI | The formula bar grows with its content | Fixed at 28px; long formulas scroll sideways |
 | U6 | UI | Remove the formula text repeated in staged cells | Every cell shows "(running) ↳ scale[mod(na…" |
-| U7 | UI | Show the saved formula as-is; never rebuild it | Reopened formulas change (`over=readings` → `over="readings"`) |
+| U7 | UI | Show the saved formula as-is; never rebuild it (**done 2026-10-06**) | Reopened formulas change (`over=readings` → `over="readings"`) |
 | U8 | UI | The data view shows columns new relative to the step it **reads** | `grid_search` hides its own result |
 | U9 | UI | Orchestration dropdown edits the formula's `[…]` stack | It writes a separate `_orchestrator` key today |
 | C1–C11 | core | Listed in §3 | |
@@ -203,7 +203,7 @@ C7–C11 are new here. Each was produced by running core at `d8b6979`.
 
 | # | Change | Files |
 |---|---|---|
-| A1 | Parse `wf["…"]` into typed references (`{"$ref": "readings"}`); reject bare names, `stepN`, `=Step!col`, dot and `[row=, col=]` forms, subscripts on a reference (suggest a select step), and an operation used as an input, with the messages in 120 §4 | `formula_parser.py`, `safe_formula.py` |
+| A1 | **Done for core's syntax (2026-10-06, `operation_formula.py`); older forms not yet rejected.** Parse `wf["…"]` into typed references (`{"$ref": "readings"}`); reject bare names, `stepN`, `=Step!col`, dot and `[row=, col=]` forms, subscripts on a reference (suggest a select step), and an operation used as an input, with the messages in 120 §4 | `formula_parser.py`, `safe_formula.py` |
 | A2 | Build the operation from the parsed form (tool, modifier stack, input reference, literals); resolve only typed references | `grid_runner.py` |
 | A3 | Remove the string guessing: `_step_ref`'s name matching, the Excel regex, `_bind_previous_step`, the hidden column rename | `grid_runner.py` |
 | A4 | Step references by **name**; ids stay internal | `useWorkflow.ts` (`genId`), the step map sent to `/api/run` |

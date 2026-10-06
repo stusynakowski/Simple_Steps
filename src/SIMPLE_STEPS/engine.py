@@ -761,6 +761,18 @@ def run_operation(
     if input_ref_id:
         df_in = get_dataframe(input_ref_id, session_id=session_id)
 
+    # 1b. A formula in core's own syntax (tool[mod.verb(…)](wf["x"], …)) is
+    # compiled from its text and run on the grid. The op id and config the UI
+    # derived from it don't matter: the formula is the whole definition.
+    if formula:
+        from .operation_formula import is_canonical
+        if is_canonical(formula):
+            from .grid_runner import run_canonical_step
+            try:
+                return run_canonical_step(formula, step_map, session_id, result_store)
+            except Exception as e:
+                raise ValueError(f"Error executing step: {e}") from e
+
     # 2. Identity / pass-through: noop or passthrough op_id
     if op_id in ('noop', 'passthrough', '', None):
         print(f"Running '{op_id}' as pass-through / identity")

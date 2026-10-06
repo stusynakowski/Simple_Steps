@@ -70,8 +70,12 @@ async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise
   // Use the saved formula only if it parsed successfully.
   // Otherwise reconstruct from legacy fields so the formula bar always
   // shows the correct function + arguments (not just the step name).
+  // A usable saved formula is shown exactly as saved. Rebuilding it from its
+  // parsed arguments loses what the arguments can't carry — references came
+  // back quoted (`over="readings"`), and core's syntax
+  // (`scale[mod.map()](wf["readings"])`) has no arguments to rebuild from.
   const formula = formulaIsUsable
-    ? await buildFormula(processType, formulaArgs, (internalKeys._orchestrator as any) ?? null)
+    ? savedFormula
     : await buildFormula(processType, configuration,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (internalKeys._orchestrator as any) ?? null,

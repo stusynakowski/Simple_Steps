@@ -49,21 +49,32 @@ class ParsedFormula:
         args: Dict[str, str],
         is_valid: bool,
         raw_input: str,
+        error: Optional[str] = None,
+        operation: Optional[Dict[str, Any]] = None,
     ):
         self.operation_id = operation_id
         self.orchestration = orchestration
         self.args = args
         self.is_valid = is_valid
         self.raw_input = raw_input
+        # Set for formulas in core's syntax (operation_formula): why it is
+        # invalid, or the core operation it compiles to.
+        self.error = error
+        self.operation = operation
 
     def as_dict(self) -> Dict[str, Any]:
-        return {
+        d = {
             'operationId':  self.operation_id,
             'orchestration': self.orchestration,
             'args':         self.args,
             'isValid':      self.is_valid,
             'rawInput':     self.raw_input,
         }
+        if self.error is not None:
+            d["error"] = self.error
+        if self.operation is not None:
+            d["operation"] = self.operation
+        return d
 
 
 # Re-exported helpers — same names the rest of the codebase has been
@@ -91,6 +102,18 @@ def parse_formula(input_str: str) -> ParsedFormula:
     raw = (input_str or '').strip()
     if not raw:
         return ParsedFormula(None, None, {}, False, raw)
+
+    # Core's own syntax — tool[mod.verb(…)](wf["x"], …) — is compiled, not
+    # flattened into text arguments: its references stay typed. `args` is
+    # empty because the formula itself is the step's whole definition.
+    from .operation_formula import FormulaError, compile_formula, is_canonical
+    if is_canonical(raw):
+        try:
+            compiled = compile_formula(raw)
+        except FormulaError as exc:
+            return ParsedFormula(None, None, {}, False, raw, error=str(exc))
+        return ParsedFormula(compiled.tool_id, None, {}, True, raw,
+                             operation=compiled.operation())
 
     info = _sf_parse_call(raw)
     if not info["is_valid"]:

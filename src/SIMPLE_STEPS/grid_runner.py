@@ -39,7 +39,7 @@ from __future__ import annotations
 import ast
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 from simple_steps_core import grid
@@ -160,6 +160,85 @@ def run_grid_step(
 
     frame = _restore_bound_columns(output.data, plan.renames, plan.verb_settings.get("name"))
     frame = frame.reset_index(drop=True)
+    out_ref = save_dataframe(frame, session_id=session_id, store_mode=result_store)
+    return out_ref, {"rows": len(frame), "columns": [str(c) for c in frame.columns],
+                     **_engine_metrics(operation, step, output)}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Formulas in core's own syntax: tool[mod.verb(…)](wf["x"], k=v)
+# ─────────────────────────────────────────────────────────────────────────────
+
+_FORMULA_STEP = "__formula__"
+
+
+def run_formula(formula: str, load: Callable[[str], Any],
+                tools: Optional[Dict[str, Any]] = None):
+    """Compile *formula* (core's syntax) and run it in core.
+
+    *load(name)* returns the data of the step called *name*, or ``None`` when
+    there is no such step (or it hasn't run). Every step the formula reads —
+    its input and any argument references — is loaded into a one-off
+    ``grid.Workflow`` under its own name, so the operation core runs is exactly
+    the one the formula spells. Returns ``(step, operation_json)``.
+    """
+    from .operation_formula import compile_formula
+
+    compiled = compile_formula(formula)
+    wf = grid.Workflow()
+    for name in compiled.reads:
+        data = load(name)
+        if data is None:
+            raise GridStepError(
+                f'no earlier step named "{name}" has output — check the name in '
+                f'wf["{name}"], or run that step first'
+            )
+        wf[name] = data
+
+    tools = tools if tools is not None else _tools()
+    inferred = None
+    if compiled.modifiers is None:
+        # tool(wf["x"], …): infer the verb from the tool, with the input's data
+        # loaded — never from a not-yet-run source (core 005 K2).
+        fn = tools.get(compiled.tool_id) or grid.BUILTIN_TOOLS.get(compiled.tool_id)
+        if fn is None:
+            raise GridStepError(f"no tool named '{compiled.tool_id}'")
+        if compiled.input is None:
+            inferred = "source"
+        else:
+            literals = {k: v for k, v in compiled.arguments.items()
+                        if not (isinstance(v, dict) and set(v) == {"$ref"})}
+            inferred, _why = grid.infer_verb(getattr(fn, "fn", fn),
+                                             wf.step(compiled.input).output, literals)
+    operation = compiled.operation(inferred)
+
+    try:
+        wf[_FORMULA_STEP] = grid.Operation.from_dict(operation, tools)
+    except Exception as exc:
+        raise GridStepError(f"core rejected the operation: {exc}") from exc
+    step = wf.step(_FORMULA_STEP)
+    if step.problems:
+        raise GridStepError("; ".join(step.problems))
+    wf.run(_FORMULA_STEP, tools)
+    return wf.step(_FORMULA_STEP), operation
+
+
+def run_canonical_step(formula: str, step_map: Dict[str, str],
+                       session_id: Optional[str],
+                       result_store: Optional[str] = None) -> Tuple[str, dict]:
+    """``/api/run`` for a formula in core's syntax: run it, store the grid."""
+    from .engine import get_value, save_dataframe
+
+    def load(name: str) -> Any:
+        ref = step_map.get(name)
+        return None if ref is None else get_value(ref, session_id=session_id)
+
+    step, operation = run_formula(formula, load)
+    output = step.output
+    if operation["modifiers"][-1]["kind"] == "source" and len(output.failed):
+        # One call, so one unit: if it failed there is no output to show.
+        raise GridStepError(str(output.failed.iloc[0].get("error", "the tool failed")))
+    frame = output.data.reset_index(drop=True)
     out_ref = save_dataframe(frame, session_id=session_id, store_mode=result_store)
     return out_ref, {"rows": len(frame), "columns": [str(c) for c in frame.columns],
                      **_engine_metrics(operation, step, output)}

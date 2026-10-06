@@ -141,7 +141,7 @@ async def api_parse_formula(payload: dict = Body(...)):
     """Parse a formula string and return the parsed structure."""
     formula = payload.get("formula", "")
     parsed = parse_formula(formula).as_dict()
-    if not parsed.get("isValid") and formula.strip().lstrip("=").strip():
+    if not parsed.get("isValid") and "error" not in parsed and formula.strip().lstrip("=").strip():
         # Say why, so the step can show it in its output cell instead of
         # running whatever operation it had before.
         parsed["error"] = f"Invalid expression: {_why_invalid(formula)}"
@@ -197,7 +197,13 @@ async def api_console_eval(
             env[key] = df
 
     try:
-        result = safe_formula.run_formula(source, steps=env)
+        from .operation_formula import is_canonical
+        if is_canonical(source):
+            # Core's syntax: the same compiler and runner as /api/run.
+            from .grid_runner import run_formula
+            result = run_formula(source, load=env.get)[0].output.data
+        else:
+            result = safe_formula.run_formula(source, steps=env)
     except Exception as exc:
         return {
             "ok": False,

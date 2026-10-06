@@ -3,271 +3,272 @@
   "id": "all-orchestrations",
   "name": "All orchestrations",
   "meta": {
-    "source": "simple-steps-core examples/all_orchestrations/pipeline.py"
+    "source": "simple-steps-core examples/all_orchestrations/pipeline.py",
+    "syntax": "core operation syntax: tool[mod.verb(...)](wf[\"step\"], ...), docs/dev_plan/120"
   },
   "steps": [
     {
       "name": "readings",
-      "expression": "to_rows(data='{\"city\": [\"SF\", \"NYC\", \"SF\", \"LA\"], \"n\": [1, 2, 3, 2]}')",
+      "expression": "to_rows[mod.source()](data='{\"city\": [\"SF\", \"NYC\", \"SF\", \"LA\"], \"n\": [1, 2, 3, 2]}')",
       "meta": {
         "label": "readings"
       }
     },
     {
       "name": "records",
-      "expression": "to_rows(data='{\"value\": [{\"city\": \"SF\", \"temp\": 18.0}, {\"city\": \"NYC\", \"temp\": 31.0}]}')",
+      "expression": "to_rows[mod.source()](data='{\"value\": [{\"city\": \"SF\", \"temp\": 18.0}, {\"city\": \"NYC\", \"temp\": 31.0}]}')",
       "meta": {
         "label": "records"
       }
     },
     {
       "name": "scored",
-      "expression": "map(tool=\"scale\", over=readings, name=\"score\")",
+      "expression": "scale[mod.map(name=\"score\")](wf[\"readings\"])",
       "meta": {
         "label": "scored"
       }
     },
     {
       "name": "kept",
-      "expression": "filter(tool=\"is_big\", over=scored)",
+      "expression": "is_big[mod.filter()](wf[\"scored\"])",
       "meta": {
         "label": "kept"
       }
     },
     {
       "name": "head2",
-      "expression": "slice(over=scored, stop=2)",
+      "expression": "identity[mod.slice(stop=2)](wf[\"scored\"])",
       "meta": {
         "label": "head2"
       }
     },
     {
       "name": "ranked",
-      "expression": "sort(over=scored, by=\"score\", ascending=False)",
+      "expression": "identity[mod.sort(by=\"score\", ascending=False)](wf[\"scored\"])",
       "meta": {
         "label": "ranked"
       }
     },
     {
       "name": "unique_city",
-      "expression": "distinct(over=scored, columns=[\"city\"])",
+      "expression": "identity[mod.distinct(columns=[\"city\"])](wf[\"scored\"])",
       "meta": {
         "label": "unique_city"
       }
     },
     {
       "name": "picked",
-      "expression": "select(over=scored, columns=[\"city\", \"score\"])",
+      "expression": "identity[mod.select(columns=[\"city\", \"score\"])](wf[\"scored\"])",
       "meta": {
         "label": "picked"
       }
     },
     {
       "name": "dropped",
-      "expression": "drop(over=scored, columns=[\"score\"])",
+      "expression": "identity[mod.drop(columns=[\"score\"])](wf[\"scored\"])",
       "meta": {
         "label": "dropped"
       }
     },
     {
       "name": "renamed",
-      "expression": "rename(over=scored, columns={\"n\": \"count\"})",
+      "expression": "identity[mod.rename(columns={\"n\": \"count\"})](wf[\"scored\"])",
       "meta": {
         "label": "renamed"
       }
     },
     {
       "name": "bucketed",
-      "expression": "group(tool=\"label_city\", over=scored, name=\"bucket\")",
+      "expression": "label_city[mod.group(name=\"bucket\")](wf[\"scored\"])",
       "meta": {
         "label": "bucketed"
       }
     },
     {
       "name": "per_city",
-      "expression": "collapse(tool=\"add_n\", over=bucketed, by=\"bucket\", initial=0)",
+      "expression": "add_n[mod.collapse(by=\"bucket\", initial=0)](wf[\"bucketed\"])",
       "meta": {
         "label": "per_city"
       }
     },
     {
       "name": "n_rows",
-      "expression": "collapse(tool=\"count\", over=readings)",
+      "expression": "count[mod.collapse()](wf[\"readings\"])",
       "meta": {
         "label": "n_rows"
       }
     },
     {
       "name": "sum_n",
-      "expression": "collapse(tool=\"add_n\", over=readings, initial=0)",
+      "expression": "add_n[mod.collapse(initial=0)](wf[\"readings\"])",
       "meta": {
         "label": "sum_n"
       }
     },
     {
       "name": "bursts",
-      "expression": "expand(tool=\"fan_out\", over=readings, name=\"item\")",
+      "expression": "fan_out[mod.expand(name=\"item\")](wf[\"readings\"])",
       "meta": {
         "label": "bursts"
       }
     },
     {
       "name": "coords",
-      "expression": "expand(tool=\"make_coords\", over=readings)",
+      "expression": "make_coords[mod.expand()](wf[\"readings\"])",
       "meta": {
         "label": "coords"
       }
     },
     {
       "name": "spread",
-      "expression": "widen(over=coords, columns=[\"axis\", \"val\"])",
+      "expression": "identity[mod.widen(columns=[\"axis\", \"val\"])](wf[\"coords\"])",
       "meta": {
         "label": "spread"
       }
     },
     {
       "name": "wide",
-      "expression": "widen(over=records, columns=[\"city\", \"temp\"])",
+      "expression": "identity[mod.widen(columns=[\"city\", \"temp\"])](wf[\"records\"])",
       "meta": {
         "label": "wide"
       }
     },
     {
       "name": "grid_search",
-      "expression": "sweep(tool=\"grid_cell\", model=[\"a\", \"b\"], window=[7, 30])",
+      "expression": "grid_cell[mod.sweep(model=[\"a\", \"b\"], window=[7, 30])]",
       "meta": {
         "label": "grid_search"
       }
     },
     {
       "name": "robust",
-      "expression": "map(tool=\"scale\", over=readings, name=\"score\", retries=2)",
+      "expression": "scale[mod.map(name=\"score\"), mod.retry(times=2), mod.timeout(seconds=5)](wf[\"readings\"])",
       "meta": {
         "label": "robust"
       }
     },
     {
       "name": "auto_map",
-      "expression": "scale(n=readings[\"n\"])",
+      "expression": "scale(wf[\"readings\"])",
       "meta": {
         "label": "auto_map"
       }
     },
     {
       "name": "auto_filter",
-      "expression": "is_big(n=readings[\"n\"])",
+      "expression": "is_big(wf[\"readings\"])",
       "meta": {
         "label": "auto_filter"
       }
     },
     {
       "name": "auto_collapse",
-      "expression": "add_n(n=readings[\"n\"])",
+      "expression": "add_n(wf[\"readings\"])",
       "meta": {
         "label": "auto_collapse"
       }
     },
     {
       "name": "auto_expand",
-      "expression": "fan_out(n=readings[\"n\"])",
+      "expression": "fan_out(wf[\"readings\"])",
       "meta": {
         "label": "auto_expand"
       }
     },
     {
       "name": "a_list",
-      "expression": "literal(expr=\"[1, 2, 3, 4]\")",
+      "expression": "[1, 2, 3, 4]",
       "meta": {
         "label": "a_list"
       }
     },
     {
       "name": "a_dict",
-      "expression": "literal(expr=\"{'x': 10, 'y': 20}\")",
+      "expression": "{\"x\": 10, \"y\": 20}",
       "meta": {
         "label": "a_dict"
       }
     },
     {
       "name": "a_scalar",
-      "expression": "literal(expr=\"7\")",
+      "expression": "7",
       "meta": {
         "label": "a_scalar"
       }
     },
     {
       "name": "from_list",
-      "expression": "expand(over=a_list)",
+      "expression": "identity[mod.expand()](wf[\"a_list\"])",
       "meta": {
         "label": "from_list"
       }
     },
     {
       "name": "from_dict",
-      "expression": "widen(over=a_dict, columns=[\"x\", \"y\"])",
+      "expression": "identity[mod.widen(columns=[\"x\", \"y\"])](wf[\"a_dict\"])",
       "meta": {
         "label": "from_dict"
       }
     },
     {
       "name": "pairs",
-      "expression": "map(tool=\"make_pair\", over=readings)",
+      "expression": "make_pair[mod.map()](wf[\"readings\"])",
       "meta": {
         "label": "pairs"
       }
     },
     {
       "name": "split",
-      "expression": "widen(over=pairs)",
+      "expression": "identity[mod.widen()](wf[\"pairs\"])",
       "meta": {
         "label": "split"
       }
     },
     {
       "name": "ns",
-      "expression": "select(over=readings, columns=[\"n\"])",
+      "expression": "identity[mod.select(columns=[\"n\"])](wf[\"readings\"])",
       "meta": {
         "label": "ns"
       }
     },
     {
       "name": "gathered",
-      "expression": "collapse(tool=\"gather\", over=ns)",
+      "expression": "gather[mod.collapse()](wf[\"ns\"])",
       "meta": {
         "label": "gathered"
       }
     },
     {
       "name": "total_n",
-      "expression": "collapse(tool=\"total\", over=ns)",
+      "expression": "total[mod.collapse()](wf[\"ns\"])",
       "meta": {
         "label": "total_n"
       }
     },
     {
       "name": "first_n",
-      "expression": "collapse(tool=\"first\", over=ns)",
+      "expression": "first[mod.collapse()](wf[\"ns\"])",
       "meta": {
         "label": "first_n"
       }
     },
     {
       "name": "last_n",
-      "expression": "collapse(tool=\"last\", over=ns)",
+      "expression": "last[mod.collapse()](wf[\"ns\"])",
       "meta": {
         "label": "last_n"
       }
     },
     {
       "name": "again",
-      "expression": "map(tool=\"scale\", over=scored, name=\"again\")",
+      "expression": "scale[mod.map(name=\"again\")](wf[\"scored\"])",
       "meta": {
         "label": "again"
       }
     },
     {
       "name": "failure",
-      "expression": "map(tool=\"risky\", over=readings, name=\"out\", retries=1)",
+      "expression": "risky[mod.map(name=\"out\"), mod.retry(times=1)](wf[\"readings\"])",
       "meta": {
         "label": "failure"
       }
