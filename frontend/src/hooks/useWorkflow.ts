@@ -337,6 +337,31 @@ export default function useWorkflow() {
     }
   }
 
+  /**
+   * Insert a step at *index* with a name and formula, and return its id.
+   * Reference picking uses it to add a select step just before the step being
+   * edited (utils/selection.ts).
+   */
+  function insertStep(index: number, label: string, formula: string): string {
+    const newStep: Step = {
+      id: genId('step'),
+      sequence_index: index,
+      label,
+      formula,
+      operation: formula,
+      process_type: 'identity',
+      configuration: {},
+      status: 'pending',
+    };
+    announce({ kind: 'add', name: label, after: index > 0 ? `step${index}` : null });
+    setWorkflow((prev) => {
+      const steps = [...prev.steps];
+      steps.splice(index, 0, newStep);
+      return { ...prev, steps: steps.map((s, i) => ({ ...s, sequence_index: i })) };
+    });
+    return newStep.id;
+  }
+
   /** Hide the step's UI and shrink its header to fit its name. */
   function minimizeStep(id: string) {
     collapseStep(id);
@@ -989,6 +1014,7 @@ export default function useWorkflow() {
     toggleMaximizeStep,
     minimizedStepIds,
     minimizeStep,
+    insertStep,
     collapseStep, 
     updateStep,
     dispatchCommand,

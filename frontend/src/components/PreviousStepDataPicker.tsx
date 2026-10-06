@@ -2,24 +2,25 @@
  * PreviousStepDataPicker
  *
  * Renders a compact panel showing all previous steps' output columns and
- * cells as clickable badges. When a badge is clicked, `onTokenSelect` is
- * called with the reference token (e.g. `step-abc.url`). The parent
- * (OperationColumn) handles focusing the formula bar and injecting the token.
+ * cells as clickable badges. A column badge picks that column, a cell badge
+ * picks its row; `onPick` gets the step's name and the pick, and the parent
+ * (OperationColumn) turns it into a select operation (utils/selection.ts).
  */
 
 import { useState } from 'react';
 import type { Step } from '../types/models';
+import type { GridPick } from '../utils/selection';
 
 interface PreviousStepDataPickerProps {
   /** All steps that appear before the current one in the pipeline. */
   previousSteps: Step[];
   /** Called when a badge is clicked with the reference token string. */
-  onTokenSelect: (token: string) => void;
+  onPick: (sourceStep: string, pick: GridPick) => void;
 }
 
 export default function PreviousStepDataPicker({
   previousSteps,
-  onTokenSelect,
+  onPick,
 }: PreviousStepDataPickerProps) {
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
 
@@ -50,14 +51,16 @@ export default function PreviousStepDataPicker({
   const relevantSteps =
     stepsWithOutput.length > 0 ? stepsWithOutput : previousSteps;
 
+  const labelOf = (stepId: string) => previousSteps.find((s) => s.id === stepId)?.label ?? stepId;
+
   const handleColumnBadgeClick = (stepId: string, col: string) => {
-    const token = `${stepId}.${col}`;
-    onTokenSelect(token);
+    onPick(labelOf(stepId), { kind: 'column', column: col, extend: false, toggle: false, order: [col] });
   };
 
-  const handleCellBadgeClick = (stepId: string, rowId: number, col: string) => {
-    const token = `${stepId}[row=${rowId}, col=${col}]`;
-    onTokenSelect(token);
+  // A single cell needs rows AND columns (core 005 K9); for now a cell badge
+  // picks its row.
+  const handleCellBadgeClick = (stepId: string, rowId: number) => {
+    onPick(labelOf(stepId), { kind: 'row', row: rowId, extend: false, toggle: false, order: [rowId] });
   };
 
   return (
@@ -118,7 +121,7 @@ export default function PreviousStepDataPicker({
                       e.preventDefault(); // Don't blur formula bar
                       handleColumnBadgeClick(step.id, col);
                     }}
-                    title={`Insert column reference: ${step.id}.${col}`}
+                    title={`Select column ${col} of ${step.label}`}
                     style={colBadgeStyle}
                     onMouseEnter={(e) => {
                       (e.currentTarget as HTMLButtonElement).style.background = '#ffc107';
@@ -147,9 +150,9 @@ export default function PreviousStepDataPicker({
                       key={`${cell.row_id}:${cell.column_id}`}
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        handleCellBadgeClick(step.id, cell.row_id, cell.column_id);
+                        handleCellBadgeClick(step.id, cell.row_id);
                       }}
-                      title={`Insert cell reference: ${step.id}[row=${cell.row_id}, col=${cell.column_id}]`}
+                      title={`Select row ${cell.row_id} of ${step.label}`}
                       style={cellBadgeStyle}
                       onMouseEnter={(e) => {
                         (e.currentTarget as HTMLButtonElement).style.background = '#fff3cd';

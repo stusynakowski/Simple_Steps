@@ -18,6 +18,8 @@ export interface ParsedFormula {
   isValid: boolean;
   /** Why the formula is invalid, when it is (`/api/parse_formula`). */
   error?: string;
+  /** Set for a formula in core's syntax: the core operation it compiles to. */
+  operation?: Record<string, unknown>;
   rawInput: string;
 }
 

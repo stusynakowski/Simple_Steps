@@ -140,6 +140,11 @@ export function useStagedPreview({
 
     if (!parsed) return empty;
 
+    // A formula in core's syntax (tool[mod.verb(…)](wf["x"])) is compiled by
+    // the backend; guessing its output columns here would invent ones that
+    // never exist. Its grid appears when it runs.
+    if (parsed.operation) return empty;
+
     const { operationId, args = {}, isValid } = parsed;
 
     if (!operationId || operationId === 'noop') {

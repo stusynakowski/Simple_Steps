@@ -5,6 +5,8 @@ import type { ProgressEvent } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
 import PreviousStepDataPicker from './PreviousStepDataPicker';
+import { applyPick, parseSelectionFormula, selectionFormula, selectStepName, stepRef } from '../utils/selection';
+import type { GridPick, Selection } from '../utils/selection';
 import { buildFormula, parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula, OrchestrationMode } from '../utils/formulaParser';
 import OrchestrationControl from './OrchestrationControl';
@@ -39,6 +41,12 @@ interface OperationColumnProps {
   onMaximize?: () => void;
   /** The header's minimize button: hide the step UI, shrink the header. */
   onMinimizeStep?: () => void;
+  /** Every step's name, so a new select step gets a unique one. */
+  allStepNames?: string[];
+  /** Insert a step (name, formula) just before this one; returns its id. */
+  onInsertStepBefore?: (label: string, formula: string) => string;
+  /** Replace another step's formula (a select step this one made). */
+  onSetStepFormula?: (id: string, formula: string) => void;
   /** Called with the pointer position when the user drags the header far enough to detach */
   onDetach?: (position: { x: number; y: number }) => void;
   /** Live progress for row-iterating operations */
@@ -66,6 +74,9 @@ export default function OperationColumn({
   onMinimize,
   onMaximize,
   onMinimizeStep,
+  allStepNames = [],
+  onInsertStepBefore,
+  onSetStepFormula,
   onDetach,
   progress,
   pipelineStatus = 'idle',
@@ -89,7 +100,7 @@ export default function OperationColumn({
   const [isLocked, setIsLocked] = useState(false);
 
   // Wiring context — this column is a wiring SOURCE when a later step's formula is focused
-  const { wiringState, injectReference, activateWiring, deactivateWiring } = useStepWiring();
+  const { wiringState, activateWiring, deactivateWiring, pickFrom, setActiveSelection } = useStepWiring();
   const isWiringSource =
     wiringState.receivingStepId !== null &&
     wiringState.receivingStepId !== step.id &&
@@ -107,62 +118,83 @@ export default function OperationColumn({
   // PreviousStepDataPicker can focus + activate wiring without losing context.
   const formulaBarRef = useRef<HTMLTextAreaElement | null>(null);
 
-  /** Called by PreviousStepDataPicker when a column/cell badge is clicked.
-   *  Directly injects the reference token into the formula bar without relying
-   *  on async wiring state — uses the formulaBarRef we already hold. */
-  const handlePickerTokenSelect = (token: string) => {
+  // ── Picking data from an earlier step ────────────────────────────────────
+  // A pick (whole table, columns, rows) becomes a select operation — see
+  // utils/selection.ts. The formula bar is written through its hidden
+  // textarea plus an `input` event, the same path typing takes, so the
+  // formula is parsed and committed exactly as if it had been typed.
+
+  /** The select step this step made while its formula was being written. */
+  const madeSelectStep = useRef<{ id: string; name: string; selection: Selection } | null>(null);
+
+  const writeFormulaBar = (value: string, cursor = value.length) => {
     const el = formulaBarRef.current;
     if (!el) return;
-
-    // Activate wiring so context state is consistent for other interactions
-    activateWiring(step.id, stepIndex, { current: el } as React.RefObject<HTMLTextAreaElement>);
-
-    // Splice the token at the current cursor position (or append)
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? start;
-    const before = el.value.slice(0, start);
-    const after = el.value.slice(end);
-
-    // Context-aware: if inside parens, prefix with "data=" when no param name present
-    let insertText = token;
-    const insideParens = before.includes('(') && (after.includes(')') || !after.trim());
-    if (insideParens) {
-      const afterLastCommaOrParen = before.slice(Math.max(before.lastIndexOf('('), before.lastIndexOf(',')) + 1).trim();
-      if (!afterLastCommaOrParen.includes('=')) {
-        insertText = `data=${token}`;
-      }
-    }
-
-    const newValue = before + insertText + after;
-
-    // Use native setter so React's synthetic onChange fires
-    const nativeInputSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      'value'
-    )?.set;
-    nativeInputSetter?.call(el, newValue);
+    // Where the caret goes after the write — FormulaEditor reads it when it
+    // copies the new value into Monaco.
+    el.dataset.selStart = String(cursor);
+    el.dataset.selEnd = String(cursor);
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
 
-    // If no operation is defined yet and the new value is a bare reference,
-    // immediately register it as a passthrough so the step can be run right away.
-    if (!newValue.startsWith('=') && (step.process_type === 'noop' || step.process_type === 'passthrough' || !step.process_type)) {
-      const internalKeys = Object.fromEntries(
-        Object.entries(step.configuration).filter(([k]) => k.startsWith('_') && k !== '_ref')
-      );
-      onUpdate?.(step.id, {
-        formula: newValue,
-        operation: newValue,
-        process_type: 'passthrough',
-        configuration: { ...internalKeys, _ref: newValue },
-      });
+  /** Insert *text* at the formula bar's caret — only the text, nothing added.
+   *  The caret is the one Monaco last had (FormulaEditor keeps it on the
+   *  element), since a grid click has already blurred the formula bar. */
+  const insertAtCursor = (text: string) => {
+    const el = formulaBarRef.current;
+    if (!el) return;
+    // The common case doesn't depend on the caret: a formula waiting for its
+    // input — `tool[mod.verb()](` or `…]()` — takes the reference inside the
+    // call, which is the only place an input can go.
+    const open = /^(.*)\(\s*(\))?\s*$/s.exec(el.value);
+    if (open && /\]\s*$/.test(open[1])) {
+      const value = `${open[1]}(${text})`;
+      writeFormulaBar(value, value.length);
+      return;
+    }
+    const clamp = (n: number) => Math.max(0, Math.min(el.value.length, n));
+    const start = clamp(Number(el.dataset.selStart ?? el.selectionStart ?? el.value.length));
+    const end = clamp(Number(el.dataset.selEnd ?? start));
+    writeFormulaBar(el.value.slice(0, start) + text + el.value.slice(end), start + text.length);
+  };
+
+  const handleReferencePick = (sourceStep: string, pick: GridPick) => {
+    const current = formulaBarRef.current?.value ?? step.formula ?? '';
+    const body = current.trim().replace(/^=/, '').trim();
+    const ownSelection = parseSelectionFormula(current);
+
+    // An empty formula, or one that is already a selection: the pick writes
+    // this step's own select operation.
+    if (!body || ownSelection) {
+      const prev = ownSelection && ownSelection.step === sourceStep ? ownSelection : null;
+      writeFormulaBar(selectionFormula(applyPick(prev, sourceStep, pick)));
+      return;
     }
 
-    // Focus and move cursor to after the token
-    const newCursor = start + insertText.length;
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(newCursor, newCursor);
-    }, 0);
+    // Writing some other formula: a whole table is just a reference.
+    if (pick.kind === 'all') {
+      insertAtCursor(stepRef(sourceStep));
+      return;
+    }
+
+    // Part of a step: its own select step, just before this one, referenced
+    // here. Picking again updates that same select step.
+    const made = madeSelectStep.current;
+    if (made && made.selection.step === sourceStep && current.includes(stepRef(made.name))) {
+      const next = applyPick(made.selection, sourceStep, pick);
+      madeSelectStep.current = { ...made, selection: next };
+      onSetStepFormula?.(made.id, selectionFormula(next));
+      setActiveSelection(next);
+      return;
+    }
+    const selection = applyPick(null, sourceStep, pick);
+    const name = selectStepName(selection, new Set(allStepNames));
+    const id = onInsertStepBefore?.(name, selectionFormula(selection));
+    if (!id) return;
+    madeSelectStep.current = { id, name, selection };
+    insertAtCursor(stepRef(name));
   };
 
   // The formula bar always reflects step.formula (the canonical field).
@@ -201,6 +233,16 @@ export default function OperationColumn({
   // Track what the user is typing live — separate from committed step.formula
   // Prefer step.formula first, then derivedFormula, then legacy operation field.
   const [liveFormula, setLiveFormula] = useState<string>(step.formula || derivedFormula || step.operation || '');
+
+  // While this step's formula bar is the one receiving picks, tell the source
+  // grids what it selects, so the selected columns / rows stay highlighted.
+  const isReceiving = wiringState.receivingStepId === step.id;
+  useEffect(() => {
+    if (!isReceiving) return;
+    const own = parseSelectionFormula(liveFormula);
+    const made = madeSelectStep.current;
+    setActiveSelection(own ?? (made && liveFormula.includes(stepRef(made.name)) ? made.selection : null));
+  }, [isReceiving, liveFormula, setActiveSelection]);
 
   // Keep liveFormula in sync when the step is updated externally.
   useEffect(() => {
@@ -506,6 +548,7 @@ export default function OperationColumn({
               isLocked={isLocked}
               onLock={() => setIsLocked(!isLocked)}
               onFormulaBarRef={(el) => { formulaBarRef.current = el; }}
+              onReferencePick={handleReferencePick}
             />
           )}
 
@@ -585,7 +628,11 @@ export default function OperationColumn({
                       {previousSteps.length > 0 && (
                         <PreviousStepDataPicker
                           previousSteps={previousSteps}
-                          onTokenSelect={handlePickerTokenSelect}
+                          onPick={(source, pick) => {
+                            const el = formulaBarRef.current;
+                            if (el) activateWiring(step.id, stepIndex, { current: el } as React.RefObject<HTMLTextAreaElement>, handleReferencePick);
+                            handleReferencePick(source, pick);
+                          }}
                         />
                       )}
 
@@ -716,25 +763,9 @@ export default function OperationColumn({
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
                       <DataOutputGrid
                         cells={step.output_preview}
-                        onCellClick={(cell) => {
-                          // If this is a wiring source, the wiring callbacks handle it.
-                          // Otherwise, clicking a cell/column inserts a reference into
-                          // the current step's formula bar.
-                          if (!isWiringSource) {
-                            if (cell.row_id === -1) {
-                              // Column header click → column reference
-                              handlePickerTokenSelect(`${step.id}.${cell.column_id}`);
-                            } else {
-                              // Cell click → specific cell reference
-                              handlePickerTokenSelect(`${step.id}[row=${cell.row_id}, col=${cell.column_id}]`);
-                            }
-                          }
-                        }}
                         wiringMode={isWiringSource}
-                        sourceStepId={step.id}
-                        onWireColumn={(token) => injectReference(token)}
-                        onWireRow={(token) => injectReference(token)}
-                        onWireCell={(token) => injectReference(token)}
+                        onPick={(pick) => pickFrom(step.label, pick)}
+                        highlight={wiringState.activeSelection?.step === step.label ? wiringState.activeSelection : null}
                         stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
                         stagedCellMode={stagedCellMode}
                       />

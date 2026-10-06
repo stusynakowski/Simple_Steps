@@ -10,10 +10,10 @@
 
 | # | Where | Change | Why |
 |---|---|---|---|
-| U1 | UI | One reference syntax, built from the step's **name** | Five syntaxes today; new steps produce references that silently become text |
-| U2 | UI | Click / shift-click / ⌘-click writes a **select step** for columns, rows or cells; a whole step inserts `wf["…"]` | You can't select ranges today |
-| U3 | UI | Insert only the reference, at the cursor | Today the UI adds `data=`, which most tools reject |
-| U4 | UI | Show references as coloured chips; drop the banner and ⚡ markers | Wiring mode is noisy |
+| U1 | UI | One reference syntax, built from the step's **name** (**done 2026-10-06**) | Five syntaxes today; new steps produce references that silently become text |
+| U2 | UI | Click / shift-click / ⌘-click writes a **select step** for columns, rows or cells; a whole step inserts `wf["…"]` (**done for whole table, columns, rows, 2026-10-06; cells/blocks later, §1.6**) | You can't select ranges today |
+| U3 | UI | Insert only the reference, at the cursor (**done 2026-10-06**) | Today the UI adds `data=`, which most tools reject |
+| U4 | UI | Show references as coloured chips; drop the banner and ⚡ markers (**banner and markers removed 2026-10-06; chips later**) | Wiring mode is noisy |
 | U5 | UI | The formula bar grows with its content | Fixed at 28px; long formulas scroll sideways |
 | U6 | UI | Remove the formula text repeated in staged cells | Every cell shows "(running) ↳ scale[mod(na…" |
 | U7 | UI | Show the saved formula as-is; never rebuild it (**done 2026-10-06**) | Reopened formulas change (`over=readings` → `over="readings"`) |
@@ -120,6 +120,51 @@ narrow, or grouped with the step that reads them.
 The app already has `select` as a palette operation
 (`=select(over=readings, columns=[…])`, from `grid_runner`'s verb
 operations). The canonical form above replaces it, per 120.
+
+### 1.2a What's built (2026-10-06)
+
+While a step's formula bar has focus, earlier steps' grids are pickable:
+
+| Click | Writes |
+|---|---|
+| the `#` corner | `=identity[mod.slice()](wf["Step 0"])` — the whole table |
+| a column header (⌘/Ctrl adds, Shift extends) | `=identity[mod.select(columns=["city", "n"])](wf["Step 0"])` |
+| a row number (⌘/Ctrl adds, Shift extends) | `=identity[mod.slice(at=[1, 2, 3])](wf["Step 0"])` |
+
+- **An empty formula, or one that's already a select,** is rewritten by the
+  pick: the step *is* the select step.
+- **Writing another formula,** a whole-table pick inserts `wf["Step 0"]`; a
+  column or row pick adds a select step just before (`Step_0_n`) and inserts
+  `wf["Step_0_n"]` — inside an open call (`…](`) when there is one, else at
+  the caret. Picking again updates that same select step.
+- **The selection stays highlighted** in the source grid while the step is
+  being edited, read back from its formula (`utils/selection.ts` parses the
+  select formulas it writes).
+- **Row numbers in the grid start at 0**, matching `slice(at=[…])`.
+- **The instruction banner, ⚡ markers and "wiring active" footer are gone;**
+  the `data=` prefix is never added.
+- A formula in core's syntax gets no guessed "staged" preview columns.
+
+Code: `frontend/src/utils/selection.ts` (picks ↔ formulas),
+`DataOutputGrid.tsx` (gestures, highlight), `StepWiringContext.tsx`
+(`pickFrom`, `activeSelection`), `OperationColumn.tsx` (`handleReferencePick`).
+
+### 1.6 Later: Excel-like subset selection
+
+Not built yet — a **subset of rows and columns together**:
+
+- **A single cell** (click a cell) and **a block** (drag across cells), each
+  one select step.
+- **Dragging a selection's edge** to resize it, as in Excel.
+- **Reference chips** in the formula bar, each in its own colour, matching a
+  box drawn around the cells it covers (§1.4).
+
+What it waits on: core taking rows and columns in one step — either one
+`select(columns=…, rows=…)` (core 005 **K9**) or letting the tool-less verbs
+(`select`, `slice`, `sort`, …) stack in one step. Until then a cell or block
+would be two steps, `slice` then `select`. When it lands, a cell pick writes
+`=identity[mod.select(rows=[2], columns=["n"])](wf["Step 0"])` (or the stacked
+form), and `utils/selection.ts` gains a `cells` kind.
 
 ### 1.3 Inserting
 

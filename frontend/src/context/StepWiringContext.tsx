@@ -19,6 +19,8 @@
  */
 
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { stepRef } from '../utils/selection';
+import type { GridPick, Selection } from '../utils/selection';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +31,14 @@ export interface WiringState {
   receivingStepIndex: number | null;
   /** The input element ref so we can splice text at cursor. */
   inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement> | null;
+  /**
+   * The receiving step's handler for a pick from an earlier step's grid (its
+   * formula bar turns it into a select operation — utils/selection.ts).
+   * Inputs without one get `wf["<step>"]` inserted at the cursor.
+   */
+  onPick: ((sourceStep: string, pick: GridPick) => void) | null;
+  /** What the receiving step currently selects, so the source grid can show it. */
+  activeSelection: Selection | null;
 }
 
 export interface StepWiringContextValue {
@@ -40,8 +50,13 @@ export interface StepWiringContextValue {
   activateWiring: (
     stepId: string,
     stepIndex: number,
-    inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>
+    inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>,
+    onPick?: (sourceStep: string, pick: GridPick) => void,
   ) => void;
+  /** A click in an earlier step's grid: hand it to the receiving step. */
+  pickFrom: (sourceStep: string, pick: GridPick) => void;
+  /** The receiving step publishes its current selection here. */
+  setActiveSelection: (selection: Selection | null) => void;
   /**
    * Called on blur (with a small delay so grid clicks can fire first).
    */
@@ -56,21 +71,23 @@ export interface StepWiringContextValue {
 
 // ── Context ────────────────────────────────────────────────────────────────
 
+const EMPTY_WIRING: WiringState = {
+  receivingStepId: null, receivingStepIndex: null, inputRef: null, onPick: null, activeSelection: null,
+};
+
 const StepWiringContext = createContext<StepWiringContextValue>({
-  wiringState: { receivingStepId: null, receivingStepIndex: null, inputRef: null },
+  wiringState: EMPTY_WIRING,
   activateWiring: () => {},
   deactivateWiring: () => {},
   injectReference: () => {},
+  pickFrom: () => {},
+  setActiveSelection: () => {},
 });
 
 // ── Provider ───────────────────────────────────────────────────────────────
 
 export function StepWiringProvider({ children }: { children: React.ReactNode }) {
-  const [wiringState, setWiringState] = useState<WiringState>({
-    receivingStepId: null,
-    receivingStepIndex: null,
-    inputRef: null,
-  });
+  const [wiringState, setWiringState] = useState<WiringState>(EMPTY_WIRING);
 
   // Deactivation timeout so grid clicks (which briefly blur the input) still
   // get a chance to fire before we clear wiring state.
@@ -80,20 +97,27 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
     (
       stepId: string,
       stepIndex: number,
-      inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>
+      inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>,
+      onPick?: (sourceStep: string, pick: GridPick) => void,
     ) => {
       if (deactivateTimeout.current) {
         clearTimeout(deactivateTimeout.current);
         deactivateTimeout.current = null;
       }
-      setWiringState({ receivingStepId: stepId, receivingStepIndex: stepIndex, inputRef });
+      setWiringState((prev) => ({
+        receivingStepId: stepId,
+        receivingStepIndex: stepIndex,
+        inputRef,
+        onPick: onPick ?? null,
+        activeSelection: prev.receivingStepId === stepId ? prev.activeSelection : null,
+      }));
     },
     []
   );
 
   const deactivateWiring = useCallback(() => {
     deactivateTimeout.current = setTimeout(() => {
-      setWiringState({ receivingStepId: null, receivingStepIndex: null, inputRef: null });
+      setWiringState(EMPTY_WIRING);
     }, 200);
   }, []);
 
@@ -114,19 +138,8 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
       const before = inputEl.value.slice(0, start);
       const after = inputEl.value.slice(end);
 
-      // Context-aware injection: if the cursor is inside parens of an
-      // operation like `=to_rows(|)`, insert as `data=token` so the
-      // formula parser doesn't misinterpret bracket-style cell references.
-      let insertText = token;
-      const insideParens = before.includes('(') && (after.includes(')') || !after.trim());
-      if (insideParens) {
-        // Check if there's already a param name before the cursor (e.g. "data=")
-        const afterLastCommaOrParen = before.slice(Math.max(before.lastIndexOf('('), before.lastIndexOf(',')) + 1).trim();
-        if (!afterLastCommaOrParen.includes('=')) {
-          // No param name yet — use "data=" as default first param
-          insertText = `data=${token}`;
-        }
-      }
+      // Insert only the reference, at the cursor — never a parameter name.
+      const insertText = token;
 
       const newValue = before + insertText + after;
 
@@ -150,8 +163,28 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
     [wiringState.inputRef]
   );
 
+  const pickFrom = useCallback(
+    (sourceStep: string, pick: GridPick) => {
+      // A grid click briefly blurs the formula bar — keep wiring alive.
+      if (deactivateTimeout.current) {
+        clearTimeout(deactivateTimeout.current);
+        deactivateTimeout.current = null;
+      }
+      if (wiringState.onPick) {
+        wiringState.onPick(sourceStep, pick);
+      } else {
+        injectReference(stepRef(sourceStep));
+      }
+    },
+    [wiringState, injectReference]
+  );
+
+  const setActiveSelection = useCallback((selection: Selection | null) => {
+    setWiringState((prev) => (prev.activeSelection === selection ? prev : { ...prev, activeSelection: selection }));
+  }, []);
+
   return (
-    <StepWiringContext.Provider value={{ wiringState, activateWiring, deactivateWiring, injectReference }}>
+    <StepWiringContext.Provider value={{ wiringState, activateWiring, deactivateWiring, injectReference, pickFrom, setActiveSelection }}>
       {children}
     </StepWiringContext.Provider>
   );

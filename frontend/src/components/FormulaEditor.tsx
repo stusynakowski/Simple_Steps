@@ -156,6 +156,11 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       if (!model) return;
       const startOffset = model.getOffsetAt(e.selection.getStartPosition());
       const endOffset = model.getOffsetAt(e.selection.getEndPosition());
+      // Also remember it on the element: a textarea's own selection resets
+      // when it isn't focused, and a grid click blurs the formula bar before
+      // the reference is inserted.
+      ta.dataset.selStart = String(startOffset);
+      ta.dataset.selEnd = String(endOffset);
       try {
         ta.setSelectionRange(startOffset, endOffset);
       } catch {
@@ -222,9 +227,14 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       const ed = monacoRef.current;
       if (!ed) return;
       if (ed.getValue() !== ta.value) {
+        // setValue moves Monaco's cursor to the start; put it where the
+        // writer left the caret (just after an inserted reference).
+        const caret = Number(ta.dataset.selEnd ?? ta.value.length);
         syncingRef.current = true;
         ed.setValue(ta.value);
         syncingRef.current = false;
+        const model = ed.getModel();
+        if (model) ed.setPosition(model.getPositionAt(Math.min(caret, ta.value.length)));
       }
       onChange(ta.value);
     };

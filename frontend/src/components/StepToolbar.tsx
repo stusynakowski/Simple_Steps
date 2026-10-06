@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import type { PanelId } from './stepPanels';
+import type { GridPick } from '../utils/selection';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
 import { parseFormula } from '../utils/formulaParser';
@@ -41,6 +42,8 @@ interface StepToolbarProps {
   onConfigure?: (id: string) => void;
   /** Called once with a ref to the formula bar input so parents can focus it. */
   onFormulaBarRef?: (ref: HTMLTextAreaElement | null) => void;
+  /** A pick in an earlier step's grid while this formula bar has focus. */
+  onReferencePick?: (sourceStep: string, pick: GridPick) => void;
 }
 
 export default function StepToolbar({ 
@@ -56,6 +59,7 @@ export default function StepToolbar({
   onLock,
   isLocked,
   onFormulaBarRef,
+  onReferencePick,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const initFormula = step.formula || step.operation || '';
@@ -428,7 +432,7 @@ export default function StepToolbar({
               setSuggestions(sugg);
               setShowSuggestions(sugg.length > 0);
               if (inputRef.current) {
-                activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLTextAreaElement>);
+                activateWiring(step.id, stepIndex, inputRef as React.RefObject<HTMLTextAreaElement>, onReferencePick);
               }
             }}
             shadowRef={(el) => {
