@@ -102,8 +102,10 @@ python examples/all_orchestrations/app.py     # or: simple-steps --workspace exa
 
 ### Prerequisites
 
-- **Python 3.9+**
-- **Node.js 18+** (only needed if you want to develop the frontend or rebuild the UI)
+- **Python 3.13** — the version Simple Steps is developed and tested on (the
+  repo's `.python-version`). It installs on 3.10+, but only 3.13 is tested.
+- **Node.js 22 LTS** (20.19+ works) — only needed to develop the frontend or
+  rebuild the UI.
 
 ### Option A: Use Simple Steps (no local repo checkout)
 
@@ -129,11 +131,11 @@ If you want to work on the codebase itself:
 git clone https://github.com/stusynakowski/Simple_Steps.git
 cd Simple_Steps
 
-python3 -m venv .venv
+uv venv --python 3.13        # or: python3.13 -m venv .venv
 source .venv/bin/activate   # macOS / Linux
 # .venv\Scripts\activate    # Windows
 
-pip install -e .
+uv pip install -e .          # or: pip install -e .
 ```
 
 That's it. The package installs the `simple-steps` CLI command and bundles a pre-built copy of the frontend.

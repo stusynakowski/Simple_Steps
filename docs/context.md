@@ -106,6 +106,9 @@ time.
 - Architecture as built: `docs/dev_plan/` (its README marks it active)
 
 ## Commands
+- Python: **3.13** (pinned in `.python-version`; `requires-python` still says
+  `>=3.10`, but nothing below 3.13 is tested). Environment:
+  `uv venv --python 3.13 && source .venv/bin/activate`
 - Install (dev): `python -m pip install -e ".[dev]"`
 - **Update a pip install elsewhere**: the version numbers rarely change
   (`simple-steps` 0.0.0, `simple-steps-core` 0.1.0), so
