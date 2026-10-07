@@ -26,6 +26,10 @@ const CASES: WorkflowCommand[] = [
   { kind: 'run', target: 'step2' },
   { kind: 'run', target: null },
   { kind: 'preview', target: 'step2' },
+  // Resources (docs/dev_plan/122 §2.4): created in the toolbar or the console.
+  { kind: 'define_resource', name: 'llm', definition: 'FakeLLM(model="fake-1")' },
+  { kind: 'define_resource', name: 'db', definition: "FakeDB(table={'SF': 'west'})" },
+  { kind: 'remove_resource', name: 'llm' },
 ];
 
 describe('command round-trip', () => {
@@ -73,3 +77,23 @@ describe('console parser', () => {
     });
   });
 });
+
+describe('resource commands', () => {
+  it('reads res["x"] = Type(…) as defining a resource, not setting a step', () => {
+    expect(parseConsoleLine('res["llm"] = FakeLLM(model="fake-1")')).toEqual({
+      kind: 'command',
+      command: { kind: 'define_resource', name: 'llm', definition: 'FakeLLM(model="fake-1")' },
+    });
+  });
+
+  it('reads del res["x"] as removing it', () => {
+    expect(parseConsoleLine('del res["llm"]')).toEqual({
+      kind: 'command', command: { kind: 'remove_resource', name: 'llm' },
+    });
+  });
+
+  it('asks for a quoted name', () => {
+    expect(parseConsoleLine('res[llm] = FakeLLM()').kind).toBe('error');
+  });
+});
+

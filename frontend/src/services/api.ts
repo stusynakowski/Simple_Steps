@@ -431,6 +431,47 @@ export async function loadPipeline(projectId: string, pipelineId: string): Promi
     return r.json();
 }
 
+// ── Resources (core 007) ────────────────────────────────────────────────────
+
+/** One saved resource: a type and literal settings, never an object. */
+export interface ResourceDeclaration {
+    source: 'defined' | 'loaded';
+    type: string;
+    settings?: Record<string, unknown>;
+    [field: string]: unknown;
+}
+
+/** A resource type the app offers (GET /api/resources), from core's resource_entry. */
+export interface ResourceTypeInfo {
+    type: string;
+    description?: string;
+    settings: { name: string; type: string; required: boolean; default?: unknown }[];
+    tools: Record<string, { description?: string }>;
+    bases?: string[];
+}
+
+export async function fetchResourceTypes(): Promise<Record<string, ResourceTypeInfo>> {
+    const r = await fetch(`${API_BASE}/resources`, { credentials: 'include' });
+    if (!r.ok) throw new Error('Failed to list resource types');
+    return r.json();
+}
+
+/** Check `Claude(model="…")` for resource *name*; returns what the workflow saves. */
+export async function declareResource(
+    name: string,
+    definition: string,
+): Promise<{ name: string; declaration: ResourceDeclaration }> {
+    const r = await fetch(`${API_BASE}/resources/declare`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, definition }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || 'Failed to declare the resource');
+    return body;
+}
+
 export async function savePipeline(projectId: string, pipeline: PipelineFile): Promise<PipelineFile> {
     const p = encodeURIComponent(projectId);
     const r = await fetch(`${API_BASE}/projects/${p}/pipelines`, {

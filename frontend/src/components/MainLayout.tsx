@@ -19,6 +19,7 @@ import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
 import { StepWiringProvider } from '../context/StepWiringContext';
+import ResourcesMenu from './ResourcesMenu';
 import { fetchWorkspaceInfo, openWorkspace, type WorkspaceInfo } from '../services/api';
 import './MainLayout.css';
 
@@ -100,6 +101,8 @@ export default function MainLayout() {
     stopPipeline,
     previewStep,
     deleteStep,
+    defineResource,
+    removeResource,
     saveWorkflow,
     fetchWorkflow,
     loadWorkflowObject,
@@ -587,6 +590,14 @@ export default function MainLayout() {
         onToggleLogs={toggleLog}
         onClearOutputs={clearLogs}
         pipelineMeta={pipelineMeta}
+        resourcesMenu={
+          <ResourcesMenu
+            resources={workflow.resources}
+            steps={workflow.steps}
+            onDefine={defineResource}
+            onRemove={removeResource}
+          />
+        }
       />
 
       {/* Visible drag-hint at the header's bottom edge — signals that the

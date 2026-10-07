@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Workflow, Step, StepStatus, Cell } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
+import { declareResource } from '../services/api';
 import { runStep as runStepApi, fetchDataView, getOperations,
   listProjects, createProject, deleteProject,
   listPipelines, loadPipeline, savePipeline, deletePipeline,
@@ -11,6 +12,7 @@ import type { OperationDefinition, PipelineFile, BackendError, ProgressEvent } f
 import { parseFormula, buildFormula } from '../utils/formulaParser';
 import { errorCell, withRowErrors } from '../utils/errorCells';
 import { columnsToShow } from '../utils/stepColumns';
+import { stepsUsingResource } from '../utils/resources';
 import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 import type { WorkflowCommand } from '../types/commands';
 import { formatCommand } from '../types/commands';
@@ -816,6 +818,39 @@ export default function useWorkflow() {
     });
   }, [setPipelineStatus]);
 
+  // ── Resources ────────────────────────────────────────────────────────────
+  // A workflow's resources live in its `resources` section, never in a step
+  // (122 §2.4). The toolbar's Resources menu and the console both come here.
+
+  /** Create or change resource *name* from `Type(setting=…)`. The backend
+   *  checks it with core first, so a bad setting never reaches the file. */
+  const defineResource = useCallback(async (name: string, definition: string): Promise<void> => {
+    const { name: clean, declaration } = await declareResource(name, definition);
+    announce({ kind: 'define_resource', name: clean, definition: definition.trim() });
+    const latest = workflowRef.current;
+    const updated = { ...latest, resources: { ...(latest.resources ?? {}), [clean]: declaration } };
+    workflowRef.current = updated;      // so a run straight after sees it
+    setWorkflow(updated);
+  }, [announce]);
+
+  /** Delete resource *name*. Refused while a step uses it, listing those steps. */
+  const removeResource = useCallback((name: string): void => {
+    const latest = workflowRef.current;
+    if (!latest.resources || !(name in latest.resources)) {
+      throw new Error(`No resource named '${name}'.`);
+    }
+    const users = stepsUsingResource(latest.steps, name);
+    if (users.length) {
+      throw new Error(`res["${name}"] is used by ${users.join(', ')}. Change those steps first.`);
+    }
+    announce({ kind: 'remove_resource', name });
+    const { [name]: _removed, ...rest } = latest.resources;
+    void _removed;
+    const updated = { ...latest, resources: rest };
+    workflowRef.current = updated;
+    setWorkflow(updated);
+  }, [announce]);
+
   function deleteStep(id: string) {
     announce({ kind: 'remove', target: stepAlias(id) });
     setWorkflow((prev) => {
@@ -1002,11 +1037,19 @@ export default function useWorkflow() {
           await previewStep(id);
           return `previewed ${cmd.target}`;
         }
+        case 'define_resource': {
+          await defineResource(cmd.name, cmd.definition);
+          return `res["${cmd.name}"] = ${cmd.definition}`;
+        }
+        case 'remove_resource': {
+          removeResource(cmd.name);
+          return `removed res["${cmd.name}"]`;
+        }
       }
     } finally {
       commandOrigin.current = prevOrigin;
     }
-  }, [resolveStepId, runStep, previewStep, runPipeline]);
+  }, [resolveStepId, runStep, previewStep, runPipeline, defineResource, removeResource]);
 
   /** The step_map the console sends with an expression, so the backend
    *  namespace matches what the GUI is showing. Same shape as a run's. */
@@ -1046,6 +1089,9 @@ export default function useWorkflow() {
     pausePipeline,
     stopPipeline,
     deleteStep,
+    // resources (the workflow's `resources` section)
+    defineResource,
+    removeResource,
     // execution log
     executionLogs,
     clearLogs,

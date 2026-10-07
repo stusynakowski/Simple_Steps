@@ -318,6 +318,119 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* ── Resources menu (ResourcesMenu.tsx) ─────────────────────────────────── */
+
+.ut-resources-panel {
+  min-width: 360px;
+  max-width: 460px;
+}
+
+.ut-resource-dot.missing {
+  background: #f87171;
+}
+
+.ut-resource-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ut-resource-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.ut-resource-def {
+  font-size: 0.72rem;
+  color: #9cdcfe;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ut-resource-meta {
+  font-size: 0.68rem;
+  color: #777;
+}
+
+.ut-resource-edit {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.ut-resource-edit:hover {
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ut-resource-editing {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.ut-resource-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.ut-resource-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #eee;
+  font-size: 0.78rem;
+  padding: 5px 8px;
+  outline: none;
+}
+
+.ut-resource-input:focus {
+  border-color: #646cff;
+}
+
+.ut-resource-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.ut-resource-type {
+  background: rgba(100, 108, 255, 0.12);
+  border: 1px solid rgba(100, 108, 255, 0.3);
+  border-radius: 10px;
+  color: #a5abff;
+  font-size: 0.7rem;
+  padding: 1px 8px;
+  cursor: pointer;
+}
+
+.ut-resource-type:hover {
+  background: rgba(100, 108, 255, 0.25);
+}
+
+.ut-resource-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.ut-resource-error {
+  margin-top: 8px;
+  font-size: 0.74rem;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
 /* ── Status pill ────────────────────────────────────────────────────────── */
 
 .ut-status-pill {

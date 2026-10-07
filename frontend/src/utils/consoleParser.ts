@@ -80,6 +80,24 @@ export function parseConsoleLine(input: string): ParsedLine {
     return { kind: 'command', command: { kind: 'set', target, formula } };
   }
 
+  // ── Resources: res["llm"] = Type(…)  /  del res["llm"] ───────────────────
+  const defineRes = line.match(/^res\s*\[\s*(.+?)\s*\]\s*=\s*(.+)$/s);
+  if (defineRes) {
+    const name = unquote(defineRes[1]);
+    if (name === null) {
+      return { kind: 'error', message: `Resource name must be quoted, e.g. res["llm"] = FakeLLM(model="fake-1")` };
+    }
+    const definition = defineRes[2].trim();
+    if (!definition) return { kind: 'error', message: 'A resource needs a type: res["llm"] = FakeLLM(…)' };
+    return { kind: 'command', command: { kind: 'define_resource', name, definition } };
+  }
+  const delRes = line.match(/^del\s+res\s*\[\s*(.+?)\s*\]\s*$/s);
+  if (delRes) {
+    const name = unquote(delRes[1]);
+    if (name === null) return { kind: 'error', message: 'Resource name must be quoted, e.g. del res["llm"]' };
+    return { kind: 'command', command: { kind: 'remove_resource', name } };
+  }
+
   // ── Method call: wf.<name>(args) ────────────────────────────────────────
   const call = line.match(/^wf\.(\w+)\s*\((.*)\)\s*$/s);
   if (call) {

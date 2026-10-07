@@ -521,6 +521,25 @@ async def list_resource_types():
     return {name: grid.resource_entry(cls) for name, cls in sorted(RESOURCE_TYPES.items())}
 
 
+class _ResourceDeclaration(BaseModel):
+    name: str
+    definition: str
+
+
+@app.post("/api/resources/declare")
+async def declare_resource(payload: _ResourceDeclaration):
+    """Check a resource definition, ``Claude(model="…")``, and return the
+    declaration the workflow saves in its ``resources`` section. Nothing is
+    built: the live object is made when a step first uses it.
+    """
+    from .resources import ResourceError, declare
+    try:
+        return {"name": payload.name.strip(),
+                "declaration": declare(payload.name, payload.definition)}
+    except ResourceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
 # --- 1.1 Diagnostics / Debug ---
 @app.get("/api/debug/registry")
 async def debug_registry():

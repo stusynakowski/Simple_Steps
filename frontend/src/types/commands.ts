@@ -29,7 +29,11 @@ export type WorkflowCommand =
   | { kind: 'remove'; target: string }
   | { kind: 'rename'; target: string; to: string }
   | { kind: 'run'; target: string | null }
-  | { kind: 'preview'; target: string };
+  | { kind: 'preview'; target: string }
+  // Resources belong to the workflow, not to a step (122 §2.4): the toolbar's
+  // Resources menu and the console both produce these.
+  | { kind: 'define_resource'; name: string; definition: string }
+  | { kind: 'remove_resource'; name: string };
 
 /** Single-quote a string for the canonical form, escaping as Python would. */
 function q(s: string): string {
@@ -58,6 +62,11 @@ export function formatCommand(cmd: WorkflowCommand): string {
       return cmd.target ? `wf.run(${q(cmd.target)})` : 'wf.run()';
     case 'preview':
       return `wf.preview(${q(cmd.target)})`;
+    case 'define_resource':
+      // The definition is code (`Claude(model="…")`), so it is not quoted.
+      return `res[${q(cmd.name)}] = ${cmd.definition}`;
+    case 'remove_resource':
+      return `del res[${q(cmd.name)}]`;
   }
 }
 
@@ -72,5 +81,7 @@ export const COMMAND_HELP: { form: string; what: string }[] = [
   { form: 'wf.run("step2")', what: 'run one step' },
   { form: 'wf.preview("step2")', what: 'preview one step' },
   { form: 'wf.steps', what: 'list the steps' },
+  { form: 'res["llm"] = FakeLLM(model="fake-1")', what: 'create or change a resource' },
+  { form: 'del res["llm"]', what: 'delete a resource no step uses' },
   { form: 'step1["score"]', what: 'evaluate an expression against live data' },
 ];

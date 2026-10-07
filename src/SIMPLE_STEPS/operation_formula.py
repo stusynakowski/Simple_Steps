@@ -64,6 +64,7 @@ bar can validate as you type. ``grid_runner.run_formula`` runs the result.
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -184,9 +185,19 @@ def is_canonical(formula: Optional[str]) -> bool:
 # Compiling
 # ─────────────────────────────────────────────────────────────────────────────
 
+_DEFINES_RESOURCE = re.compile(r"^res\s*\[[^\]]*\]\s*=(?!=)")
+
+
 def compile_formula(formula: str) -> Compiled:
     """Compile a formula in core's syntax, or raise :class:`FormulaError`."""
     body = _body(formula)
+    if _DEFINES_RESOURCE.match(body):
+        # A resource belongs to the workflow, never to a step.
+        raise FormulaError(
+            "a step can use a resource but not create one. Create it from the "
+            "Resources menu in the toolbar, or in the console: "
+            'res["name"] = Type(setting=…)'
+        )
     try:
         tree = ast.parse(body, mode="eval").body
     except SyntaxError as exc:

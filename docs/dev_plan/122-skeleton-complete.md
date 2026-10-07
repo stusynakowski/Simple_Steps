@@ -312,7 +312,7 @@ other tool. Everything else (`close`, `connect`, `_retry`, helpers) is plain
 Python:
 
 - users and the agent see **only marked methods**: in the catalog, the
-  Resources panel, and the formula bar's suggestions;
+  Resources menu, and the formula bar's suggestions;
 - `res["db"].close()` in a formula is refused with *"close is not a tool of
   ClinicalDB; its tools are: query"*;
 - tool code can still call any method. An unbound tool like `summarize`
@@ -336,23 +336,47 @@ App(tools=[my_tools],
 Credentials stay here, never in a workflow file and never in the agent's
 context. `Secret` settings are always locked; `locked=` locks others.
 
-**Defined instances live in the workflow.** The user creates one from a form
-in the Resources panel (built from the constructor) or by writing
+**Defined instances live in the workflow.** The user creates one in the
+toolbar's Resources menu, or in the console with
 `res["claude"] = Claude(model="claude-opus-5-5")`. It's saved in the
 workflow's `resources` section.
 
-**Where resources appear in the UI: out of the way while building steps.**
-Resources are their own section of the workflow file, and the UI gives them
-their own place too: the sidebar's existing **Session Manager** view (labelled
-"resources & tool registry"), not the step list and not above it. While
-someone builds steps they see only steps. Resources are one click away:
+**Where resources appear in the UI: a dropdown in the workflow toolbar.**
+A resource belongs to the workflow, not to a step, so it lives in the toolbar
+that acts on the whole workflow (Run / Pause / Stop / Clear / Logs), as a
+closed **Resources (n) ▾** menu: always in view, never in the way while
+someone builds steps.
 
-- from the sidebar's Session Manager icon;
-- from a `res["…"]` in any formula (clicking it opens that resource's
-  settings);
-- **when a workflow opens and needs attention**: a resource it uses isn't
-  loaded here, or the deployment's settings differ from `as_loaded`. A
-  single notice links to the panel. Otherwise nothing interrupts.
+```
+[▶ Run] [⏹] [Clear] │ [Resources (3) ▾] │            ● Online   [Logs]
+                      ┌───────────────────────────────────────┐
+                      │ ● db    FakeDB()          used by regions  ✎ × │
+                      │ ● llm   FakeLLM(model="fake-1")  not used  ✎ × │
+                      │ 🔒 study ClinicalDB (loaded)              × │
+                      │ + New resource                          │
+                      └───────────────────────────────────────┘
+```
+
+- **The menu creates and changes resources.** Each row shows the resource as
+  the formula that creates it (`FakeLLM(model="fake-1")`) and which steps use
+  it. ✎ edits that formula; **+ New resource** takes a name and a definition,
+  with the app's resource types as one-click templates. The backend checks a
+  definition with core before it is saved, so a bad setting never reaches the
+  file.
+- **Steps only use resources.** A step formula that tries to create one,
+  `=res["x"] = Claude(…)`, is refused: *"a step can use a resource but not
+  create one. Create it from the Resources menu…"*.
+- **The console matches the menu.** `res["x"] = Type(…)` creates or changes
+  a resource and `del res["x"]` deletes one: the same commands the menu
+  emits, so a session's transcript replays (118).
+- **A resource a step uses can't be deleted.** The menu says which steps use
+  it, the way core refuses to remove a step that others read.
+- **When a resource needs attention** (its type isn't in this app; later: a
+  loaded one is missing, or the deployment's settings differ from
+  `as_loaded`) the button shows a red dot instead of a separate notice.
+- **The sidebar's Session Manager stays the developer's view:** which
+  resource types and tools the app offers (`GET /api/resources`). The toolbar
+  menu is *this workflow's* resources.
 
 **When an instance is built:**
 
@@ -365,7 +389,7 @@ someone builds steps they see only steps. Resources are one click away:
   can be marked `shared=True` (a connection pool, say) to have one instance
   for the whole app.
 - **Closed when the session ends** (`ResourceContainer.aclose()`).
-- **Health-checked** when the Resources panel opens and before a step runs.
+- **Health-checked** when the Resources menu opens and before a step runs.
   A failure shows on the step: *"resource `db` is not loaded"*.
 
 ### 2.4a Every resource a workflow uses is saved in it
@@ -396,7 +420,7 @@ with, and opening it elsewhere knows what to ask for:
   doesn't break the workflow. Locked and `Secret` settings can't be
   overridden.
 - **When the deployment's settings differ from `as_loaded`** (say the
-  model changed from one release to the next), the Resources panel shows the
+  model changed from one release to the next), the Resources menu shows the
   difference when the workflow opens. Nothing changes silently in either
   direction.
 - **Opening the workflow where that name isn't loaded**: the type and the
@@ -436,13 +460,14 @@ with, and opening it elsewhere knows what to ask for:
   must also recognize `res[`: today `=res["db"].query(sql=…)` has no `wf[` or
   `mod.`, so it isn't detected as core syntax and goes to the old parser
   (*"res['db'].query is not a tool"*).
-- **S2.4** A **Resources panel** in the sidebar's Session Manager view (not
-  in or above the step list), opened from a `res["…"]` in a formula or from a
-  notice when a workflow opens with a resource that needs attention. It shows loaded resources
-  (editable except locked and secret settings, saved as overrides) and
-  defined ones, a form built from the constructor to
-  define one, and the tools each provides. Health checks can come after the
-  MVP; until then a failure shows on the step.
+- **S2.4** The toolbar's **Resources menu** (§2.4). **Built 2026-10-07**
+  (`ResourcesMenu.tsx`): list with definitions and users, add from a name +
+  `Type(…)` with type templates, edit, delete refused while used, a red dot
+  for an unavailable type, the console's `res["x"] = …` / `del res["x"]`, and a
+  step formula that tries to create one refused. **Still to do:** loaded
+  resources with overrides (needs core slice 3), `res["` suggestions in the
+  formula bar (needs editor completions), clicking a `res["…"]` in a formula
+  to open it (needs U4 chips), and health checks (after the MVP).
 - **S2.5** The example: add a resource to `examples/all_orchestrations`
   (e.g. a toy key-value store with `get`/`put` methods, plus one unbound
   tool), and pin it in `check.py`.

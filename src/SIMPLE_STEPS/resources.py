@@ -21,7 +21,9 @@ overrides and secrets are core's slice 3 (``docs/core-proposals/006`` R3/R4).
 
 from __future__ import annotations
 
+import ast
 import json
+import re
 import threading
 from typing import Any, Dict, Mapping, Optional, Tuple
 
@@ -86,6 +88,58 @@ def live_resource(session_id: Optional[str], name: str,
                 raise ResourceError(f'resource "{name}" could not be built: {exc}') from exc
             bucket[key] = obj
         return obj
+
+
+_NAME = re.compile(r"^[A-Za-z_][\w-]*$")
+
+
+def declare(name: str, definition: str) -> Dict[str, Any]:
+    """``("claude", 'Claude(model="claude-opus-5-5")')`` → a declaration.
+
+    What the toolbar's Resources menu and the console's ``res["x"] = Type(…)``
+    send. The definition is written in formula syntax: a resource type called
+    with literal keyword settings. Core checks the settings against the
+    constructor (``wf.define``), so a bad setting is refused here, before it is
+    saved, rather than when a step first runs.
+    """
+    from simple_steps_core import grid
+
+    name = (name or "").strip()
+    if not _NAME.match(name):
+        raise ResourceError(
+            f"{name!r} can't name a resource; use letters, digits, _ or -, "
+            "starting with a letter: res[\"claude\"]"
+        )
+    text = (definition or "").strip().lstrip("=").strip()
+    try:
+        node = ast.parse(text, mode="eval").body
+    except SyntaxError as exc:
+        raise ResourceError(f"Invalid definition: {exc.msg}") from None
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+        raise ResourceError('a resource is a type called with settings: Claude(model="…")')
+    if node.args:
+        raise ResourceError(f"{node.func.id}(…) takes settings by name, e.g. "
+                            f'{node.func.id}(model="…")')
+    settings: Dict[str, Any] = {}
+    for kw in node.keywords:
+        if kw.arg is None:
+            raise ResourceError("**kwargs aren't allowed in a definition")
+        try:
+            settings[kw.arg] = ast.literal_eval(kw.value)
+        except ValueError:
+            raise ResourceError(
+                f"{kw.arg}= must be a literal (text, a number, a list, …), "
+                f"not {ast.unparse(kw.value)}"
+            ) from None
+    declaration = {"source": "defined", "type": node.func.id}
+    if settings:
+        declaration["settings"] = settings
+    cls = resource_type(declaration, name)
+    try:
+        grid.Workflow().define(name, cls, **settings)
+    except TypeError as exc:
+        raise ResourceError(str(exc)) from None
+    return declaration
 
 
 def drop_session(session_id: Optional[str]) -> None:

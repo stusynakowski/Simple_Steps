@@ -20,6 +20,8 @@ interface UnifiedToolbarProps {
   onClearOutputs?: () => void;
   onRestartBackend?: () => void;
   pipelineMeta?: PipelineMeta;
+  /** The workflow's Resources menu, placed after the execution controls. */
+  resourcesMenu?: React.ReactNode;
 }
 
 export default function UnifiedToolbar({
@@ -34,6 +36,7 @@ export default function UnifiedToolbar({
   onClearOutputs,
   onRestartBackend,
   pipelineMeta,
+  resourcesMenu,
 }: UnifiedToolbarProps) {
   return (
     <div className="unified-toolbar" data-testid="unified-toolbar">
@@ -79,6 +82,14 @@ export default function UnifiedToolbar({
       </div>
 
       <div className="ut-divider" />
+
+      {/* ── Workflow: its resources ──────────────────────────────────── */}
+      {resourcesMenu && (
+        <>
+          {resourcesMenu}
+          <div className="ut-divider" />
+        </>
+      )}
 
       {/* ── Center-right: Pipeline status counts ─────────────────────── */}
       {pipelineMeta && (pipelineMeta.counts.running > 0 || pipelineMeta.counts.errors > 0) && (
