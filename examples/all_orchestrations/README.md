@@ -9,11 +9,11 @@ dataset, and one step per step of core's workflow, each written as a formula.
 |---|---|
 | [`tools.py`](tools.py) | core's registry, declared with `@simple_step_tool`, plus its resource types (`@simple_step_resource`) |
 | [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow: every shape verb |
-| [`projects/demo/resources.simple-steps-workflow`](projects/demo/resources.simple-steps-workflow) | the 10-step resources workflow: core's `build_resources()` |
+| [`projects/demo/resources.simple-steps-workflow`](projects/demo/resources.simple-steps-workflow) | the 11-step resources workflow: core's `build_resources()`, plus a ready-made resource |
 | [`check.py`](check.py) | runs both workflows the way the UI does and compares every step with core |
 
 ```bash
-python examples/all_orchestrations/check.py        # 54/54 steps match simple-steps-core
+python examples/all_orchestrations/check.py        # 55/55 steps match simple-steps-core
 simple-steps --workspace examples/all_orchestrations
                                                     # open the workflow in the UI and press Run
 ```
@@ -95,8 +95,28 @@ them with `res["…"]`:
 | `=res["db"].lookup(wf["keys"])` | bound tool, verb inferred |
 
 The app builds each instance the first time a step uses it, keeps one per
-session, and builds a new one when its settings change. Only `"source":
-"defined"` works so far; loaded resources come with core's next slice.
+session, and builds a new one when its settings change.
+
+**Ready-made resources** come from the deployment, not the workflow.
+`tools.py` provides one:
+
+```python
+simple_step_loaded("house_llm", FakeLLM, model="house-1")   # env("NAME") for credentials
+```
+
+The workflow uses it and changes one setting. The file saves only the change,
+so the deployment's settings apply underneath:
+
+```jsonc
+"house_llm": {"source": "loaded", "type": "FakeLLM",
+              "as_loaded": {"model": "house-1"}, "overrides": {"model": "house-2"}}
+```
+
+`=summarize[mod.map()](wf["notes"], llm=res["house_llm"])` gives
+`[house-2] A`, `[house-2] B`. Core has no ready-made resources, so `check.py`
+marks this step *app only* and checks it against fixed values. In the UI the
+toolbar's **Resources** menu lists ready-made resources under *From the
+deployment* with a **Use** button.
 
 ## Differences from core's example
 

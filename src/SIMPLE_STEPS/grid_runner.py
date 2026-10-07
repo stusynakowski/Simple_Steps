@@ -195,7 +195,7 @@ def run_formula(formula: str, load: Callable[[str], Any],
     session-less store in :mod:`.resources`).
     """
     from .operation_formula import compile_formula
-    from .resources import ResourceError, live_resource, resource_type, settings_of
+    from .resources import ResourceError, live_resource, resolve
 
     compiled = compile_formula(formula)
     declarations = resources or {}
@@ -211,8 +211,10 @@ def run_formula(formula: str, load: Callable[[str], Any],
                 "Add it to the workflow's resources first"
             )
         try:
-            types[name] = resource_type(declarations[name], name)
-            wf.define(name, types[name], **settings_of(declarations[name]))
+            # Defined or ready-made, core gets one plain declaration: the type
+            # and the settings it builds with (deployment's + user's changes).
+            types[name], settings = resolve(name, declarations[name])
+            wf.define(name, types[name], **settings)
         except (ResourceError, TypeError) as exc:
             raise GridStepError(str(exc)) from exc
 

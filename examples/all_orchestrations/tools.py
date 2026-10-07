@@ -19,7 +19,7 @@ with core's own output.
 
 from __future__ import annotations
 
-from SIMPLE_STEPS import simple_step_resource, simple_step_tool
+from SIMPLE_STEPS import simple_step_loaded, simple_step_resource, simple_step_tool
 
 
 @simple_step_tool(category="All orchestrations")
@@ -202,3 +202,11 @@ def summarize(text: str, llm: FakeLLM) -> str:
         llm: the model to ask.
     """
     return llm.complete(text)
+
+
+# ── A ready-made resource: provided by the deployment, not the workflow ──────
+# Every workflow in this workspace can use res["house_llm"]. A workflow that
+# changes a setting saves only the change (its `overrides`); the deployment's
+# settings apply underneath. A real deployment reads credentials with
+# env("NAME"), which a workflow can never see or change.
+simple_step_loaded("house_llm", FakeLLM, model="house-1")

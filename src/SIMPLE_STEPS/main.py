@@ -521,6 +521,16 @@ async def list_resource_types():
     return {name: grid.resource_entry(cls) for name, cls in sorted(RESOURCE_TYPES.items())}
 
 
+@app.get("/api/resources/loaded")
+async def list_loaded_resources():
+    """The ready-made resources this deployment provides: each one's type, its
+    settings (never one read from the environment — those appear only as
+    ``env:NAME``), and which settings users may not change.
+    """
+    from .resources import loaded_info
+    return loaded_info()
+
+
 class _ResourceDeclaration(BaseModel):
     name: str
     definition: str

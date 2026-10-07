@@ -7,6 +7,12 @@
 > them: S2.2 (class and method decorators), S2.3 (`res["…"]` in formulas), and
 > the `resources` section in files and runs (defined resources only). See
 > `examples/all_orchestrations/projects/demo/resources.simple-steps-workflow`.
+> **Ready-made resources built 2026-10-07, in the app alone** (S2.2b, S2.2c):
+> `simple_step_loaded(name, Type, locked=[…], **settings)` with `env("NAME")`
+> for credentials; workflows save `source: "loaded"` + `as_loaded` +
+> `overrides`; the Resources menu offers them ("Use"), saves edits as
+> overrides, and flags one that's missing or whose settings changed. Core
+> needed nothing: the app hands it `define(name, Type, **merged settings)`.
 > Sections 1–4 are the four things to add; §6 lists the decisions to settle
 > before building them. Everything else is in §7 (later) and §8 (cleanup).
 
@@ -446,11 +452,13 @@ with, and opening it elsewhere knows what to ask for:
   keeps working for tool groups.
 - **S2.2a** A `Secret` setting type that accepts only `"env:…"` pointers or
   a loaded resource's name, refused at declaration otherwise.
-- **S2.2b** `App(loaded=…)` taking `Loaded(Type, **settings, locked=[…])`,
-  and an `env("NAME")` helper. Instances are built lazily per session (one per
+- **S2.2b** **Built** as `simple_step_loaded("name", Type, locked=[…], **settings)`
+  (callable from the workspace's `tools.py` today; `App(loaded=…)` will call
+  it when S1 lands) and `env("NAME", default=None)`, which is always locked
+  and never written to a workflow. Instances are built lazily per session (one per
   app when `shared`), health-checked, and closed with the session. A defined
   resource with a loaded resource's name is refused.
-- **S2.2c** The workflow's `resources` section (§2.4a): every resource used,
+- **S2.2c** **Built.** The workflow's `resources` section (§2.4a): every resource used,
   with `source`, `settings` / `secrets` for defined ones and `as_loaded` /
   `overrides` for loaded ones. Show differences from `as_loaded` on open, and
   ask for a missing loaded resource instead of failing.

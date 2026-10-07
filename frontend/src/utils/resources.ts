@@ -1,5 +1,5 @@
 import type { Step } from '../types/models';
-import type { ResourceDeclaration } from '../services/api';
+import type { LoadedResourceInfo, ResourceDeclaration } from '../services/api';
 
 /**
  * Helpers for the workflow's resources (docs/dev_plan/122 §2.4): showing a
@@ -22,12 +22,51 @@ export function pyLiteral(value: unknown): string {
   return String(value);
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+}
+
+/**
+ * The settings a declaration builds with, as far as the UI may know them.
+ * Defined: its `settings`. Ready-made: the deployment's current settings (or,
+ * if the deployment doesn't provide it, what they were when saved) with the
+ * user's `overrides` on top. Settings read from the environment never appear.
+ */
+export function effectiveSettings(
+  decl: ResourceDeclaration,
+  loaded?: LoadedResourceInfo,
+): Record<string, unknown> {
+  if (decl.source !== 'loaded') return asRecord(decl.settings);
+  const base = loaded ? loaded.settings : asRecord(decl.as_loaded);
+  return { ...base, ...asRecord(decl.overrides) };
+}
+
 /** `{type: "FakeLLM", settings: {model: "fake-1"}}` → `FakeLLM(model="fake-1")`. */
-export function definitionText(decl: ResourceDeclaration): string {
-  const settings = Object.entries(decl.settings ?? {})
+export function definitionText(decl: ResourceDeclaration, loaded?: LoadedResourceInfo): string {
+  const settings = Object.entries(effectiveSettings(decl, loaded))
     .map(([k, v]) => `${k}=${pyLiteral(v)}`)
     .join(', ');
   return `${decl.type}(${settings})`;
+}
+
+/**
+ * What needs the user's attention about a ready-made resource, or null:
+ * the deployment doesn't provide it here, or its settings changed since the
+ * workflow was saved (`as_loaded`).
+ */
+export function loadedProblem(
+  decl: ResourceDeclaration,
+  loaded: LoadedResourceInfo | undefined,
+): { kind: 'missing' | 'changed'; detail: string } | null {
+  if (decl.source !== 'loaded') return null;
+  if (!loaded) return { kind: 'missing', detail: "The deployment doesn't provide it here." };
+  const before = asRecord(decl.as_loaded);
+  const changed = Object.keys({ ...before, ...loaded.settings })
+    .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(loaded.settings[k]))
+    .map((k) => `${k}: ${pyLiteral(before[k])} → ${pyLiteral(loaded.settings[k])}`);
+  return changed.length
+    ? { kind: 'changed', detail: `Deployment settings changed since saved (${changed.join(', ')}).` }
+    : null;
 }
 
 /** The steps whose formula uses `res["name"]` (either quote style), by label. */

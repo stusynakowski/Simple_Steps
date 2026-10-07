@@ -75,10 +75,22 @@ wf.run("x")
 call is fine; the app lists only its own types, with `grid.resource_entry(cls)`
 per type (`GET /api/resources`).
 
-**3. Slice 3 priority:** *to confirm with the app owner.* Proposed:
-**loaded resources with overrides first** (`source: "loaded"`, `as_loaded`,
-`overrides`), then `Secret` pointers, then R5 option (a). Until then the app
-refuses a `loaded` declaration with a clear message.
+**3. Slice 3 priority: smaller than planned.** The app built ready-made
+("loaded") resources itself, on `a799d0e`, because both halves are the app's:
+the deployment's settings (`simple_step_loaded(…)`, `env("NAME")` for
+credentials) and the workflow file (`source: "loaded"`, `as_loaded`,
+`overrides`). The app merges them and hands core a plain
+`wf.define(name, Type, **settings)`, which core already checks. So core
+doesn't need to serialize `loaded` declarations in its own `to_dict` (R4's
+`loaded` half), unless core wants its Python users to have them too.
+
+What's left for slice 3, in order:
+1. **N1** below (a `dict | None` setting refuses every value), which blocks
+   changing any such setting, ready-made or not;
+2. **`Secret`** settings (R3), so a *defined* resource can name a credential
+   pointer and core refuses a raw value at declaration;
+3. **R5** option (a), unknown sections kept by `from_dict`/`to_dict`. (The
+   app's own file now keeps them; this matters for core's Python users.)
 
 ### Found while adopting it
 

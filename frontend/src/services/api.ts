@@ -450,6 +450,21 @@ export interface ResourceTypeInfo {
     bases?: string[];
 }
 
+/** A ready-made resource the deployment provides (GET /api/resources/loaded).
+ *  Settings read from the environment appear only as `env:NAME` pointers. */
+export interface LoadedResourceInfo {
+    type: string;
+    settings: Record<string, unknown>;
+    from_env: Record<string, string>;
+    locked: string[];
+}
+
+export async function fetchLoadedResources(): Promise<Record<string, LoadedResourceInfo>> {
+    const r = await fetch(`${API_BASE}/resources/loaded`, { credentials: 'include' });
+    if (!r.ok) throw new Error('Failed to list ready-made resources');
+    return r.json();
+}
+
 export async function fetchResourceTypes(): Promise<Record<string, ResourceTypeInfo>> {
     const r = await fetch(`${API_BASE}/resources`, { credentials: 'include' });
     if (!r.ok) throw new Error('Failed to list resource types');

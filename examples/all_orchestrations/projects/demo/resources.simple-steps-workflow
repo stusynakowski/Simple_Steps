@@ -24,6 +24,16 @@
       "settings": {
         "model": "tiny-1"
       }
+    },
+    "house_llm": {
+      "source": "loaded",
+      "type": "FakeLLM",
+      "as_loaded": {
+        "model": "house-1"
+      },
+      "overrides": {
+        "model": "house-2"
+      }
     }
   },
   "steps": [
@@ -95,6 +105,13 @@
       "expression": "identity[mod.select(columns=[\"city\", \"value\"])](wf[\"regions\"])",
       "meta": {
         "label": "region_table"
+      }
+    },
+    {
+      "name": "house_summaries",
+      "expression": "summarize[mod.map()](wf[\"notes\"], llm=res[\"house_llm\"])",
+      "meta": {
+        "label": "house_summaries"
       }
     }
   ]

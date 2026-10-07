@@ -55,9 +55,23 @@ def core_outputs() -> dict:
 
 
 def core_resource_outputs() -> dict:
-    """Every step of core's resource workflow, run against core's own objects."""
+    """Every step of core's resource workflow, run against core's own objects,
+    plus the app-only steps core has no counterpart for."""
     wf, _live = core_pipeline().run_resources()
-    return {sid: _table(step.output.data) for sid, step in wf.steps.items()}
+    out = {sid: _table(step.output.data) for sid, step in wf.steps.items()}
+    out.update(APP_ONLY)
+    return out
+
+
+#: Steps with no counterpart in core's example, and what they must produce.
+#: `house_summaries` uses the workspace's ready-made `house_llm`
+#: (FakeLLM(model="house-1"), from tools.py) with the workflow's saved override
+#: model="house-2" — so it proves the override is applied when the step runs.
+#: Core has no ready-made resources: the app merges the settings and hands
+#: core a plain declaration.
+APP_ONLY = {
+    "house_summaries": (["text", "value"], [["a", "[house-2] A"], ["b", "[house-2] B"]]),
+}
 
 
 def _table(frame) -> tuple:
@@ -128,7 +142,8 @@ def check_workflow(client, pipeline_id: str, expected: dict) -> tuple[int, int]:
         else:
             got = _cells_to_table(client, refs[sid])
             same = got[0] == expected[sid][0] and _norm(got[1]) == _norm(expected[sid][1])
-            print(f"{'PASS' if same else 'DIFF'}  {label:14} {formula}")
+            tag = "  (app only)" if sid in APP_ONLY else ""
+            print(f"{'PASS' if same else 'DIFF'}  {label:14} {formula}{tag}")
             if not same:
                 print(f"      core: {expected[sid][0]} {str(expected[sid][1])[:160]}")
                 print(f"      app : {got[0]} {str(got[1])[:160]}")
