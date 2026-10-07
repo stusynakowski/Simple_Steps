@@ -1,0 +1,86 @@
+/* The agent's proposal card (ChatSidebar.tsx, ProposalCard). */
+
+.agent-proposal {
+  margin-top: 8px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-change {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.agent-change:hover {
+  background: rgba(128, 128, 128, 0.08);
+}
+
+.agent-change.invalid {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.agent-change input {
+  margin-top: 2px;
+}
+
+.agent-change-mark {
+  width: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.agent-change-add .agent-change-mark { color: #22c55e; }
+.agent-change-change .agent-change-mark { color: #eab308; }
+.agent-change-remove .agent-change-mark { color: #ef4444; }
+.agent-change-resource .agent-change-mark { color: #60a5fa; }
+
+.agent-change-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agent-change-formula {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.agent-change-before {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.agent-change-problem {
+  color: #ef4444;
+  font-size: 0.74rem;
+}
+
+.agent-proposal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.agent-proposal-done,
+.agent-proposal-note {
+  font-size: 0.74rem;
+  opacity: 0.7;
+}
+
+.chat-message.agent-error .message-content {
+  color: #ef4444;
+}

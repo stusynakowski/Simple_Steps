@@ -28,7 +28,7 @@ export interface ConsoleRecord {
   timestamp: string;
   stream: ConsoleStream;
   /** Where a command came from. Absent for non-command records. */
-  origin?: 'gui' | 'console';
+  origin?: 'gui' | 'console' | 'agent';
   /** The canonical one-liner, the request line, or the echoed expression. */
   text: string;
   /** Expanded body: a payload, a rendered value, a traceback. */

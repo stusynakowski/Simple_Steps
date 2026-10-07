@@ -182,7 +182,7 @@ def main():
     # ── Print startup banner ─────────────────────────────────────────────
     print()
     print("  ┌─────────────────────────────────────────────┐")
-    print("  │       ⚡ Simple Steps v0.1.0 (Desktop) ⚡     │")
+    print("  │       ⚡ Simple Steps v0.0.0 (Desktop) ⚡     │")
     print("  ├─────────────────────────────────────────────┤")
     print(f"  │  Mode:        Native window (pywebview)      │")
     print(f"  │  Backend API: {url}/api")

@@ -14,10 +14,11 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Body
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .config import AgentConfig, get_agent_config, update_agent_config
+from ..session import get_session_id
 from .graph import invoke_agent, invoke_agent_streaming
 
 router = APIRouter(prefix="/api/agent", tags=["agent"])
@@ -39,6 +40,50 @@ class ChatResponse(BaseModel):
     message: str
     suggested_formula: Optional[str] = None
     error: Optional[str] = None
+
+
+# ── Proposals (docs/dev_plan/122 §3) ─────────────────────────────────────────
+# The agent the UI uses: it proposes steps as checked changes, which the user
+# accepts and runs. The /chat and /chat/stream endpoints below are the earlier
+# LangChain agent (free text, one formula scraped from it), kept until the new
+# one has replaced it everywhere.
+
+class ProposeRequest(BaseModel):
+    """A user's request, with the workflow as the UI holds it."""
+    message: str
+    #: [{name, formula, status, error, output_ref}] in order.
+    steps: List[Dict[str, Any]] = Field(default_factory=list)
+    #: The workflow's `resources` section.
+    resources: Dict[str, Any] = Field(default_factory=dict)
+    #: Earlier turns: [{role: user|assistant, content}].
+    history: List[Dict[str, str]] = Field(default_factory=list)
+
+
+@router.get("/status")
+async def agent_status():
+    """Whether the agent can run, with which model — or why it can't."""
+    from .model import resolve
+    agent, why = resolve()
+    if agent is None:
+        return {"available": False, "reason": why}
+    return {"available": True, "provider": agent.provider, "model": agent.model,
+            "host": agent.host}
+
+
+@router.post("/propose")
+def agent_propose(req: ProposeRequest, session_id: str = Depends(get_session_id)):
+    """One agent turn: steps to add, change or remove, each checked; nothing applied."""
+    from .model import ModelError, resolve
+    from .proposals import propose
+    agent, why = resolve()
+    if agent is None:
+        raise HTTPException(status_code=503, detail=f"The agent is off: {why}")
+    if not req.message.strip():
+        raise HTTPException(status_code=400, detail="Ask the agent something first.")
+    try:
+        return propose(agent, req.message, req.steps, req.resources, req.history, session_id)
+    except ModelError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 # ── REST endpoints ───────────────────────────────────────────────────────────

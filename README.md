@@ -54,7 +54,7 @@ simple-steps
 
 ### Updating an existing install — read this
 
-Both `simple-steps` and `simple-steps-core` are permanently version `0.1.0`, so
+`simple-steps` (`0.0.0`) and `simple-steps-core` (`0.1.0`) rarely change version, so
 **a plain `pip install git+...` on a machine that already has them does
 nothing** — pip sees the installed copy as satisfying the requirement and keeps
 your old code. `pip install --upgrade` does not help either, for the same
@@ -71,7 +71,7 @@ Check what you really have — the commit, not the version:
 
 ```bash
 simple-steps --version
-#   simple-steps       0.1.0 (git 5597c025ae78)
+#   simple-steps       0.0.0 (git 5597c025ae78)
 #   simple-steps-core  0.1.0 (git 1c30e03c9a10)
 ```
 
@@ -116,7 +116,7 @@ python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git"
 Optional: pin to a specific tag/release:
 
 ```bash
-python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.0"
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.0.0"
 ```
 
 This installs the package into your environment (`site-packages`) and gives you the `simple-steps` CLI without creating a repo folder in your current workspace.
@@ -171,7 +171,7 @@ pip install -e ".[desktop,dev]"
 # 1) Use environment (no repo checkout in your project folders)
 conda create -n simple_steps_use python=3.11 -y
 conda activate simple_steps_use
-python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.0"
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.0.0"
 
 # 2) Dev environment (full repo, editable install)
 conda create -n simple_steps_dev python=3.11 -y
@@ -197,7 +197,7 @@ This starts the backend API **and** serves the frontend UI on a single port. You
 
 ```
   ┌─────────────────────────────────────────┐
-  │         ⚡ Simple Steps v0.1.0 ⚡        │
+  │         ⚡ Simple Steps v0.0.0 ⚡        │
   ├─────────────────────────────────────────┤
   │  Backend API: http://127.0.0.1:8000/api  │
   │  Frontend UI: http://127.0.0.1:8000      │
@@ -242,6 +242,21 @@ Simple Steps discovers tools in the folder as before.
 | `title`, `host`, `port` | `"Simple Steps"`, `127.0.0.1`, `8000` (the next free port if taken) |
 | `cell_types` | the built-in cell types (images, Plotly, tables, JSON) |
 | `freeze` | `False`; `True` refuses new tools once the server is up |
+| `agent` | a local Ollama model if one is running (`llama3.2:3b`); `Agent(model="qwen2.5:7b")` to choose; `False` for none |
+
+### The agent
+
+The chat panel's agent **proposes** steps; you choose which to keep, apply
+them, and run them. It never runs anything itself, and every formula it
+proposes is checked (it compiles, reads only earlier steps, uses only your
+tools and resources) before you see it. It runs on a local
+[Ollama](https://ollama.com) model:
+
+```bash
+ollama pull llama3.2:3b      # small; a 7–8B model (qwen2.5:7b) gives better proposals
+```
+
+Without a model the app works as usual and the panel says why the agent is off.
 
 ### Desktop mode (no browser)
 
@@ -270,7 +285,7 @@ That's it — a native window opens with the full Simple Steps UI. The directory
 
 ```
   ┌─────────────────────────────────────────────┐
-  │       ⚡ Simple Steps v0.1.0 (Desktop) ⚡     │
+  │       ⚡ Simple Steps v0.0.0 (Desktop) ⚡     │
   ├─────────────────────────────────────────────┤
   │  Mode:        Native window (pywebview)      │
   │  Backend API: http://127.0.0.1:8000/api      │

@@ -80,6 +80,7 @@ class App:
         port: int = 8000,
         cell_types: Iterable[Any] = (),
         freeze: bool = False,
+        agent: Any = None,
     ):
         """
         Args:
@@ -98,6 +99,9 @@ class App:
             cell_types: extra ``CellType``\\ s for the grid (``cell_types.py``).
             freeze: refuse new tools once the server has started, for an app
                 served to others.
+            agent: the agent's model, ``Agent(model="qwen2.5:7b")``; ``False``
+                turns the agent off. Default: a local Ollama model if one is
+                running (``agent/model.py``), else no agent.
         """
         global CURRENT
         self.workspace = os.path.abspath(workspace or _caller_folder())
@@ -105,6 +109,7 @@ class App:
         self.host = host
         self.port = port
         self.freeze = freeze
+        self.agent = agent
         self.tool_ids: List[str] = []
         for item in tools:
             self.tool_ids += _tool_ids(item)

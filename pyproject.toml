@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simple-steps"
-version = "0.1.0"
+version = "0.0.0"
 description = "Visual pipeline orchestrator for Python functions"
 requires-python = ">=3.10"
 readme = "README.md"

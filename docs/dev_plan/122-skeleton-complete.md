@@ -20,6 +20,11 @@
 > **S1.1 (the App) built 2026-10-07:** `SIMPLE_STEPS.App` in `application.py`;
 > `python app.py` or `simple-steps` in the folder (the server loads
 > `<workspace>/app.py`). Example: `examples/all_orchestrations/app.py`.
+> **S3 (the agent) built 2026-10-07, MVP form:** `agent/model.py`,
+> `agent/scope.py`, `agent/proposals.py`, `POST /api/agent/propose`,
+> `GET /api/agent/status`; the chat panel shows checked proposals to apply.
+> Model: a local Ollama (`llama3.2:3b` by default); off, with the reason, if
+> none is available. Tested against a fake Ollama, not a real model yet.
 > Sections 1–4 are the four things to add; §6 lists the decisions to settle
 > before building them. Everything else is in §7 (later) and §8 (cleanup).
 
@@ -556,6 +561,25 @@ which can be accepted per step or all at once. Accepted steps are staged,
 not run. The user runs them, and the agent's next turn includes the results.
 
 ### 3.5 What to build
+
+**Built 2026-10-07 (MVP form):**
+
+| piece | where | notes |
+|---|---|---|
+| model | `agent/model.py` | `Agent(model, host, temperature, timeout, retries)`; chosen from `App(agent=…)` (`False` = off), then `agent_config.json` with `provider: "ollama"`, then a running Ollama with `OLLAMA_MODEL` (default `llama3.2:3b`). Called over Ollama's HTTP API with the standard library, using its JSON-schema output mode. No LangChain |
+| scope | `agent/scope.py` | the App's tools (signature + docstring line), resource types with their marked tools, the workflow's and the deployment's resources, and each step's formula, status, error, columns, row count and 3 sample rows (rich cells as summaries) |
+| proposal | `agent/proposals.py` | the model returns `{summary, steps: [{name, formula}], remove}` — "an updated list of expressions", easy for a small model. Each formula is checked (compiles; reads only earlier steps; only usable resources; only real tools, and only marked methods); problems go back to the model, up to `retries` times. Returned as changes: use a ready-made resource / add / change / remove, each with any problem left |
+| API | `agent/routes.py` | `GET /api/agent/status`, `POST /api/agent/propose` (503 with the reason when the agent is off) |
+| UI | `ChatSidebar.tsx`, `utils/proposal.ts` | a card per proposal: valid changes pre-selected, invalid ones disabled with the reason; **Apply** sends the console's commands through `dispatchCommand(cmd, 'agent')`, shown in the console as **AI** |
+| fixes | `useWorkflow.ts` | `add` keeps its name; `add` / `set` / `remove` update the step lookup at once, so commands in a row (a proposal, a pasted script) see each other |
+
+**Not yet:** skills (S3.6, after the MVP); providers other than Ollama; the
+earlier LangChain agent's `/api/agent/chat` and `/chat/stream` are still
+there, unused by the UI (cleanup); tried against a real model only through a
+fake Ollama server. A 3B model may need a larger one (`qwen2.5:7b`,
+`llama3.1:8b`) for good proposals.
+
+The original list, for reference:
 
 - **S3.1** Rewrite `agent/prompts.py` for core syntax, `res["…"]`, and the
   proposal schema. Retire the legacy modes from the prompt.

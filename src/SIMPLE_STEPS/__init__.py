@@ -26,12 +26,13 @@ Usage:
 #   from simple_steps import simple_step
 import sys as _sys
 
-__version__ = "0.1.0"
+__version__ = "0.0.0"
 
 from .decorators import simple_step, simple_step_tool, register_operation  # noqa: F401
 from .core_bridge import simple_step_resource  # noqa: F401
 from .resources import simple_step_loaded, env, Loaded  # noqa: F401
 from .application import App  # noqa: F401
+from .agent.model import Agent  # noqa: F401
 from .step_proxy import step, StepProxy, ColumnProxy, raw, RawValue  # noqa: F401
 from .helpers import map_each, apply_to, filter_by, expand_each, val, col  # noqa: F401
 

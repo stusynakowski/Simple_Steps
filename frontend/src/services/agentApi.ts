@@ -27,6 +27,49 @@ function resolveBackendOrigin(): string {
 
 const _BACKEND_ORIGIN = resolveBackendOrigin();
 const API_BASE = `${_BACKEND_ORIGIN}/api/agent`;
+
+// ── Proposals (docs/dev_plan/122 §3) ───────────────────────────────────────
+
+/** Whether the agent can run, with which model — or why it can't. */
+export interface AgentStatus {
+  available: boolean;
+  model?: string;
+  provider?: string;
+  reason?: string;
+}
+
+export async function getAgentStatus(): Promise<AgentStatus> {
+  const r = await fetch(`${API_BASE}/status`, { credentials: 'include' });
+  if (!r.ok) return { available: false, reason: 'The agent status could not be read.' };
+  return r.json();
+}
+
+/** One step as the agent reads it: its formula, status, error and output. */
+export interface AgentStepContext {
+  name: string;
+  formula: string;
+  status: string;
+  error?: string;
+  output_ref?: string;
+}
+
+/** Ask the agent for steps; every proposed formula comes back checked. */
+export async function proposeChanges(req: {
+  message: string;
+  steps: AgentStepContext[];
+  resources: Record<string, unknown>;
+  history: { role: 'user' | 'assistant'; content: string }[];
+}): Promise<import('../utils/proposal').AgentProposal> {
+  const r = await fetch(`${API_BASE}/propose`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body.detail || `The agent failed (${r.status}).`);
+  return body;
+}
 const WS_BASE = `${_BACKEND_ORIGIN.replace(/^http/, 'ws')}/api/agent`;
 
 // ── Types ────────────────────────────────────────────────────────────────────

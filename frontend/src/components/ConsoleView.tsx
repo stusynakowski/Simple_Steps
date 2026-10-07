@@ -180,7 +180,7 @@ export default function ConsoleView({ view, dispatchCommand, consoleStepMap }: C
                 <span className="console-time">{hhmmss(r.timestamp)}</span>
                 {r.origin && (
                   <span className={`console-origin origin-${r.origin}`}>
-                    {r.origin === 'gui' ? 'GUI' : '›_'}
+                    {r.origin === 'gui' ? 'GUI' : r.origin === 'agent' ? 'AI' : '›_'}
                   </span>
                 )}
                 <span className="console-text">{r.text}</span>

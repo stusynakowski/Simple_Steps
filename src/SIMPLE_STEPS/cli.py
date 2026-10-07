@@ -58,7 +58,7 @@ def print_versions() -> None:
     """
     Report what is actually installed, including each package's git commit.
 
-    The version string never changes (both packages sit at 0.1.0), so pip
+    The version string rarely changes (simple-steps 0.0.0, core 0.1.0), so pip
     treats any installed copy as satisfying a fresh `pip install git+...` and
     silently leaves the old code in place. The commit is the only way to tell
     what you really have — which is what this prints.
@@ -95,7 +95,7 @@ def print_versions() -> None:
         print(f"  {name:18} {dist.version}{detail}")
 
     print()
-    print("  Both packages are version 0.1.0 always, so `pip install` sees an")
+    print("  The version numbers rarely change, so `pip install` sees an")
     print("  existing copy as up to date. To genuinely update:")
     print("    pip install --upgrade --force-reinstall --no-cache-dir \\")
     print('      "git+https://github.com/stusynakowski/Simple_Steps.git"')
@@ -248,7 +248,7 @@ def main():
     # ── Print startup banner ─────────────────────────────────────────────
     print()
     print("  ┌─────────────────────────────────────────────┐")
-    print("  │          ⚡ Simple Steps v0.1.0 ⚡            │")
+    print("  │          ⚡ Simple Steps v0.0.0 ⚡            │")
     print("  ├─────────────────────────────────────────────┤")
     print(f"  │  Backend API: http://{args.host}:{port}/api    │")
     print(f"  │  Frontend UI: http://{args.host}:{port}        │")

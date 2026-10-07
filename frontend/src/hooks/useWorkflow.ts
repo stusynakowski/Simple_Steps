@@ -160,7 +160,7 @@ export default function useWorkflow() {
   // Whether the command currently being applied came from the console or a
   // click. Set for the duration of dispatchCommand so the emitted record is
   // attributed correctly without threading an argument through every mutator.
-  const commandOrigin = useRef<'gui' | 'console'>('gui');
+  const commandOrigin = useRef<'gui' | 'console' | 'agent'>('gui');
 
   const announce = useCallback((cmd: WorkflowCommand) => {
     emitConsoleRecord({
@@ -306,11 +306,11 @@ export default function useWorkflow() {
     _setPipelineStatus(s);
   }, []);
 
-  function addStepAt(index: number) {
+  function addStepAt(index: number, label?: string) {
     const newStep: Step = {
       id: genId('step'),
       sequence_index: index,
-      label: `Step ${index}`,
+      label: label || `Step ${index}`,
       formula: '',
       process_type: 'noop',
       configuration: {},
@@ -327,12 +327,17 @@ export default function useWorkflow() {
     // is memoised and captures this function, so a closure read here served a
     // workflow snapshot from before the last run — adding a step from the
     // console reverted completed steps to pending and dropped their output.
-    setWorkflow((prev) => {
-      const newSteps = [...prev.steps];
+    const insert = (wf: Workflow): Workflow => {
+      const newSteps = [...wf.steps];
       newSteps.splice(index, 0, newStep);
-      return { ...prev, steps: newSteps.map((s, i) => ({ ...s, sequence_index: i })) };
-    });
+      return { ...wf, steps: newSteps.map((s, i) => ({ ...s, sequence_index: i })) };
+    };
+    // The ref too, now: commands applied in a row (an agent proposal, a pasted
+    // console script) address this step before React re-renders.
+    workflowRef.current = insert(workflowRef.current);
+    setWorkflow(insert);
     setExpandedStepIds(prev => new Set(prev).add(newStep.id));
+    return newStep.id;
   }
 
   function toggleStep(id: string) {
@@ -853,10 +858,12 @@ export default function useWorkflow() {
 
   function deleteStep(id: string) {
     announce({ kind: 'remove', target: stepAlias(id) });
-    setWorkflow((prev) => {
-      const newSteps = prev.steps.filter((s) => s.id !== id).map((s, i) => ({ ...s, sequence_index: i }));
-      return { ...prev, steps: newSteps };
+    const drop = (wf: Workflow): Workflow => ({
+      ...wf,
+      steps: wf.steps.filter((s) => s.id !== id).map((s, i) => ({ ...s, sequence_index: i })),
     });
+    workflowRef.current = drop(workflowRef.current);
+    setWorkflow(drop);
     setExpandedStepIds(prev => {
         const next = new Set(prev);
         next.delete(id);
@@ -877,10 +884,12 @@ export default function useWorkflow() {
         announce({ kind: 'rename', target: stepAlias(id), to: updates.label });
       }
     }
-    setWorkflow((prev) => {
-      const nextSteps = prev.steps.map((s) => (s.id === id ? { ...s, ...updates } : s));
-      return { ...prev, steps: nextSteps };
+    const patch = (wf: Workflow): Workflow => ({
+      ...wf,
+      steps: wf.steps.map((s) => (s.id === id ? { ...s, ...updates } : s)),
     });
+    workflowRef.current = patch(workflowRef.current);
+    setWorkflow(patch);
   }
 
   // --- Persistence ---
@@ -976,9 +985,12 @@ export default function useWorkflow() {
    *
    * Returns a human-readable confirmation, or throws with a usable message.
    */
-  const dispatchCommand = useCallback(async (cmd: WorkflowCommand): Promise<string> => {
+  const dispatchCommand = useCallback(async (
+    cmd: WorkflowCommand,
+    origin: 'console' | 'agent' = 'console',
+  ): Promise<string> => {
     const prevOrigin = commandOrigin.current;
-    commandOrigin.current = 'console';
+    commandOrigin.current = origin;
     try {
       const need = (name: string): string => {
         const id = resolveStepId(name);
@@ -1013,8 +1025,8 @@ export default function useWorkflow() {
           const index = anchorId
             ? workflowRef.current.steps.findIndex((st) => st.id === anchorId) + 1
             : workflowRef.current.steps.length;
-          addStepAt(index);
-          return `added step${index + 1}`;
+          addStepAt(index, cmd.name);
+          return cmd.name ? `added ${cmd.name}` : `added step${index + 1}`;
         }
         case 'remove': {
           const id = need(cmd.target);

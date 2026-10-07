@@ -810,9 +810,12 @@ export default function MainLayout() {
                 isVisible={true}
                 onClose={toggleChat}
                 workflow={workflow}
-                availableOperations={availableOperations}
-                onApplyFormula={(stepId, formula) => {
-                  updateStep(stepId, { formula });
+                onApplyCommands={async (commands) => {
+                  // One at a time, in order: an `add` must exist before the
+                  // `set` that names it. The console shows them as from the agent.
+                  for (const command of commands) {
+                    await dispatchCommand(command, 'agent');
+                  }
                 }}
               />
               <button

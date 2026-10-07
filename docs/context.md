@@ -107,7 +107,8 @@ time.
 
 ## Commands
 - Install (dev): `python -m pip install -e ".[dev]"`
-- **Update a pip install elsewhere**: both packages are permanently `0.1.0`, so
+- **Update a pip install elsewhere**: the version numbers rarely change
+  (`simple-steps` 0.0.0, `simple-steps-core` 0.1.0), so
   a plain `pip install git+...` is a NO-OP on a machine that already has them —
   pip reports the old copy as satisfying the requirement. Use
   `pip install --upgrade --force-reinstall --no-cache-dir "git+https://github.com/stusynakowski/Simple_Steps.git"`,
