@@ -54,6 +54,17 @@ import os
 _PKG_DIR = os.path.dirname(__file__)
 _WORKSPACE = os.path.abspath(WORKSPACE_ROOT)
 
+# ── The App this process serves (application.py) ─────────────────────────────
+# The one built by `python app.py`, or the one the workspace's app.py builds
+# (`simple-steps` in that folder), or None — then everything below is the
+# default App: discovery exactly as before. An App that lists its tools turns
+# off the workspace's top-level *.py scan, so a module app.py imports is never
+# imported again under another name.
+from .application import app_file as _app_file, load_app as _load_app
+_APP = _load_app(_WORKSPACE)
+_SCAN_WORKSPACE = (not (_APP is not None and _APP.explicit)
+                   and os.environ.get("SIMPLE_STEPS_SCAN_WORKSPACE", "1") != "0")
+
 # Developer pack directories (Tier 2)
 _DEVELOPER_PACK_DIRS: list[str] = []
 
@@ -72,7 +83,7 @@ if os.path.isdir(_ws_ops):
 #    The workspace root is just wherever the user launched from; importing a
 #    module executes it, so walking the whole tree would run every .py file
 #    under their cwd.
-_ws_has_py = any(
+_ws_has_py = _SCAN_WORKSPACE and any(
     f.endswith(".py") and not f.startswith("__")
     for f in os.listdir(_WORKSPACE)
     if os.path.isfile(os.path.join(_WORKSPACE, f))
@@ -116,8 +127,15 @@ _loader = PackLoader(
     project_dirs=_discover_project_dirs(),
     workspace_root=_WORKSPACE if _ws_has_py else None,
 )
+# app.py is the application's entry point, never a tool file to scan.
+if _app_file(_WORKSPACE):
+    _loader._loaded_modules.add(os.path.abspath(_app_file(_WORKSPACE)))
 _loader.load_all()
 set_loader(_loader)
+if _APP is not None and _APP.freeze:
+    # Served to others: no tool can be added once the server is up.
+    from simple_steps_core import REGISTRY as _CORE_REGISTRY
+    _CORE_REGISTRY.freeze()
 
 # Core's shape verbs as palette operations (=select(...), =map(tool=...)),
 # built from grid.modifier_catalog() so the palette cannot drift from core.
@@ -127,7 +145,7 @@ register_verb_operations()
 
 # --- App Initialize ---
 app = FastAPI(
-    title="Simple Steps Backend",
+    title=_APP.title if _APP is not None else "Simple Steps Backend",
     description="Orchestrates data operations defined by developers"
 )
 

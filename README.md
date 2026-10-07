@@ -89,13 +89,14 @@ confirm the install works:
 simple-steps                      # built-in tools only
 ```
 
-To run the 17-tool example, you need the repo:
+To run the example application (its tools, resources, and three workflows),
+you need the repo:
 
 ```bash
 git clone https://github.com/stusynakowski/Simple_Steps.git
 cd Simple_Steps
-pip install -e .
-python examples/tools.py          # registers the example tools, starts the app
+pip install -e ".[media]"
+python examples/all_orchestrations/app.py     # or: simple-steps --workspace examples/all_orchestrations
 ```
 
 
@@ -205,6 +206,42 @@ This starts the backend API **and** serves the frontend UI on a single port. You
 ```
 
 Open [http://localhost:8000](http://localhost:8000) to use the UI, or [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API docs.
+
+### Your own application: `app.py`
+
+Put your tools and resources in your own files, then list them in an `app.py`
+next to them. Everything else has a default.
+
+```python
+# app.py
+from SIMPLE_STEPS import App, Loaded, env
+import my_tools                                # your @simple_step_tool functions
+from my_resources import ClinicalDB            # your @simple_step_resource classes
+
+app = App(
+    tools=[my_tools],
+    resources=[ClinicalDB],
+    loaded={"study": Loaded(ClinicalDB, url="postgres://study",
+                            api_key=env("DB_KEY"), locked=["url"])},
+)
+
+if __name__ == "__main__":
+    app.serve()
+```
+
+Start it with `python app.py`, or run `simple-steps` in that folder: the server
+finds `app.py` and serves the `App` it defines. Because `app.py` lists its
+tools, the folder's other `.py` files aren't scanned. Without an `app.py`,
+Simple Steps discovers tools in the folder as before.
+
+| `App(…)` setting | default |
+|---|---|
+| `tools` | none listed → the folder's `*.py` files are scanned for tools |
+| `resources`, `loaded` | none |
+| `workspace` | the folder `app.py` is in |
+| `title`, `host`, `port` | `"Simple Steps"`, `127.0.0.1`, `8000` (the next free port if taken) |
+| `cell_types` | the built-in cell types (images, Plotly, tables, JSON) |
+| `freeze` | `False`; `True` refuses new tools once the server is up |
 
 ### Desktop mode (no browser)
 

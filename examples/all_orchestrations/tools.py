@@ -8,9 +8,8 @@ infers a step's verb from them (``-> bool`` filters, ``-> list`` expands,
 
     simple-steps --workspace examples/all_orchestrations
 
-The app imports this file from the workspace. (Running ``python tools.py``
-would import it twice — once as the script, once from the workspace scan —
-and list every tool twice.)
+``app.py`` imports this file and lists it as the application's tools, which
+is also where the ready-made ``house_llm`` resource is provided.
 
 Then open ``projects/demo/all-orchestrations.simple-steps-workflow`` and run
 it. ``check.py`` runs the same workflow headlessly and compares every step
@@ -22,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from SIMPLE_STEPS import simple_step_loaded, simple_step_resource, simple_step_tool
+from SIMPLE_STEPS import simple_step_resource, simple_step_tool
 
 
 @simple_step_tool(category="All orchestrations")
@@ -206,13 +205,6 @@ def summarize(text: str, llm: FakeLLM) -> str:
     """
     return llm.complete(text)
 
-
-# ── A ready-made resource: provided by the deployment, not the workflow ──────
-# Every workflow in this workspace can use res["house_llm"]. A workflow that
-# changes a setting saves only the change (its `overrides`); the deployment's
-# settings apply underneath. A real deployment reads credentials with
-# env("NAME"), which a workflow can never see or change.
-simple_step_loaded("house_llm", FakeLLM, model="house-1")
 
 
 # ─────────────────────────────────────────────────────────────────────────

@@ -43,7 +43,7 @@ import json
 import os
 import re
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 #: Resource types this app declared, by class name — the ResourceRegistry.
@@ -97,13 +97,24 @@ def env(name: str, default: Optional[str] = None) -> Env:
     return Env(name, default)
 
 
-@dataclass
 class Loaded:
     """A ready-made resource: its type, its settings, and which ones users
-    may not change. Settings given as :func:`env` are always locked."""
-    type: type
-    settings: Dict[str, Any] = field(default_factory=dict)
-    locked: Tuple[str, ...] = ()
+    may not change. Settings given as :func:`env` are always locked::
+
+        Loaded(ClinicalDB, url="postgres://study", api_key=env("DB_KEY"), locked=["url"])
+
+    Passed to ``App(loaded={"study": Loaded(…)})``, or registered directly with
+    :func:`simple_step_loaded`.
+    """
+
+    def __init__(self, type_: type, /, *, locked: Iterable[str] = (), **settings: Any):
+        self.type = type_
+        self.settings: Dict[str, Any] = dict(settings)
+        self.locked: Tuple[str, ...] = tuple(locked)
+
+    def __repr__(self) -> str:
+        shown = ", ".join(f"{k}={v!r}" for k, v in self.settings.items())
+        return f"Loaded({self.type.__name__}{', ' + shown if shown else ''})"
 
     @property
     def visible(self) -> Dict[str, Any]:
@@ -123,6 +134,22 @@ class Loaded:
 LOADED: Dict[str, Loaded] = {}
 
 
+def register_loaded(name: str, loaded: Loaded) -> Loaded:
+    """Make *loaded* available to every workflow as ``res["name"]``."""
+    if not _NAME.match(name):
+        raise ResourceError(f"{name!r} can't name a resource")
+    if not isinstance(loaded, Loaded):
+        raise ResourceError(
+            f"{name}: expected Loaded(Type, setting=…), got {type(loaded).__name__}"
+        )
+    if loaded.type.__name__ not in RESOURCE_TYPES:
+        raise ResourceError(
+            f"{loaded.type.__name__} isn't a resource type; declare it with @simple_step_resource"
+        )
+    LOADED[name] = loaded
+    return loaded
+
+
 def simple_step_loaded(name: str, type_: type, /, *, locked: Iterable[str] = (),
                        **settings: Any) -> Loaded:
     """Provide a ready-made resource called *name* to every workflow.
@@ -137,15 +164,7 @@ def simple_step_loaded(name: str, type_: type, /, *, locked: Iterable[str] = (),
     unlocked settings; the workflow saves only those changes (``overrides``),
     so the deployment's settings — and credentials — always apply underneath.
     """
-    if not _NAME.match(name):
-        raise ResourceError(f"{name!r} can't name a resource")
-    if type_.__name__ not in RESOURCE_TYPES:
-        raise ResourceError(
-            f"{type_.__name__} isn't a resource type; declare it with @simple_step_resource"
-        )
-    loaded = Loaded(type_, dict(settings), tuple(locked))
-    LOADED[name] = loaded
-    return loaded
+    return register_loaded(name, Loaded(type_, locked=locked, **settings))
 
 
 def loaded_info() -> Dict[str, Dict[str, Any]]:

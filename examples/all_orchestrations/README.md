@@ -7,6 +7,7 @@ dataset, and one step per step of core's workflow, each written as a formula.
 
 | file | what it is |
 |---|---|
+| [`app.py`](app.py) | the application: `App(tools=[tools], resources=[…], loaded={…})` — `python app.py` serves it |
 | [`tools.py`](tools.py) | core's registry, declared with `@simple_step_tool`, plus its resource types (`@simple_step_resource`) |
 | [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow: every shape verb |
 | [`projects/demo/resources.simple-steps-workflow`](projects/demo/resources.simple-steps-workflow) | the 11-step resources workflow: core's `build_resources()`, plus a ready-made resource |
@@ -15,8 +16,8 @@ dataset, and one step per step of core's workflow, each written as a formula.
 
 ```bash
 python examples/all_orchestrations/check.py        # 60/60 steps match simple-steps-core
-simple-steps --workspace examples/all_orchestrations
-                                                    # open the workflow in the UI and press Run
+python examples/all_orchestrations/app.py          # serve it (or: simple-steps --workspace examples/all_orchestrations)
+                                                    # open a workflow in the UI and press Run
 ```
 
 ## The formulas are core's own syntax
@@ -99,10 +100,10 @@ The app builds each instance the first time a step uses it, keeps one per
 session, and builds a new one when its settings change.
 
 **Ready-made resources** come from the deployment, not the workflow.
-`tools.py` provides one:
+`app.py` provides one:
 
 ```python
-simple_step_loaded("house_llm", FakeLLM, model="house-1")   # env("NAME") for credentials
+App(..., loaded={"house_llm": Loaded(FakeLLM, model="house-1")})   # env("NAME") for credentials
 ```
 
 The workflow uses it and changes one setting. The file saves only the change,

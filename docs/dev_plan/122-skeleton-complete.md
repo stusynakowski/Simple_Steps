@@ -17,6 +17,9 @@
 > Plotly, table, JSON and text types), `/api/data` cells with `cell_type` /
 > `summary` / `preview`, `GET /api/cell/{ref}` for the full view, and the
 > grid's thumbnails + `CellViewer`. Example: `projects/demo/rich-cells`.
+> **S1.1 (the App) built 2026-10-07:** `SIMPLE_STEPS.App` in `application.py`;
+> `python app.py` or `simple-steps` in the folder (the server loads
+> `<workspace>/app.py`). Example: `examples/all_orchestrations/app.py`.
 > Sections 1–4 are the four things to add; §6 lists the decisions to settle
 > before building them. Everything else is in §7 (later) and §8 (cleanup).
 
@@ -161,11 +164,26 @@ or build a default App, then serve it". This replaces item 5 of
 
 - **S1.1** An `App` object in this package that owns the components in §1.2
   and builds the FastAPI app from them. `main.py`'s globals move onto it.
+  **Built 2026-10-07 (MVP form)** in `application.py`:
+  `App(tools, resources, loaded, *, workspace, title, host, port, cell_types,
+  freeze)`, every argument optional, `.serve()` and `.api`. It is loaded where
+  the server starts: `main.py` uses the App already built (`python app.py`) or
+  loads `<workspace>/app.py`, so `simple-steps`, `simple-steps-dev` (with
+  reload) and `--local` all serve it unchanged. Listing tools turns off the
+  workspace's `*.py` scan, so a module `app.py` imports is never imported
+  twice (which would register every tool and resource class twice);
+  `app.py` itself is never scanned. **Not yet:** `main.py`'s globals still
+  configure the server when it is first imported (so one process serves one
+  App), and the components below aren't swappable.
 - **S1.2** An interface for each component that varies by deployment, with
   the current behaviour as the default implementation (`FolderWorkspace`,
   `MemorySessions`, `DiskStore`). Same behaviour, now swappable, and
   `App()` with no arguments reproduces today's app exactly.
-- **S1.3** A long-lived `Session` that holds a `grid.Workflow` across runs,
+- **S1.3** *(For the MVP, what this was for already holds: a session's
+  results persist in its ref store and its resources in
+  `resources.live_resource`, one object per session. Holding one
+  `grid.Workflow` per session, for cross-step staging and stale tracking, is
+  after the MVP.)* A long-lived `Session` that holds a `grid.Workflow` across runs,
   so resources, outputs and staging persist instead of being rebuilt for
   every step (`run_formula` today). This is also what core 006 §2.4 asks:
   *"resources may be the reason it grows a session owner."*
