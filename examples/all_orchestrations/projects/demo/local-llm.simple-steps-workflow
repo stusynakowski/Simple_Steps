@@ -1,0 +1,42 @@
+{
+  "format_version": 2,
+  "id": "local-llm",
+  "name": "Local LLM",
+  "meta": {
+    "source": "app only: a real model as a ready-made resource (local_llm.py)",
+    "needs": "Ollama running with the model app.py names (default llama3.2:3b)"
+  },
+  "resources": {
+    "local_llm": {
+      "source": "loaded",
+      "type": "OllamaLLM",
+      "as_loaded": {
+        "model": "llama3.2:3b",
+        "host": "http://localhost:11434"
+      }
+    }
+  },
+  "steps": [
+    {
+      "name": "notes",
+      "expression": "to_rows[mod.source()](data='{\"text\": [\"The quick brown fox jumps over the lazy dog.\", \"Simple Steps composes Python tools the way a spreadsheet composes formulas.\"]}')",
+      "meta": {
+        "label": "notes"
+      }
+    },
+    {
+      "name": "summaries",
+      "expression": "summarize[mod.map()](wf[\"notes\"], llm=res[\"local_llm\"])",
+      "meta": {
+        "label": "summaries"
+      }
+    },
+    {
+      "name": "hello",
+      "expression": "res[\"local_llm\"].complete[mod.source()](prompt=\"Reply with exactly one word: hello\")",
+      "meta": {
+        "label": "hello"
+      }
+    }
+  ]
+}

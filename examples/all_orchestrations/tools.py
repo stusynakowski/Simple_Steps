@@ -160,8 +160,20 @@ class FakeDB:
         self.reads = 0
 
 
+class LLM:
+    """Any language model: something with ``complete(prompt) -> str``.
+
+    A base type, not a resource type itself: a tool that takes ``llm: LLM``
+    accepts every resource that is one — the dummy ``FakeLLM`` here, or a real
+    local model (``OllamaLLM`` in ``local_llm.py``).
+    """
+
+    def complete(self, prompt: str) -> str:
+        raise NotImplementedError
+
+
 @simple_step_resource
-class FakeLLM:
+class FakeLLM(LLM):
     """Answers deterministically: the model name, then the prompt upper-cased."""
 
     def __init__(self, model: str = "fake-1"):
@@ -196,8 +208,8 @@ def enrich(city: str, db: FakeDB) -> str:
 
 
 @simple_step_tool(category="Resources")
-def summarize(text: str, llm: FakeLLM) -> str:
-    """unbound: one line from the model.
+def summarize(text: str, llm: LLM) -> str:
+    """unbound: one line from the model — any LLM, fake or real.
 
     Args:
         text: the text to summarize.

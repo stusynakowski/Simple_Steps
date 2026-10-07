@@ -12,10 +12,12 @@ dataset, and one step per step of core's workflow, each written as a formula.
 | [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow: every shape verb |
 | [`projects/demo/resources.simple-steps-workflow`](projects/demo/resources.simple-steps-workflow) | the 11-step resources workflow: core's `build_resources()`, plus a ready-made resource |
 | [`projects/demo/rich-cells.simple-steps-workflow`](projects/demo/rich-cells.simple-steps-workflow) | 5 steps whose cells are images, tables and a Plotly chart (app only) |
-| [`check.py`](check.py) | runs all three workflows the way the UI does and compares every step with core |
+| [`local_llm.py`](local_llm.py) | `OllamaLLM`: a real local model as a resource, loaded only if Ollama has it |
+| [`projects/demo/local-llm.simple-steps-workflow`](projects/demo/local-llm.simple-steps-workflow) | 3 steps that use the local model (needs Ollama) |
+| [`check.py`](check.py) | runs every workflow the way the UI does and compares every step with core |
 
 ```bash
-python examples/all_orchestrations/check.py        # 60/60 steps match simple-steps-core
+python examples/all_orchestrations/check.py        # 60/60 steps match simple-steps-core (63 with Ollama)
 python examples/all_orchestrations/app.py          # serve it (or: simple-steps --workspace examples/all_orchestrations)
                                                     # open a workflow in the UI and press Run
 ```
@@ -129,6 +131,34 @@ thumbnail or a short summary (`16×16 RGB image`, `table 1×3`,
 `bar chart · 1 trace · Readings per city`); clicking the cell opens the full
 view. `bright` reads the images back with `brightness`, which gets the real
 array, never the thumbnail.
+
+## A real local model (optional)
+
+`local_llm.py` declares `OllamaLLM`, a resource that calls a model served by
+[Ollama](https://ollama.com) on this machine (standard library only, no extra
+package). `app.py` offers it as the ready-made `res["local_llm"]` **only when
+it can be loaded**. Otherwise the app starts as usual and prints why:
+
+```
+ⓘ  local_llm not loaded: Ollama isn't answering at http://localhost:11434 (…)
+ⓘ  local_llm not loaded: Ollama doesn't have llama3.2:3b (it has: …); run: ollama pull llama3.2:3b
+```
+
+To use it, a small model is enough. `llama3.2:3b` (about 2 GB) runs
+comfortably on an M-series Mac with 16–24 GB of memory:
+
+```bash
+ollama pull llama3.2:3b          # once
+python examples/all_orchestrations/app.py
+```
+
+Use another model or server with `OLLAMA_MODEL=qwen2.5:3b` or `OLLAMA_HOST=…`.
+`OllamaLLM` is an `LLM`, so it fits any tool that takes one:
+`=summarize[mod.map()](wf["notes"], llm=res["local_llm"])`, or call it directly
+with `=res["local_llm"].complete[mod.source()](prompt="…")`. The `local-llm`
+workflow does both. `check.py` runs it only when the model is loaded, and
+checks just that every answer is non-empty text, since a real model's words
+vary. Without Ollama it prints `SKIP`.
 
 ## Differences from core's example
 

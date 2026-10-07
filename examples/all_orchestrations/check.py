@@ -12,7 +12,10 @@ check.py — run the workflow the way the UI does, and compare with core.
    - ``resources`` — core's ``run_resources()``: resources, ``res["…"]``;
    - ``rich-cells`` — app only: images, a Plotly figure and tables in cells.
      A rich cell compares as ``<type: summary>``, and its full view
-     (``/api/cell``) must open as the right kind.
+     (``/api/cell``) must open as the right kind;
+   - ``local-llm`` — app only, and only when Ollama is running with the model
+     (``local_llm.py``): a real model's words can't be predicted, so each
+     answer must just be non-empty text. Skipped, not failed, without Ollama.
 
 3. Runs each step as ``useWorkflow.runStep`` does: parse the formula with
    ``/api/parse_formula``, send its arguments to ``/api/run`` with the
@@ -113,8 +116,12 @@ def main() -> int:
     for pipeline_id, expected, app_only in (
             ("all-orchestrations", core_outputs(), set()),
             ("resources", core_resource_outputs(), set(APP_ONLY)),
-            ("rich-cells", RICH_CELLS, set(RICH_CELLS))):
+            ("rich-cells", RICH_CELLS, set(RICH_CELLS)),
+            ("local-llm", None, set())):
         print(f"── {pipeline_id}")
+        if expected is None and "local_llm" not in client.get("/api/resources/loaded").json():
+            print("SKIP  the local model isn't loaded (see local_llm.py: Ollama, ollama pull …)\n")
+            continue
         n, d = check_workflow(client, pipeline_id, expected, app_only)
         total, differ = total + n, differ + d
         print()
@@ -127,7 +134,8 @@ def check_workflow(client, pipeline_id: str, expected: dict,
                    app_only: set = frozenset()) -> tuple[int, int]:
     """Run one saved workflow the way the UI does; return (steps, differing).
     Steps in *app_only* have no counterpart in core and are checked against
-    fixed values instead."""
+    fixed values instead. With *expected* None (a real model's output), each
+    step must run and every `value` cell must be non-empty text."""
     pipeline = client.get(f"/api/projects/demo/pipelines/{pipeline_id}").json()
     resources = pipeline.get("resources") or None
 
@@ -167,6 +175,13 @@ def check_workflow(client, pipeline_id: str, expected: dict,
             print(f"{'PASS' if same else 'DIFF'}  {label:14} {got} rows failed "
                   f"(core: {expected['failure']}) — "
                   f"{(body['metrics'].get('errors') or [{}])[0].get('error', '')}")
+        elif expected is None:
+            got = _cells_to_table(client, refs[sid])
+            values = [row[got[0].index("value")] for row in got[1]] if "value" in got[0] else []
+            same = all(isinstance(v, str) and v.strip() for v in values)
+            print(f"{'PASS' if same else 'DIFF'}  {label:14} {formula}")
+            for v in values:
+                print(f"      → {str(v)[:100]!r}")
         else:
             got = _cells_to_table(client, refs[sid])
             same = got[0] == expected[sid][0] and _norm(got[1]) == _norm(expected[sid][1])
