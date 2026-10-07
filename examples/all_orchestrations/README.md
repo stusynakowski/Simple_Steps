@@ -7,12 +7,13 @@ dataset, and one step per step of core's workflow, each written as a formula.
 
 | file | what it is |
 |---|---|
-| [`tools.py`](tools.py) | core's registry, declared with `@simple_step_tool` |
-| [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow |
-| [`check.py`](check.py) | runs the workflow the way the UI does and compares every step with core |
+| [`tools.py`](tools.py) | core's registry, declared with `@simple_step_tool`, plus its resource types (`@simple_step_resource`) |
+| [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow: every shape verb |
+| [`projects/demo/resources.simple-steps-workflow`](projects/demo/resources.simple-steps-workflow) | the 10-step resources workflow: core's `build_resources()` |
+| [`check.py`](check.py) | runs both workflows the way the UI does and compares every step with core |
 
 ```bash
-python examples/all_orchestrations/check.py        # 44/44 steps match simple-steps-core
+python examples/all_orchestrations/check.py        # 54/54 steps match simple-steps-core
 simple-steps --workspace examples/all_orchestrations
                                                     # open the workflow in the UI and press Run
 ```
@@ -62,6 +63,40 @@ formula reads the same as the Python in core's `pipeline.py`:
 The verb is part of the formula, so the saved file is the whole workflow.
 The app compiles each formula to core's operation JSON
 (`src/SIMPLE_STEPS/operation_formula.py`) and core runs it.
+
+## Resources
+
+A resource is an object steps use that isn't data: here a dummy database
+(`FakeDB`) and a dummy LLM (`FakeLLM`). Three marks in `tools.py`:
+
+- `@simple_step_resource` on a class declares a resource **type**, built from
+  literal settings.
+- `@simple_step_tool` on one of its methods makes that method a **bound
+  tool**. Unmarked methods (`FakeDB.reset`) are never tools.
+- `@simple_step_tool` on a function with a resource-typed parameter
+  (`summarize(text, llm: FakeLLM)`) makes an **unbound tool**: it needs a
+  resource of that type but doesn't belong to one.
+
+The workflow file names its instances in a `resources` section, and steps use
+them with `res["…"]`:
+
+```jsonc
+"resources": {"db":   {"source": "defined", "type": "FakeDB"},
+              "llm":  {"source": "defined", "type": "FakeLLM", "settings": {"model": "fake-1"}},
+              "tiny": {"source": "defined", "type": "TinyLLM", "settings": {"model": "tiny-1"}}}
+```
+
+| formula | what it does |
+|---|---|
+| `=enrich[mod.map()](wf["readings"], db=res["db"])` | unbound tool, resource by name |
+| `=summarize[mod.map()](wf["notes"], res["tiny"])` | unbound tool, resource by position, matched by type (a `TinyLLM` fits `llm: FakeLLM`) |
+| `=res["db"].lookup[mod.map()](wf["keys"])` | bound tool |
+| `=res["llm"].complete[mod.source()](prompt="hi")` | bound tool as a source |
+| `=res["db"].lookup(wf["keys"])` | bound tool, verb inferred |
+
+The app builds each instance the first time a step uses it, keeps one per
+session, and builds a new one when its settings change. Only `"source":
+"defined"` works so far; loaded resources come with core's next slice.
 
 ## Differences from core's example
 

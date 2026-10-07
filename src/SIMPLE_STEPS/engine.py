@@ -749,9 +749,13 @@ def run_operation(
     step_id: Optional[str] = None,
     session_id: Optional[str] = None,
     result_store: Optional[str] = None,
+    resources: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, dict]:
     """
     Orchestrates the running of a single step with dynamic wrappers.
+
+    *resources* is the workflow's ``resources`` section, used by formulas in
+    core's syntax that name ``res["…"]``.
     """
     
     step_map = step_label_map or {}
@@ -769,7 +773,8 @@ def run_operation(
         if is_canonical(formula):
             from .grid_runner import run_canonical_step
             try:
-                return run_canonical_step(formula, step_map, session_id, result_store)
+                return run_canonical_step(formula, step_map, session_id, result_store,
+                                          resources)
             except Exception as e:
                 raise ValueError(f"Error executing step: {e}") from e
 

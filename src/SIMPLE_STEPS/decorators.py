@@ -310,6 +310,18 @@ def _ui_type(type_name: str, schema_type: str = None) -> str:
     return "string"
 
 
+def _is_method(func: Callable) -> bool:
+    """Whether *func* is being defined in a class body, taking ``self``."""
+    parts = getattr(func, "__qualname__", "").split(".")
+    if len(parts) < 2 or parts[-2] == "<locals>":
+        return False
+    try:
+        params = list(inspect.signature(func).parameters)
+    except (TypeError, ValueError):
+        return False
+    return bool(params) and params[0] == "self"
+
+
 def simple_step_tool(
     name: str = None,
     category: str = "General",
@@ -344,8 +356,18 @@ def simple_step_tool(
         The auto-broadcasting wrapper, so direct Python calls and eval-mode
         formulas keep working exactly as they did under ``@simple_step``.
     """
+    if callable(name):                       # bare @simple_step_tool
+        return simple_step_tool()(name)
+
     def decorator(func: Callable):
         from .core_bridge import core_contract
+
+        if _is_method(func):
+            # A method of a @simple_step_resource class is a *bound* tool
+            # (core 007): core records it on the type when the class decorator
+            # runs, and it stays an ordinary method. It is never a global tool.
+            from simple_steps_core import grid
+            return grid.bound_tool(func)
 
         op_name = name or func.__name__.replace("_", " ").title()
         op_id = id or func.__name__

@@ -17,6 +17,7 @@ Every shim below is tagged with the proposal section that removes it::
                    reports every parameter's type_name as "Any"
     SHIM(core §K)  grid: no verb hands a tool the whole table
     SHIM(core §L)  grid: a step cannot take a value from another step
+    SHIM(core §M)  grid: infer_verb reads a bound method's `self` as a column
                    (core 004 §B6, P5)
 
 When core lands one of those, delete the tagged block and read the value off
@@ -572,7 +573,7 @@ def register_with_core(
 # --------------------------------------------------------------------------- #
 
 def simple_step_resource(
-    name: str,
+    name: Any,
     factory: Optional[Callable[[], Any]] = None,
     *,
     value: Any = None,
@@ -598,7 +599,24 @@ def simple_step_resource(
     bare name kept as an alias, so saved workflows keep resolving. A
     namespace-only spec becomes resource-backed later by adding ``factory=``
     to this same call — tool ids do not move, because they derive from *name*.
+
+    **On a class**, it declares a resource *type* for the grid (core 007): the
+    constructor's parameters are its literal settings, and the methods marked
+    ``@simple_step_tool`` are its bound tools. Unmarked methods are never tools::
+
+        @simple_step_resource
+        class ClinicalDB:
+            def __init__(self, url: str): ...
+
+            @simple_step_tool
+            def query(self, sql: str) -> pd.DataFrame: ...   # res["db"].query(…)
+
+            def close(self) -> None: ...                     # not a tool
     """
+    if inspect.isclass(name):
+        from simple_steps_core import grid
+        from .resources import register_type
+        return register_type(grid.resource(name))
     return ResourceSpec(
         name,
         factory=factory,
@@ -612,6 +630,20 @@ def simple_step_resource(
 # --------------------------------------------------------------------------- #
 # Grid execution gaps                                                         #
 # --------------------------------------------------------------------------- #
+
+def inferable_method(method: Callable) -> Callable:
+    """A bound tool's method, ready for ``grid.infer_verb``.
+
+    SHIM(core §M): ``grid.infer_verb(FakeDB.lookup, …)`` counts ``self`` as a
+    parameter the grid must supply, finds no such column, and calls the method
+    a reducer (``collapse``). Core's own ``res["db"].lookup(wf["keys"])`` infers
+    ``map``, but the public function doesn't, and the app infers from the
+    formula before building the operation. Binding ``self`` leaves only the
+    real parameters. Delete when ``infer_verb`` accepts a bound tool.
+    """
+    import functools
+    return functools.partial(method, None)
+
 
 def needs_whole_frame_shim(verb: str, table_args: list, value_args: list) -> bool:
     """Whether a step must run on the legacy engine instead of core's grid.

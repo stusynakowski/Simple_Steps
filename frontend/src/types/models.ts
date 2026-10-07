@@ -44,4 +44,9 @@ export interface Workflow {
   name: string;
   created_at: string; // ISO timestamp string
   steps: Step[];
+  meta?: Record<string, unknown>;
+  /** Resources the steps use: name → {source, type, settings} (core 007). */
+  resources?: Record<string, unknown>;
+  /** Other top-level sections of the saved file, kept verbatim for the next save. */
+  sections?: Record<string, unknown>;
 }

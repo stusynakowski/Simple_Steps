@@ -32,6 +32,19 @@ Forms:
 ``zip_(wf["a"], wf["b"], …)``
 ==========================================  ===================================
 
+**Resources** (core 007) are ``res["name"]``, declared in the workflow's
+``resources`` section:
+
+==============================================  ===============================
+``tool[mod.map()](wf["x"], llm=res["claude"])``   an unbound tool taking a resource
+``tool[mod.map()](wf["x"], res["claude"])``       the same, matched by type at run
+``res["db"].lookup[mod.map()](wf["x"])``          a bound tool: a marked method
+``res["db"].query(sql="…")``                      the same, verb inferred
+==============================================  ===============================
+
+The rule becomes: ``wf["…"]`` is a table, ``res["…"]`` is a resource, everything
+else is a literal. A resource is never a modifier setting or a combine setting.
+
 A combine is core's own constructor (``grid.join`` / ``stack`` / ``zip_``),
 not a tool: it takes no modifiers, its positional arguments are the steps it
 reads, and its keyword settings are literals. Those names are therefore
@@ -82,6 +95,21 @@ class Compiled:
     #: Every step a combine reads, primary first (``input`` is the first);
     #: empty for an ordinary single-input step.
     inputs: List[str] = field(default_factory=list)
+    #: For a bound tool (``res["db"].lookup``): the resource it runs on.
+    #: ``tool_id`` is then the method name, qualified with the resource's type
+    #: (``FakeDB.lookup``) once the declarations are known — see :meth:`operation`.
+    bound_to: Optional[str] = None
+    #: Resources passed by position (``tool(wf["x"], res["llm"])``). Core takes
+    #: keywords only, so the runner binds each to the parameter whose type fits.
+    positional_resources: List[str] = field(default_factory=list)
+
+    @property
+    def resources(self) -> List[str]:
+        """Every resource this uses: the one it's bound to, then its arguments."""
+        names = [self.bound_to] if self.bound_to else []
+        names += [v["$res"] for v in self.arguments.values() if _is_res(v)]
+        names += self.positional_resources
+        return list(dict.fromkeys(names))
 
     @property
     def is_combine(self) -> bool:
@@ -105,19 +133,27 @@ class Compiled:
         names += [v["$ref"] for v in self.arguments.values() if _is_ref(v)]
         return list(dict.fromkeys(names))
 
-    def operation(self, inferred_verb: Optional[str] = None) -> dict:
-        """Core's operation JSON. *inferred_verb* fills in an inferred form."""
+    def operation(self, inferred_verb: Optional[str] = None,
+                  bound_type: Optional[str] = None) -> dict:
+        """Core's operation JSON. *inferred_verb* fills in an inferred form;
+        *bound_type* is the declared type of :attr:`bound_to`, which qualifies a
+        bound tool's id (``FakeDB.lookup``)."""
         modifiers = self.modifiers
         if modifiers is None:
             modifiers = [{"kind": inferred_verb or "map", "params": {}}]
+        tool_id = self.tool_id
+        if self.bound_to and bound_type:
+            tool_id = f"{bound_type}.{self.tool_id}"
         operation = {
-            "tool_id": self.tool_id,
+            "tool_id": tool_id,
             "input": {"$ref": self.input} if self.input is not None else None,
             "arguments": dict(self.arguments),
             "modifiers": [dict(m) for m in modifiers],
         }
         if self.inputs:
             operation["inputs"] = [{"$ref": name} for name in self.inputs]
+        if self.bound_to:
+            operation["bound_to"] = {"$res": self.bound_to}
         return operation
 
 
@@ -126,7 +162,7 @@ class Compiled:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def is_canonical(formula: Optional[str]) -> bool:
-    """Whether *formula* is written in core's syntax (uses ``wf[…]`` or ``mod.``)."""
+    """Whether *formula* is written in core's syntax (``wf[…]``, ``res[…]`` or ``mod.``)."""
     body = _body(formula)
     if not body:
         return False
@@ -134,9 +170,10 @@ def is_canonical(formula: Optional[str]) -> bool:
         tree = ast.parse(body, mode="eval")
     except SyntaxError:
         # Half-typed core syntax should get this module's messages.
-        return 'wf[' in body or "mod." in body
+        return 'wf[' in body or 'res[' in body or "mod." in body
     for node in ast.walk(tree):
-        if isinstance(node, ast.Subscript) and _is_name(node.value, "wf"):
+        if isinstance(node, ast.Subscript) and (_is_name(node.value, "wf")
+                                                or _is_name(node.value, "res")):
             return True
         if isinstance(node, ast.Attribute) and _is_name(node.value, "mod"):
             return True
@@ -157,6 +194,17 @@ def compile_formula(formula: str) -> Compiled:
 
     if isinstance(tree, ast.Call):
         func = tree.func
+        if isinstance(func, ast.Subscript) and _bound(func.value):   # res["db"].tool[mods](…)
+            resource, method = _bound(func.value)
+            return _with_call(method, _modifiers(func.slice), tree, bound_to=resource)
+        if _bound(func):                                 # res["db"].tool(…): inferred
+            resource, method = _bound(func)
+            return _with_call(method, None, tree, bound_to=resource)
+        if isinstance(func, ast.Subscript) and _res_name(func) is not None:
+            raise FormulaError(
+                f'res["{_res_name(func)}"] is a resource, not a tool. Call one of its '
+                f'tools, res["{_res_name(func)}"].<tool>(…), or pass it to a tool'
+            )
         if isinstance(func, ast.Subscript):              # tool[mods](…)
             if _wf_name(func) is not None:
                 raise FormulaError(
@@ -169,6 +217,23 @@ def compile_formula(formula: str) -> Compiled:
         if isinstance(func, ast.Name):                   # tool(wf["x"], …): inferred
             return _with_call(func.id, None, tree)
         raise FormulaError(f"{ast.unparse(func)} is not a tool")
+
+    if isinstance(tree, ast.Subscript) and _bound(tree.value):   # res["llm"].tool[mod.source()]
+        resource, method = _bound(tree.value)
+        compiled = Compiled(method, _modifiers(tree.slice), None, {}, bound_to=resource)
+        if compiled.verb not in NO_INPUT_VERBS:
+            raise FormulaError(
+                f'{compiled.verb or "this"} reads a step: '
+                f'res["{resource}"].{method}[{_written(compiled.modifiers)}](wf["…"])'
+            )
+        return compiled
+
+    if isinstance(tree, ast.Subscript) and _res_name(tree) is not None:
+        name = _res_name(tree)
+        raise FormulaError(
+            f'res["{name}"] on its own is a resource, not a step. Use one of its tools, '
+            f'res["{name}"].<tool>(…), or pass it to a tool: tool[mod.map()](wf["…"], res["{name}"])'
+        )
 
     if isinstance(tree, ast.Subscript):
         name = _wf_name(tree)
@@ -194,17 +259,34 @@ def compile_formula(formula: str) -> Compiled:
     )
 
 
-def _with_call(tool: str, modifiers: Optional[List[dict]], call: ast.Call) -> Compiled:
+def _with_call(tool: str, modifiers: Optional[List[dict]], call: ast.Call,
+               bound_to: Optional[str] = None) -> Compiled:
     if any(isinstance(a, ast.Starred) for a in call.args) or any(k.arg is None for k in call.keywords):
         raise FormulaError("*args and **kwargs aren't allowed in a formula")
-    if len(call.args) > 1:
-        raise FormulaError(
-            "a step reads one input; to combine steps use join(wf[\"a\"], wf[\"b\"], on=…), "
-            "stack(wf[\"a\"], wf[\"b\"]) or zip_(wf[\"a\"], wf[\"b\"])"
-        )
-    input_name = _input_ref(call.args[0]) if call.args else None
+    # Positional arguments: at most one step (the input, first), then any
+    # resources — res["…"] — which the runner binds to parameters by type.
+    positional = list(call.args)
+    input_name = None
+    if positional and _res_name(positional[0]) is None:
+        input_name = _input_ref(positional.pop(0))
+    resources = []
+    for arg in positional:
+        name = _res_name(arg)
+        if name is not None:
+            resources.append(name)
+        elif _wf_name(arg) is not None:
+            raise FormulaError(
+                "a step reads one input; to combine steps use join(wf[\"a\"], wf[\"b\"], on=…), "
+                "stack(wf[\"a\"], wf[\"b\"]) or zip_(wf[\"a\"], wf[\"b\"])"
+            )
+        else:
+            raise FormulaError(
+                f"after the input, only resources go by position (res[\"…\"]); "
+                f"give {ast.unparse(arg)} a name: {tool}(…, name={ast.unparse(arg)})"
+            )
     arguments = {kw.arg: _argument(kw.value, kw.arg) for kw in call.keywords}
-    compiled = Compiled(tool, modifiers, input_name, arguments)
+    compiled = Compiled(tool, modifiers, input_name, arguments,
+                        bound_to=bound_to, positional_resources=resources)
 
     verb = compiled.verb
     if modifiers is not None:
@@ -253,6 +335,8 @@ def _combine_input(node: ast.AST, name: str) -> str:
 
 def _setting_of(name: str, key: str, node: ast.AST) -> Any:
     """A combine setting: a literal, like a modifier's."""
+    if _res_name(node) is not None:
+        raise FormulaError(f"{name} applies no tool, so it takes no resource")
     if _wf_name(node) is not None:
         raise FormulaError(
             f"{name}({key}=…) is a setting, and settings are literals. The steps "
@@ -327,10 +411,14 @@ def _input_ref(node: ast.AST) -> str:
 
 
 def _argument(node: ast.AST, name: str) -> Any:
-    """A tool argument: a literal, or ``wf["x"]`` for another step's value."""
+    """A tool argument: a literal, ``wf["x"]`` for another step's value, or
+    ``res["x"]`` for a resource."""
     ref = _wf_name(node)
     if ref is not None:
         return {"$ref": ref}
+    resource = _res_name(node)
+    if resource is not None:
+        return {"$res": resource}
     _reject_column_ref(node)
     if isinstance(node, ast.Call):
         raise FormulaError(
@@ -353,6 +441,11 @@ def _argument(node: ast.AST, name: str) -> Any:
 
 def _setting(node: ast.AST, kind: str, name: str) -> Any:
     """A modifier setting: always a literal."""
+    if _res_name(node) is not None:
+        raise FormulaError(
+            f"mod.{kind}({name}=…) is a setting, and settings are literals. "
+            "A resource goes in the call: tool[…](wf[\"…\"], name=res[\"…\"])"
+        )
     if _wf_name(node) is not None:
         raise FormulaError(
             f"mod.{kind}({name}=…) is a setting, and settings are literals. "
@@ -389,9 +482,28 @@ def _wf_name(node: ast.AST) -> Optional[str]:
     return None
 
 
+def _res_name(node: ast.AST) -> Optional[str]:
+    """``res["name"]`` → ``"name"``; anything else → ``None``."""
+    if isinstance(node, ast.Subscript) and _is_name(node.value, "res"):
+        key = node.slice
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            return key.value
+        raise FormulaError('res[…] takes a resource name in quotes: res["db"]')
+    return None
+
+
+def _bound(node: ast.AST) -> Optional[tuple]:
+    """``res["db"].lookup`` → ``("db", "lookup")``; anything else → ``None``."""
+    if isinstance(node, ast.Attribute):
+        resource = _res_name(node.value)
+        if resource is not None:
+            return resource, node.attr
+    return None
+
+
 def _tool_name(node: ast.AST) -> str:
     if isinstance(node, ast.Name):
-        if node.id in ("wf", "mod"):
+        if node.id in ("wf", "mod", "res"):
             raise FormulaError(f"{node.id} isn't a tool")
         return node.id
     raise FormulaError(f"{ast.unparse(node)} is not a tool name")
@@ -403,6 +515,10 @@ def _is_name(node: ast.AST, name: str) -> bool:
 
 def _is_ref(value: Any) -> bool:
     return isinstance(value, dict) and set(value) == {"$ref"}
+
+
+def _is_res(value: Any) -> bool:
+    return isinstance(value, dict) and set(value) == {"$res"}
 
 
 def _body(formula: Optional[str]) -> str:

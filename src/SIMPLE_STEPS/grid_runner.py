@@ -39,8 +39,10 @@ core's syntax reach (``run_formula``).
 from __future__ import annotations
 
 import ast
+import inspect
 import json
 import re
+import typing
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
@@ -175,7 +177,9 @@ _FORMULA_STEP = "__formula__"
 
 
 def run_formula(formula: str, load: Callable[[str], Any],
-                tools: Optional[Dict[str, Any]] = None):
+                tools: Optional[Dict[str, Any]] = None,
+                resources: Optional[Dict[str, Any]] = None,
+                live: Optional[Callable[[str, Dict[str, Any]], Any]] = None):
     """Compile *formula* (core's syntax) and run it in core.
 
     *load(name)* returns the data of the step called *name*, or ``None`` when
@@ -183,11 +187,35 @@ def run_formula(formula: str, load: Callable[[str], Any],
     its input and any argument references — is loaded into a one-off
     ``grid.Workflow`` under its own name, so the operation core runs is exactly
     the one the formula spells. Returns ``(step, operation_json)``.
+
+    *resources* is the workflow's ``resources`` section (declarations: a type
+    and literal settings, never an object). Each resource the formula uses is
+    declared with ``wf.define`` before the step, so core can check its type;
+    *live(name, declaration)* returns the object to run it with (by default, the
+    session-less store in :mod:`.resources`).
     """
     from .operation_formula import compile_formula
+    from .resources import ResourceError, live_resource, resource_type, settings_of
 
     compiled = compile_formula(formula)
+    declarations = resources or {}
+    live = live or (lambda name, decl: live_resource(None, name, decl))
     wf = grid.Workflow()
+    # Resources first: a step declared before its resource is invalid in core.
+    types: Dict[str, type] = {}
+    for name in compiled.resources:
+        if name not in declarations:
+            known = ", ".join(f'res["{n}"]' for n in declarations) or "none yet"
+            raise GridStepError(
+                f'no resource named "{name}" in this workflow (its resources: {known}). '
+                "Add it to the workflow's resources first"
+            )
+        try:
+            types[name] = resource_type(declarations[name], name)
+            wf.define(name, types[name], **settings_of(declarations[name]))
+        except (ResourceError, TypeError) as exc:
+            raise GridStepError(str(exc)) from exc
+
     for name in compiled.reads:
         data = load(name)
         if data is None:
@@ -198,13 +226,17 @@ def run_formula(formula: str, load: Callable[[str], Any],
         wf[name] = data
 
     tools = tools if tools is not None else _tools()
+    fn = _formula_tool(compiled, tools, types)
+    _bind_positional_resources(compiled, fn, types)
     inferred = None
     if compiled.modifiers is None:
         # tool(wf["x"], …): infer the verb from the tool, with the input's data
         # loaded — never from a not-yet-run source (core 005 K2).
-        fn = tools.get(compiled.tool_id) or grid.BUILTIN_TOOLS.get(compiled.tool_id)
         if fn is None:
             raise GridStepError(f"no tool named '{compiled.tool_id}'")
+        if compiled.bound_to:
+            from .core_bridge import inferable_method
+            fn = inferable_method(fn)
         if compiled.input is None:
             inferred = "source"
         else:
@@ -212,7 +244,8 @@ def run_formula(formula: str, load: Callable[[str], Any],
                         if not (isinstance(v, dict) and set(v) == {"$ref"})}
             inferred, _why = grid.infer_verb(getattr(fn, "fn", fn),
                                              wf.step(compiled.input).output, literals)
-    operation = compiled.operation(inferred)
+    bound_type = types[compiled.bound_to].__name__ if compiled.bound_to in types else None
+    operation = compiled.operation(inferred, bound_type)
 
     try:
         wf[_FORMULA_STEP] = grid.Operation.from_dict(operation, tools)
@@ -221,21 +254,70 @@ def run_formula(formula: str, load: Callable[[str], Any],
     step = wf.step(_FORMULA_STEP)
     if step.problems:
         raise GridStepError("; ".join(step.problems))
-    wf.run(_FORMULA_STEP, tools)
+    try:
+        objects = {name: live(name, declarations[name]) for name in types}
+        wf.run(_FORMULA_STEP, tools, resources=objects)
+    except (ResourceError, grid.ResourceNotLoaded) as exc:
+        raise GridStepError(str(exc)) from exc
     return wf.step(_FORMULA_STEP), operation
+
+
+def _formula_tool(compiled, tools: Dict[str, Any], types: Dict[str, type]):
+    """The callable a compiled formula names: a tool, or a resource's method."""
+    if compiled.bound_to:
+        cls = types.get(compiled.bound_to)
+        return getattr(cls, compiled.tool_id, None) if cls is not None else None
+    return tools.get(compiled.tool_id) or grid.BUILTIN_TOOLS.get(compiled.tool_id)
+
+
+def _bind_positional_resources(compiled, fn, types: Dict[str, type]) -> None:
+    """``tool(wf["x"], res["llm"])`` → ``llm=res["llm"]``, by type.
+
+    Core takes resources as keywords only. A positional resource binds to the
+    one parameter whose annotation its declared type fits (a subclass fits its
+    base); none or several is an error that says how to name it.
+    """
+    if not compiled.positional_resources:
+        return
+    try:
+        hints = typing.get_type_hints(getattr(fn, "fn", fn))
+    except Exception:
+        hints = {}
+    tool = compiled.tool_id
+    for name in compiled.positional_resources:
+        cls = types[name]               # run_formula already refused undeclared names
+        fits = [param for param, ann in hints.items()
+                if param not in ("return", "self") and param not in compiled.arguments
+                and inspect.isclass(ann) and issubclass(cls, ann)]
+        if len(fits) != 1:
+            why = (f"{tool} has no parameter that takes a {cls.__name__}" if not fits else
+                   f"{tool} has several parameters that take a {cls.__name__} "
+                   f"({', '.join(fits)})")
+            raise GridStepError(f'{why}; pass it by name: {tool}(…, <param>=res["{name}"])')
+        compiled.arguments[fits[0]] = {"$res": name}
+    compiled.positional_resources = []
 
 
 def run_canonical_step(formula: str, step_map: Dict[str, str],
                        session_id: Optional[str],
-                       result_store: Optional[str] = None) -> Tuple[str, dict]:
-    """``/api/run`` for a formula in core's syntax: run it, store the grid."""
+                       result_store: Optional[str] = None,
+                       resources: Optional[Dict[str, Any]] = None) -> Tuple[str, dict]:
+    """``/api/run`` for a formula in core's syntax: run it, store the grid.
+
+    *resources* is the workflow's ``resources`` section; their live objects
+    are kept per session (:func:`.resources.live_resource`).
+    """
     from .engine import get_value, save_dataframe
+    from .resources import live_resource
 
     def load(name: str) -> Any:
         ref = step_map.get(name)
         return None if ref is None else get_value(ref, session_id=session_id)
 
-    step, operation = run_formula(formula, load)
+    step, operation = run_formula(
+        formula, load, resources=resources,
+        live=lambda name, decl: live_resource(session_id, name, decl),
+    )
     output = step.output
     if _verb_of(operation) == "source" and len(output.failed):
         # One call, so one unit: if it failed there is no output to show.

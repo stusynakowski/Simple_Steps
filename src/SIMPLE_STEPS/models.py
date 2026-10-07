@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional, Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 import uuid
 
 
@@ -242,8 +242,14 @@ class PipelineFile(BaseModel):
         { "format_version": 2,
           "name": "...",
           "meta": {...},          # optional, free-form
+          "resources": {...},     # optional: resources the steps use (core 007)
           "steps": [StepConfig]  }
+
+    Sections this model doesn't name are kept, not dropped (``extra="allow"``),
+    so a file written by a newer app survives a load and save here.
     """
+    model_config = ConfigDict(extra="allow")
+
     format_version: int = 2
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
@@ -251,6 +257,8 @@ class PipelineFile(BaseModel):
     created_at: str = ""
     updated_at: str = ""
     steps: List[StepConfig]
+    #: name → {"source": "defined", "type": "<Class>", "settings": {...}}
+    resources: Dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="before")
     @classmethod
@@ -292,6 +300,9 @@ class StepRunRequest(BaseModel):
     # ``SIMPLE_STEPS.session.get_session_id``.  The client cannot set,
     # read, or spoof it.
     result_store: Optional[Literal['memory', 'parquet']] = None
+    # The workflow's `resources` section — declarations (type + literal
+    # settings), never objects. The server keeps the live objects per session.
+    resources: Optional[Dict[str, Any]] = None
 
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']

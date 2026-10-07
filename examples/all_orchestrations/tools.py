@@ -19,7 +19,7 @@ with core's own output.
 
 from __future__ import annotations
 
-from SIMPLE_STEPS import simple_step_tool
+from SIMPLE_STEPS import simple_step_resource, simple_step_tool
 
 
 @simple_step_tool(category="All orchestrations")
@@ -116,3 +116,89 @@ def make_pair(n):
     """
     return (n * 10, n * n)
 
+
+# ─────────────────────────────────────────────────────────────────────────
+# Resources — core's ``build_resources()`` example (core-proposals/007).
+#
+#   @simple_step_resource  on a class: a resource type, built from literal
+#                          settings (core's @resource).
+#   @simple_step_tool      on one of its methods: a BOUND tool, written
+#                          res["db"].lookup[mod.map()](wf["keys"]). The method
+#                          stays an ordinary method (core's @bound_tool).
+#   @simple_step_tool      on a function with a resource-typed parameter: an
+#                          UNBOUND tool, written
+#                          enrich[mod.map()](wf["readings"], db=res["db"]).
+#
+# An unmarked method (FakeDB.reset) is never a tool, though tool code may call
+# it. The workflow declares which instances exist in its `resources` section
+# (projects/demo/resources.simple-steps-workflow); the app builds each one on
+# first use, once per session.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@simple_step_resource
+class FakeDB:
+    """An in-memory table: city -> region."""
+
+    def __init__(self, table: dict | None = None):
+        self.table = dict(table or {"SF": "west", "NYC": "east", "LA": "west"})
+        self.reads = 0
+
+    @simple_step_tool
+    def lookup(self, key: str) -> str | None:
+        """The region stored for a key, or None.
+
+        Args:
+            key: the city to look up.
+        """
+        self.reads += 1
+        return self.table.get(key)
+
+    def reset(self) -> None:                      # unmarked: never a tool
+        self.reads = 0
+
+
+@simple_step_resource
+class FakeLLM:
+    """Answers deterministically: the model name, then the prompt upper-cased."""
+
+    def __init__(self, model: str = "fake-1"):
+        self.model = model
+        self.calls = 0
+
+    @simple_step_tool
+    def complete(self, prompt: str) -> str:
+        """One completion for a prompt.
+
+        Args:
+            prompt: the text to complete.
+        """
+        self.calls += 1
+        return f"[{self.model}] {prompt.upper()}"
+
+
+@simple_step_resource
+class TinyLLM(FakeLLM):
+    """A smaller FakeLLM — fits anywhere a FakeLLM is asked for."""
+
+
+@simple_step_tool(category="Resources")
+def enrich(city: str, db: FakeDB) -> str:
+    """unbound: the region for a city, read from the database.
+
+    Args:
+        city: the city to look up.
+        db: the database to read.
+    """
+    return db.lookup(city) or "unknown"
+
+
+@simple_step_tool(category="Resources")
+def summarize(text: str, llm: FakeLLM) -> str:
+    """unbound: one line from the model.
+
+    Args:
+        text: the text to summarize.
+        llm: the model to ask.
+    """
+    return llm.complete(text)

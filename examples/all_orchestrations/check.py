@@ -5,12 +5,16 @@ check.py — run the workflow the way the UI does, and compare with core.
 
 1. Starts the app in-process with this folder as the workspace, so
    ``tools.py`` registers the example's tools.
-2. Loads ``projects/demo/all-orchestrations.simple-steps-workflow`` through
-   the same endpoint the UI's file explorer uses.
+2. Loads each workflow in ``projects/demo/`` through the same endpoint the
+   UI's file explorer uses:
+
+   - ``all-orchestrations`` — core's ``run()``: every shape verb;
+   - ``resources`` — core's ``run_resources()``: resources, ``res["…"]``.
+
 3. Runs each step as ``useWorkflow.runStep`` does: parse the formula with
    ``/api/parse_formula``, send its arguments to ``/api/run`` with the
-   previous step's output as input and a step map keyed by id, label and the
-   positional ``stepN`` alias.
+   previous step's output as input, a step map keyed by id, label and the
+   positional ``stepN`` alias, and the workflow's ``resources`` section.
 4. Compares every step's output with simple-steps-core's own run of
    ``examples/all_orchestrations/pipeline.py`` (from the submodule).
 
@@ -34,15 +38,26 @@ os.environ["SIMPLE_STEPS_WORKSPACE"] = str(HERE)
 os.environ.setdefault("SIMPLE_STEPS_ENGINE", "grid")
 
 
-def core_outputs() -> dict:
-    """Every step of core's own run, as {step: (columns, rows)}."""
+def core_pipeline():
+    """Core's example module, from the submodule."""
     sys.path.insert(0, str(CORE_EXAMPLE))
     import pipeline  # core's example module
+    return pipeline
 
+
+def core_outputs() -> dict:
+    """Every step of core's own run, as {step: (columns, rows)}."""
+    pipeline = core_pipeline()
     wf = pipeline.run()
     out = {sid: _table(step.output.data) for sid, step in wf.steps.items()}
     out["failure"] = len(pipeline.failure().step("out").output.failed)
     return out
+
+
+def core_resource_outputs() -> dict:
+    """Every step of core's resource workflow, run against core's own objects."""
+    wf, _live = core_pipeline().run_resources()
+    return {sid: _table(step.output.data) for sid, step in wf.steps.items()}
 
 
 def _table(frame) -> tuple:
@@ -57,8 +72,22 @@ def main() -> int:
     client = TestClient(app_main.app)
     client.get("/api/session")
 
-    pipeline = client.get("/api/projects/demo/pipelines/all-orchestrations").json()
-    expected = core_outputs()
+    total = differ = 0
+    for pipeline_id, expected in (("all-orchestrations", core_outputs()),
+                                  ("resources", core_resource_outputs())):
+        print(f"── {pipeline_id}")
+        n, d = check_workflow(client, pipeline_id, expected)
+        total, differ = total + n, differ + d
+        print()
+
+    print(f"{total - differ}/{total} steps match simple-steps-core")
+    return 1 if differ else 0
+
+
+def check_workflow(client, pipeline_id: str, expected: dict) -> tuple[int, int]:
+    """Run one saved workflow the way the UI does; return (steps, differing)."""
+    pipeline = client.get(f"/api/projects/demo/pipelines/{pipeline_id}").json()
+    resources = pipeline.get("resources") or None
 
     refs: dict[str, str] = {}      # step id -> output ref
     order: list[str] = []
@@ -80,6 +109,7 @@ def main() -> int:
                 "step_id": sid, "operation_id": parsed["operationId"],
                 "config": parsed["args"], "input_ref_id": previous_ref,
                 "step_map": step_map, "formula": formula,
+                "resources": resources,
             })
         if r.status_code != 200:
             print(f"FAIL  {label:14} {formula}\n      {r.json().get('detail', '')[:200]}")
@@ -104,9 +134,7 @@ def main() -> int:
                 print(f"      app : {got[0]} {str(got[1])[:160]}")
         differ += not same
 
-    total = len(pipeline["steps"])
-    print(f"\n{total - differ}/{total} steps match simple-steps-core")
-    return 1 if differ else 0
+    return len(pipeline["steps"]), differ
 
 
 def _cells_to_table(client, ref: str) -> tuple:

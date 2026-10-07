@@ -1,0 +1,101 @@
+{
+  "format_version": 2,
+  "id": "resources",
+  "name": "Resources",
+  "meta": {
+    "source": "simple-steps-core examples/all_orchestrations/pipeline.py build_resources()",
+    "syntax": "core operation syntax with res[\"name\"] (core-proposals/007, docs/dev_plan/122 \u00a72)"
+  },
+  "resources": {
+    "db": {
+      "source": "defined",
+      "type": "FakeDB"
+    },
+    "llm": {
+      "source": "defined",
+      "type": "FakeLLM",
+      "settings": {
+        "model": "fake-1"
+      }
+    },
+    "tiny": {
+      "source": "defined",
+      "type": "TinyLLM",
+      "settings": {
+        "model": "tiny-1"
+      }
+    }
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"city\": [\"SF\", \"NYC\", \"SF\", \"LA\"], \"n\": [1, 2, 3, 2]}')",
+      "meta": {
+        "label": "readings"
+      }
+    },
+    {
+      "name": "notes",
+      "expression": "to_rows[mod.source()](data='{\"text\": [\"a\", \"b\"]}')",
+      "meta": {
+        "label": "notes"
+      }
+    },
+    {
+      "name": "keys",
+      "expression": "identity[mod.rename(columns={\"city\": \"key\"})](wf[\"readings\"])",
+      "meta": {
+        "label": "keys"
+      }
+    },
+    {
+      "name": "regions",
+      "expression": "enrich[mod.map()](wf[\"readings\"], db=res[\"db\"])",
+      "meta": {
+        "label": "regions"
+      }
+    },
+    {
+      "name": "summaries",
+      "expression": "summarize[mod.map()](wf[\"notes\"], llm=res[\"llm\"])",
+      "meta": {
+        "label": "summaries"
+      }
+    },
+    {
+      "name": "tiny_summaries",
+      "expression": "summarize[mod.map()](wf[\"notes\"], res[\"tiny\"])",
+      "meta": {
+        "label": "tiny_summaries"
+      }
+    },
+    {
+      "name": "regions_bound",
+      "expression": "res[\"db\"].lookup[mod.map()](wf[\"keys\"])",
+      "meta": {
+        "label": "regions_bound"
+      }
+    },
+    {
+      "name": "hello",
+      "expression": "res[\"llm\"].complete[mod.source()](prompt=\"hi\")",
+      "meta": {
+        "label": "hello"
+      }
+    },
+    {
+      "name": "inferred",
+      "expression": "res[\"db\"].lookup(wf[\"keys\"])",
+      "meta": {
+        "label": "inferred"
+      }
+    },
+    {
+      "name": "region_table",
+      "expression": "identity[mod.select(columns=[\"city\", \"value\"])](wf[\"regions\"])",
+      "meta": {
+        "label": "region_table"
+      }
+    }
+  ]
+}

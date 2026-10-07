@@ -23,6 +23,7 @@ been superseded by the unified-expression model documented here.
 | [`119-grid-integration.md`](./119-grid-integration.md) | Step execution on simple-steps-core's grid model: how a UI step becomes a core operation, what changed for users, and what is still shimmed. |
 | [`120-literals-and-references.md`](./120-literals-and-references.md) | The rule that only `wf["step"]` is a reference and everything else is a literal; the canonical `tool[modifiers](input, arguments)` formula; requirements, tests and asks for core. |
 | [`121-ui-and-core-changes.md`](./121-ui-and-core-changes.md) | What to change in the UI (reference picking, the formula bar), in core, and in the app backend, with the evidence for each and an order of work. |
+| [`122-skeleton-complete.md`](./122-skeleton-complete.md) | **Draft.** The four pieces that complete the skeleton (object model, resources, the agent, custom cell types), the decisions to settle first, and what's deferred to cleanup. |
 
 ## One-paragraph summary
 

@@ -252,7 +252,8 @@ export async function runStep(
     stepMap?: Record<string, string>,
     isPreview: boolean = false,
     formula?: string,
-    resultStore?: 'memory' | 'parquet'
+    resultStore?: 'memory' | 'parquet',
+    resources?: Record<string, unknown>,
 ): Promise<StepRunResponse> {
   
   const payload = {
@@ -264,6 +265,9 @@ export async function runStep(
       is_preview: isPreview,
       formula: formula || null,
       result_store: resultStore || null,
+      // The workflow's `resources` section (declarations, never objects). A
+      // formula naming res["…"] is checked and run against it.
+      resources: resources || null,
   };
 
   // Wire tap. This records the payload at the fetch boundary — the bytes that
@@ -379,6 +383,11 @@ export interface PipelineFile {
     created_at: string;
     updated_at: string;
     steps: StepConfig[];
+    meta?: Record<string, unknown>;
+    /** Resources the steps use: name → {source, type, settings} (core 007). */
+    resources?: Record<string, unknown>;
+    /** Any other top-level section, kept as-is so a save never drops it. */
+    [section: string]: unknown;
 }
 
 // ── Projects (folders) ────────────────────────────────────────────────────

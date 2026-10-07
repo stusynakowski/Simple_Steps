@@ -26,6 +26,25 @@ import { emitConsoleRecord } from '../context/ConsoleContext';
  *   2. No formula saved     → reconstruct from operation_id + config (legacy files).
  *   3. Invalid formula saved → ignore it, reconstruct from operation_id + config.
  */
+/**
+ * A saved file's workflow-level parts: identity, `meta`, `resources`, and every
+ * other top-level section verbatim (`sections`), so saving it again never drops
+ * one this app doesn't edit yet (stages, ui, extensions, …).
+ */
+function fileSections(pipeline: PipelineFile): Omit<Workflow, 'steps'> {
+  const {
+    id, name, created_at, meta, resources,
+    steps: _steps, updated_at: _updated, ...sections
+  } = pipeline;
+  void _steps; void _updated;
+  return {
+    id, name, created_at,
+    ...(meta ? { meta } : {}),
+    ...(resources ? { resources } : {}),
+    ...(Object.keys(sections).length ? { sections } : {}),
+  };
+}
+
 async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise<Step> {
   const savedFormula = s.formula ?? '';
   const parsed = savedFormula ? await parseFormula(savedFormula) : null;
@@ -472,6 +491,8 @@ export default function useWorkflow() {
           // passed `workflowRef.current.id` (the saved-pipeline slug),
           // which conflated "saved artifact" with "running tab" and
           // caused data leaks between concurrent users of the same file.
+          undefined,
+          workflowRef.current.resources,
       );
 
           const stableMeta = await waitForStableOutput(res.output_ref_id, id, step.label, operationId);
@@ -632,6 +653,8 @@ export default function useWorkflow() {
           true, // isPreview
           step.formula || undefined,
           // No sessionId — see runStep above.  The cookie carries identity.
+          undefined,
+          workflowRef.current.resources,
       );
       
       const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
@@ -863,6 +886,10 @@ export default function useWorkflow() {
       .replace(/^-|-$/g, '') || 'pipeline';
 
     const pipeline: PipelineFile = {
+      // Sections this app doesn't edit go back exactly as they were loaded.
+      ...(current.sections ?? {}),
+      ...(current.meta ? { meta: current.meta } : {}),
+      ...(current.resources ? { resources: current.resources } : {}),
       id: pipelineId,
       name: pipelineName,
       created_at: current.created_at ?? new Date().toISOString(),
@@ -883,12 +910,7 @@ export default function useWorkflow() {
   const loadWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<void> => {
     const pipeline = await loadPipeline(projectId, pipelineId);
     const restoredSteps: Step[] = await Promise.all(pipeline.steps.map(hydrateStep));
-    setWorkflow({
-      id: pipeline.id,
-      name: pipeline.name,
-      created_at: pipeline.created_at,
-      steps: restoredSteps,
-    });
+    setWorkflow({ ...fileSections(pipeline), steps: restoredSteps });
     setExpandedStepIds(new Set(restoredSteps.length > 0 ? [restoredSteps[0].id] : []));
     setMaximizedStepId(null);
     setPipelineStatus('idle');
@@ -898,7 +920,7 @@ export default function useWorkflow() {
   const fetchWorkflow = useCallback(async (projectId: string, pipelineId: string): Promise<Workflow> => {
     const pipeline = await loadPipeline(projectId, pipelineId);
     const steps: Step[] = await Promise.all(pipeline.steps.map(hydrateStep));
-    return { id: pipeline.id, name: pipeline.name, created_at: pipeline.created_at, steps };
+    return { ...fileSections(pipeline), steps };
   }, []);
 
   const listSavedProjects = useCallback(() => listProjects(), []);

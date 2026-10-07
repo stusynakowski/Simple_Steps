@@ -508,6 +508,30 @@ upstream, and its error now points at those verbs.
 
 ---
 
+## M. Grid: `infer_verb` reads a bound method's `self` as a column
+
+*Added 2026-10-07, against `a799d0e`.*
+
+For a formula written without brackets, `res["db"].lookup(wf["keys"])`, the app
+infers the verb before it builds the operation, with `grid.infer_verb`. Given
+the method, it counts `self` as a parameter the grid must supply:
+
+```
+grid.infer_verb(DB.lookup, upstream, {})
+  -> ('collapse', "'self' is not a column but 'key' is, so this reads as a reducer")
+grid.infer_verb(functools.partial(DB.lookup, None), upstream, {})
+  -> ('map', 'the input is a single row')
+```
+
+Core's own Python form, `res["db"].lookup(wf["keys"])`, does infer `map`; only
+the public function misses it.
+
+**Shimmed:** `SHIM(core §M)` in `core_bridge.inferable_method` binds `self`
+before inference. Delete it when `infer_verb` accepts a bound tool (or a
+`(type, method)` pair).
+
+---
+
 ## What this leaves on our side
 
 Not core's problem, listed so the boundary is clear:

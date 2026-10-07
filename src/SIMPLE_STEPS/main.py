@@ -509,6 +509,18 @@ async def list_modifiers():
     return {"engine": get_settings().engine, "modifiers": grid.modifier_catalog()}
 
 
+@app.get("/api/resources")
+async def list_resource_types():
+    """The resource types this app declared (``@simple_step_resource``), each
+    with its literal settings, its bound tools (methods marked
+    ``@simple_step_tool`` only) and its base types. Served from core's
+    ``grid.resource_entry`` so a type reads the same here as in core.
+    """
+    from simple_steps_core import grid
+    from .resources import RESOURCE_TYPES
+    return {name: grid.resource_entry(cls) for name, cls in sorted(RESOURCE_TYPES.items())}
+
+
 # --- 1.1 Diagnostics / Debug ---
 @app.get("/api/debug/registry")
 async def debug_registry():
@@ -676,6 +688,7 @@ async def execute_step(
             payload.step_id,
             session_id,
             payload.result_store,
+            payload.resources,
         ))
         
         return StepRunResponse(
