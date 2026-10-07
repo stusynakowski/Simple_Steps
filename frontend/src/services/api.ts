@@ -431,6 +431,28 @@ export async function loadPipeline(projectId: string, pipelineId: string): Promi
     return r.json();
 }
 
+// ── Cell views (docs/dev_plan/122 §4) ───────────────────────────────────────
+
+/** One cell's full view, for the cell viewer (GET /api/cell/{ref}). */
+export interface CellView {
+    cell_type: string | null;
+    summary: string;
+    view:
+        | { kind: 'image'; src: string; width: number; height: number }
+        | { kind: 'plotly'; figure: { data?: unknown[]; layout?: Record<string, unknown> } }
+        | { kind: 'table'; columns: string[]; rows: unknown[][]; total: number }
+        | { kind: 'json'; value: unknown }
+        | { kind: 'text'; text: string };
+}
+
+export async function fetchCellView(refId: string, row: number, column: string): Promise<CellView> {
+    const qs = new URLSearchParams({ row: String(row), column });
+    const r = await fetch(`${API_BASE}/cell/${encodeURIComponent(refId)}?${qs}`, { credentials: 'include' });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || 'Failed to load the cell');
+    return body;
+}
+
 // ── Resources (core 007) ────────────────────────────────────────────────────
 
 /** One saved resource: a type and literal settings, never an object. */

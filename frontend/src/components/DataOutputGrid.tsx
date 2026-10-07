@@ -3,7 +3,29 @@ import { isErrorCell } from '../utils/errorCells';
 import type { GridPick, Selection } from '../utils/selection';
 import type { Cell } from '../types/models';
 import type { StagedColumn } from '../hooks/useStagedPreview';
+import CellViewer from './CellViewer';
 import './OperationColumn.css'; // Ensure grid styles are available
+import './CellViewer.css';
+
+const TYPE_ICONS: Record<string, string> = { plotly: '📈', table: '▦', json: '{}' };
+
+/**
+ * What a cell shows. Text and numbers as they are; a typed value (an image, a
+ * figure, a table, a dict — backend cell_types.py) as its preview or an icon,
+ * plus its summary. The full value opens in the cell viewer on click.
+ */
+function CellContent({ cell }: { cell: Cell }) {
+  if (!cell.cell_type) return <>{cell.display_value}</>;
+  const summary = cell.summary ?? cell.display_value;
+  return (
+    <span className="typed-cell" data-cell-type={cell.cell_type}>
+      {cell.preview
+        ? <img className="typed-cell-thumb" src={cell.preview} alt="" />
+        : TYPE_ICONS[cell.cell_type] && <span className="typed-cell-icon">{TYPE_ICONS[cell.cell_type]}</span>}
+      <span className="typed-cell-text">{summary}</span>
+    </span>
+  );
+}
 
 interface DataOutputGridProps {
   cells?: Cell[];
@@ -17,6 +39,8 @@ interface DataOutputGridProps {
   stagedColumns?: StagedColumn[];
   /** Visual mode for staged cells when pipeline is queued/running */
   stagedCellMode?: 'idle' | 'scheduled' | 'running';
+  /** The output these cells come from; lets a typed cell open its full view. */
+  refId?: string;
 }
 
 export default function DataOutputGrid({
@@ -27,8 +51,15 @@ export default function DataOutputGrid({
   highlight = null,
   stagedColumns = [],
   stagedCellMode = 'idle',
+  refId,
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  // The typed cell whose full view is open, if any.
+  const [viewing, setViewing] = useState<{ row: number; column: string } | null>(null);
+  const canOpen = (cell?: Cell) => !!cell?.cell_type && !!refId && !wiringMode;
+  const viewer = viewing && refId ? (
+    <CellViewer refId={refId} row={viewing.row} column={viewing.column} onClose={() => setViewing(null)} />
+  ) : null;
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   // Cells aren't pickable yet (they need rows AND columns, core 005 K9), so
   // only the setter is used — kept for when they are.
@@ -114,6 +145,7 @@ export default function DataOutputGrid({
 
   const handleCellWireClick = (cell: Cell) => {
     if (wiringMode) return;            // single cells: later (needs rows AND columns)
+    if (canOpen(cell)) setViewing({ row: cell.row_id, column: cell.column_id });
     onCellClick?.(cell);
   };
 
@@ -181,15 +213,16 @@ export default function DataOutputGrid({
     return (
       <div className="output-container single">
         <div
-          className="single-value-display"
+          className={`single-value-display${canOpen(cell) ? ' openable' : ''}`}
           onClick={() => {
-            if (!wiringMode && cell) onCellClick?.(cell);
+            if (cell) handleCellWireClick(cell);
           }}
-          title="Click to inspect"
+          title={canOpen(cell) ? 'Click to open' : 'Click to inspect'}
           style={{}}
         >
-          {cell ? cell.display_value : ''}
+          {cell ? <CellContent cell={cell} /> : ''}
         </div>
+        {viewer}
       </div>
     );
   }
@@ -325,10 +358,10 @@ export default function DataOutputGrid({
               return (
                 <div
                   key={cellKey}
-                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}`}
+                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}${canOpen(cell) ? ' openable' : ''}`}
                   role="gridcell"
                   onClick={() => cell && handleCellWireClick(cell)}
-                  title={cell?.display_value ?? ''}
+                  title={canOpen(cell) ? `${cell?.summary ?? ''} — click to open` : (cell?.display_value ?? '')}
                   style={wiringCellStyle(cellKey, c)}
                   onMouseEnter={() => {
                     if (wiringMode) {
@@ -343,7 +376,7 @@ export default function DataOutputGrid({
                     }
                   }}
                 >
-                  {cell ? cell.display_value : ''}
+                  {cell ? <CellContent cell={cell} /> : ''}
                 </div>
               );
             })}
@@ -355,6 +388,7 @@ export default function DataOutputGrid({
         {cols.length !== 1 ? 's' : ''}
 
       </div>
+      {viewer}
     </div>
   );
 }

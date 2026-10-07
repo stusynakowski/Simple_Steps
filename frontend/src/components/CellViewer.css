@@ -1,0 +1,179 @@
+/* The cell viewer (CellViewer.tsx): one cell's full view, over the app. */
+
+.cv-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.cv-panel {
+  background: #1e1e1e;
+  color: #ddd;
+  border: 1px solid #444;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  width: min(900px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+}
+
+.cv-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #333;
+}
+
+.cv-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.cv-summary {
+  flex: 1;
+  font-size: 0.78rem;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cv-close {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cv-close:hover {
+  color: #fff;
+}
+
+.cv-body {
+  padding: 14px;
+  overflow: auto;
+}
+
+.cv-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  image-rendering: pixelated;   /* small images stay crisp when scaled up */
+  background: repeating-conic-gradient(#2a2a2a 0% 25%, #333 0% 50%) 50% / 16px 16px;
+}
+
+.cv-plotly {
+  width: 100%;
+  min-height: 420px;
+}
+
+.cv-table-wrap {
+  overflow: auto;
+}
+
+.cv-table {
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.cv-table th,
+.cv-table td {
+  border: 1px solid #333;
+  padding: 3px 8px;
+  text-align: left;
+}
+
+.cv-table th {
+  background: #252526;
+  color: #bbb;
+}
+
+.cv-note,
+.cv-loading {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.cv-error {
+  color: #f87171;
+  font-size: 0.8rem;
+}
+
+.cv-text,
+.cv-json {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.cv-json-node {
+  margin-left: 14px;
+}
+
+.cv-json > .cv-json-node {
+  margin-left: 0;
+}
+
+.cv-json-node > summary {
+  cursor: pointer;
+  color: #bbb;
+}
+
+.cv-json-leaf {
+  margin-left: 14px;
+}
+
+.cv-json-key { color: #9cdcfe; }
+.cv-json-string { color: #ce9178; }
+.cv-json-number { color: #b5cea8; }
+.cv-json-boolean,
+.cv-json-null { color: #569cd6; }
+
+/* ── Typed cells in the grid (DataOutputGrid.tsx) ─────────────────────────── */
+
+.typed-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.typed-cell-thumb {
+  width: auto;
+  height: 28px;
+  max-width: 48px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.typed-cell-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.typed-cell-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-cell.openable,
+.single-value-display.openable {
+  cursor: zoom-in !important;
+}

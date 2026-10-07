@@ -10,10 +10,11 @@ dataset, and one step per step of core's workflow, each written as a formula.
 | [`tools.py`](tools.py) | core's registry, declared with `@simple_step_tool`, plus its resource types (`@simple_step_resource`) |
 | [`projects/demo/all-orchestrations.simple-steps-workflow`](projects/demo/all-orchestrations.simple-steps-workflow) | the 44-step workflow: every shape verb |
 | [`projects/demo/resources.simple-steps-workflow`](projects/demo/resources.simple-steps-workflow) | the 11-step resources workflow: core's `build_resources()`, plus a ready-made resource |
-| [`check.py`](check.py) | runs both workflows the way the UI does and compares every step with core |
+| [`projects/demo/rich-cells.simple-steps-workflow`](projects/demo/rich-cells.simple-steps-workflow) | 5 steps whose cells are images, tables and a Plotly chart (app only) |
+| [`check.py`](check.py) | runs all three workflows the way the UI does and compares every step with core |
 
 ```bash
-python examples/all_orchestrations/check.py        # 55/55 steps match simple-steps-core
+python examples/all_orchestrations/check.py        # 60/60 steps match simple-steps-core
 simple-steps --workspace examples/all_orchestrations
                                                     # open the workflow in the UI and press Run
 ```
@@ -117,6 +118,16 @@ so the deployment's settings apply underneath:
 marks this step *app only* and checks it against fixed values. In the UI the
 toolbar's **Resources** menu lists ready-made resources under *From the
 deployment* with a **Use** button.
+
+## Rich cells
+
+A cell can hold more than text: `rich-cells` returns an image per row
+(`swatch`, a numpy array), a table per row (`profile`), and a Plotly chart
+(`city_chart`, which needs `pip install simple-steps[media]`). The grid shows a
+thumbnail or a short summary (`16×16 RGB image`, `table 1×3`,
+`bar chart · 1 trace · Readings per city`); clicking the cell opens the full
+view. `bright` reads the images back with `brightness`, which gets the real
+array, never the thumbnail.
 
 ## Differences from core's example
 

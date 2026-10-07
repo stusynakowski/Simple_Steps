@@ -57,7 +57,14 @@ agent-ollama = [
 desktop = [
     "pywebview>=5.0",
 ]
+# Rich cell types (docs/dev_plan/122 S4): Plotly figures and Pillow images get
+# their own cell views. Optional — numpy image arrays work without either.
+media = [
+    "plotly>=5.0",
+    "pillow>=10.0",
+]
 dev = [
+    "simple-steps[media]",
     "pytest>=8.0",
     "httpx2>=0.28",
     "ruff>=0.6",

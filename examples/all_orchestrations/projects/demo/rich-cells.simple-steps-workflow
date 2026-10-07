@@ -1,0 +1,46 @@
+{
+  "format_version": 2,
+  "id": "rich-cells",
+  "name": "Rich cells",
+  "meta": {
+    "source": "app only: docs/dev_plan/122 \u00a74 (S4)",
+    "syntax": "core operation syntax, docs/dev_plan/120"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"city\": [\"SF\", \"NYC\", \"SF\", \"LA\"], \"n\": [1, 2, 3, 2]}')",
+      "meta": {
+        "label": "readings"
+      }
+    },
+    {
+      "name": "swatches",
+      "expression": "swatch[mod.map(name=\"swatch\")](wf[\"readings\"])",
+      "meta": {
+        "label": "swatches"
+      }
+    },
+    {
+      "name": "bright",
+      "expression": "brightness[mod.map(name=\"brightness\")](wf[\"swatches\"])",
+      "meta": {
+        "label": "bright"
+      }
+    },
+    {
+      "name": "profiles",
+      "expression": "profile[mod.map(name=\"profile\")](wf[\"readings\"])",
+      "meta": {
+        "label": "profiles"
+      }
+    },
+    {
+      "name": "chart",
+      "expression": "city_chart[mod.source()](cities=[\"SF\", \"NYC\", \"LA\"], counts=[2, 1, 1])",
+      "meta": {
+        "label": "chart"
+      }
+    }
+  ]
+}

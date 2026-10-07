@@ -13,6 +13,10 @@
 > `overrides`; the Resources menu offers them ("Use"), saves edits as
 > overrides, and flags one that's missing or whose settings changed. Core
 > needed nothing: the app hands it `define(name, Type, **merged settings)`.
+> **S4 (rich cells) built 2026-10-07:** `cell_types.py` (registry + image,
+> Plotly, table, JSON and text types), `/api/data` cells with `cell_type` /
+> `summary` / `preview`, `GET /api/cell/{ref}` for the full view, and the
+> grid's thumbnails + `CellViewer`. Example: `projects/demo/rich-cells`.
 > Sections 1–4 are the four things to add; §6 lists the decisions to settle
 > before building them. Everything else is in §7 (later) and §8 (cleanup).
 
@@ -585,6 +589,20 @@ A developer registers their own type with the same three parts. The fuller
 version, with input UIs, guardrails and custom methods, is in §7.
 
 ### 4.3 What to build
+
+**Built 2026-10-07** (S4.1–S4.5), as follows:
+
+| piece | where | notes |
+|---|---|---|
+| registry | `src/SIMPLE_STEPS/cell_types.py` | `CellType(name, matches, summary, view, preview=None)`; `register_cell_type(…)` puts a developer's type ahead of the built-ins |
+| built-ins | same | **image** (uint8 `H×W[×3\|4]` arrays, encoded to PNG with the standard library; Pillow images), **plotly** (any `plotly.*` figure), **table** (a DataFrame in a cell), **json** (dicts, lists, arrays; keeps its JSON `value`), **text** (`repr`, the fallback). Text and numbers are untouched |
+| cells | `/api/data` | both paths (tables and raw values) use `cell_types.cell`; a typed cell adds `cell_type`, `summary`, and for images a ≤48 px `preview`; its `display_value` is the summary |
+| full view | `GET /api/cell/{ref}?row=&column=` | `{cell_type, summary, view: {kind: image\|plotly\|table\|json\|text, …}}` |
+| grid | `DataOutputGrid.tsx`, `CellViewer.tsx` | thumbnail or icon + summary in the cell; a click (not in wiring mode) opens the viewer; Plotly is a separate 4.8 MB chunk loaded only when a chart opens |
+| dependencies | `pyproject.toml` | `media` extra (`plotly`, `pillow`), included in `dev`; neither is imported unless a value is one of theirs |
+| example | `projects/demo/rich-cells` | swatches (images), `brightness` reading the real arrays, tables in cells, a Plotly chart; `check.py` compares rich cells as `<type: summary>` and opens each full view |
+
+The original list, for reference:
 
 - **S4.1** `TypeRegistry` with the built-ins above.
 - **S4.2** Values stay real objects in the session (`Store` keeps the object,

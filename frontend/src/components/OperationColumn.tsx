@@ -763,6 +763,7 @@ export default function OperationColumn({
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
                       <DataOutputGrid
                         cells={step.output_preview}
+                        refId={step.outputRefId}
                         wiringMode={isWiringSource}
                         onPick={(pick) => pickFrom(step.label, pick)}
                         highlight={wiringState.activeSelection?.step === step.label ? wiringState.activeSelection : null}

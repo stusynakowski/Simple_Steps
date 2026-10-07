@@ -9,7 +9,10 @@ check.py — run the workflow the way the UI does, and compare with core.
    UI's file explorer uses:
 
    - ``all-orchestrations`` — core's ``run()``: every shape verb;
-   - ``resources`` — core's ``run_resources()``: resources, ``res["…"]``.
+   - ``resources`` — core's ``run_resources()``: resources, ``res["…"]``;
+   - ``rich-cells`` — app only: images, a Plotly figure and tables in cells.
+     A rich cell compares as ``<type: summary>``, and its full view
+     (``/api/cell``) must open as the right kind.
 
 3. Runs each step as ``useWorkflow.runStep`` does: parse the formula with
    ``/api/parse_formula``, send its arguments to ``/api/run`` with the
@@ -73,6 +76,26 @@ APP_ONLY = {
     "house_summaries": (["text", "value"], [["a", "[house-2] A"], ["b", "[house-2] B"]]),
 }
 
+_IMG = "<image: 16×16 RGB image>"
+_TABLE = "<table: table 1×3>"
+#: The rich-cells workflow is app only (core has no cell types). Each rich cell
+#: compares as `<type: summary>`. `bright` proves a later step reads the real
+#: image array, not its thumbnail: a swatch's mean is (60·n + 0 + 128) / 3.
+RICH_CELLS = {
+    "readings": (["city", "n"], [["SF", 1], ["NYC", 2], ["SF", 3], ["LA", 2]]),
+    "swatches": (["city", "n", "swatch"],
+                 [["SF", 1, _IMG], ["NYC", 2, _IMG], ["SF", 3, _IMG], ["LA", 2, _IMG]]),
+    "bright": (["city", "n", "swatch", "brightness"],
+               [["SF", 1, _IMG, 62.67], ["NYC", 2, _IMG, 82.67], ["SF", 3, _IMG, 102.67],
+                ["LA", 2, _IMG, 82.67]]),
+    "profiles": (["city", "n", "profile"],
+                 [["SF", 1, _TABLE], ["NYC", 2, _TABLE], ["SF", 3, _TABLE], ["LA", 2, _TABLE]]),
+    "chart": (["value"], [["<plotly: bar chart · 1 trace · Readings per city>"]]),
+}
+
+#: What each rich cell's full view must be.
+VIEW_KINDS = {"image": "image", "plotly": "plotly", "table": "table", "json": "json", "text": "text"}
+
 
 def _table(frame) -> tuple:
     rows = json.loads(frame.to_json(orient="values", default_handler=str))
@@ -87,10 +110,12 @@ def main() -> int:
     client.get("/api/session")
 
     total = differ = 0
-    for pipeline_id, expected in (("all-orchestrations", core_outputs()),
-                                  ("resources", core_resource_outputs())):
+    for pipeline_id, expected, app_only in (
+            ("all-orchestrations", core_outputs(), set()),
+            ("resources", core_resource_outputs(), set(APP_ONLY)),
+            ("rich-cells", RICH_CELLS, set(RICH_CELLS))):
         print(f"── {pipeline_id}")
-        n, d = check_workflow(client, pipeline_id, expected)
+        n, d = check_workflow(client, pipeline_id, expected, app_only)
         total, differ = total + n, differ + d
         print()
 
@@ -98,8 +123,11 @@ def main() -> int:
     return 1 if differ else 0
 
 
-def check_workflow(client, pipeline_id: str, expected: dict) -> tuple[int, int]:
-    """Run one saved workflow the way the UI does; return (steps, differing)."""
+def check_workflow(client, pipeline_id: str, expected: dict,
+                   app_only: set = frozenset()) -> tuple[int, int]:
+    """Run one saved workflow the way the UI does; return (steps, differing).
+    Steps in *app_only* have no counterpart in core and are checked against
+    fixed values instead."""
     pipeline = client.get(f"/api/projects/demo/pipelines/{pipeline_id}").json()
     resources = pipeline.get("resources") or None
 
@@ -142,7 +170,7 @@ def check_workflow(client, pipeline_id: str, expected: dict) -> tuple[int, int]:
         else:
             got = _cells_to_table(client, refs[sid])
             same = got[0] == expected[sid][0] and _norm(got[1]) == _norm(expected[sid][1])
-            tag = "  (app only)" if sid in APP_ONLY else ""
+            tag = "  (app only)" if sid in app_only else ""
             print(f"{'PASS' if same else 'DIFF'}  {label:14} {formula}{tag}")
             if not same:
                 print(f"      core: {expected[sid][0]} {str(expected[sid][1])[:160]}")
@@ -153,12 +181,22 @@ def check_workflow(client, pipeline_id: str, expected: dict) -> tuple[int, int]:
 
 
 def _cells_to_table(client, ref: str) -> tuple:
+    """A step's output as the grid receives it. A rich cell (image, figure,
+    table) carries no value, only a summary, so it reads as `<type: summary>` —
+    and its full view must open as the matching kind."""
     cells = client.get(f"/api/data/{ref}?limit=1000").json()
     columns, rows = [], {}
     for cell in cells:
         if cell["column_id"] not in columns:
             columns.append(cell["column_id"])
-        rows.setdefault(cell["row_id"], {})[cell["column_id"]] = cell["value"]
+        value = cell["value"]
+        if cell.get("cell_type") and not cell.get("value"):
+            value = f"<{cell['cell_type']}: {cell['summary']}>"
+            view = client.get(f"/api/cell/{ref}",
+                              params={"row": cell["row_id"], "column": cell["column_id"]}).json()
+            if view.get("view", {}).get("kind") != VIEW_KINDS.get(cell["cell_type"]):
+                value += f" (view opened as {view.get('view', {}).get('kind')!r})"
+        rows.setdefault(cell["row_id"], {})[cell["column_id"]] = value
     return columns, [[row.get(c) for c in columns] for _, row in sorted(rows.items())]
 
 

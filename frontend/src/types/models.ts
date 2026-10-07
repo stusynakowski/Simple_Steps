@@ -6,6 +6,13 @@ export interface Cell {
   value: unknown;
   display_value: string;
   metadata?: Record<string, unknown>;
+  /** Set for a value richer than text or a number: 'image', 'plotly', 'table',
+   *  'json', 'text', or a developer's own type (backend cell_types.py). */
+  cell_type?: string;
+  /** A short line describing the value: "64×64 RGB image", "table 40×3". */
+  summary?: string;
+  /** Small inline data shown in the cell, e.g. an image thumbnail (data: URL). */
+  preview?: string;
 }
 
 export type StepConfiguration = Record<string, unknown>;

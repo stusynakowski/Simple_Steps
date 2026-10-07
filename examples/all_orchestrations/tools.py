@@ -19,6 +19,9 @@ with core's own output.
 
 from __future__ import annotations
 
+import numpy as np
+import pandas as pd
+
 from SIMPLE_STEPS import simple_step_loaded, simple_step_resource, simple_step_tool
 
 
@@ -210,3 +213,58 @@ def summarize(text: str, llm: FakeLLM) -> str:
 # settings apply underneath. A real deployment reads credentials with
 # env("NAME"), which a workflow can never see or change.
 simple_step_loaded("house_llm", FakeLLM, model="house-1")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Rich cells — values the grid shows as more than text (docs/dev_plan/122 §4).
+# An image, a Plotly figure and a table, each in a cell: the grid shows a
+# thumbnail or a summary, and a click opens the full view. A later step reads
+# the real object — `brightness` gets the image array, not its thumbnail.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@simple_step_tool(category="Rich cells")
+def swatch(n: int) -> np.ndarray:
+    """A 16×16 colour swatch for a reading: redder as n grows. A uint8 array
+    is shown as an image, with no imaging library needed.
+
+    Args:
+        n: the reading.
+    """
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    image[..., 0] = min(255, 60 * n)
+    image[..., 2] = 128
+    return image
+
+
+@simple_step_tool(category="Rich cells")
+def brightness(swatch: np.ndarray) -> float:
+    """The mean pixel value of an image — reads the real array.
+
+    Args:
+        swatch: an image from a previous step.
+    """
+    return round(float(swatch.mean()), 2)
+
+
+@simple_step_tool(category="Rich cells")
+def profile(city: str, n: int) -> pd.DataFrame:
+    """A one-row table about a reading, shown as a table in a cell.
+
+    Args:
+        city: the city.
+        n: the reading.
+    """
+    return pd.DataFrame({"city": [city], "n": [n], "double": [2 * n]})
+
+
+@simple_step_tool(category="Rich cells")
+def city_chart(cities: list, counts: list):
+    """A Plotly bar chart (needs the `media` extra: pip install simple-steps[media]).
+
+    Args:
+        cities: the bars' labels.
+        counts: the bars' heights.
+    """
+    import plotly.graph_objects as go
+    return go.Figure(go.Bar(x=cities, y=counts), layout_title_text="Readings per city")

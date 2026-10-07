@@ -6,7 +6,6 @@ from .formula_parser import parse_formula, build_formula
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 import pandas as pd
-import numpy as np
 import traceback as tb_module
 
 from .models import (
@@ -824,52 +823,10 @@ def _raw_to_cells(raw: object, *, offset: int = 0, limit: int = 50) -> list:
     * scalar / object    → 1 row × 1 cell under column ``"value"``
     """
     def _cell(row_id: int, column_id: str, value: object) -> dict:
-        # Best-effort JSON-friendly representation.
-        if value is None:
-            return {"row_id": row_id, "column_id": column_id, "value": None, "display_value": ""}
-        if isinstance(value, (str, int, float, bool)):
-            return {
-                "row_id": row_id,
-                "column_id": column_id,
-                "value": value,
-                "display_value": str(value),
-            }
-        if isinstance(value, (list, tuple)):
-            return {
-                "row_id": row_id,
-                "column_id": column_id,
-                "value": list(value),
-                "display_value": str(value),
-            }
-        if isinstance(value, dict):
-            return {
-                "row_id": row_id,
-                "column_id": column_id,
-                "value": value,
-                "display_value": str(value),
-            }
-        # Pydantic v2 / dataclass / arbitrary object → best-effort dict
-        try:
-            if hasattr(value, "model_dump"):
-                dumped = value.model_dump()
-            elif hasattr(value, "__dataclass_fields__"):
-                from dataclasses import asdict
-                dumped = asdict(value)
-            else:
-                dumped = str(value)
-            return {
-                "row_id": row_id,
-                "column_id": column_id,
-                "value": dumped if not isinstance(dumped, str) else dumped,
-                "display_value": str(value),
-            }
-        except Exception:
-            return {
-                "row_id": row_id,
-                "column_id": column_id,
-                "value": str(value),
-                "display_value": str(value),
-            }
+        # The same cell builder as the DataFrame path, so a raw value that's an
+        # image or a figure gets its cell type too.
+        from .cell_types import cell
+        return cell(row_id, column_id, value)
 
     if raw is None:
         return []
@@ -970,37 +927,54 @@ async def get_data_view(
     # In a real app, we might want to keep the original index
     subset_reset = subset.reset_index(drop=True)
 
+    from .cell_types import cell
     for i, row in subset_reset.iterrows():
         # The absolute row index (for pagination context)
         current_row_idx = offset + int(i)
-
         for col_name, val in row.items():
-            # Handle list/array values correctly to avoid ValueError
-            # pd.isna() raises on array-like values, so check those first.
-            if isinstance(val, (list, tuple, np.ndarray)):
-                display_val = str(val)
-                # Convert numpy arrays to lists for JSON serialization
-                actual_val = val.tolist() if isinstance(val, np.ndarray) else val
-            else:
-                try:
-                    is_na = pd.isna(val)
-                except (ValueError, TypeError):
-                    is_na = False
-                if is_na:
-                    display_val = ""
-                    actual_val = None
-                else:
-                    display_val = str(val)
-                    actual_val = val
-
-            cells.append({
-                "row_id": current_row_idx,
-                "column_id": str(col_name),
-                "value": actual_val,
-                "display_value": display_val
-            })
+            # Text and numbers as they are; images, figures, tables and dicts
+            # as a typed cell with a summary (cell_types.py).
+            cells.append(cell(current_row_idx, str(col_name), val))
 
     return cells
+
+
+@app.get("/api/cell/{ref_id}")
+async def get_cell_view(
+    ref_id: str,
+    row: int,
+    column: str,
+    session_id: str = Depends(get_session_id),
+):
+    """One cell's full view — the image at full size, the Plotly figure, the
+    whole dict — for the grid's cell viewer. ``/api/data`` sends only a
+    summary and a small preview, so a column of images stays cheap.
+    """
+    from .cell_types import view
+    if _ref_exists_in_raw_store(ref_id, session_id=session_id):
+        found, value = _raw_value_at(_get_raw_only(ref_id, session_id=session_id), row, column)
+    else:
+        df = get_dataframe(ref_id, session_id=session_id)
+        if df is None:
+            raise HTTPException(status_code=404, detail="Data reference expired")
+        found = 0 <= row < len(df) and column in [str(c) for c in df.columns]
+        value = df.iloc[row][[c for c in df.columns if str(c) == column][0]] if found else None
+    if not found:
+        raise HTTPException(status_code=404, detail=f"No cell at row {row}, column {column!r}")
+    return view(value)
+
+
+def _raw_value_at(raw: object, row: int, column: str) -> tuple:
+    """The value ``_raw_to_cells`` shows at (*row*, *column*): ``(found, value)``."""
+    if isinstance(raw, list) and raw and isinstance(raw[0], dict):
+        if 0 <= row < len(raw) and isinstance(raw[row], dict) and column in raw[row]:
+            return True, raw[row][column]
+        return False, None
+    if isinstance(raw, dict):
+        return (row == 0 and column in raw), raw.get(column)
+    if isinstance(raw, list):
+        return (column == "value" and 0 <= row < len(raw)), (raw[row] if 0 <= row < len(raw) else None)
+    return (row == 0 and column == "value"), raw
 
 
 @app.get("/api/data-meta/{ref_id}")
