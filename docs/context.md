@@ -12,6 +12,16 @@ Set this manually before using an agent:
 - SPEC: may edit only `docs/spec/**`, `docs/adr/**`, `docs/core-proposals/**`, and `docs/context.md`
 - TESTS: may edit only `tests/**`, `docs/testplan/**`, and `docs/context.md`
 - IMPL: may edit only `src/**`, `frontend/**`, `examples/**`, `scripts/**`, `docs/**`, `README.md`, and `pyproject.toml`
+- CLEANUP: the IMPL paths plus `tests/**`, for consolidation only:
+  removing a legacy path, a duplicate or a retired word
+  ([`how-simple-steps-works.md`](how-simple-steps-works.md) §5, §7). A test
+  may change only when it asserts behaviour being deliberately removed. A test
+  of behaviour that stays is never edited to make it pass. Each removal is
+  confirmed by the owner first, with what it costs (§8).
+
+  Note: `scripts/guardrails.py` has let `impl` edit `tests/**` all along,
+  which contradicts the IMPL rule above. Which of the two should be fixed is
+  still open.
 
 ---
 
@@ -101,7 +111,8 @@ time.
 - Test plans: `docs/testplan/`
 - ADRs: `docs/adr/`
 - Core adoption status and next steps: `docs/core-adoption-status.md`
-- Changes requested of core: `docs/core-proposals/`
+- Changes requested of core: `docs/core-proposals/`; the handover for the
+  grid-only core update: `docs/core-proposals/011-core-handover.md`
 - What was removed and what is staged for removal: `docs/cleanup-map.md`
 - Architecture as built: `docs/dev_plan/` (its README marks it active)
 - System design on core — object model, data flow and storage, what core
@@ -141,6 +152,10 @@ time.
 - A tool's contract comes from its signature and docstring. Write an `Args:`
   section: per-parameter text in the UI is parsed from it, and 35% of
   parameters currently have none.
+- Planned (owner, 2026-10-26): `ResourceSpec` will mean a resource's spec, the
+  type and settings needed to load it; tool groups move to the catalog
+  ([doc 12](system_design/12-core-and-app.md#spec-and-status-for-every-object)).
+  Until core changes, the line below still holds.
 - Built-in tool groups are namespace-only `ResourceSpec`s, following core's own
   `orchestration` precedent. The word "pack" is retired.
 - **Change tests only when absolutely necessary**: when a test asserts

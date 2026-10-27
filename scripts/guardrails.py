@@ -53,6 +53,10 @@ PHASE_ALLOWLIST = {
         "external/simple-steps-core",
     ],
 }
+# Consolidation (docs/how-simple-steps-works.md §5, §7): removing a legacy
+# path removes its tests with it, so code and tests change together. Same
+# paths as impl; the rule that differs is in docs/context.md.
+PHASE_ALLOWLIST["cleanup"] = list(PHASE_ALLOWLIST["impl"])
 
 def run(cmd: list[str]) -> str:
     out = subprocess.check_output(cmd, text=True)
