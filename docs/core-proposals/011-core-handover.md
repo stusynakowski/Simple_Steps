@@ -6,6 +6,12 @@
 > over for context. It holds no new decisions; those are in the documents it
 > points to.
 
+**To copy it all at once:** `python scripts/core_handover.py` builds
+`build/core-handover/` (git-ignored) from the current files: this page as its
+README, plus `plan.md`, `requests.md`, `words-and-rules.md`, `code-to-port/`,
+`probes/` and a `CLAUDE.md` of core's rules. Rebuild it after any of those
+files change; don't edit the folder.
+
 **The goal in one line.** Everything Simple Steps can do to a workflow can be
 done on a kernel in a Python terminal. Core is the grid model and nothing
 else; this repo adds transport, sessions, storage, concurrency, UI and the
