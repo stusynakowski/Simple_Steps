@@ -26,6 +26,7 @@ been superseded by the unified-expression model documented here.
 | [`122-skeleton-complete.md`](./122-skeleton-complete.md) | **Draft.** The four pieces that complete the skeleton (object model, resources, the agent, custom cell types), the decisions to settle first, and what's deferred to cleanup. |
 | [`124-core-009-integration.md`](./124-core-009-integration.md) | **Proposed.** Taking core 009 (results-only steps, per-cell states, row ids, `wf.preview`), a core `Workflow` per session, then the grid of spec 014, in six phases. |
 | [`123-tool-picker-discrepancy.md`](./123-tool-picker-discrepancy.md) | **Note.** The formula-bar autocomplete and the Formula panel's tool picker list, show and write tools differently (the autocomplete's formulas don't parse for most tools); suggestions to unify them. |
+| [`125-migrate-to-core-kernel.md`](./125-migrate-to-core-kernel.md) | **Proposed.** Moving to core's kernel (branch `core-handover`, phase 3): what it costs here, the order of work, and the decisions to make. |
 
 ## One-paragraph summary
 

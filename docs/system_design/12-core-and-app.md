@@ -137,7 +137,7 @@ from a registry directly.
 | **Resource** | something tools use | type, config (`ResourceDecl`), the live instance | exists (`define`, `res["x"]`) |
 | **Reference** | points at earlier data | `StepRef`, a selection (rows, columns, cell) by row id, `ResRef` | exists; selections are by position |
 | **Operation** | a step's description, nothing run | tool, modifiers, arguments, input(s) | exists; prints itself (`to_source()`) but can't be parsed from text |
-| **Step** | one line of the workflow | name, position (its id), operation, output, status, problems, warnings | exists |
+| **Step** | one line of the workflow | name (its identity), position (a lookup), operation, output, state, problems, warnings | exists |
 | **Output** | what a step produced, always a DataFrame | `data` with its row id, `meta`, per-row `states` | exists |
 | **Workflow** | the ordered steps | steps, resources | exists |
 | **Kernel** | a workflow with the tools it runs with; what you hold in a terminal | a workflow, a catalog, the loaded resources | missing in core; the app's `Kernel` (`kernels.py`) holds a workflow but no catalog |

@@ -272,7 +272,7 @@ the code, the API and the docs.
 | Word | Means | Retired words |
 |---|---|---|
 | **workflow** | a list of steps | *pipeline* |
-| **step** | one entry in that list: a name and an expression. **Its position in the list is its id**. A step has several forms (the line you type, the operation it parses to, the saved recipe, the live step with its data). They are different things, but they all point to the same output ([one step, several forms](system_design/12-core-and-app.md#one-step-several-forms)) | — |
+| **step** | one entry in that list: a name and an expression. **Its name is its identity** (references and hashes use it); its position is a lookup, and changes with `insert` and `move`. Both `wf["name"]` and `wf[index]` work; an index reference is saved by name (decided 2026-10-27, replacing "its position is its id" from 2026-10-24). A step has several forms (the line you type, the operation it parses to, the saved recipe, the live step with its data). They are different things, but they all point to the same output ([one step, several forms](system_design/12-core-and-app.md#one-step-several-forms)) | — |
 | **expression**, or **formula** | what's written in the formula bar: the right-hand side of `wf["name"] = …` in Python. The two words mean the same thing; scientists tend to say *formula*, programmers *expression* | — |
 | **tool** | a function from the catalog | — |
 | **operation** | what is actually executed: a tool with its modifiers, its arguments, and the data it runs on | *operation* for a plain tool |

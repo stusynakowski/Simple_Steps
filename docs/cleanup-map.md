@@ -265,6 +265,126 @@ filename, which is why it shows as `WHY_WE` in most listings.
 
 ---
 
+## Round 4 — preparing for the grid-only core (2026-10-26)
+
+The owner is changing core to the plan in
+[`system_design/12-core-and-app.md`](system_design/12-core-and-app.md) ("The
+core update") and [`core-proposals/011-core-handover.md`](core-proposals/011-core-handover.md).
+This round maps what changes **in this repo** because of it, and what becomes
+dead. Measured on the working tree, not guessed. Nothing here is removed yet:
+each removal is confirmed first, in the `cleanup` phase
+([`how-simple-steps-works.md`](how-simple-steps-works.md) §8 has what each
+legacy piece still does).
+
+### What was measured
+
+- **Still no orphaned module.** An import graph of `src/SIMPLE_STEPS` finds
+  every module imported by something, or an entry point. Dead code is still
+  in branches and routes, and in modules only legacy code imports:
+  `helpers.py` is imported only by `eval_engine.py`; `orchestrators.py` only
+  by `engine.py`; `orchestration_ops.py` and `pack_loader.py` only by
+  `main.py`.
+- **Correction to §8 L11.** It said the UI never calls the formula
+  endpoints. It does: the UI parses *every* formula through
+  `/api/parse_formula` (`useWorkflow.ts`, `StepToolbar.tsx`,
+  `OperationColumn.tsx`, `ToolEditor.tsx`), and also calls `build_formula`,
+  `format_formula` and `infer_verb`. The routes the UI really never calls are
+  `/api/debug/registry`, `/api/loader` and `/api/projects/{id}/load-ops`.
+- **How widely the legacy names reach** (references in src / tests / frontend):
+  `OPERATION_REGISTRY` 56 / 34 / 0, `StepProxy` 86 / 2 / 0, `ref_id`
+  135 / 68 / 12, `RAW_STORE` 15 / 7 / 0, `DATA_STORE` 10 / 8 / 0,
+  `eval_mode` 8 / 0 / 6, `coerce_config_to_signature` 9 / 0 / 0.
+
+### Stage A — now, without waiting for core
+
+Decided already; needs only the owner's go-ahead per item.
+
+| Item | Code | Notes |
+|---|---|---|
+| L1 eval mode | `eval_engine.py` (161 lines), `settings.eval_mode`, its branch in `engine.py`; the toggle in `Sidebar.tsx` and `api.ts` | `helpers.py` (335) is imported only by `eval_engine.py`, so it becomes unreachable too, unless L8 keeps it as public API |
+| L2 engine switch | `settings.engine` (1 backend reference, 1 frontend) | the grid only |
+| Unused routes | `/api/debug/registry`, `/api/loader`, `/api/projects/{id}/load-ops` | `load-ops` is also half of the code-execution hole (with `files/write`) |
+| L11, corrected | — | the formula routes stay until core's parser backs them (stage C) |
+
+### Stage B — the tangles, no behaviour change
+
+From §8 "Tangles to cut first", plus one more:
+
+1. Split `grid_runner.py` (961 lines) into what the kernel needs and the
+   legacy per-step path (L10, `coerce_config_to_signature`).
+2. Move `models.StepConfig` and `example_check.py` off `formula_parser` onto
+   `operation_formula`.
+3. `@simple_step_tool` stops wrapping tools in `StepProxy`.
+4. New: `useWorkflow.ts:104` rebuilds a formula from legacy fields
+   (`buildFormula(processType, configuration, …)`) when a saved formula
+   doesn't parse. That is the frontend's last legacy-formula path; it goes
+   with L4.
+
+### Stage C — as each core change lands
+
+| Core change | What changes here | Dead afterwards |
+|---|---|---|
+| **Catalog object** (12: object model; K24) | `application.App` builds a `grid.Catalog`; `core_bridge.register_with_core` and `main.py:139` stop using `REGISTRY`/`register_tool`; `agent/scope.py` reads the catalog | `OPERATION_REGISTRY` becomes the catalog (56 refs); `DEFINITIONS_LIST`; the old engine's imports |
+| **`Formula.parse` in core** | `/api/parse_formula`, `format_formula` keep their response shape and call core | `operation_formula.py` (678) shrinks to the UI's `to_parts`; the canonical half of `formula_parser.py` |
+| **Kernel in core, with `kernel.spec`** | `kernels.Kernel` keeps key, kernel, lock, last-used; snapshots save `kernel.spec` | `Kernel.formulas`, `operations`, `reads`, `uses`, `problems`, `loaded`, `ids`; `kernels.summary()` |
+| **Outputs by data version** (K22) | `/api/data`, `/api/cell`, `/api/data-meta` read from the kernel. Recommend: **keep the `ref_id` field, and make its value the data version**, so the 12 frontend references and 68 test references keep working | `DATA_STORE`, `RAW_STORE` (with L6), the leak |
+| **Sizes and pages** (K26) | `/api/data?offset&limit` calls `wf.preview(rows=…)`; responses carry row count, estimated size, or `unknown` with the reason | the app's own slicing |
+| **Lineage** (K28) | `/api/cell` returns core's stored lineage | the app working lineage out |
+| **Progress modifiers** (K23) | `progress.py` (90) and the SSE route `/api/progress/{step_id}` relay core's callback | the app's own progress bookkeeping |
+| **`extras`** (K21) | `@simple_step_tool` = core `@tool` + `extras["simple_steps.ui"]` (`name`, `category`, widgets); `operation_type` becomes a default modifier; `description` goes to the docstring | `apply`; `SHIM(core §C18)`; the side table for UI data |
+| **`spec` / `from_spec`** | `file_manager.py` saves and loads `kernel.spec` | the app's own workflow format, after a converter (K17) |
+| **`ResourceSpec` renamed** | `core_bridge.py` built-in tool groups move to the catalog; `CLAUDE.md` and `context.md` name a new pin-drift symptom | the old `ResourceSpec` use |
+| **Kernel and run ids** (K20) | the workflow file and the UI show `k.id` | — |
+| **Stale-reference warnings** (K29) | shown with the other step problems | — |
+
+### Stage D — the owner's calls (§8)
+
+**The rule for this round** (owner, 2026-10-26): mitigate spaghetti code and
+leaky abstractions as much as possible; *the best code is no code that still
+implements what we envisioned*. So the default for each call below is
+**delete**, unless a stated goal needs it, and no converters, aliases or
+compatibility layers without a named user who needs them.
+
+| Item | Modules | Lines | Recommendation under the rule |
+|---|---|---|---|
+| L3 tool loading at runtime | `pack_loader.py` | 522 | delete. `App(tools=[…])` at boot covers it, and it's half of a security hole |
+| L4 old-syntax formulas | `orchestrators.py`, `orchestration_ops.py`, the legacy half of `formula_parser.py`, most of `engine.py`'s dispatch | 322 + 251 + ~100 + most of 999 | delete, with one clear error ("written in the old syntax") instead of a converter. No shipped example uses it |
+| L7 console expressions | `safe_formula.py` | 837 | delete, and the console with it: adding a step *is* how you evaluate something, and it shows the result as data. Keep the console only if it does something a step can't |
+| L8 steps as Python variables | `step_proxy.py`, `helpers.py` | 505 + 335 | delete. Core's `wf["x"] = …` is the Python way, the same in a terminal |
+| L9 duplicate standard tools | in `operations.py` | per tool | delete the duplicates. Add a second spelling later, as a thin tool on core's verb, only when a user asks for it |
+
+### Leaks to close, beyond dead code
+
+Places where one concept is implemented twice, or where one layer's detail
+shows through another:
+
+| Leak | Where | One owner |
+|---|---|---|
+| two formula parsers | `formula_parser.py` and `operation_formula.py`; the UI round-trips every edit through the first | core's `Formula.parse` |
+| three registries | core `REGISTRY`, `grid.TOOLS`, this repo's `OPERATION_REGISTRY` | the catalog |
+| two `App`s | core's `app.py` and this repo's `application.py` | this repo's (core's goes) |
+| two status models | §7 item 20 | core's step status |
+| two agent paths | `/propose` and the LangGraph `/chat` | one agent, using `proposals.py`'s checks |
+| the frontend keeps parsed state beside the formula | `types/models.ts:32` ("always updated alongside `formula`"), `processType`/`configuration` legacy fields | the formula text is the step; parts are derived on demand |
+| stores outside the kernel | `DATA_STORE`, `RAW_STORE` | the kernel's outputs (K22) |
+| the kernel duplicates core's step fields | `kernels.Kernel.formulas`, `operations`, … | core's step |
+
+About 3,200 lines of whole modules, plus most of `engine.py` and half of
+`grid_runner.py`.
+
+**Tests that go with their code:** `test_orchestrators.py` and
+`test_step_mode.py` (orchestrators, L4), `test_pack_loader.py` (L3),
+`test_safe_formula.py` (L7). `test_formula_alignment.py` (910 lines),
+`test_step_engine.py` and `test_engine.py` exercise `engine.py`; check each
+test against what stays before removing any. A test of behaviour that stays
+is never edited to pass.
+
+**The checks after each removal:** `pytest` stays at 1 failure (0 once
+`select_cell` goes), `python scripts/preflight.py`, and
+`python src/SIMPLE_STEPS/examples/runme.py`.
+
+---
+
 ## Not dead — keep, despite appearances
 
 Checked and live, so you can stop wondering:
@@ -274,7 +394,7 @@ Checked and live, so you can stop wondering:
 - **`photos/`** — the README cover image.
 - **All four `mock_projects/`** — every one is used by tests.
 - **`eval_engine.py`** — wired behind the `eval_mode` setting, which the
-  Settings panel exposes.
+  Settings panel exposes. *Removal decided 2026-10-24 (L1); see Round 4.*
 - **`src/SIMPLE_STEPS/agent/`** — `main.py:145` includes its router.
 - **`build_frontend.py`** — 0 inbound references, but it is the bundle build.
   Run as `python -m SIMPLE_STEPS.build_frontend`.

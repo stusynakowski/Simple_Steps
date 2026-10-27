@@ -1709,6 +1709,35 @@ references: `d`'s formula becomes `dbl[mod.map()](wf["q"])` and `d` stays
 reference's current output warns the user that it is reading old data (a
 stale reference), with the step it read and the version.
 
+### K30. `wf[index]` in a formula, saved by name
+
+**Decided by the owner (2026-10-27):** a step's name is its identity, and both
+`wf["name"]` and `wf[index]` work as references.
+
+**Today** (run at `core-handover` `61f31e2`): the kernel takes an index
+(`k[0]`, `k[-1]`, `k.step(0).name` → `'p'`), but a reference in a formula
+doesn't: `dbl[mod.map()](wf[0])` raises *"a step reference takes a step id (a
+string), got 0"*. Core's plan §7.2 already says a reference written by index
+is saved by name.
+
+**Ask:** `wf[i]` (negative too) resolves to the name of the step at that
+position when declared, and is saved and printed (`to_source()`) by name. An
+index past the step being declared is the later-step problem.
+
+Rules (owner, 2026-10-27):
+
+1. **Typing shorthand, never a live position.** Resolved once, when declared;
+   after that it is `wf["name"]`, so `insert` and `move` never change what it
+   reads, and the hash never sees a position.
+2. **A negative index counts from the step being declared**, not from the end
+   of the list: in `k.insert(2, "x", … wf[-1] …)`, `wf[-1]` is the step at
+   position 1. When appending, the two are the same.
+3. **The name is shown at once.** After Enter, the formula bar shows
+   `wf["p"]`, not `wf[-1]`.
+4. **Two levels of `[number]`, documented:** `wf[0]` picks a step;
+   `wf["r"][0]` picks a row of step `r`. Step names are always text, so core
+   never confuses them.
+
 ### R7. A standard handle for media
 
 **Today:** saving an output that holds an image is refused, clearly.
