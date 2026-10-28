@@ -84,8 +84,8 @@ COMBINES = {"join": join, "stack": stack, "zip_": zip_, "zip": zip_}
 
 def _modifier_catalog() -> Dict[str, dict]:
     """Core's modifiers, from the app's catalog: name → class, settings, tool."""
-    from .catalog import catalog
-    return catalog().describe()["modifiers"]
+    from .catalog import modifiers
+    return modifiers()
 
 
 class FormulaError(ValueError):
@@ -207,6 +207,16 @@ OLD_SYNTAX = (
 )
 
 
+def not_a_step(formula: Optional[str]) -> str:
+    """Why a formula that is neither core's syntax nor a value can't be a step:
+    Python's own message when it doesn't parse, else :data:`OLD_SYNTAX`."""
+    try:
+        ast.parse(_body(formula), mode="eval")
+    except SyntaxError as exc:
+        return f"Invalid expression: {exc.msg}"
+    return OLD_SYNTAX
+
+
 def is_literal(formula: Optional[str]) -> bool:
     """Whether *formula* is a value — ``[1, 2]``, ``{"x": 1}``, ``7``, ``"text"``."""
     body = _body(formula)
@@ -238,7 +248,7 @@ def describe(formula: Optional[str]) -> Dict[str, Any]:
     if is_literal(raw):
         return {**out, "operationId": "literal", "isValid": True,
                 "args": {"expr": body, "_literal": body}}
-    return {**out, "error": OLD_SYNTAX}
+    return {**out, "error": not_a_step(raw)}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -281,7 +281,7 @@ def sync(s: Kernel, steps: List[Dict[str, Any]]) -> None:
     one is re-declared and core marks it — and what reads it — stale. A step
     the app no longer has is removed; a moved one is moved.
     """
-    from .operation_formula import OLD_SYNTAX, FormulaError, is_canonical
+    from .operation_formula import FormulaError, is_canonical, not_a_step
 
     names = [str(step["name"]) for step in steps]
     # Renamed in the app (same id, new name): rename in core, which keeps the
@@ -318,7 +318,7 @@ def sync(s: Kernel, steps: List[Dict[str, Any]]) -> None:
             if literal is not _NOT_LITERAL:
                 operation = literal
             elif not is_canonical(formula):
-                s.problems[name] = OLD_SYNTAX
+                s.problems[name] = not_a_step(formula)
             else:
                 try:
                     operation = operation_for(formula, s.declarations, s.k.catalog)

@@ -1854,6 +1854,18 @@ tool(id="session_src")(_src).id        # 'session_src'
 `catalog.tool` calls `make(fn, None)` when `fn` is given. **Ask:** pass `id`.
 The app uses the decorator form, so no shim.
 
+### C36. `describe()` lists a verb's retired `name=` setting
+
+**Today:** `Catalog().describe()["modifiers"]["map"]["settings"]` names
+`name`, `retries`, `axis`, `replace`; the same for `expand`, `group`,
+`collapse`, `sweep`. Yet `check_modifier("map", {"name": "x"})` is
+`unknown_setting: map's name= is retired: name the output with mod.name("x")
+after the verb`. The step editor builds its fields from `describe()`, so it
+would offer a field core refuses. **Ask:** `describe()` lists only the
+settings a verb takes. **Shim:** `SHIM(core §C36)`,
+`core_bridge.described_modifiers`, which drops a setting core's own check
+calls unknown.
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |
@@ -1884,6 +1896,6 @@ The app uses the decorator form, so no shim.
 | `SHIM(core §A6)` in `grid_runner.py` | K12 (whole-table tools) — done, removed |
 | `SHIM(core §C17)` | C17 — the path that needed it is removed |
 | `SHIM(core §C18)` | C18 |
-| `SHIM(core §C32)`, `SHIM(core §C33)`, `SHIM(core §C34)` | C32, C33, C34 |
+| `SHIM(core §C32)`, `SHIM(core §C33)`, `SHIM(core §C34)`, `SHIM(core §C36)` | C32, C33, C34, C36 |
 | `SHIM(core §C21)` | C21 |
 | `dev_plan/200` B2 (kernel restart) | C4 |

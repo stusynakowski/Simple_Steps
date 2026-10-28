@@ -343,8 +343,8 @@ async def list_modifiers():
     ``describe()`` so the UI's Orchestration control cannot drift from what
     core runs.
     """
-    from .catalog import catalog
-    return {"modifiers": catalog().describe()["modifiers"]}
+    from .catalog import modifiers
+    return {"modifiers": modifiers()}
 
 
 @app.get("/api/resources")

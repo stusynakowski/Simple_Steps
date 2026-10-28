@@ -160,7 +160,7 @@ def run_operation(
 
     *resources* is the workflow's ``resources`` section.
     """
-    from .operation_formula import OLD_SYNTAX, is_canonical, is_literal
+    from .operation_formula import is_canonical, is_literal, not_a_step
 
     formula = (formula or "").strip()
     if workflow_steps is not None and step_id:
@@ -188,4 +188,4 @@ def run_operation(
         raise ValueError("Error executing step: the step has no formula")
     if is_literal(formula):
         raise ValueError("Error executing step: a value runs as a step of its workflow")
-    raise ValueError(f"Error executing step: {OLD_SYNTAX}")
+    raise ValueError(f"Error executing step: {not_a_step(formula)}")

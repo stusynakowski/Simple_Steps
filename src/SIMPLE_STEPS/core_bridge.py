@@ -16,6 +16,8 @@ Every shim below is tagged with what removes it::
     SHIM(core §C34)  check_modifier and shape_verbs are internal
                      (simple_steps_core.catalog); the parser checks a
                      modifier's settings as you type with them
+    SHIM(core §C36)  describe() lists a verb's retired name= setting, which
+                     core then refuses
     SHIM(core §C32)  a kernel can't be saved with its outputs (the output
                      store); a put-away kernel keeps them through the
                      workflow's internal session export
@@ -59,6 +61,7 @@ __all__ = [
     "with_signature",
     "check_modifier",
     "shape_verbs",
+    "described_modifiers",
     "save_with_outputs",
     "restore_with_outputs",
     "simple_step_resource",
@@ -114,6 +117,23 @@ def shape_verbs() -> Tuple[str, ...]:
     """Core's shape verbs. SHIM(core §C34): internal in core."""
     from simple_steps_core.catalog import shape_verbs as _verbs
     return _verbs()
+
+
+def described_modifiers(catalog: Catalog) -> dict:
+    """``catalog.describe()["modifiers"]``, without the settings core refuses.
+
+    SHIM(core §C36): every verb still lists ``name``, retired for
+    ``mod.name(…)``, so the step editor would offer a field core then refuses.
+    A setting is left out when core's own check calls it unknown. Delete when
+    ``describe()`` lists only the settings a verb takes.
+    """
+    out = {}
+    for kind, entry in catalog.describe()["modifiers"].items():
+        kept = [s for s in entry["settings"]
+                if not any(getattr(p, "code", None) == "unknown_setting"
+                           for p in check_modifier(kind, {s["name"]: s.get("default")}))]
+        out[kind] = {**entry, "settings": kept}
+    return out
 
 
 # --------------------------------------------------------------------------- #

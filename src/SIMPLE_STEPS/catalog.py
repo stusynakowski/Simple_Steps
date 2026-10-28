@@ -53,6 +53,13 @@ def freeze() -> None:
     _FROZEN = catalog()
 
 
+def modifiers() -> Dict[str, dict]:
+    """Core's modifiers as the UI and the parser read them: name → class,
+    settings, whether it takes a tool (``core_bridge.described_modifiers``)."""
+    from .core_bridge import described_modifiers
+    return described_modifiers(catalog())
+
+
 def functions() -> Dict[str, Any]:
     """Tool name → its function, for every tool the catalog has."""
     return dict(catalog().functions)
