@@ -44,7 +44,7 @@
     },
     {
       "name": "doubled",
-      "expression": "double_n[mod.map(name=\"n\")](wf[\"readings\"])",
+      "expression": "double_n[mod.map(), mod.name(\"n\")](wf[\"readings\"])",
       "meta": {
         "label": "doubled"
       }

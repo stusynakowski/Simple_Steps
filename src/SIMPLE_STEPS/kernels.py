@@ -3,35 +3,21 @@ kernels.py — kernels: each open workflow, live (dev_plan/124 phase 2).
 
 Vocabulary (docs/system_design/10-object-model.md): a **session** is a user's
 browser connection (the ``ss_session`` cookie); a **kernel** is one workflow,
-live, inside a session — not a process (yet); the **kernel manager** (below)
-decides which kernels are live and puts the others away.
+live, inside a session — core's ``Kernel``, with its catalog; the **kernel
+manager** (below) decides which kernels are live and puts the others away.
 
-Before this, every step ran in a throwaway ``grid.Workflow`` with the steps it
-read loaded back in as plain tables. Two things were lost on the way:
+Each run request carries every step's name and formula; they are
+(re)declared in the session's kernel — an unchanged step is left alone, a
+changed one makes core mark it and everything after it ``stale`` — and the
+step is run there, so row links and staleness carry across steps. Core runs
+the inputs that never ran first. The output is still stored under a ref id,
+so ``/api/data``, ``/api/cell`` and the grid read it as before; every response
+also reports each step's state (core's ``step.state``, ``stale_reason``,
+``problems``).
 
-* **row links** — core keeps, for each row, the input row it came from, and
-  ``zip_`` pairs by it. A loaded table is renumbered 0…n-1 (core 010, ``#``),
-  so a result computed after a sort and zipped back beside its input paired
-  the wrong rows, silently;
-* **staleness** — editing an earlier step can't mark later ones out of date
-  when they ran in workflows that are already gone.
-
-Here the session's active workflow is one core ``Workflow`` for as long as it
-stays active. Each run request carries every step's name and formula; they
-are (re)declared — an unchanged formula is left alone, a changed one makes
-core mark it and everything after it ``stale`` — and the step is run in that
-workflow. Steps it reads that have never run in this session (a fresh session,
-a reopened workflow) run first. The output is still stored under a ref id, so
-``/api/data``, ``/api/cell`` and the grid read it as before; every response
-also reports each step's state (completed, stale and why, staged, invalid).
-
-Each live workflow is a *kernel* (see "Kernels" below): one is live per
-session (owner, 2026-10-21); switching workflows saves the current one to disk
-and restores — or starts — the other, without recomputing anything.
-
-Only formulas in core's syntax (``operation_formula.is_canonical``) live here.
-A step in the app's older syntax still runs on the old path; a core step that
-reads one gets its stored output as a table, as before.
+Formulas are in core's syntax (``operation_formula``) or are values; a step
+whose formula doesn't parse (the removed older syntax, say) is an empty step
+with the parser's reason, so nothing reads what it used to compute.
 """
 
 from __future__ import annotations
@@ -40,33 +26,22 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from simple_steps_core import grid
+from simple_steps_core import Kernel as CoreKernel
+from simple_steps_core import Operation
 
-from .grid_runner import (
-    GridStepError, _bind_positional_resources, _engine_metrics, _formula_tool, _tools, _verb_of,
-)
+from .grid_runner import GridStepError, _bind_positional_resources, _engine_metrics, _formula_tool
 
 
 @dataclass
 class Kernel:
-    """One workflow, live: its core Workflow, and what the app declared into it."""
+    """One workflow, live: core's kernel, and what hosting it needs."""
 
     key: str
-    wf: grid.Workflow
+    k: CoreKernel
     #: The resource declarations it was built with (a change rebuilds it).
     declarations: Dict[str, Any]
-    types: Dict[str, type] = field(default_factory=dict)
-    #: step → the formula last declared for it.
-    formulas: Dict[str, str] = field(default_factory=dict)
-    #: step → the core operation it was declared as.
-    operations: Dict[str, dict] = field(default_factory=dict)
-    #: step → the steps it reads, and the resources it uses.
-    reads: Dict[str, List[str]] = field(default_factory=dict)
-    uses: Dict[str, List[str]] = field(default_factory=dict)
-    #: step → why it couldn't be declared (a formula that doesn't compile, …).
+    #: step → why its formula couldn't be declared (the parser's reason).
     problems: Dict[str, str] = field(default_factory=dict)
-    #: step → the stored ref an old-syntax step was loaded from.
-    loaded: Dict[str, str] = field(default_factory=dict)
     #: the app's step id → its name, as last synced (to follow renames).
     ids: Dict[str, str] = field(default_factory=dict)
     #: When it was last used (time.monotonic), for the idle culler.
@@ -78,13 +53,10 @@ class Kernel:
 # Kernels: the live workflows, and putting them away
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# A *kernel* is one workflow, live: its core Workflow with every step declared,
-# each step's last output (with its version and what it read — how core knows
-# what is stale), and the app's bookkeeping. As in JupyterHub, a kernel belongs
-# to a session and a workflow; unlike a Jupyter kernel it has no hidden state,
-# so it can be saved whole and brought back exactly (core's
-# ``to_session_dict`` / ``Workflow.from_dict``) — outputs, versions and row
-# links — without recomputing anything.
+# As in JupyterHub, a kernel belongs to a session and a workflow; unlike a
+# Jupyter kernel it has no hidden state, so it can be saved whole and brought
+# back exactly — outputs, versions and row links — without recomputing
+# anything (core_bridge.save_with_outputs, until core's output store).
 #
 # At most MAX_LIVE kernels per session are live (owner, 2026-10-21: one
 # workflow is worked on at a time). Opening another saves the least recently
@@ -114,27 +86,25 @@ def _snapshot_path(session_id: str, key: str) -> str:
 
 
 def _save(session_id: str, s: Kernel) -> bool:
-    """Put a kernel away on disk: its core workflow, outputs and all."""
+    """Put a kernel away on disk: its workflow, outputs and all."""
     import json
     import os
+    from .core_bridge import save_with_outputs
     if not PERSIST:
         return False
     with s.lock:
         try:
-            core = s.wf.to_session_dict()
+            core, outputs = save_with_outputs(s.k), True
         except Exception as exc:
             # An output core can't save — an image array, a Figure (core asks
             # C29/C30). Save the steps without outputs: restored, they re-run
             # when needed rather than coming back.
             print(f"  kernel '{s.key}': outputs not saved ({exc}); its steps will re-run")
-            core = s.wf.to_dict()
+            core, outputs = json.loads(s.k.to_json()), False
         try:
-            text = json.dumps({
-                "key": s.key, "declarations": s.declarations,
-                "formulas": s.formulas, "operations": s.operations, "reads": s.reads,
-                "uses": s.uses, "problems": s.problems, "loaded": s.loaded, "ids": s.ids,
-                "core": core,
-            })
+            text = json.dumps({"key": s.key, "declarations": s.declarations,
+                               "problems": s.problems, "ids": s.ids,
+                               "outputs": outputs, "core": core})
         except (TypeError, ValueError) as exc:
             print(f"  kernel '{s.key}' not saved: {exc}")
             return False
@@ -152,7 +122,8 @@ def _restore(session_id: str, key: str, declarations: Dict[str, Any]) -> Optiona
     was saved with other resources, or core can no longer read it)."""
     import json
     import os
-    from .resources import resolve
+    from .catalog import catalog
+    from .core_bridge import restore_with_outputs
     path = _snapshot_path(session_id, key)
     if not PERSIST or not os.path.exists(path):
         return None
@@ -161,16 +132,13 @@ def _restore(session_id: str, key: str, declarations: Dict[str, Any]) -> Optiona
             blob = json.load(fh)
         if blob.get("key") != key or blob.get("declarations") != declarations:
             return None
-        types = {name: resolve(name, decl)[0] for name, decl in declarations.items()}
-        wf = grid.Workflow.from_dict(blob["core"], _tools(),
-                                     resource_types={cls.__name__: cls for cls in types.values()})
+        k = (restore_with_outputs(blob["core"], catalog()) if blob.get("outputs")
+             else CoreKernel.from_json(json.dumps(blob["core"]), catalog()))
     except Exception as exc:
         print(f"  kernel '{key}' not restored, starting fresh: {exc}")
         return None
-    s = Kernel(key, wf, dict(declarations), types=types)
-    for name in ("formulas", "operations", "reads", "uses", "problems", "loaded", "ids"):
-        setattr(s, name, blob.get(name) or {})
-    return s
+    return Kernel(key, k, dict(declarations), problems=blob.get("problems") or {},
+                  ids=blob.get("ids") or {})
 
 
 def _cull_idle(now: float) -> None:
@@ -191,7 +159,9 @@ def _kernel_for(session_id: str, key: str, declarations: Dict[str, Any]) -> Kern
     """The live kernel for *key* in this session: kept, restored from disk, or
     new — putting away the least recently used one when the session is full."""
     import time
+    from .catalog import catalog
     now = time.monotonic()
+    cat = catalog()
     with _GUARD:
         _cull_idle(now)
         live = _LIVE.setdefault(session_id, {})
@@ -200,6 +170,10 @@ def _kernel_for(session_id: str, key: str, declarations: Dict[str, Any]) -> Kern
             # Resources changed: a kernel is built around its resources.
             del live[key]
             s = None
+        if s is not None and s.k.catalog is not cat:
+            # A tool was declared since: a kernel's catalog is fixed, so the
+            # steps move to a new kernel with the new catalog (outputs aren't kept).
+            s.k = CoreKernel.from_json(s.k.to_json(), cat)
         if s is None:
             # Put away the least recently used — never one that's mid-run
             # (the session goes over the cap until it finishes).
@@ -215,7 +189,7 @@ def _kernel_for(session_id: str, key: str, declarations: Dict[str, Any]) -> Kern
                         victim.lock.release()
             s = _restore(session_id, key, declarations)
             if s is None:
-                s = Kernel(key, grid.Workflow(), dict(declarations))
+                s = Kernel(key, CoreKernel(cat), dict(declarations))
                 _define_resources(s)
             live[key] = s
         s.last_used = now
@@ -245,8 +219,8 @@ def _define_resources(s: Kernel) -> None:
     from .resources import ResourceError, resolve
     for name, declaration in s.declarations.items():
         try:
-            s.types[name], settings = resolve(name, declaration)
-            s.wf.define(name, s.types[name], **settings)
+            cls, settings = resolve(name, declaration)
+            s.k.define(name, cls, **settings)
         except (ResourceError, TypeError) as exc:
             s.problems[f'res["{name}"]'] = str(exc)
 
@@ -266,40 +240,48 @@ def _literal_value(formula: str) -> Any:
     except (ValueError, SyntaxError, MemoryError, RecursionError):
         return _NOT_LITERAL
 
-def _operation_for(s: Kernel, formula: str, tools: Dict[str, Any]) -> Tuple[dict, Any]:
-    """A formula in core's syntax → (the core operation, its compiled form)."""
+
+def operation_for(formula: str, declarations: Dict[str, Any], cat) -> Operation:
+    """A formula in core's syntax → core's operation, for *cat*'s tools.
+    Raises :class:`GridStepError` (or the parser's ``FormulaError``) with the reason."""
     from .operation_formula import compile_formula
+    from .resources import resource_type
 
     compiled = compile_formula(formula)
+    types: Dict[str, type] = {}
     for name in compiled.resources:
-        if name not in s.declarations:
-            known = ", ".join(f'res["{n}"]' for n in s.declarations) or "none yet"
+        if name not in declarations:
+            known = ", ".join(f'res["{n}"]' for n in declarations) or "none yet"
             raise GridStepError(
                 f'no resource named "{name}" in this workflow (its resources: {known}). '
                 "Add it to the workflow's resources first"
             )
-    fn = _formula_tool(compiled, tools, s.types)
-    _bind_positional_resources(compiled, fn, s.types)
+        types[name] = resource_type(declarations[name], name)
+    fn = _formula_tool(compiled, cat.functions, types)
+    _bind_positional_resources(compiled, fn, types)
     inferred = None
     if compiled.needs_inference:
-        # tool(wf["x"], …) is core's implicit auto (core 009 decision 6).
+        # tool(wf["x"], …) is core's implicit auto: it saves `mod.auto()`, and
+        # core picks the verb from the data at each run. With no input, a source.
         if fn is None:
             raise GridStepError(f"no tool named '{compiled.tool_id}'")
         inferred = "source" if compiled.input is None else "auto"
-    bound_type = s.types[compiled.bound_to].__name__ if compiled.bound_to in s.types else None
-    return compiled.operation(inferred, bound_type), compiled
+    bound_type = types[compiled.bound_to].__name__ if compiled.bound_to in types else None
+    return Operation.from_spec(compiled.operation(inferred, bound_type), cat)
 
 
-def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
-         load: Callable[[str], Any]) -> None:
-    """Make the workflow's steps match *steps* (``[{name, formula}]``, in order).
+def _declared(s: Kernel, name: str) -> Optional[Any]:
+    return s.k.step(name) if name in s.k else None
 
-    An unchanged formula is left alone, so its output stays current; a changed
+
+def sync(s: Kernel, steps: List[Dict[str, Any]]) -> None:
+    """Make the kernel's steps match *steps* (``[{id, name, formula}]``, in order).
+
+    An unchanged step is left alone, so its output stays current; a changed
     one is re-declared and core marks it — and what reads it — stale. A step
-    the app no longer has is removed. *load(name)* is an old-syntax step's
-    stored output, loaded as a table for core steps that read it.
+    the app no longer has is removed; a moved one is moved.
     """
-    from .operation_formula import is_canonical
+    from .operation_formula import FormulaError, is_canonical, not_a_step
 
     names = [str(step["name"]) for step in steps]
     # Renamed in the app (same id, new name): rename in core, which keeps the
@@ -307,110 +289,91 @@ def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
     for step in steps:
         sid, name = step.get("id"), str(step["name"])
         old = s.ids.get(sid) if sid else None
-        if old and old != name and old in s.wf.steps and name not in s.wf.steps:
+        if old and old != name and old in s.k and name not in s.k:
             try:
-                s.wf.rename(old, name)
+                s.k.rename(old, name)
             except (KeyError, ValueError):
                 continue
-            for table in (s.formulas, s.operations, s.reads, s.uses, s.problems, s.loaded):
-                if old in table:
-                    table[name] = table.pop(old)
-            for reads in s.reads.values():
-                reads[:] = [name if r == old else r for r in reads]
+            if old in s.problems:
+                s.problems[name] = s.problems.pop(old)
     s.ids = {step.get("id"): str(step["name"]) for step in steps if step.get("id")}
     # Gone from the app: remove, last first, so readers go before what they read.
-    for name in reversed(list(s.wf.steps)):
+    for name in reversed([st.name for st in s.k.steps]):
         if name not in names:
             try:
-                s.wf.remove(name)
+                del s.k[name]
             except (KeyError, ValueError):
                 continue
-            for table in (s.formulas, s.operations, s.reads, s.uses, s.problems, s.loaded):
-                table.pop(name, None)
+            s.problems.pop(name, None)
 
-    for step in steps:
+    for position, step in enumerate(steps):
         name = str(step["name"])
         formula = (step.get("formula") or "").strip()
         if formula and not formula.startswith("="):
             formula = "=" + formula
-        if not formula or formula == "=":
-            continue
-        literal = _literal_value(formula)
-        if literal is not _NOT_LITERAL:
-            # A literal (`[1, 2]`, `{"x": 1}`, `7`) is a value; core takes it
-            # as a step, declared here in its place among the others.
-            if s.formulas.get(name) != formula or name not in s.wf.steps:
-                s.wf[name] = literal
-                s.formulas[name] = formula
-                s.problems.pop(name, None)
-            continue
-        if not is_canonical(formula):
-            # The app's older syntax: run on the old path. A core step that
-            # reads it gets its stored output, as a table.
-            ref = step.get("ref")
-            if ref and s.loaded.get(name) != ref:
-                data = load(name)
-                if data is not None:
-                    s.wf[name] = data
-                    s.loaded[name] = ref
-            continue
-        if s.formulas.get(name) == formula and name in s.wf.steps:
-            continue
-        try:
-            operation, compiled = _operation_for(s, formula, tools)
-            earlier = names[:names.index(name)]
-            for read in compiled.reads:
-                if read not in earlier:
-                    # The same words as a step run on its own (run_formula).
-                    raise GridStepError(
-                        f'no earlier step named "{read}" has output — check the name in '
-                        f'wf["{read}"], or run that step first'
-                    )
-            s.wf[name] = grid.Operation.from_dict(operation, tools)
-        except Exception as exc:
-            s.problems[name] = str(exc)
-            s.formulas.pop(name, None)
-            continue
-        s.formulas[name] = formula
-        s.operations[name] = operation
-        s.reads[name] = list(compiled.reads)
-        s.uses[name] = list(compiled.resources)
         s.problems.pop(name, None)
-        s.loaded.pop(name, None)
+        operation: Any = None                      # the empty step, `k[name] = None`
+        if formula and formula != "=":
+            literal = _literal_value(formula)
+            if literal is not _NOT_LITERAL:
+                operation = literal
+            elif not is_canonical(formula):
+                s.problems[name] = not_a_step(formula)
+            else:
+                try:
+                    operation = operation_for(formula, s.declarations, s.k.catalog)
+                except (FormulaError, GridStepError) as exc:
+                    s.problems[name] = str(exc)
+        _declare(s, position, name, operation)
+
+
+def _declare(s: Kernel, position: int, name: str, operation: Any) -> None:
+    """Declare *name* at *position*, unless core already has exactly it there."""
+    current = _declared(s, name)
+    if current is not None:
+        same = (current.spec.literal == {"value": operation} if not isinstance(operation, Operation)
+                else current.spec.literal is None and current.spec.operation == operation.to_dict())
+        if not same or current.state == "invalid":
+            s.k[name] = operation                  # re-checked: a read may resolve now
+    elif position < len(s.k.steps):
+        s.k.insert(position, name, operation)
+    else:
+        s.k[name] = operation
+    order = [st.name for st in s.k.steps]
+    if order.index(name) != position and position < len(order):
+        s.k.move(name, position)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Running
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _unrun_inputs(s: Kernel, name: str) -> List[str]:
-    """The steps *name* reads, directly or not, that have never run here — in
-    the order they were declared, so each runs after what it reads."""
-    seen: set = set()
+def _upstream(s: Kernel, name: str) -> List[str]:
+    """*name* and every step it reads, directly or not."""
+    seen: List[str] = []
 
     def walk(step: str) -> None:
-        for read in s.reads.get(step, []):
-            if read not in seen:
-                seen.add(read)
-                walk(read)
+        if step in seen or step not in s.k:
+            return
+        seen.append(step)
+        operation = s.k.step(step).operation
+        for read in (operation.reads if operation is not None else ()):
+            walk(read)
 
     walk(name)
-    return [step for step in s.wf.steps
-            if step in seen and step in s.operations and s.wf.step(step).status == "staged"]
+    return seen
 
 
 def summary(s: Kernel) -> Dict[str, dict]:
-    """Every step's state, for the UI: status, why it's stale, problems."""
+    """Every step's state, for the UI: core's state, why it's stale, problems."""
     out: Dict[str, dict] = {}
-    for name, step in s.wf.steps.items():
-        output = step.output
-        meta = output.meta if output is not None else {}
-        problems = list(step.problems)
-        if name in s.problems:
-            problems.insert(0, s.problems[name])
-        out[name] = {
-            "status": step.status,
-            "stale_reason": meta.get("stale_reason"),
+    for step in s.k.steps:
+        problems = [str(p) for p in step.problems]
+        if step.name in s.problems:
+            problems.insert(0, s.problems[step.name])
+        out[step.name] = {
+            "status": "invalid" if step.name in s.problems else step.state,
+            "stale_reason": step.output.stale_reason,
             "problems": problems,
         }
     for name, problem in s.problems.items():
@@ -419,61 +382,65 @@ def summary(s: Kernel) -> Dict[str, dict]:
 
 
 def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
-             declarations: Optional[Dict[str, Any]], load: Callable[[str], Any],
+             declarations: Optional[Dict[str, Any]],
              live: Callable[[str, Any], Any], store: Callable[[Any], str]) -> Tuple[str, dict]:
     """Run step *name* of the session's workflow. Returns ``(output_ref, metrics)``.
 
     *store(frame)* saves an output and returns its ref; *live(name, decl)* is a
-    resource's live object. Inputs that never ran here run first; their refs
-    are reported under ``metrics["outputs"]`` so the UI can show them too.
+    resource's live object. Inputs that never ran run first; their refs are
+    reported under ``metrics["outputs"]`` so the UI can show them too.
     """
     s = _kernel_for(session_id, key, declarations or {})
-    tools = _tools()
     with s.lock:
-        sync(s, steps, tools, load)
+        sync(s, steps)
         if name in s.problems:
             raise GridStepError(s.problems[name])
-        if name not in s.operations:
-            raise GridStepError(f"step '{name}' has no formula in core's syntax to run")
-        step = s.wf.step(name)
+        step = _declared(s, name)
+        if step is None or (step.literal is None and step.operation is None):
+            raise GridStepError(f"step '{name}' has no formula to run")
         if step.problems:
-            raise GridStepError("; ".join(step.problems))
+            raise GridStepError("; ".join(str(p) for p in step.problems))
 
-        first = _unrun_inputs(s, name)
-        needed = {res for step_name in first + [name] for res in s.uses.get(step_name, [])}
+        upstream = _upstream(s, name)
+        needed = {r for n in upstream for r in (s.k.step(n).operation.resources
+                                                 if s.k.step(n).operation is not None else ())}
         try:
-            objects = {res: live(res, s.declarations[res]) for res in needed}
+            for res in needed:
+                s.k.resources.attach(res, live(res, s.declarations[res]))
         except Exception as exc:
             raise GridStepError(str(exc)) from exc
 
-        outputs: Dict[str, str] = {}
-        for step_name in first + [name]:
-            try:
-                s.wf.run(step_name, tools, resources=objects)
-            except grid.ResourceNotLoaded as exc:
-                raise GridStepError(str(exc)) from exc
-            ran = s.wf.step(step_name)
-            if _verb_of(s.operations[step_name]) == "source" and len(ran.output.failed):
+        before = {n: s.k.step(n).output.version for n in upstream}
+        try:
+            s.k.run(name)
+        except Exception as exc:
+            raise GridStepError(str(exc)) from exc
+        ran = [n for n in upstream if s.k.step(n).output.version != before[n] or n == name]
+        for n in ran:
+            output = s.k.step(n).output
+            if output.meta.get("verb") == "source" and len(output.failed):
                 # One call, so one unit: if it failed there is no output to show.
-                raise GridStepError(str(ran.output.failed.iloc[0].get("error", "the tool failed")))
-            outputs[step_name] = store(ran.output.data)
+                raise GridStepError(str(output.failed.iloc[0].get("error", "the tool failed")))
+        outputs = {n: store(s.k.step(n).data) for n in ran}
 
-        step = s.wf.step(name)
-        frame = step.output.data
+        from .engine import values
+        step = s.k.step(name)
+        frame = values(step.data)
         metrics = {
             "rows": len(frame),
             "columns": [str(c) for c in frame.columns],
-            **_engine_metrics(s.operations[name], step, step.output),
+            **_engine_metrics(step.spec.operation, step, step.output),
             "steps": summary(s),
         }
+        first = [n for n in reversed(ran) if n != name]
         if first:
             metrics["also_ran"] = first
-            metrics["outputs"] = {k: v for k, v in outputs.items() if k != name}
+            metrics["outputs"] = {k: outputs[k] for k in first}
         return outputs[name], metrics
 
 
 def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
-              declarations: Optional[Dict[str, Any]], load: Callable[[str], Any],
+              declarations: Optional[Dict[str, Any]],
               store: Optional[Callable[[Any], str]] = None) -> Dict[str, Any]:
     """Declare the app's steps without running anything.
 
@@ -487,14 +454,14 @@ def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
     """
     s = _kernel_for(session_id, key, declarations or {})
     with s.lock:
-        sync(s, steps, _tools(), load)
+        sync(s, steps)
         outputs: Dict[str, str] = {}
         if store is not None:
             for step in steps:
                 name = str(step["name"])
-                if step.get("ref") or name not in s.operations or name not in s.wf.steps:
+                ran = _declared(s, name)
+                if step.get("ref") or ran is None or ran.operation is None or name in s.problems:
                     continue
-                ran = s.wf.step(name)
-                if ran.status in ("completed", "stale") and ran.output is not None:
-                    outputs[name] = store(ran.output.data)
+                if ran.state in ("completed", "stale", "failed"):
+                    outputs[name] = store(ran.data)
         return {"steps": summary(s), "outputs": outputs}

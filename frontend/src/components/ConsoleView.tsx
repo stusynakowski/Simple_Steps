@@ -7,7 +7,8 @@
  *   command     applied client-side via `dispatchCommand`, i.e. the exact
  *               path a GUI click takes — which is what makes the two
  *               directions structurally identical rather than mirrored
- *   expression  sent to /api/console/eval and evaluated by safe_formula
+ *   expression  not evaluated: a step is how you evaluate something, and
+ *               its output shows as data
  *
  * See docs/dev_plan/118-console-and-gui-parity.md.
  */
@@ -16,7 +17,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useConsole, type ConsoleStream } from '../context/ConsoleContext';
 import { parseConsoleLine } from '../utils/consoleParser';
 import { COMMAND_HELP } from '../types/commands';
-import { evalConsole } from '../services/api';
 import type { WorkflowCommand } from '../types/commands';
 import './ConsoleView.css';
 
@@ -112,23 +112,12 @@ export default function ConsoleView({ view, dispatchCommand, consoleStepMap }: C
         const confirmation = await dispatchCommand(parsed.command);
         emit({ stream: 'result', text: confirmation });
       } else {
-        const res = await evalConsole(parsed.source, consoleStepMap());
-        if (res.ok) {
-          emit({
-            stream: 'result',
-            text: `${res.kind}${res.shape ? `  ${res.shape}` : ''}`,
-            detail: (res.repr ?? '') + (res.truncated ? '\n… truncated' : ''),
-          });
-        } else {
-          emit({
-            stream: 'result',
-            level: 'error',
-            text: res.error ?? 'Evaluation failed.',
-            detail: res.available_steps?.length
-              ? `Available steps: ${res.available_steps.join(', ')}`
-              : undefined,
-          });
-        }
+        emit({
+          stream: 'result',
+          level: 'error',
+          text: 'To evaluate something, add it as a step; its output shows as data.',
+          detail: `wf["x"] = '=${parsed.source}'`,
+        });
       }
     } catch (e) {
       emit({ stream: 'result', level: 'error', text: e instanceof Error ? e.message : String(e) });
@@ -161,7 +150,7 @@ export default function ConsoleView({ view, dispatchCommand, consoleStepMap }: C
       ? 'No requests yet. Run a step to see the exact payload sent to /api/run.'
       : view === 'command'
         ? 'No commands yet. Edit a formula or run a step — the command appears here.'
-        : 'Type help for commands, or an expression like step1["score"].';
+        : 'Type help for commands, e.g. wf["x"] = \'=tool[mod.map()](wf["step1"])\'.';
 
   return (
     <div className="console-view">
@@ -204,7 +193,7 @@ export default function ConsoleView({ view, dispatchCommand, consoleStepMap }: C
             disabled={busy}
             spellCheck={false}
             autoComplete="off"
-            placeholder={busy ? 'running…' : 'wf["step2"] = \'=op(…)\'   ·   step1["score"]   ·   help'}
+            placeholder={busy ? 'running…' : 'wf["step2"] = \'=op(…)\'   ·   wf.run("step2")   ·   help'}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={onKeyDown}
             data-testid="console-input"

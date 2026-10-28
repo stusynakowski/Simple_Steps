@@ -63,8 +63,8 @@ For every saved workflow, every step is run **twice**:
    exactly that line's right-hand side:
 
    ```
-   saved formula:  scale[mod.map(name="score")](wf["readings"])
-   Python:         wf["scored"] = scale[mod.map(name="score")](wf["readings"])
+   saved formula:  scale[mod.map(), mod.name("score")](wf["readings"])
+   Python:         wf["scored"] = scale[mod.map(), mod.name("score")](wf["readings"])
    ```
 
    A twin imports the tools like any module — `from basic_tools import scale`
@@ -78,7 +78,7 @@ by content). Some steps are also checked against values written out in
 ```
 ── basic/all-orchestrations
 PASS  readings         to_rows[mod.source()](data='{"city": ["SF", "NYC", "SF", "LA"], "n": [1, 2, 3, 2]}')
-PASS  scored           scale[mod.map(name="score")](wf["readings"])
+PASS  scored           scale[mod.map(), mod.name("score")](wf["readings"])
 …
 63/63 steps as expected
 ```
@@ -93,7 +93,7 @@ script exits non-zero. The checks run in the test suite too
 A step is written the way simple-steps-core writes an operation:
 
 ```
-=scale[mod.map(name="score")](wf["readings"], weight=2)
+=scale[mod.map(), mod.name("score")](wf["readings"], weight=2)
  tool  modifier stack          the input       arguments
 ```
 
@@ -142,12 +142,12 @@ their resources, and `all-examples` uses them together:
 
 | step | formula | from |
 |---|---|---|
-| `scored` | `scale[mod.map(name="score")](wf["readings"])` | basic |
+| `scored` | `scale[mod.map(), mod.name("score")](wf["readings"])` | basic |
 | `big` | `is_big[mod.filter()](wf["scored"])` | basic |
-| `regions` | `enrich[mod.map(name="region")](wf["big"], db=res["db"])` | dummy_llm |
-| `summaries` | `summarize[mod.map(name="summary")](wf["texts"], llm=res["llm"])` | dummy_llm |
+| `regions` | `enrich[mod.map(), mod.name("region")](wf["big"], db=res["db"])` | dummy_llm |
+| `summaries` | `summarize[mod.map(), mod.name("summary")](wf["texts"], llm=res["llm"])` | dummy_llm |
 | `total_n` | `add_n[mod.collapse(initial=0)](wf["big"])` | basic |
-| `swatches` | `swatch[mod.map(name="swatch")](wf["big"])` | plotly_charts |
+| `swatches` | `swatch[mod.map(), mod.name("swatch")](wf["big"])` | plotly_charts |
 | `chart` | `bar_chart[mod.collapse()](wf["big"])` | plotly_charts |
 
 ## Adding a sub-example

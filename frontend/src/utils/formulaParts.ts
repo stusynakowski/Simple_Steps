@@ -115,11 +115,19 @@ export function explicitModifiers(mods: ModifierPart[], resolved: string | null)
 
 /** What the editor reads from core's catalog entry for a modifier. */
 export interface VerbInfo {
-  class: 'shape' | 'execution';
+  class: 'shape' | 'execution' | 'naming';
   /** `false` for a verb that applies no tool (select, sort, …). */
   takes_tool?: boolean | 'optional' | null;
   /** The tool such a verb runs on (`identity`). */
   default_tool?: string | null;
+}
+
+/**
+ * Whether *kind* is a shape verb — not an execution modifier (retry, …) or
+ * `name`. A kind the catalog doesn't list yet counts as one.
+ */
+export function isShapeVerb(kind: string, catalog: Record<string, VerbInfo>): boolean {
+  return (catalog[kind]?.class ?? 'shape') === 'shape';
 }
 
 /**
@@ -129,7 +137,7 @@ export interface VerbInfo {
  * the old tool and its arguments go with it.
  */
 export function withChosenVerb(parts: FormulaParts, verb: string, catalog: Record<string, VerbInfo>): FormulaParts {
-  const isShape = (kind: string) => catalog[kind]?.class !== 'execution';
+  const isShape = (kind: string) => isShapeVerb(kind, catalog);
   const modifiers = withShapeVerb(parts.modifiers, verb, isShape);
   const info = catalog[verb];
   if (info?.takes_tool === false && info.default_tool && parts.tool !== info.default_tool) {

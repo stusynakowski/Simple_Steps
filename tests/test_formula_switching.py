@@ -24,14 +24,15 @@ from SIMPLE_STEPS.main import app
 from SIMPLE_STEPS.operation_formula import (
     FormulaError, compile_formula, format_parts, is_canonical, to_parts,
 )
-from simple_steps_core import grid
+from SIMPLE_STEPS.catalog import catalog
 
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES = ROOT / "src" / "SIMPLE_STEPS" / "examples"
 
 #: Core's verbs that apply no tool, from its own catalog.
-NO_TOOL_VERBS = sorted(k for k, v in grid.modifier_catalog().items() if v["takes_tool"] is False)
-SHAPE_VERBS = sorted(k for k, v in grid.modifier_catalog().items() if v["class"] == "shape")
+MODIFIERS = catalog().describe()["modifiers"]
+NO_TOOL_VERBS = sorted(k for k, v in MODIFIERS.items() if v["takes_tool"] is False)
+SHAPE_VERBS = sorted(k for k, v in MODIFIERS.items() if v["class"] == "shape")
 
 #: Settings that make each verb valid on the `numbers` step (n, city).
 SETTINGS = {"select": 'columns=["n"]', "drop": 'columns=["n"]', "rename": 'columns={"n": "m"}',
@@ -126,7 +127,7 @@ def test_execution_modifiers_go_with_any_shape_verb(execution):
 @pytest.mark.parametrize("verb", NO_TOOL_VERBS)
 def test_a_verb_that_applies_no_tool_refuses_another_tool(verb):
     """REQ-FORM-002: refused when written, with both fixes in the message."""
-    default = grid.modifier_catalog()[verb]["default_tool"]
+    default = MODIFIERS[verb]["default_tool"]
     with pytest.raises(FormulaError) as err:
         compile_formula(f'=fs_double[mod.{verb}({SETTINGS.get(verb, "")})](wf["numbers"])')
     message = str(err.value)
@@ -138,7 +139,7 @@ def test_a_verb_that_applies_no_tool_refuses_another_tool(verb):
 @pytest.mark.parametrize("verb", NO_TOOL_VERBS)
 def test_a_verb_that_applies_no_tool_takes_its_default_tool(verb):
     """REQ-FORM-002: the default tool is still accepted."""
-    default = grid.modifier_catalog()[verb]["default_tool"]
+    default = MODIFIERS[verb]["default_tool"]
     compile_formula(f'={default}[mod.{verb}({SETTINGS.get(verb, "")})](wf["numbers"])')
 
 
@@ -201,7 +202,7 @@ def test_switching_back_and_forth_runs_each_time(client, numbers):
         _parts("identity", [_mod("select", columns=["n"])]),
         _parts("fs_is_big", [_mod("auto")]),
         _parts("fs_fan", [_mod("expand")]),
-        _parts("fs_double", [_mod("map", name="twice")]),
+        _parts("fs_double", [_mod("map"), _mod("name", to="twice")]),
     ]
     for parts in sequence:
         formula = "=" + format_parts(parts)

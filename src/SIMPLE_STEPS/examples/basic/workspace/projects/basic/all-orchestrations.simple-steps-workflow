@@ -23,7 +23,7 @@
     },
     {
       "name": "score",
-      "expression": "scale[mod.map(name=\"score\")](wf[\"readings\"])",
+      "expression": "scale[mod.map(), mod.name(\"score\")](wf[\"readings\"])",
       "meta": {
         "label": "score"
       }
@@ -86,21 +86,14 @@
     },
     {
       "name": "bucket",
-      "expression": "label_city[mod.group(name=\"bucket\")](wf[\"scored\"])",
+      "expression": "label_city[mod.group(), mod.name(\"bucket\")](wf[\"scored\"])",
       "meta": {
         "label": "bucket"
       }
     },
     {
-      "name": "bucketed",
-      "expression": "zip_(wf[\"scored\"], wf[\"bucket\"])",
-      "meta": {
-        "label": "bucketed"
-      }
-    },
-    {
       "name": "per_city",
-      "expression": "add_n[mod.collapse(by=\"bucket\", initial=0)](wf[\"bucketed\"])",
+      "expression": "add_n[mod.collapse(by=\"bucket\", initial=0)](wf[\"bucket\"])",
       "meta": {
         "label": "per_city"
       }
@@ -121,7 +114,7 @@
     },
     {
       "name": "bursts",
-      "expression": "fan_out[mod.expand(name=\"item\")](wf[\"readings\"])",
+      "expression": "fan_out[mod.expand(), mod.name(\"item\")](wf[\"readings\"])",
       "meta": {
         "label": "bursts"
       }
@@ -156,7 +149,7 @@
     },
     {
       "name": "robust",
-      "expression": "scale[mod.map(name=\"score\"), mod.retry(times=2), mod.timeout(seconds=5)](wf[\"readings\"])",
+      "expression": "scale[mod.map(), mod.name(\"score\"), mod.retry(times=2), mod.timeout(seconds=5)](wf[\"readings\"])",
       "meta": {
         "label": "robust"
       }
@@ -275,7 +268,7 @@
     },
     {
       "name": "again",
-      "expression": "scale[mod.map(name=\"again\")](wf[\"scored\"])",
+      "expression": "scale[mod.map(), mod.name(\"again\")](wf[\"scored\"])",
       "meta": {
         "label": "again"
       }
@@ -324,7 +317,7 @@
     },
     {
       "name": "failure",
-      "expression": "risky[mod.map(name=\"out\"), mod.try_except(), mod.retry(times=1)](wf[\"readings\"])",
+      "expression": "risky[mod.map(), mod.name(\"out\"), mod.try_except(), mod.retry(times=1)](wf[\"readings\"])",
       "meta": {
         "label": "failure"
       }

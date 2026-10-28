@@ -246,7 +246,7 @@ export interface ModifierSetting {
 /** A core verb (shape) or execution modifier, from ``GET /api/modifiers``. */
 export interface ModifierInfo {
   name: string;
-  class: 'shape' | 'execution';
+  class: 'shape' | 'execution' | 'naming';
   row_rule: string | null;
   settings: ModifierSetting[];
   /** `false` for a verb that applies no tool (select, sort, …); `null` for an execution modifier. */
@@ -775,7 +775,6 @@ export async function writeWorkspaceFile(path: string, content: string): Promise
 // --- Settings ---
 
 export interface SimpleStepsSettings {
-    eval_mode: boolean;
     result_store: 'memory' | 'parquet';
 }
 
@@ -797,40 +796,3 @@ export async function updateSettings(updates: Partial<SimpleStepsSettings>): Pro
     return r.json();
 }
 
-
-// ── Console ────────────────────────────────────────────────────────────────
-
-export interface ConsoleEvalResult {
-  ok: boolean;
-  kind?: string;
-  shape?: string;
-  columns?: string[];
-  repr?: string;
-  truncated?: boolean;
-  error?: string;
-  error_type?: string;
-  available_steps?: string[];
-}
-
-/**
- * Evaluate one console expression against live session data.
- *
- * Read-only: the backend runs this through `safe_formula`, the AST-allowlist
- * interpreter, so an expression can neither mutate the workflow nor reach
- * outside the registered operations.
- */
-export async function evalConsole(
-  source: string,
-  stepMap: Record<string, string>,
-): Promise<ConsoleEvalResult> {
-  const response = await fetch(`${API_BASE}/console/eval`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ source, step_map: stepMap }),
-  });
-  if (!response.ok) {
-    return { ok: false, error: `Backend error: ${response.status} ${response.statusText}` };
-  }
-  return response.json();
-}

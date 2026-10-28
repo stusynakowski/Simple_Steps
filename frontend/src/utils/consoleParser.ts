@@ -2,12 +2,8 @@
  * Parse one console input line.
  *
  * A line is either a **command** (mutates the workflow; applied client-side
- * through the same dispatch the GUI uses) or an **expression** (reads live
- * data; evaluated server-side by `safe_formula`).
- *
- * The split matters: it is what keeps a single path into workflow state. An
- * expression can never smuggle a mutation in, because expressions never reach
- * `dispatch` — see `docs/dev_plan/118-console-and-gui-parity.md` §5 and §7.
+ * through the same dispatch the GUI uses) or an **expression**, which the
+ * console doesn't evaluate: a step is how you evaluate something.
  */
 
 import type { WorkflowCommand } from '../types/commands';
@@ -141,7 +137,7 @@ export function parseConsoleLine(input: string): ParsedLine {
     }
   }
 
-  // ── Anything else is an expression for the backend to evaluate ──────────
+  // ── Anything else is an expression (not evaluated; see ConsoleView) ─────
   if (/^wf\b/.test(line)) {
     return { kind: 'error', message: `Could not parse '${line}'. Type help for the command list.` };
   }

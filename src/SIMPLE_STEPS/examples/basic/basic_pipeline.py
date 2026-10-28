@@ -5,8 +5,8 @@ Each saved workflow in ``workspace/projects/basic/`` has a *twin* here: the
 same steps, one Python line per step, in simple-steps-core's syntax. The
 formula a step saves is exactly the right-hand side of its line::
 
-    saved:   scale[mod.map(name="score")](wf["readings"])
-    Python:  wf["score"] = scale[mod.map(name="score")](wf["readings"])
+    saved:   scale[mod.map(), mod.name("score")](wf["readings"])
+    Python:  wf["score"] = scale[mod.map(), mod.name("score")](wf["readings"])
 
 ``runme.py`` runs both — the saved file through the app, the twin straight in
 core — and checks every step's output is the same. The twin imports the
@@ -15,8 +15,10 @@ app's own tools, so the two run the same code.
 
 from __future__ import annotations
 
-from simple_steps_core import grid
-from simple_steps_core.grid import join, mod, op, stack, zip_
+from simple_steps_core import Kernel
+from simple_steps_core import join, mod, op, stack, zip_
+
+from SIMPLE_STEPS.catalog import catalog
 
 from SIMPLE_STEPS.operations import to_rows
 
@@ -33,11 +35,11 @@ identity, count, gather, total, first, last = (
 READINGS = '{"city": ["SF", "NYC", "SF", "LA"], "n": [1, 2, 3, 2]}'
 
 
-def build_all_orchestrations() -> grid.Workflow:
+def build_all_orchestrations() -> Kernel:
     """``all-orchestrations``: every shape verb, the combine verbs, execution
     modifiers, verb inference and standard Python values as sources —
     simple-steps-core's own ``all_orchestrations`` example, step for step."""
-    wf = grid.Workflow()
+    wf = Kernel(catalog())
 
     # sources: a table from JSON text, and a column of records
     wf["readings"] = to_rows[mod.source()](data=READINGS)
@@ -45,7 +47,7 @@ def build_all_orchestrations() -> grid.Workflow:
 
     # map: one value per row. A map step is only its results (the `score`
     # column), on the readings' row ids; zip_ puts the two side by side.
-    wf["score"] = scale[mod.map(name="score")](wf["readings"])
+    wf["score"] = scale[mod.map(), mod.name("score")](wf["readings"])
     wf["scored"] = zip_(wf["readings"], wf["score"])
 
     # rows: filter, slice, sort, distinct (no tool runs for the last three)
@@ -59,18 +61,17 @@ def build_all_orchestrations() -> grid.Workflow:
     wf["dropped"] = identity[mod.drop(columns=["score"])](wf["scored"])
     wf["renamed"] = identity[mod.rename(columns={"n": "count"})](wf["scored"])
 
-    # group, then collapse per group. group is only the key, on each row's
-    # id; zip_ pairs every row with its key for the collapse.
-    wf["bucket"] = label_city[mod.group(name="bucket")](wf["scored"])
-    wf["bucketed"] = zip_(wf["scored"], wf["bucket"])
-    wf["per_city"] = add_n[mod.collapse(by="bucket", initial=0)](wf["bucketed"])
+    # group, then collapse per group. group keeps each row's columns and adds
+    # its key; the collapse reads it directly.
+    wf["bucket"] = label_city[mod.group(), mod.name("bucket")](wf["scored"])
+    wf["per_city"] = add_n[mod.collapse(by="bucket", initial=0)](wf["bucket"])
 
     # collapse to one row: a builtin reducer and a tool
     wf["n_rows"] = count[mod.collapse()](wf["readings"])
     wf["sum_n"] = add_n[mod.collapse(initial=0)](wf["readings"])
 
     # expand (one row → many), and expand then widen
-    wf["bursts"] = fan_out[mod.expand(name="item")](wf["readings"])
+    wf["bursts"] = fan_out[mod.expand(), mod.name("item")](wf["readings"])
     wf["coords"] = make_coords[mod.expand()](wf["readings"])
     wf["spread"] = identity[mod.widen(columns=["axis", "val"])](wf["coords"])
     wf["wide"] = identity[mod.widen(columns=["city", "temp"])](wf["records"])
@@ -79,7 +80,7 @@ def build_all_orchestrations() -> grid.Workflow:
     wf["grid_search"] = grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]
 
     # execution modifiers around a map
-    wf["robust"] = scale[mod.map(name="score"), mod.retry(times=2), mod.timeout(seconds=5)](wf["readings"])
+    wf["robust"] = scale[mod.map(), mod.name("score"), mod.retry(times=2), mod.timeout(seconds=5)](wf["readings"])
 
     # verb inference: no brackets, core picks the verb from the tool
     wf["auto_map"] = scale(wf["readings"])
@@ -106,7 +107,7 @@ def build_all_orchestrations() -> grid.Workflow:
     wf["last_n"] = last[mod.collapse()](wf["ns"])
 
     # a map over a map
-    wf["again"] = scale[mod.map(name="again")](wf["scored"])
+    wf["again"] = scale[mod.map(), mod.name("again")](wf["scored"])
 
     # combine verbs: read more than one step
     wf["city_info"] = to_rows[mod.source()](data='{"city": ["SF", "NYC", "LA"], "region": ["west", "east", "west"]}')
@@ -117,25 +118,25 @@ def build_all_orchestrations() -> grid.Workflow:
     wf["zipped"] = zip_(wf["ns"], wf["scores_only"])
 
     # failure: risky raises on n == 2; try_except lets those rows through
-    wf["failure"] = risky[mod.map(name="out"), mod.try_except(), mod.retry(times=1)](wf["readings"])
+    wf["failure"] = risky[mod.map(), mod.name("out"), mod.try_except(), mod.retry(times=1)](wf["readings"])
     return wf
 
 
-def build_table_tools() -> grid.Workflow:
+def build_table_tools() -> Kernel:
     """``table-tools``: the data-manipulation tools — sources, per-row tools,
     whole-table tools (``mod.table()``) and diagnostics."""
-    wf = grid.Workflow()
+    wf = Kernel(catalog())
 
     # numbers: per-row tools, a caught failure, a list fanned out to rows
     wf["numbers"] = make_range[mod.source()](n=6, start=1)
-    wf["doubled"] = slow_double[mod.map(name="doubled")](wf["numbers"], delay_ms=0)
-    wf["checked"] = sometimes_fails[mod.map(name="checked"), mod.try_except(default=-1)](wf["numbers"])
-    wf["series"] = make_series[mod.expand(name="item")](wf["numbers"], length=2)
+    wf["doubled"] = slow_double[mod.map(), mod.name("doubled")](wf["numbers"], delay_ms=0)
+    wf["checked"] = sometimes_fails[mod.map(), mod.name("checked"), mod.try_except(default=-1)](wf["numbers"])
+    wf["series"] = make_series[mod.expand(), mod.name("item")](wf["numbers"], length=2)
 
     # people: per-row analysis, then whole-table tools
     wf["people"] = sample_people[mod.source()](count=8, seed=0)
-    wf["staged"] = classify_age[mod.map(name="stage")](wf["people"])
-    wf["banded"] = bucket_score[mod.map(name="band")](wf["people"], scheme="halves")
+    wf["staged"] = classify_age[mod.map(), mod.name("stage")](wf["people"])
+    wf["banded"] = bucket_score[mod.map(), mod.name("band")](wf["people"], scheme="halves")
     wf["top3"] = top_n[mod.table()](wf["people"], column="score", n=3)
     wf["per_city"] = count_by[mod.table()](wf["people"], column="city")
     wf["ages"] = add_computed[mod.table()](wf["people"], source_column="age", new_column="age_x2", operation="double")
@@ -143,11 +144,11 @@ def build_table_tools() -> grid.Workflow:
 
     # text: one row per piece, then per-row text tools
     wf["words"] = split_text[mod.source()](text="alpha beta,gamma,delta epsilon zeta")
-    wf["counted"] = word_count[mod.map(name="words")](wf["words"])
-    wf["shout"] = to_upper[mod.map(name="upper")](wf["words"])
-    wf["backward"] = reverse_text[mod.map(name="reversed")](wf["words"])
+    wf["counted"] = word_count[mod.map(), mod.name("words")](wf["words"])
+    wf["shout"] = to_upper[mod.map(), mod.name("upper")](wf["words"])
+    wf["backward"] = reverse_text[mod.map(), mod.name("reversed")](wf["words"])
     wf["as_values"] = identity[mod.rename(columns={"text": "value"})](wf["words"])
-    wf["records"] = build_record[mod.map(name="record")](wf["as_values"])
+    wf["records"] = build_record[mod.map(), mod.name("record")](wf["as_values"])
 
     # empty in, empty out
     wf["empty"] = empty_table[mod.source()](columns="a,b")

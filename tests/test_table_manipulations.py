@@ -64,10 +64,10 @@ def _run(workflow_filename: str) -> PipelineRunner:
 # ---------------------------------------------------------------------------
 
 def test_table_ops_registered():
-    # REQ-CORE-001: operations declared with @simple_step appear in the registry
-    from SIMPLE_STEPS.decorators import OPERATION_REGISTRY
-    assert "expand_cell" in OPERATION_REGISTRY, "expand_cell not in registry"
-    assert "make_table" in OPERATION_REGISTRY,  "make_table not in registry"
+    # REQ-CORE-001: operations declared with @simple_step appear in the catalog
+    from SIMPLE_STEPS.catalog import catalog
+    assert "expand_cell" in catalog().functions, "expand_cell not in catalog"
+    assert "make_table" in catalog().functions,  "make_table not in catalog"
 
 
 # ---------------------------------------------------------------------------

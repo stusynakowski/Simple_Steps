@@ -55,31 +55,29 @@ def _signature(func: Any) -> str:
 def tool_ids() -> List[str]:
     """The tools the agent may use."""
     from .. import application
-    from ..decorators import OPERATION_REGISTRY
+    from ..decorators import DECLARED
 
     app = application.CURRENT
-    if app is not None and app.explicit:
-        ids = list(app.tool_ids)
+    if app is not None and app.tools:
+        ids = [t.id for t in app.tools]
     else:
-        ids = [i for i, e in OPERATION_REGISTRY.items()
-               if not str(getattr(e.get("func"), "__module__", "")).startswith("SIMPLE_STEPS")]
-    if "to_rows" in OPERATION_REGISTRY and "to_rows" not in ids:
+        ids = [i for i, t in DECLARED.items()
+               if not str(getattr(t.fn, "__module__", "")).startswith("SIMPLE_STEPS")]
+    if "to_rows" in DECLARED and "to_rows" not in ids:
         ids.append("to_rows")          # how a step makes a table from literal data
     return ids
 
 
 def catalog_text() -> str:
     """Tools and resource types, one per line."""
-    from simple_steps_core import grid
-    from ..decorators import OPERATION_REGISTRY
+    from ..catalog import catalog
     from ..resources import RESOURCE_TYPES
 
     lines = ["TOOLS (use as tool[mod.verb(…)](wf[\"step\"], arg=…)):"]
     for op_id in tool_ids():
-        entry = OPERATION_REGISTRY.get(op_id)
-        if not entry:
+        func = catalog().functions.get(op_id)
+        if func is None:
             continue
-        func = entry.get("func")
         lines.append(f"- {op_id}{_signature(func)} — {_first_line(inspect.getdoc(func))}")
     lines.append("- identity, count, gather, total, first, last — built in; identity applies no "
                  "tool (for select/drop/rename/sort/slice/distinct/widen)")
@@ -87,7 +85,7 @@ def catalog_text() -> str:
         lines.append("")
         lines.append("RESOURCE TYPES (a resource is used by name: res[\"name\"]):")
         for name, cls in sorted(RESOURCE_TYPES.items()):
-            entry = grid.resource_entry(cls)
+            entry = catalog().describe()["resource_types"].get(name, {})
             bases = [b for b in entry.get("bases", []) if b != name]
             fits = f" (is a {', '.join(bases)})" if bases else ""
             lines.append(f"- {name}{fits} — {_first_line(entry.get('description'))}")

@@ -71,6 +71,43 @@ turn text into steps. So it should be **important and small** (owner,
 - **A new feature starts in core.** If core accepts it in Python (`wf["r"][0]`,
   `rows`, `cols`), the parser only adds the mapping.
 
+**References: notation, chips and boxes.** The reference UI planned in
+[121 §1.4 and §1.6](121-ui-and-core-changes.md#14-how-it-should-look) (each
+reference a coloured chip in the formula bar, matching a box drawn around the
+cells it covers in the source grid) needs one thing from the parser: **for
+each reference, where it is in the text and what it covers.** Python's `ast`
+already gives every node its offsets, so this is a few lines, not a feature:
+
+```json
+{"references": [
+  {"span": [27, 34], "step": "r"},
+  {"span": [43, 64], "step": "r", "rows": [0], "columns": ["w"]}
+]}
+```
+
+for `scale[mod.map()](wf["r"], weight=wf["r"][0][cols["w"]])`. The editor draws
+a chip over each span, and the grid draws the box from step, rows and columns.
+One source for both, so they can't disagree.
+
+The notation, checked at core `61f31e2` (each prints back as typed with
+`to_source()`, and runs, as its own step or as an argument):
+
+| Pick | Writes |
+|---|---|
+| a whole step | `wf["r"]` (or `wf[-1]`, saved as the name: K30) |
+| a column | `wf["r"][cols["n"]]` |
+| rows | `wf["r"][0:2]` |
+| a cell | `wf["r"][0][cols["w"]]` |
+| a block | `wf["r"][0:2][cols["n"]]` |
+
+`cols["n", "w"]` is refused; a list of names, `cols[["n", "w"]]`, is the
+form core's message names. Rows are picked by position today; by row id once
+K19 lands.
+
+Two things in the editor today that this replaces: `shell/monacoSetup.ts:96`
+colours only the old `step1.col` notation, not `wf["x"]`; and the three
+copies of the picking tokens listed in [121 §1.1](121-ui-and-core-changes.md#11-what-happens-today).
+
 What that removes from today's `operation_formula.py` (678 lines), checked in
 the code:
 

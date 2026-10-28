@@ -30,7 +30,6 @@ interface SidebarProps {
 // ── Settings Panel ────────────────────────────────────────────────────────
 
 const defaultSettings: SimpleStepsSettings = {
-  eval_mode: false,
   result_store: 'memory',
 };
 
@@ -47,7 +46,6 @@ const SettingsPanel: React.FC = () => {
     try {
       const s = await fetchSettings();
       setSettings({
-        eval_mode: !!s.eval_mode,
         result_store: s.result_store ?? 'memory',
       });
     } catch {
@@ -67,7 +65,6 @@ const SettingsPanel: React.FC = () => {
     try {
       const next = await updateSettings(updates);
       setSettings({
-        eval_mode: !!next.eval_mode,
         result_store: next.result_store ?? 'memory',
       });
       setSavedAt(Date.now());
@@ -101,21 +98,6 @@ const SettingsPanel: React.FC = () => {
             Memory keeps step outputs in RAM only. Parquet writes outputs to disk cache and survives process memory eviction.
           </span>
         </label>
-
-        <label className="settings-toggle-row">
-          <input
-            type="checkbox"
-            checked={settings.eval_mode}
-            disabled={loading || saving}
-            onChange={(e) => {
-              void persist({ eval_mode: e.target.checked });
-            }}
-          />
-          <span className="settings-label">Enable Eval Mode</span>
-        </label>
-        <div className="settings-help">
-          Eval mode executes arbitrary Python from formulas. Keep this off in untrusted environments.
-        </div>
       </div>
 
       <div className="settings-meta-row">

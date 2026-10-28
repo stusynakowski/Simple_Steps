@@ -37,7 +37,7 @@ It has two tools of its own, written `res["image_directory"].<tool>`:
 | tool | formula | gives |
 |---|---|---|
 | `files` | `res["image_directory"].files[mod.source()]()` | one row per image: `file` |
-| `load` | `res["image_directory"].load[mod.map(name="image")](wf["files"])` | each file's image, as an array |
+| `load` | `res["image_directory"].load[mod.map(), mod.name("image")](wf["files"])` | each file's image, as an array |
 
 ## The workflow
 
@@ -47,15 +47,15 @@ and its Python twin `build_images()` in [`image_pipeline.py`](image_pipeline.py)
 | step | formula | what it shows |
 |---|---|---|
 | `files` | `res["image_directory"].files[mod.source()]()` | a resource's tool as a source |
-| `images` | `res["image_directory"].load[mod.map(name="image")](wf["files"])` | a cell that holds an image |
-| `widths` | `image_width[mod.map(name="width")](wf["images"])` | a number from an image |
-| `brightness` | `mean_brightness[mod.map(name="brightness")](wf["images"])` | 0 (black) to 255 (white) |
-| `colors` | `average_color[mod.map(name="color")](wf["images"])` | a hex colour, `#d75564` |
+| `images` | `res["image_directory"].load[mod.map(), mod.name("image")](wf["files"])` | a cell that holds an image |
+| `widths` | `image_width[mod.map(), mod.name("width")](wf["images"])` | a number from an image |
+| `brightness` | `mean_brightness[mod.map(), mod.name("brightness")](wf["images"])` | 0 (black) to 255 (white) |
+| `colors` | `average_color[mod.map(), mod.name("color")](wf["images"])` | a hex colour, `#d75564` |
 | `dark` | `is_dark[mod.filter()](wf["images"], threshold=80)` | keeps forest and night |
 | `brightest` | `identity[mod.sort(by="brightness", ascending=False)](wf["brightness"])` | sunset first |
-| `grey` | `to_grayscale[mod.map(name="grey")](wf["images"])` | an image from an image |
-| `negatives` | `invert[mod.map(name="negative")](wf["images"])` | |
-| `thumbs` | `thumbnail[mod.map(name="thumb")](wf["images"], size=32)` | |
+| `grey` | `to_grayscale[mod.map(), mod.name("grey")](wf["images"])` | an image from an image |
+| `negatives` | `invert[mod.map(), mod.name("negative")](wf["images"])` | |
+| `thumbs` | `thumbnail[mod.map(), mod.name("thumb")](wf["images"], size=32)` | |
 | `strip` | `film_strip[mod.collapse()](wf["thumbs"])` | every thumbnail in one image: a reducer |
 
 A tool reads an image by parameter name, like any column: `mean_brightness(image)`

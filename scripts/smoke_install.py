@@ -155,8 +155,8 @@ def main() -> int:
         py = str(venv_bin(venv, "python"))
         m = run([py, "-c",
                  "from SIMPLE_STEPS.main import app; "
-                 "from SIMPLE_STEPS.decorators import OPERATION_REGISTRY as R; "
-                 "print(len(R))"], cwd=str(work))
+                 "from SIMPLE_STEPS.catalog import catalog; "
+                 "print(len(catalog().functions))"], cwd=str(work))
         n_ops = m.stdout.strip().splitlines()[-1] if m.returncode == 0 else "?"
         report("package imports outside the repo", m.returncode == 0,
                (m.stderr or "")[-500:])
@@ -257,10 +257,11 @@ def main() -> int:
         # ── 10. run a step and read its output back ─────────────────────
         # Mint the session cookie first, exactly as the browser does on boot.
         http_get(f"{base}/api/session")
+        # As the UI sends it: the step's formula, and the whole workflow.
+        formula = """=to_rows[mod.source()](data='{"n": [1, 2, 3]}')"""
         status, body = http_post(f"{base}/api/run", {
-            "step_id": "smoke1", "operation_id": "literal",
-            "config": {"expr": "[1, 2, 3]"}, "input_ref_id": None,
-            "step_map": {}, "is_preview": False,
+            "step_id": "smoke1", "formula": formula, "workflow_key": "smoke",
+            "workflow_steps": [{"id": "smoke1", "name": "smoke1", "formula": formula}],
         })
         ok = status == 200 and json.loads(body or b"{}").get("status") == "success"
         report("a step runs end to end", ok, f"HTTP {status}: {body[:300]!r}")

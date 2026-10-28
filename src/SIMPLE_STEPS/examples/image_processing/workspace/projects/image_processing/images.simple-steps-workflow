@@ -24,28 +24,28 @@
     },
     {
       "name": "images",
-      "expression": "res[\"image_directory\"].load[mod.map(name=\"image\")](wf[\"files\"])",
+      "expression": "res[\"image_directory\"].load[mod.map(), mod.name(\"image\")](wf[\"files\"])",
       "meta": {
         "label": "images"
       }
     },
     {
       "name": "widths",
-      "expression": "image_width[mod.map(name=\"width\")](wf[\"images\"])",
+      "expression": "image_width[mod.map(), mod.name(\"width\")](wf[\"images\"])",
       "meta": {
         "label": "widths"
       }
     },
     {
       "name": "brightness",
-      "expression": "mean_brightness[mod.map(name=\"brightness\")](wf[\"images\"])",
+      "expression": "mean_brightness[mod.map(), mod.name(\"brightness\")](wf[\"images\"])",
       "meta": {
         "label": "brightness"
       }
     },
     {
       "name": "colors",
-      "expression": "average_color[mod.map(name=\"color\")](wf[\"images\"])",
+      "expression": "average_color[mod.map(), mod.name(\"color\")](wf[\"images\"])",
       "meta": {
         "label": "colors"
       }
@@ -80,21 +80,21 @@
     },
     {
       "name": "grey",
-      "expression": "to_grayscale[mod.map(name=\"grey\")](wf[\"images\"])",
+      "expression": "to_grayscale[mod.map(), mod.name(\"grey\")](wf[\"images\"])",
       "meta": {
         "label": "grey"
       }
     },
     {
       "name": "negatives",
-      "expression": "invert[mod.map(name=\"negative\")](wf[\"images\"])",
+      "expression": "invert[mod.map(), mod.name(\"negative\")](wf[\"images\"])",
       "meta": {
         "label": "negatives"
       }
     },
     {
       "name": "thumbs",
-      "expression": "thumbnail[mod.map(name=\"thumb\")](wf[\"images\"], size=32)",
+      "expression": "thumbnail[mod.map(), mod.name(\"thumb\")](wf[\"images\"], size=32)",
       "meta": {
         "label": "thumbs"
       }

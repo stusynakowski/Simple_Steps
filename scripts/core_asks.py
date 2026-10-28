@@ -8,9 +8,9 @@ Each ask prints OPEN (core still behaves as the proposal describes) or DONE
 (the probe now gets the asked-for behaviour), with what it observed. Rerun it
 after changing core: an ask is finished when its line says DONE.
 
-The probes run core directly, not through the app, so a result here is
-core's behaviour and nothing else. Taken back from core's copy at 9a86a0d,
-which adds probes for the C/N/O items (marked "(core)").
+Taken back from core's copy at 58bc115 (on the kernel API), which adds probes
+for the C/N/O items (marked "(core)"). The only change is where the commit is
+read from: the app's external/ checkout.
 """
 
 from __future__ import annotations
@@ -24,8 +24,22 @@ from pathlib import Path
 from typing import Annotated, Callable, TypedDict
 
 import pandas as pd
-from simple_steps_core import grid
-from simple_steps_core.grid import mod, op, tool
+from simple_steps_core import (
+    cols,
+    mod,
+    Operation,
+    Output,
+    Tool,
+    tool,
+    wf as unbound_wf,
+    zip_,
+)
+from simple_steps_core.catalog import catalog, check_modifier, formula_names
+from simple_steps_core.checks import check, infer_verb, predicted_columns
+from simple_steps_core.modifiers import modifier_catalog, MODIFIERS
+from simple_steps_core.operation import op
+from simple_steps_core.verbs import grid
+from simple_steps_core.workflow import Workflow
 
 warnings.simplefilter("ignore")
 
@@ -33,6 +47,23 @@ I = op("identity")  # noqa: E741  (kept as in the app's copy)
 
 
 # ── The example's tools, so probes read like the docs ─────────────────────────
+def _core_modules() -> list:
+    """The package and every module in it."""
+    return [m for n, m in sys.modules.items() if n.split(".")[0] == "simple_steps_core"]
+
+
+def _core_has(name: str) -> bool:
+    """Does core define *name* anywhere: on the package or in one of its modules?"""
+    return any(hasattr(m, name) for m in _core_modules())
+
+
+def _tools(scope: dict | None = None) -> dict:
+    """The tools this script defines, by name (and any in *scope*): @tool
+    registers nothing, so reloading a workflow by name needs them passed."""
+    found = {**globals(), **(scope or {})}
+    return {v.id: v.fn for v in found.values() if isinstance(v, Tool)}
+
+
 @tool
 def scale(n, weight=1):
     return n * 10 * weight
@@ -75,8 +106,8 @@ def readings() -> pd.DataFrame:
 DATA = json.dumps({"city": ["SF", "NYC", "SF", "LA"], "n": [1, 2, 3, 2]})
 
 
-def _wf() -> grid.Workflow:
-    wf = grid.Workflow()
+def _wf() -> Workflow:
+    wf = Workflow()
     wf["readings"] = readings()
     return wf
 
@@ -87,7 +118,7 @@ def _input_of(operation) -> str:
     ref = blob.get("input")
     if isinstance(ref, dict):
         return ref.get("$ref")
-    return blob["modifiers"][-1]["params"].get("over")
+    return blob["modifiers"][-1]["settings"].get("over")
 
 
 def _try(fn: Callable):
@@ -100,11 +131,15 @@ def _try(fn: Callable):
 # ── Probes: each returns (done, observed) ──────────────────────────────────────
 
 def k1_unrun_source_columns():
-    wf = grid.Workflow()
+    # (core) Changed from the app's probe: a map step is only its results
+    # (owner decision, 2026-10-20), so `city` can't follow `score` through a
+    # map. The same deferral is checked through zip_, which carries both.
+    wf = Workflow()
     wf["readings"] = to_rows.bind(data=DATA)[mod.source()]
-    wf["scored"] = scale[mod.map(name="score")](wf["readings"])
+    wf["score"] = scale[mod.map(), mod.name("score")](wf["readings"])
+    wf["scored"] = zip_(wf["readings"], wf["score"])
     wf["picked"] = mod.select(over=wf["scored"], columns=["city", "score"])
-    declared = wf.step("picked").status
+    declared = wf.step("picked").state
     wf.run_all()
     got = wf.step("picked").output.data.to_dict("list")
     done = got == {"city": ["SF", "NYC", "SF", "LA"], "score": [10, 20, 30, 20]}
@@ -114,7 +149,7 @@ def k1_unrun_source_columns():
 def k2_inference_run_state():
     a = _wf()
     a["x"] = add_n(a["readings"])
-    b = grid.Workflow()
+    b = Workflow()
     b["readings"] = to_rows.bind(data=DATA)[mod.source()]
     b["x"] = add_n(b["readings"])
     va = a.steps["x"].operation.to_dict()["modifiers"][-1]["kind"]
@@ -131,7 +166,7 @@ def k3_operation_as_input():
     wf["x"] = built
     wf.run("x")
     return False, (f"accepted; ran as {wf.steps['x'].operation.to_dict()['modifiers'][-1]['kind']}, "
-                   f"status {wf.step('x').status}, data {wf.step('x').output.data.to_dict('list')}")
+                   f"status {wf.step('x').state}, data {wf.step('x').output.data.to_dict('list')}")
 
 
 def k4_over_twice():
@@ -160,14 +195,14 @@ def k6_source_call_form():
     built, err = _try(lambda: to_rows[mod.source()](data=DATA))
     if err:
         return False, f"to_rows[mod.source()](data=…) -> {err[:110]}"
-    return isinstance(built, grid.Operation), f"-> {type(built).__name__}"
+    return isinstance(built, Operation), f"-> {type(built).__name__}"
 
 
 def k7_sweep_call_form():
     built, err = _try(lambda: grid_cell[mod.sweep(model=["a"], window=[7])]())
     if err:
         return False, f"grid_cell[mod.sweep(…)]() -> {err[:110]}"
-    return isinstance(built, grid.Operation), f"-> {type(built).__name__} (a DataFrame means it ran instead of declaring)"
+    return isinstance(built, Operation), f"-> {type(built).__name__} (a DataFrame means it ran instead of declaring)"
 
 
 def k8_modifier_callable():
@@ -218,48 +253,53 @@ def k11_multi_input():
 
 
 def k12_whole_table_verb():
-    verbs = set(grid.modifier_catalog())
+    verbs = set(modifier_catalog())
     candidates = verbs & {"table", "apply", "frame", "whole", "pipe"}
     wf = _wf()
     wf["x"] = piv[mod.collapse(over=wf["readings"])]
-    wf.run("x")
-    err = wf.step("x").output.ledger["error"].iloc[0]
+    if wf.step("x").problems:                    # (core) refused when declared, with a hint
+        err = wf.step("x").problems[0]
+    else:
+        wf.run("x")
+        out = wf.step("x").output
+        err = (out.notes.get(out.data.index[0], {}).get("error") if hasattr(out, "notes")
+               else out.ledger["error"].iloc[0])
     return bool(candidates), (f"verbs: {sorted(verbs)}; piv[mod.collapse()] -> {str(err)[:90]}"
                               if not candidates else f"found {sorted(candidates)}")
 
 
 def k13_catalog_takes_tool():
-    entry = grid.modifier_catalog()["select"]
+    entry = modifier_catalog()["select"]
     keys = set(entry) - {"name", "class", "row_rule", "settings"}
     return bool(keys & {"takes_tool", "tool", "default_tool"}), f"modifier_catalog()['select'] keys: {sorted(entry)}"
 
 
 def k14_progress_callback():
-    params = inspect.signature(grid.Workflow.run).parameters
-    return any(p not in ("self", "step_id", "tools", "resources") for p in params), f"Workflow.run{inspect.signature(grid.Workflow.run)}"
+    params = inspect.signature(Workflow.run).parameters
+    return any(p not in ("self", "step_id", "tools", "resources") for p in params), f"Workflow.run{inspect.signature(Workflow.run)}"
 
 
 def k15_redrive():
-    return hasattr(grid.Workflow, "redrive"), f"Workflow.redrive exists: {hasattr(grid.Workflow, 'redrive')}"
+    return hasattr(Workflow, "redrive"), f"Workflow.redrive exists: {hasattr(Workflow, 'redrive')}"
 
 
 def k16_results_store():
-    has = hasattr(grid.Output, "ref") or any("store" in n.lower() for n in dir(grid))
-    return has, f"Output.ref: {hasattr(grid.Output, 'ref')}; store names in grid: {[n for n in dir(grid) if 'store' in n.lower()]}"
+    has = hasattr(Output, "ref") or any("store" in n.lower() for m in _core_modules() for n in dir(m))
+    return has, f"Output.ref: {hasattr(Output, 'ref')}; store names in core: {[n for m in _core_modules() for n in dir(m) if 'store' in n.lower()]}"
 
 
 def k17_json_version():
-    # (core) the app's probe could only say "check by hand"; this checks it:
-    # the new format is written, v1 still loads, a newer file is refused.
+    # (core) K17 asked to keep v1 loadable; the owner decided (2026-10-26)
+    # that files from before the redesign aren't loaded. Done now means: the
+    # current format is written, and older and newer files are refused clearly.
     blob = json.loads(_wf().to_json())
-    v1 = {"version": 1, "steps": [{"step_id": "r", "operation": {
-        "tool_id": "scale", "input": None, "arguments": {"weight": 2},
-        "modifiers": [{"kind": "map", "params": {}}]}}]}
-    _, v1_err = _try(lambda: grid.Workflow.from_dict(v1))
-    _, v3_err = _try(lambda: grid.Workflow.from_dict({**v1, "version": 99}))
-    done = blob.get("version", 1) > 1 and v1_err is None and v3_err is not None
-    return done, (f"to_json version = {blob.get('version')!r}; v1 loads: {v1_err is None}; "
-                  f"newer refused: {v3_err is not None}")
+    current = blob.get("version")
+    old = {**blob, "version": 1}
+    _, old_err = _try(lambda: Workflow.from_dict(old))
+    _, new_err = _try(lambda: Workflow.from_dict({**blob, "version": 99}))
+    done = current == 5 and old_err is not None and new_err is not None
+    return done, (f"to_json version = {current!r}; v1 refused: {old_err is not None}; "
+                  f"newer refused: {new_err is not None}")
 
 
 def k18_timeout_enforced():
@@ -275,7 +315,9 @@ def k18_timeout_enforced():
     t0 = time.time()
     wf.run("x")
     took = time.time() - t0
-    statuses = wf.step("x").output.ledger["status"].tolist()
+    out = wf.step("x").output
+    statuses = ([str(v) for v in out.row_states] if hasattr(out, "row_states")
+                else out.ledger["status"].tolist())
     return "failed" in statuses or took < 0.3, f"4 units × 0.3s with timeout=0.05 took {took:.1f}s; statuses {statuses}"
 
 
@@ -285,8 +327,8 @@ def n1_dict_or_none_setting():
     class DB:
         def __init__(self, table: dict | None = None):
             self.table = table
-    _, e1 = _try(lambda: grid.Workflow().define("db", DB, table={"SF": "n"}))
-    _, e2 = _try(lambda: grid.Workflow().define("db", DB, table=None))
+    _, e1 = _try(lambda: Workflow().define("db", DB, table={"SF": "n"}))
+    _, e2 = _try(lambda: Workflow().define("db", DB, table=None))
     return not e1 and not e2, f"table={{…}} -> {e1 or 'ok'}; table=None -> {e2 or 'ok'}"
 
 
@@ -305,32 +347,38 @@ def n2_literal_beats_column():
 
 
 def c13_output_replaces_input():
+    # (core) map and expand output only the tool's result (owner, 2026-10-20);
+    # group carries its input's columns plus its key (owner, 2026-10-27), so a
+    # key named like an input column is refused unless replace=True.
     wf = _wf()
-    wf["x"] = dbl[mod.map(name="n")](wf["readings"])
-    refused = bool(wf.step("x").problems)
-    wf["y"] = dbl[mod.map(name="n", replace=True)](wf["readings"])
-    ok = not wf.step("y").problems
-    return refused and ok, (f"name='n' -> {wf.step('x').problems or 'accepted'}; "
-                            f"replace=True -> {wf.step('y').problems or 'ok'}")
+    wf["m"] = dbl[mod.map(), mod.name("n")](wf["readings"])
+    wf["g"] = dbl[mod.group(), mod.name("n")](wf["readings"])
+    clash = [p.code for p in wf.step("g").problems] == ["column_clash"]
+    wf["g"] = dbl[mod.group(replace=True), mod.name("n")](wf["readings"])
+    wf.run_all()
+    columns = {sid: list(wf.step(sid).output.data.columns) for sid in ("m", "g")}
+    untouched = list(wf.step("readings").output.data["n"]) == [1, 2, 3, 2]
+    return columns == {"m": ["n"], "g": ["city", "n"]} and untouched and clash, (
+        f"outputs -> {columns}; clash refused: {clash}; input n untouched: {untouched}")
 
 
 def o_missing_required_setting():
-    blob = {"tool_id": "scale", "input": None, "arguments": {},
-            "modifiers": [{"kind": "retry", "params": {}}, {"kind": "map", "params": {}}]}
-    operation = grid.Operation.from_dict(blob)
-    problems = grid.check(operation)
+    blob = {"tool": "scale", "input": None, "arguments": {},
+            "modifiers": [{"kind": "retry", "settings": {}}, {"kind": "map", "settings": {}}]}
+    operation = Operation.from_dict(blob)
+    problems = check(operation)
     return any("times" in p for p in problems), f"check(retry without times) -> {problems or '()'}"
 
 
 def c6_unbound_wf():
-    has = hasattr(grid, "wf")
+    has = _core_has("wf")
     if not has:
-        return False, "grid.wf does not exist"
-    w1, w2 = grid.Workflow(), grid.Workflow()
+        return False, "unbound_wf does not exist"
+    w1, w2 = Workflow(), Workflow()
     w1["r"] = pd.DataFrame({"n": [1, 2]})
     w2["r"] = pd.DataFrame({"n": [7, 8]})
     for w in (w1, w2):
-        w["x"] = scale[mod.map()](grid.wf["r"])
+        w["x"] = scale[mod.map()](unbound_wf["r"])
         w.run("x")
     got = (w1.step("x").output.values, w2.step("x").output.values)
     return got == ([10, 20], [70, 80]), f"-> {got}"
@@ -350,7 +398,7 @@ def c10_failure_flows_downstream():
         calls["n"] += 1
         return value + 1
 
-    wf = grid.Workflow()
+    wf = Workflow()
     wf["r"] = pd.DataFrame({"n": [1, 2, 3]})
     built, err = _try(lambda: scale[mod.map()](wf["nope"]))
     if err:
@@ -358,15 +406,17 @@ def c10_failure_flows_downstream():
     wf["bad"] = built
     # The owner's rule (2026-10-19): an uncaught failure stops run_all, so
     # the failure only flows downstream as state when the step lets it through.
-    wf["a"] = risky[mod.map(), mod.try_except()](wf["r"]) if "try_except" in grid.MODIFIERS \
+    wf["a"] = risky[mod.map(), mod.try_except()](wf["r"]) if "try_except" in MODIFIERS \
         else risky[mod.map()](wf["r"])
     wf["b"] = plus1[mod.map()](wf["a"])
     wf.run_all()
-    cause = wf.step("b").output.ledger["cause"].iloc[1] if "cause" in wf.step("b").output.ledger else None
+    out = wf.step("b").output
+    cause = (out.notes.get(1, {}).get("cause") if hasattr(out, "notes")
+             else out.ledger["cause"].iloc[1])
     dtype = str(wf.step("a").output.data["value"].dtype)
     done = (not wf.step("bad").valid and calls["n"] == 2 and dtype == "Int64"
             and cause == "a[1]: ValueError: boom")
-    return done, f"bad ref -> {wf.step('bad').status}; a: {dtype}; plus1 calls {calls['n']}; cause {cause!r}"
+    return done, f"bad ref -> {wf.step('bad').state}; a: {dtype}; plus1 calls {calls['n']}; cause {cause!r}"
 
 
 def c14_missing_is_none():
@@ -378,7 +428,7 @@ def c14_missing_is_none():
     def inc(n: int) -> int:
         return n + 1
 
-    wf = grid.Workflow()
+    wf = Workflow()
     wf["r"] = pd.DataFrame({"n": [1, None, 3]})
     wf["o"] = inc_opt[mod.map()](wf["r"])
     wf["i"] = inc[mod.map()](wf["r"])
@@ -409,7 +459,7 @@ def c11_literals_round_trip():
     wrong = []
     for v in values:
         wf["s"] = scale.bind(weight=v)[mod.map()](wf["readings"])
-        back = grid.Workflow.from_json(wf.to_session_json(), grid.TOOLS).step("s").operation.arguments["weight"]
+        back = Workflow.from_json(wf.to_session_json(), _tools(locals())).step("s").operation.arguments["weight"]
         if back != v or type(back) is not type(v):
             wrong.append(f"{v!r} -> {back!r}")
     wf["d"] = scale.bind(weight=datetime.date(2024, 1, 1))[mod.map()](wf["readings"])
@@ -444,19 +494,19 @@ def c2_tool_settings():
     if err:
         return False, f"sort(by=tool) -> {err[:100]}"
     wf["s"] = built
-    back = grid.Workflow.from_json(wf.to_session_json(), grid.TOOLS)
+    back = Workflow.from_json(wf.to_session_json(), _tools(locals()))
     back.run("s")
     got = list(back.step("s").output.data["n"])
     return got == [3, 2, 2, 1], f"sort(by=neg_n) after a round trip -> {got}"
 
 
 def c7_selection():
-    wf = grid.Workflow()
+    wf = Workflow()
     wf["p"] = pd.DataFrame({"name": list("abcde"), "qty": [1, 2, 3, 4, 5],
                             "price": [10.0, 20.0, 30.0, 40.0, 50.0]})
-    if not hasattr(grid, "cols"):
-        return False, "grid.cols does not exist"
-    c = grid.cols
+    if not _core_has("cols"):
+        return False, "cols does not exist"
+    c = cols
     wf["block"] = wf["p"][1:3][c["name":"price"]]
     wf.run("block")
     got = wf.step("block").output.data.to_dict("list")
@@ -478,12 +528,12 @@ def c5_load(path: str) -> Annotated[pd.DataFrame, _C5Out]:
 def c5_typed_source_columns():
     # Module level on purpose: under `from __future__ import annotations` a
     # return annotation is a string, resolvable only from the module's names.
-    wf = grid.Workflow()
+    wf = Workflow()
     wf["r"] = c5_load[mod.source()](path="x")
     wf["typo"] = I[mod.select(columns=["cty"])](wf["r"])
     step = wf.step("r")
     plan = getattr(step, "plan", None) or {}
-    cols_ = plan.get("columns", {}).get("names") if plan else grid.predicted_columns(step.output)
+    cols_ = plan.get("columns", {}).get("names") if plan else predicted_columns(step.output)
     caught = bool(wf.step("typo").problems)
     return cols_ == ["city", "n"] and caught, (
         f"unrun source columns -> {cols_}; select typo caught at declaration: {caught} "
@@ -495,7 +545,7 @@ def c9_partial_plans():
     def load_raw(path: str) -> pd.DataFrame:
         return pd.DataFrame({"city": ["SF"]})
 
-    wf = grid.Workflow()
+    wf = Workflow()
     wf["r"] = load_raw[mod.source()](path="x")
     plan = getattr(wf.step("r"), "plan", None)
     if not plan:
@@ -521,9 +571,9 @@ def stop_on_failure():
 
     wf = _wf()
     wf["a"] = risky[mod.map()](wf["readings"])
-    wf["b"] = scale[mod.map()](wf["a"])
+    wf["b"] = I[mod.select(columns=["value"])](wf["a"])     # a map step holds only `value`
     _, err = _try(wf.run_all)
-    stopped = err is not None and "StepFailed" in err and wf.step("b").status == "staged"
+    stopped = err is not None and "StepFailed" in err and wf.step("b").state == "staged"
     wf["a"] = risky[mod.map(), mod.try_except(default=0)](wf["readings"])
     _, err2 = _try(wf.run_all)
     return stopped and err2 is None, (f"uncaught -> {(err or 'no stop')[:70]}; "
@@ -531,13 +581,15 @@ def stop_on_failure():
 
 
 def c3_public_functions():
-    wanted = ["builtin_tools", "declared_tools", "shape_verbs", "resource_types",
-              "payload_column", "check_modifier", "freeze"]
-    missing = [n for n in wanted if not hasattr(grid, n)]
+    # declared_tools, resource_types and freeze read or closed the process-wide
+    # registry, which K24 removed: a Catalog says what a workflow may use.
+    wanted = ["builtin_tools", "shape_verbs", "value_column", "check_modifier",
+              "Catalog"]
+    missing = [n for n in wanted if not _core_has(n)]
     if missing:
         return False, f"missing: {missing}"
-    tagged = "tags" in grid.catalog().get("scale", {})
-    problems = grid.check_modifier("retry", {})
+    tagged = "tags" in catalog(_tools()).get("scale", {})
+    problems = check_modifier("retry", {})
     return tagged and bool(problems), f"functions present; tags in catalog: {tagged}; check_modifier('retry') -> {problems}"
 
 
@@ -545,12 +597,12 @@ def m_infer_bound_method():
     class DB:
         def lookup(self, key):
             return key
-    kind = grid.infer_verb(DB.lookup, grid.grid(pd.DataFrame({"key": ["SF"]})), {})[0]
+    kind = infer_verb(DB.lookup, grid(pd.DataFrame({"key": ["SF"]})), {})[0]
     return kind == "map", f"infer_verb(DB.lookup, …) -> {kind}"
 
 
 def n_auto_modifier():
-    if "auto" not in grid.MODIFIERS:
+    if "auto" not in MODIFIERS:
         return False, "'auto' not in MODIFIERS"
     wf = _wf()
     wf["x"] = add_n[mod.auto()](wf["readings"])
@@ -562,11 +614,11 @@ def n_auto_modifier():
 
 def p_to_source():
     wf = _wf()
-    operation = scale[mod.map(name="s"), mod.retry(times=2)](wf["readings"], weight=2)
+    operation = scale[mod.map(), mod.name("s"), mod.retry(times=2)](wf["readings"], weight=2)
     if not hasattr(operation, "to_source"):
         return False, "Operation.to_source does not exist"
     text = operation.to_source()
-    back = eval(text, {"__builtins__": {}}, grid.formula_names())
+    back = eval(text, {"__builtins__": {}}, formula_names(_tools()))
     return back == operation, f"{text} -> equal: {back == operation}"
 
 
@@ -579,8 +631,24 @@ def c12_kwargs_warn():
         def kw_probe(n: int, **opts) -> int:
             return n
     warned = any("accepts **opts" in str(c.message) for c in caught)
-    is_open = grid.catalog()["kw_probe"].get("open")
+    is_open = catalog({"kw_probe": kw_probe})["kw_probe"].get("open")
     return warned and is_open, f"warned: {warned}; catalog open: {is_open}"
+
+
+def c16_row_ids():
+    @tool
+    def fan(n) -> list:
+        return [n] * n
+
+    wf = _wf()
+    wf["items"] = fan[mod.expand()](wf["readings"])
+    wf["with_parent"] = zip_(wf["items"], wf["readings"])
+    wf.run_all()
+    ids = list(wf.step("items").output.data.index)
+    cities = list(wf.step("with_parent").output.data["city"])
+    done = ids[:3] == ["0.0", "1.0", "1.1"] and cities[:3] == ["SF", "NYC", "NYC"]
+    return done, (f"expand ids {ids[:4]}…; zip_ to parent -> cities {cities[:3]}… "
+                  "(expand only; collapse/join/stack ids still open)")
 
 
 ASKS = [
@@ -606,7 +674,7 @@ ASKS = [
     ("N2", "(core) an explicit literal beats a same-named column, with a warning", n2_literal_beats_column),
     ("C13", "(core) an output never silently replaces an input column", c13_output_replaces_input),
     ("O", "(core) a missing required setting is a declaration problem", o_missing_required_setting),
-    ("C6", "(core) grid.wf: an unbound step reference", c6_unbound_wf),
+    ("C6", "(core) wf: an unbound step reference", c6_unbound_wf),
     ("C10", "(core) failure is a state that flows downstream", c10_failure_flows_downstream),
     ("C14", "(core) missing is None; nullability is checked", c14_missing_is_none),
     ("R8", "(core) failed rows keep an int column int", r8_failed_rows_keep_int),
@@ -622,6 +690,7 @@ ASKS = [
     ("N", "(core) a written mod.auto(), resolved at run", n_auto_modifier),
     ("P", "(core) Operation.to_source() round-trips", p_to_source),
     ("C12", "(core) **kwargs tools warn and are marked open", c12_kwargs_warn),
+    ("C16", "(core) row ids derive from the parent; zip_ pairs by id", c16_row_ids),
 ]
 
 

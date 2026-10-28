@@ -12,7 +12,8 @@ Hard invariants (details and commands in docs/context.md):
   claims have been wrong here.
 - The core pin in `pyproject.toml` and the `external/simple-steps-core`
   submodule commit must match. If they drift, installs break with
-  `ImportError: cannot import name 'ResourceSpec'`.
+  `ImportError: This version of simple-steps needs a newer simple-steps-core`
+  (missing `Catalog` or `Kernel`).
 - `src/SIMPLE_STEPS/frontend_dist/` ships in the wheel. Any change under
   `frontend/src` requires `python -m SIMPLE_STEPS.build_frontend`.
 - Tools use `@simple_step_tool`; resources use `simple_step_resource`.

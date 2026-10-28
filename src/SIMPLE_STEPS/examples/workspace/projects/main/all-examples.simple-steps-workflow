@@ -29,7 +29,7 @@
     },
     {
       "name": "score",
-      "expression": "scale[mod.map(name=\"score\")](wf[\"readings\"])",
+      "expression": "scale[mod.map(), mod.name(\"score\")](wf[\"readings\"])",
       "meta": {
         "label": "score"
       }
@@ -50,7 +50,7 @@
     },
     {
       "name": "regions",
-      "expression": "enrich[mod.map(name=\"region\")](wf[\"big\"], db=res[\"db\"])",
+      "expression": "enrich[mod.map(), mod.name(\"region\")](wf[\"big\"], db=res[\"db\"])",
       "meta": {
         "label": "regions"
       }
@@ -64,7 +64,7 @@
     },
     {
       "name": "summaries",
-      "expression": "summarize[mod.map(name=\"summary\")](wf[\"texts\"], llm=res[\"llm\"])",
+      "expression": "summarize[mod.map(), mod.name(\"summary\")](wf[\"texts\"], llm=res[\"llm\"])",
       "meta": {
         "label": "summaries"
       }
@@ -78,7 +78,7 @@
     },
     {
       "name": "swatches",
-      "expression": "swatch[mod.map(name=\"swatch\")](wf[\"big\"])",
+      "expression": "swatch[mod.map(), mod.name(\"swatch\")](wf[\"big\"])",
       "meta": {
         "label": "swatches"
       }

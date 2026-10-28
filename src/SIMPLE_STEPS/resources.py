@@ -8,10 +8,9 @@ owns the model — ``res["db"]`` references, type checks, bound tools — and th
 caller owns the live objects (core 007, Q1). This module is that caller side:
 
 - :data:`RESOURCE_TYPES` — the types *this app* declared with
-  ``@simple_step_resource``, by class name. A workflow names a type by that
-  name in its ``resources`` section. Kept here rather than read from core's
-  ``grid.RESOURCE_TYPES`` so a same-named type registered by another library
-  (core's own example declares a ``FakeDB`` too) can never replace one of ours.
+  ``@simple_step_resource``, by class name: what the catalog's resource types
+  are built from (``catalog.py``). A workflow names a type by that name in its
+  ``resources`` section.
 - :data:`LOADED` — **ready-made** resources the deployment provides
   (:func:`simple_step_loaded`): a type and settings, some of them read from the
   environment (:func:`env`) so credentials never reach a workflow file.
@@ -30,9 +29,10 @@ caller owns the live objects (core 007, Q1). This module is that caller side:
   use and kept per session, so every row and every step of a session share
   one instance. Changing a declaration's settings builds a new one.
 
-Core sees neither source: the app hands it ``wf.define(name, Type, **settings)``
-with the resolved settings, which core checks like any other. Secrets as typed
-settings (core's ``Secret``, 006 R3) are still core's slice 3.
+Core sees neither source: the app hands it ``k.define(name, Type, **settings)``
+with the resolved settings, which core checks like any other, and attaches the
+live object (``k.resources.attach``). A setting typed ``Secret[str]`` is never
+saved by core.
 """
 
 from __future__ import annotations
@@ -306,10 +306,11 @@ def declare(name: str, definition: str) -> Dict[str, Any]:
     locked, or reads from the environment, can't be changed. Otherwise the
     declaration is ``source: "defined"``.
 
-    Core checks the result against the constructor (``wf.define``), so a bad
+    Core checks the result against the constructor (``k.define``), so a bad
     setting is refused here, before it is saved, rather than when a step runs.
     """
-    from simple_steps_core import grid
+    from simple_steps_core import Kernel
+    from .catalog import catalog
 
     name = (name or "").strip()
     if not _NAME.match(name):
@@ -347,7 +348,7 @@ def declare(name: str, definition: str) -> Dict[str, Any]:
 
     cls, checked = resolve(name, declaration, secrets=False)
     try:
-        grid.Workflow().define(name, cls, **checked)
+        Kernel(catalog()).define(name, cls, **checked)
     except TypeError as exc:
         raise ResourceError(str(exc)) from None
     return declaration

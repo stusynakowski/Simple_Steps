@@ -25,12 +25,12 @@ the agent is off, and why.
 
    | ask | a good answer adds |
    |---|---|
-   | Add a step called totals with each order's total: price times quantity. | `line_total[mod.map(name="total")](wf["orders"])` |
+   | Add a step called totals with each order's total: price times quantity. | `line_total[mod.map(), mod.name("total")](wf["orders"])` |
    | Add a step called with_totals: each order beside its total. | `zip_(wf["orders"], wf["totals"])` |
    | Add a step called large that keeps only the orders whose total is over 100. | `is_large_order[mod.filter()](wf["with_totals"], threshold=100)` |
    | Add a step called ranked: the large orders sorted by total, highest first. | `identity[mod.sort(by="total", ascending=False)](wf["large"])` |
    | Add a step called per_city with the total revenue for each city. | `sum_totals[mod.collapse(by="city", initial=0)](wf["with_totals"])` |
-   | Add a step called months with the month each order was placed. | `month_of[mod.map(name="month")](wf["orders"])` |
+   | Add a step called months with the month each order was placed. | `month_of[mod.map(), mod.name("month")](wf["orders"])` |
 
 4. The proposal lists each change — add, change or remove a step — and any
    problem the checks found. **Apply** it, then run the new steps.
@@ -48,11 +48,11 @@ Asking llama3.2:3b at http://localhost:11434
 
 ── totals: Add a step called totals with each order's total: price times quantity.
       agent: Adds totals.
-      add     totals after orders: =line_total[mod.map(name="total")](wf["orders"])
+      add     totals after orders: =line_total[mod.map(), mod.name("total")](wf["orders"])
       (1 attempt(s), 4.2s)
 …
 ── does each task's step do the job?
-PASS  totals     line_total[mod.map(name="total")](wf["orders"])
+PASS  totals     line_total[mod.map(), mod.name("total")](wf["orders"])
 …
 N/6 tasks done right by llama3.2:3b
 ```

@@ -46,7 +46,7 @@ SOURCES = [
     ("gappy", """to_rows[mod.source()](data='{"n": [1, null, 3]}')"""),
     ("people", """to_rows[mod.source()](data='{"first": ["Ada", "Bo"]}')"""),
     ("scored", 'double_n[mod.map()](wf["readings"])'),
-    ("doubled", 'double_n[mod.map(name="n")](wf["readings"])'),
+    ("doubled", 'double_n[mod.map(), mod.name("n")](wf["readings"])'),
 ]
 
 #: Extra good steps only the corrected workflow needs, before the cases.
@@ -65,7 +65,7 @@ CASES = [
          "A quoted string is text, never a step.",
          'double_n[mod.map()](wf["readings"])'),
     Case("missing_step", "Referring to steps",
-         'double_n[mod.map()](wf["reading"])', "refused", 'no earlier step named "reading" has output',
+         'double_n[mod.map()](wf["reading"])', "refused", "input 'reading', which is not an earlier step",
          "There's no step called that (a typo), or it hasn't run yet.",
          'double_n[mod.map()](wf["readings"])'),
     Case("two_inputs", "Referring to steps",
@@ -79,7 +79,7 @@ CASES = [
 
     # ── tools and modifiers ──────────────────────────────────────────────
     Case("unknown_tool", "Tools and modifiers",
-         'dubble_n[mod.map()](wf["readings"])', "refused", "unknown tool 'dubble_n'",
+         'dubble_n[mod.map()](wf["readings"])', "refused", "'dubble_n' is not in this workflow's catalog",
          "The tool name is misspelt.",
          'double_n[mod.map()](wf["readings"])'),
     Case("unknown_modifier", "Tools and modifiers",
@@ -93,7 +93,7 @@ CASES = [
     Case("misspelt_setting", "Tools and modifiers",
          'double_n[mod.map(nme="doubled")](wf["readings"])', "refused", "map takes no parameter 'nme'; it accepts axis, name, replace, retries",
          "map has no setting nme.",
-         'double_n[mod.map(name="doubled")](wf["readings"])'),
+         'double_n[mod.map(), mod.name("doubled")](wf["readings"])'),
     Case("missing_setting", "Tools and modifiers",
          'double_n[mod.map(), mod.retry()](wf["readings"])', "refused", 'retry needs times= — it has no default',
          "retry has no default number of tries.",

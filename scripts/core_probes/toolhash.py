@@ -1,6 +1,6 @@
-# Core probe (2026-10-26), see docs/core-proposals/011-core-handover.md. Run: .venv/bin/python scripts/core_probes/toolhash.py
+# Core probe (2026-10-26; on core's kernel API 2026-10-27), see docs/core-proposals/011-core-handover.md. Run: .venv/bin/python scripts/core_probes/toolhash.py
 import hashlib, inspect, time, sys
-from simple_steps_core.grid import tool
+from simple_steps_core import Catalog, Kernel, tool
 @tool
 def to_f(t: float) -> float: return t*2
 fn = getattr(to_f, "fn", None) or getattr(to_f, "__wrapped__", None) or to_f

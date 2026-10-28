@@ -1,6 +1,6 @@
 {
   "format_version": 2,
-  "name": "Expand \u2014 List of Nested Dicts",
+  "name": "Expand — List of Nested Dicts",
   "meta": {
     "legacy_id": "expand-list-nested-dicts"
   },
@@ -15,7 +15,7 @@
     },
     {
       "name": "step_expand",
-      "expression": "expand_cell()",
+      "expression": "expand_cell[mod.table()](wf[\"step_var\"])",
       "meta": {
         "label": "Flatten Nested Rows",
         "legacy_step_id": "step-expand"

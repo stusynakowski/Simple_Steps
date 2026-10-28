@@ -69,13 +69,6 @@ def test_metrics_warnings_empty_when_none(client, cities):
     assert metrics["warnings"] == []
 
 
-def test_ui_request_path_carries_warnings(client, cities):
-    """REQ-RUN-001: steps built from the UI's config (not a core formula) too."""
-    metrics = _run(client, None, cities, operation_id="rf_greet",
-                   config={"city": 'step1["city"]', "_orchestrator": "map"})
-    assert metrics["warnings"] == []
-
-
 # ── TEST-RUN-03 · REQ-RUN-003 ────────────────────────────────────────────────
 
 def test_uncaught_failed_counts_own_failures(client, cities):

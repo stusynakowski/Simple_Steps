@@ -3,78 +3,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 import uuid
 
 
-# ── Formula utilities ─────────────────────────────────────────────────────────
-# These mirror the buildFormula / parseFormula logic in the frontend
-# (frontend/src/utils/formulaParser.ts) so the backend can derive the formula
-# from operation_id + config when loading old pipeline files that lack it.
-
-import re as _re
-
-def _is_step_reference(value: str) -> bool:
-    """Return True if *value* looks like a step reference token (e.g. ``step1.url``)."""
-    return bool(_re.match(r'^step[\w-]*\.\w+$', value, _re.IGNORECASE))
-
-
-def _format_formula_value(v: Any) -> str:
-    """
-    Format a config value for inclusion in a formula string.
-
-    * Step references (step1.url) → unquoted
-    * Numbers / booleans → unquoted
-    * Everything else → double-quoted
-
-    Must match ``formatFormulaValue()`` in formulaParser.ts exactly.
-    """
-    if v is None:
-        return ""
-    if isinstance(v, bool):
-        return str(v).lower()          # true / false
-    if isinstance(v, (int, float)):
-        return str(v)
-    s = str(v)
-    if s.startswith("="):
-        return s
-    if _is_step_reference(s):
-        return s
-    # Pure numeric strings stay unquoted
-    if _re.match(r'^-?\d+(\.\d+)?$', s):
-        return s
-    return f'"{s}"'
-
-
-def build_formula_from_fields(
-    operation_id: str,
-    config: Dict[str, Any],
-    orchestration: Optional[str] = None,
-) -> str:
-    """
-    Build a canonical formula string from an operation ID and config dict.
-
-    Examples:
-        build_formula_from_fields("fetch_videos", {"channel_url": "https://..."}, "source")
-        → '=fetch_videos.source(channel_url="https://...")'
-
-        build_formula_from_fields("extract_metadata", {"url": "step1.url"}, "map")
-        → '=extract_metadata.map(url=step1.url)'
-
-    This is the Python equivalent of `buildFormula()` in formulaParser.ts.
-    Both MUST produce identical output for the same inputs.
-    """
-    if not operation_id or operation_id in ("noop", "passthrough", ""):
-        return ""
-
-    effective_mode = orchestration or config.get("_orchestrator")
-    modifier = f".{effective_mode}" if effective_mode else ""
-
-    arg_parts = []
-    for k, v in config.items():
-        if k.startswith("_"):
-            continue  # internal keys (_orchestrator, _ref, etc.)
-        arg_parts.append(f"{k}={_format_formula_value(v)}")
-
-    args = ", ".join(arg_parts)
-    return f"={operation_id}{modifier}({args})"
-
 # --- 1. Dynamic Discovery ---
 class OperationParam(BaseModel):
     name: str
@@ -171,10 +99,6 @@ class StepConfig(BaseModel):
             meta["settings"] = settings
 
         formula = (data.get("formula") or "").strip()
-        if not formula and data.get("operation_id"):
-            formula = build_formula_from_fields(
-                data["operation_id"], data.get("config") or {}
-            )
         expression = formula[1:].lstrip() if formula.startswith("=") else formula
 
         return {
@@ -197,24 +121,20 @@ class StepConfig(BaseModel):
         return f"={self.expression}" if self.expression else ""
 
     @property
-    def _parsed(self) -> Any:
+    def _parsed(self) -> Dict[str, Any]:
         """Cached parse of the expression — `operation_id` / `config` use this."""
         if not hasattr(self, "__parsed_cache"):
-            from .formula_parser import parse_formula
-            object.__setattr__(self, "__parsed_cache", parse_formula(self.formula))
+            from .operation_formula import describe
+            object.__setattr__(self, "__parsed_cache", describe(self.formula))
         return getattr(self, "__parsed_cache")
 
     @property
     def operation_id(self) -> str:
-        p = self._parsed
-        return p.operation_id or ""
+        return self._parsed["operationId"] or ""
 
     @property
     def config(self) -> Dict[str, Any]:
-        p = self._parsed
-        cfg: Dict[str, Any] = dict(p.args or {})
-        if p.orchestration:
-            cfg["_orchestrator"] = p.orchestration
+        cfg: Dict[str, Any] = dict(self._parsed["args"])
         cfg.update(self.meta.get("settings") or {})
         return cfg
 
@@ -289,12 +209,9 @@ class ProjectInfo(BaseModel):
 # --- 4. Reference Passing (Run Single Step) ---
 class StepRunRequest(BaseModel):
     step_id: str
-    operation_id: str
-    config: Dict[str, Any]
-    input_ref_id: Optional[str] = None
+    formula: Optional[str] = None
+    # step name → output ref, for a formula run outside a workflow.
     step_map: Optional[Dict[str, str]] = None
-    is_preview: bool = False
-    formula: Optional[str] = None  # raw formula string for eval-mode fallback
     # NOTE: ``session_id`` is intentionally NOT a request field.  It is
     # resolved server-side from the ``ss_session`` HttpOnly cookie via
     # ``SIMPLE_STEPS.session.get_session_id``.  The client cannot set,
@@ -322,36 +239,7 @@ class StepRunResponse(BaseModel):
     metrics: Dict[str, Any]
     error: Optional[str] = None
 
-# --- 5. Global Control Responses ---
-class PipelineRunResponse(BaseModel):
-    run_id: str
-
-class PipelineStatusResponse(BaseModel):
-    run_id: str
-    status: Literal['running', 'completed', 'failed', 'stopped']
-    current_step_index: int
-    step_statuses: Dict[str, Literal['pending', 'running', 'completed', 'failed']]
-
 # --- 6. Data View ---
 class DataViewRequest(BaseModel):
     offset: int = 0
     limit: int = 50
-
-# ── Legacy shims (kept so existing file_manager.py compiles) ──────────────
-class ProjectMetadata(BaseModel):
-    id: str
-    name: str
-    description: Optional[str] = ""
-    updated_at: str
-
-class WorkflowDefinition(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    name: str
-    steps: List[StepConfig]
-
-class Project(BaseModel):
-    metadata: ProjectMetadata
-    workflow: WorkflowDefinition
-
-class ProjectListResponse(BaseModel):
-    projects: List[ProjectMetadata]
