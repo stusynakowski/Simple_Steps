@@ -13,8 +13,10 @@ too: the saved file declares, the server owns the live objects.
 
 from __future__ import annotations
 
-from simple_steps_core import grid
-from simple_steps_core.grid import mod, op, res, zip_
+from simple_steps_core import Kernel
+from simple_steps_core import mod, op, res, zip_
+
+from SIMPLE_STEPS.catalog import catalog
 
 from SIMPLE_STEPS.operations import to_rows
 
@@ -23,10 +25,10 @@ from llm_tools import FakeDB, FakeLLM, TinyLLM, enrich, summarize
 identity = op("identity")  # core's built-in tool, by name, as core's own example writes it
 
 
-def build_resources() -> grid.Workflow:
+def build_resources() -> Kernel:
     """``resources``: unbound tools taking a resource, bound tools on one
     named instance, and a ready-made resource with a saved override."""
-    wf = grid.Workflow()
+    wf = Kernel(catalog())
     wf.define("db", FakeDB)
     wf.define("llm", FakeLLM, model="fake-1")
     wf.define("tiny", TinyLLM, model="tiny-1")

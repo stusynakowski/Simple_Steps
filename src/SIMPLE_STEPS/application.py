@@ -106,9 +106,10 @@ class App:
         self.port = port
         self.freeze = freeze
         self.agent = agent
-        self.tool_ids: List[str] = []
+        #: The tools this App offers, beside the standard set (catalog.py).
+        self.tools: List[Any] = []
         for item in tools:
-            self.tool_ids += _tool_ids(item)
+            self.tools += _tools_of(item)
         self.resource_types: List[type] = [_resource_type(cls) for cls in resources]
         self.loaded: Dict[str, Any] = {}
         from .resources import ResourceError, register_loaded
@@ -124,7 +125,7 @@ class App:
             CURRENT = self
 
     def __repr__(self) -> str:
-        return (f"App({len(self.tool_ids)} tools, {len(self.resource_types)} resource types, "
+        return (f"App({len(self.tools)} tools, {len(self.resource_types)} resource types, "
                 f"{len(self.loaded)} ready-made, workspace={self.workspace!r})")
 
     # ── Serving ─────────────────────────────────────────────────────────────
@@ -242,22 +243,18 @@ def _caller_folder() -> str:
     return os.getcwd()
 
 
-def _tool_ids(item: Any) -> List[str]:
-    """The tool ids a module, or a single tool, contributes."""
-    from .decorators import OPERATION_REGISTRY
+def _tools_of(item: Any) -> List[Any]:
+    """The tools a module (the ones it defines), or a single tool, contributes."""
+    from simple_steps_core import Tool
 
     if isinstance(item, types.ModuleType):
-        ids = [op_id for op_id, entry in OPERATION_REGISTRY.items()
-               if getattr(entry.get("func"), "__module__", None) == item.__name__]
-        if not ids:
+        found = [v for v in vars(item).values()
+                 if isinstance(v, Tool) and getattr(v.fn, "__module__", None) == item.__name__]
+        if not found:
             raise AppError(f"module {item.__name__} has no @simple_step_tool functions")
-        return ids
-    op_id = getattr(item, "_tool_id", None)
-    if op_id in OPERATION_REGISTRY:
-        return [op_id]
-    for op_id, entry in OPERATION_REGISTRY.items():
-        if entry.get("func") is item:
-            return [op_id]
+        return found
+    if isinstance(item, Tool):
+        return [item]
     name = getattr(item, "__name__", repr(item))
     raise AppError(f"{name} isn't a tool; decorate it with @simple_step_tool")
 

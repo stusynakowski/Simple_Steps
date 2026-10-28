@@ -246,7 +246,7 @@ export interface ModifierSetting {
 /** A core verb (shape) or execution modifier, from ``GET /api/modifiers``. */
 export interface ModifierInfo {
   name: string;
-  class: 'shape' | 'execution';
+  class: 'shape' | 'execution' | 'naming';
   row_rule: string | null;
   settings: ModifierSetting[];
   /** `false` for a verb that applies no tool (select, sort, …); `null` for an execution modifier. */

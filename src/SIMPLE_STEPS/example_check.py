@@ -79,10 +79,10 @@ class Example:
     # ── what the app offers ──────────────────────────────────────────────
 
     @staticmethod
-    def tools() -> Dict[str, Callable]:
-        """The app's tools as core's tools dict — what a twin runs with."""
-        from .grid_runner import _tools
-        return _tools()
+    def catalog():
+        """The app's catalog — what a twin's kernel is built with."""
+        from .catalog import catalog
+        return catalog()
 
     def workflow(self, project: str, name: str) -> dict:
         """A saved workflow file from this example's workspace."""
@@ -93,7 +93,7 @@ class Example:
 
     def run_saved(self, project: str, name: str) -> Dict[str, StepRun]:
         """Every step of a saved workflow, run the way the UI runs it."""
-        from .engine import get_value, run_operation
+        from .engine import get_value, run_operation, values
 
         saved = self.workflow(project, name)
         resources = saved.get("resources") or None
@@ -117,18 +117,20 @@ class Example:
                 run.error = str(exc)
                 continue
             refs[name_] = ref
-            run.data = as_table(get_value(ref, session_id=SESSION))
+            run.data = values(as_table(get_value(ref, session_id=SESSION)))
         return runs
 
-    def run_twin(self, workflow, live: Optional[dict] = None) -> Dict[str, pd.DataFrame]:
-        """Every step of a twin (a declared ``grid.Workflow``), run one at a
+    def run_twin(self, k, live: Optional[dict] = None) -> Dict[str, pd.DataFrame]:
+        """Every step of a twin (a declared core ``Kernel``), run one at a
         time in order, as the UI runs them — so a step with failed rows doesn't
-        stop the steps after it."""
-        tools = self.tools()
+        stop the steps after it. *live* is the resource objects to attach."""
+        for name, obj in (live or {}).items():
+            k.resources.attach(name, obj)
+        from .engine import values
         out: Dict[str, pd.DataFrame] = {}
-        for sid in workflow.steps:
-            workflow.run(sid, tools, resources=live or {})
-            out[sid] = workflow.step(sid).output.data
+        for step in k.steps:
+            k.run(step.name)
+            out[step.name] = values(k.step(step.name).data)
         return out
 
     # ── checking ─────────────────────────────────────────────────────────
@@ -141,7 +143,7 @@ class Example:
               strict: bool = False) -> bool:
         """Run one saved workflow and check every step.
 
-        *twin* builds the same workflow in Python (declared, not run); each
+        *twin* builds the same workflow in Python (a ``Kernel``, declared, not run); each
         step's output must match the app's. *live* returns the resource
         objects the twin runs with. *expect* adds explicit checks per step —
         including :func:`refused`, :func:`warns` and :func:`fails` for a step
@@ -305,8 +307,8 @@ def as_table(value: Any) -> pd.DataFrame:
     (a list, a dict, a number) as core holds it — one cell."""
     if isinstance(value, pd.DataFrame):
         return value
-    from simple_steps_core import grid
-    return grid.grid(value).data
+    from simple_steps_core.verbs import grid
+    return grid(value).data
 
 
 def _differences(app: pd.DataFrame, python: pd.DataFrame) -> List[str]:

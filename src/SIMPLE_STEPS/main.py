@@ -16,8 +16,7 @@ from .models import (
     ProjectInfo,
     PipelineFile,
 )
-from .operations import DEFINITIONS as OPERATIONS
-from .engine import run_operation, get_dataframe, get_value
+from .engine import run_operation, get_dataframe, get_value, values
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
@@ -44,9 +43,8 @@ from .application import load_app as _load_app
 _APP = _load_app(_WORKSPACE)
 if _APP is not None and _APP.freeze:
     # Served to others: no tool can be added once the server is up.
-    from simple_steps_core import REGISTRY as _CORE_REGISTRY, grid as _grid
-    _CORE_REGISTRY.freeze()
-    _grid.freeze()          # the grid's own tool and resource-type registries
+    from .catalog import freeze as _freeze_catalog
+    _freeze_catalog()
 
 
 # --- App Initialize ---
@@ -331,33 +329,33 @@ async def api_write_file(body: FileWriteRequest):
 @app.get("/api/operations", response_model=List[OperationDefinition])
 async def list_operations():
     """
-    Returns the catalogue of available Python operations.
-    Run on app startup or when developer adds new functions.
+    The app's tools, as the palette and the step editor show them
+    (``catalog.palette``, from the catalog's ``describe()``).
     """
-    return OPERATIONS
+    from .catalog import palette
+    return palette()
 
 
 @app.get("/api/modifiers")
 async def list_modifiers():
     """Core's verb vocabulary — every shape verb and execution modifier with
-    its class, row rule and typed settings. Served straight from
-    ``grid.modifier_catalog()`` so the UI's Orchestration control cannot drift
-    from what core runs (core react-api.md, ``GET /modifiers``).
+    its class, row rule and typed settings. Served straight from the catalog's
+    ``describe()`` so the UI's Orchestration control cannot drift from what
+    core runs.
     """
-    from simple_steps_core.grid import modifier_catalog
-    return {"modifiers": modifier_catalog()}
+    from .catalog import catalog
+    return {"modifiers": catalog().describe()["modifiers"]}
 
 
 @app.get("/api/resources")
 async def list_resource_types():
     """The resource types this app declared (``@simple_step_resource``), each
     with its literal settings, its bound tools (methods marked
-    ``@simple_step_tool`` only) and its base types. Served from core's
-    ``grid.resource_entry`` so a type reads the same here as in core.
+    ``@simple_step_tool`` only) and its base types. Served from the catalog's
+    ``describe()`` so a type reads the same here as in core.
     """
-    from simple_steps_core import grid
-    from .resources import RESOURCE_TYPES
-    return {name: grid.resource_entry(cls) for name, cls in sorted(RESOURCE_TYPES.items())}
+    from .catalog import catalog
+    return dict(sorted(catalog().describe()["resource_types"].items()))
 
 
 @app.get("/api/environment")
@@ -614,10 +612,13 @@ async def get_data_view(
     ref_id: str,
     offset: int = 0,
     limit: int = 50,
+    index: bool = False,
     session_id: str = Depends(get_session_id),
 ):
     """
-    Returns a slice of a step's output for the Frontend Grid as ``Cell[]``.
+    Returns a slice of a step's output for the Frontend Grid as ``Cell[]``:
+    its values, or with ``index=true`` also core's ``#`` columns (which input
+    row each row came from) for the index grid.
 
     Session isolation: the ``ref_id`` carries an embedded session token
     (``<token>__<uuid>``).  Lookups that don't match the cookie's session
@@ -626,7 +627,9 @@ async def get_data_view(
     df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
-    
+    if not index:
+        df = values(df)
+
     # Slice the dataframe safely
     subset = df.iloc[offset : offset + limit]
     
@@ -676,6 +679,7 @@ async def get_cell_view(
 @app.get("/api/data-meta/{ref_id}")
 async def get_data_meta(
     ref_id: str,
+    index: bool = False,
     session_id: str = Depends(get_session_id),
 ):
     """
@@ -692,6 +696,8 @@ async def get_data_meta(
     df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
+    if not index:
+        df = values(df)
 
     return {
         "kind": "dataframe",

@@ -1800,6 +1800,60 @@ Every ask's **Done when** is written as a check that can be run against core.
 - **Live resource objects and sessions** (Q1): the app owns them and passes
   them to `run`.
 
+## At the kernel API (core `58bc115`, 0.2.0)
+
+Found while moving the app onto `Catalog` and `Kernel`
+([core_migration.md](../dev_plan/core_migration.md)), each run, not read.
+`SHIM(core §C17)` and `SHIM(core §G)` are gone with the paths that needed them
+(the `dataframe` orchestrator, the engine registry). `SHIM(core §C18)` stays:
+`cat.describe()` still takes the docstring's first line.
+
+### C32. A kernel saved with its outputs
+
+**Today:** `k.to_json()` holds no output data (by design), and the output
+store is step E. A kernel the app puts away (another workflow opened, idle,
+the server stopping) would come back with nothing run. **Shim:**
+`SHIM(core §C32)` in `core_bridge.save_with_outputs` / `restore_with_outputs`,
+through the workflow's internal `to_session_json()` and
+`simple_steps_core.workflow.Workflow.from_dict(blob, catalog=…)`, assigned to
+`Kernel(cat).workflow` as `Kernel._load` does. **Removes:** both functions,
+when the output store lands.
+
+### C33. `inspect.signature(tool)` is the function's
+
+**Today:**
+
+```python
+@tool
+def th_scale(n: int, weight: int = 1) -> int: ...
+inspect.signature(th_scale)   # (*args, **kwargs) -> 'Any'
+```
+
+`__name__` and `__doc__` are the function's; `__wrapped__` isn't set.
+**Ask:** `Tool` wraps its function (`functools.update_wrapper`). **Shim:**
+`SHIM(core §C33)`, `core_bridge.with_signature`.
+
+### C34. A public check for one modifier's settings
+
+**Today:** the app's parser checks settings as you type with
+`simple_steps_core.catalog.check_modifier` and `shape_verbs`, both internal.
+`cat.describe()["modifiers"]` gives the settings but not the check.
+**Ask:** export them, or a `cat.check_modifier(kind, settings)`. **Shim:**
+`SHIM(core §C34)`.
+
+### C35. `tool(fn, id="x")` ignores `id`
+
+**Today:**
+
+```python
+def _src() -> pd.DataFrame: ...
+tool(_src, id="session_src").id        # '_src'
+tool(id="session_src")(_src).id        # 'session_src'
+```
+
+`catalog.tool` calls `make(fn, None)` when `fn` is given. **Ask:** pass `id`.
+The app uses the decorator form, so no shim.
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |
@@ -1828,7 +1882,8 @@ Every ask's **Done when** is written as a check that can be run against core.
 | `dev_plan/117` SR-12, SR-13 (engine `ReferenceResolver` subscripts) | C7 (on the grid's `StepRef`; the engine resolver is retiring) |
 | `dev_plan/117` SR-14 (contradiction with 001 §C) | settled by C7: selections are explicit and typed |
 | `SHIM(core §A6)` in `grid_runner.py` | K12 (whole-table tools) — done, removed |
-| `SHIM(core §C17)` | C17 |
+| `SHIM(core §C17)` | C17 — the path that needed it is removed |
 | `SHIM(core §C18)` | C18 |
+| `SHIM(core §C32)`, `SHIM(core §C33)`, `SHIM(core §C34)` | C32, C33, C34 |
 | `SHIM(core §C21)` | C21 |
 | `dev_plan/200` B2 (kernel restart) | C4 |

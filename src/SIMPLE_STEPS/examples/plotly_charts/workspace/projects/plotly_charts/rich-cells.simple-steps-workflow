@@ -17,21 +17,21 @@
     },
     {
       "name": "swatches",
-      "expression": "swatch[mod.map(name=\"swatch\")](wf[\"readings\"])",
+      "expression": "swatch[mod.map(), mod.name(\"swatch\")](wf[\"readings\"])",
       "meta": {
         "label": "swatches"
       }
     },
     {
       "name": "bright",
-      "expression": "brightness[mod.map(name=\"brightness\")](wf[\"swatches\"])",
+      "expression": "brightness[mod.map(), mod.name(\"brightness\")](wf[\"swatches\"])",
       "meta": {
         "label": "bright"
       }
     },
     {
       "name": "profiles",
-      "expression": "profile[mod.map(name=\"profile\")](wf[\"readings\"])",
+      "expression": "profile[mod.map(), mod.name(\"profile\")](wf[\"readings\"])",
       "meta": {
         "label": "profiles"
       }

@@ -48,9 +48,10 @@ argument that masked the behaviour being tested.
 ### The core pin and the submodule move together
 
 `pyproject.toml` pins core to a commit; `external/simple-steps-core` records
-one. **If they disagree, installs break** — an older core lacks `ResourceSpec`,
-and because `SIMPLE_STEPS/__init__` imports `core_bridge`, the whole package
-becomes unimportable.
+one. **If they disagree, installs break** — an older core lacks `Catalog` and
+`Kernel`, and because `SIMPLE_STEPS/__init__` imports `core_bridge`, the whole
+package becomes unimportable ("This version of simple-steps needs a newer
+simple-steps-core").
 
 To take a core update:
 
@@ -152,12 +153,10 @@ time.
 - A tool's contract comes from its signature and docstring. Write an `Args:`
   section: per-parameter text in the UI is parsed from it, and 35% of
   parameters currently have none.
-- Planned (owner, 2026-10-26): `ResourceSpec` will mean a resource's spec, the
-  type and settings needed to load it; tool groups move to the catalog
-  ([doc 12](system_design/12-core-and-app.md#spec-and-status-for-every-object)).
-  Until core changes, the line below still holds.
-- Built-in tool groups are namespace-only `ResourceSpec`s, following core's own
-  `orchestration` precedent. The word "pack" is retired.
+- A tool is core's `Tool`; what the UI adds (label, category, suggested verb)
+  is in its `extras["simple_steps.ui"]`. The app's one catalog is
+  `catalog.catalog()`: every declared tool and resource type. Nothing
+  registers itself with core. The word "pack" is retired.
 - **Change tests only when absolutely necessary**: when a test asserts
   behaviour that has deliberately changed, never to make a failure go away.
 - **Key core-driven behaviour changes are confirmed by the owner before they

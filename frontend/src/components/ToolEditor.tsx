@@ -10,8 +10,8 @@ import {
   type FormulaParts, type ParsedFormula,
 } from '../utils/formulaParser';
 import {
-  AUTO, autoForWiring, explicitModifiers, fromFieldText, moveModifier, partsForTool, toFieldText,
-  wiringChanged, withChosenVerb, withEntry,
+  AUTO, autoForWiring, explicitModifiers, fromFieldText, isShapeVerb, moveModifier, partsForTool,
+  toFieldText, wiringChanged, withChosenVerb, withEntry,
 } from '../utils/formulaParts';
 import { effectiveSettings, pyLiteral } from '../utils/resources';
 import './ToolEditor.css';
@@ -80,7 +80,7 @@ export default function ToolEditor({
   const [answer, setAnswer] = useState<{ key: string; resolved: Resolved } | null>(null);
 
   useEffect(() => { getModifiers().then(setCatalog).catch(() => setCatalog({})); }, []);
-  const isShape = (kind: string) => catalog[kind]?.class !== 'execution';
+  const isShape = (kind: string) => isShapeVerb(kind, catalog);
   const refOf = (stepName: string | null) =>
     previousSteps.find((s) => s.label === stepName)?.outputRefId;
 
@@ -433,7 +433,7 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
 
   const add = (kind: string) => {
     if (!kind) return;
-    if (catalog[kind]?.class !== 'execution') {
+    if (isShapeVerb(kind, catalog)) {
       // One shape verb per step: the one chosen replaces it (REQ-FORM-003),
       // and brings its own tool if it applies none (REQ-FORM-004).
       onWrite(withChosenVerb(parts, kind, catalog));
@@ -503,8 +503,8 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
       })}
       <select className="te-add" value="" onChange={(e) => add(e.target.value)} title="Add a modifier at the end of the brackets">
         <option value="">+ Add modifier…</option>
-        {(['shape', 'execution'] as const).map((cls) => (
-          <optgroup key={cls} label={cls === 'shape' ? 'Shape' : 'Execution'}>
+        {(['shape', 'execution', 'naming'] as const).map((cls) => (
+          <optgroup key={cls} label={{ shape: 'Shape', execution: 'Execution', naming: 'Naming' }[cls]}>
             {Object.values(catalog).filter((c) => c.class === cls).map((c) => (
               <option key={c.name} value={c.name}>{c.name}</option>
             ))}

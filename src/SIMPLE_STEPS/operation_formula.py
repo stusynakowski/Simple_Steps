@@ -7,13 +7,13 @@ A step written the way simple-steps-core writes it::
      └┬─┘ └───────────────┬─────────────────────────┘ └──────┬──────┘ └───┬───┘
      tool          modifier stack                         the input    arguments
 
-compiles straight to core's operation JSON::
+compiles straight to core's operation spec (``Operation.from_spec``)::
 
-    {"tool_id": "scale",
+    {"tool": "scale",
      "input": {"$ref": "readings"},
      "arguments": {"weight": 2},
-     "modifiers": [{"kind": "retry", "params": {"times": 2}},
-                   {"kind": "map", "params": {"name": "score"}}]}
+     "modifiers": [{"kind": "retry", "settings": {"times": 2}},
+                   {"kind": "map", "settings": {"name": "score"}}]}
 
 The rule (``docs/dev_plan/120-literals-and-references.md``): **a reference is
 ``wf["<step name>"]``; everything else is a literal.** A reference is the
@@ -45,7 +45,7 @@ Forms:
 The rule becomes: ``wf["…"]`` is a table, ``res["…"]`` is a resource, everything
 else is a literal. A resource is never a modifier setting or a combine setting.
 
-A combine is core's own constructor (``grid.join`` / ``stack`` / ``zip_``),
+A combine is core's own constructor (``join`` / ``stack`` / ``zip_``),
 not a tool: it takes no modifiers, its positional arguments are the steps it
 reads, and its keyword settings are literals. Those names are therefore
 reserved — a tool called ``join`` can still be written with brackets,
@@ -69,15 +69,23 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from simple_steps_core import grid
+from simple_steps_core import join, stack, wf, zip_
+
+from .core_bridge import check_modifier, shape_verbs
 
 
 #: Shape verbs that read no step.
 NO_INPUT_VERBS = ("source", "sweep")
 
 #: Combine verbs (core 005 B), as written → core's constructor. ``zip`` is
-#: accepted too: core's tool_id is ``zip``; ``zip_`` is only Python's spelling.
-COMBINES = {"join": grid.join, "stack": grid.stack, "zip_": grid.zip_, "zip": grid.zip_}
+#: accepted too: core's tool is ``zip``; ``zip_`` is only Python's spelling.
+COMBINES = {"join": join, "stack": stack, "zip_": zip_, "zip": zip_}
+
+
+def _modifier_catalog() -> Dict[str, dict]:
+    """Core's modifiers, from the app's catalog: name → class, settings, tool."""
+    from .catalog import catalog
+    return catalog().describe()["modifiers"]
 
 
 class FormulaError(ValueError):
@@ -127,7 +135,7 @@ class Compiled:
             return self.tool_id
         if self.modifiers is None:
             return None
-        shapes = [m["kind"] for m in self.modifiers if m["kind"] in grid.shape_verbs()]
+        shapes = [m["kind"] for m in self.modifiers if m["kind"] in shape_verbs()]
         return shapes[-1] if shapes else None
 
     @property
@@ -145,20 +153,20 @@ class Compiled:
 
     def operation(self, inferred_verb: Optional[str] = None,
                   bound_type: Optional[str] = None) -> dict:
-        """Core's operation JSON. *inferred_verb* fills in an inferred form;
+        """Core's operation spec. *inferred_verb* fills in an inferred form;
         *bound_type* is the declared type of :attr:`bound_to`, which qualifies a
-        bound tool's id (``FakeDB.lookup``)."""
+        bound tool's name (``FakeDB.lookup``)."""
         modifiers = self.modifiers
         if modifiers is None:
             modifiers = [{"kind": inferred_verb or "map", "params": {}}]
-        tool_id = self.tool_id
+        tool = self.tool_id
         if self.bound_to and bound_type:
-            tool_id = f"{bound_type}.{self.tool_id}"
+            tool = f"{bound_type}.{self.tool_id}"
         operation = {
-            "tool_id": tool_id,
+            "tool": tool,
             "input": {"$ref": self.input} if self.input is not None else None,
             "arguments": dict(self.arguments),
-            "modifiers": [dict(m) for m in modifiers],
+            "modifiers": [{"kind": m["kind"], "settings": dict(m["params"])} for m in modifiers],
         }
         if self.inputs:
             operation["inputs"] = [{"$ref": name} for name in self.inputs]
@@ -381,10 +389,10 @@ def _combine(name: str, call: ast.Call) -> Compiled:
     inputs = [_combine_input(arg, name) for arg in call.args]
     settings = {kw.arg: _setting_of(name, kw.arg, kw.value) for kw in call.keywords}
     try:
-        operation = COMBINES[name](*inputs, **settings)
-    except TypeError as exc:
+        spec = COMBINES[name](*(wf[i] for i in inputs), **settings).to_dict()
+    except (TypeError, ValueError) as exc:
         raise FormulaError(f"{name}: {exc}") from None
-    return Compiled(operation.tool_id, [], inputs[0], dict(operation.arguments), inputs)
+    return Compiled(spec["tool"], [], inputs[0], dict(spec.get("arguments") or {}), inputs)
 
 
 def _combine_input(node: ast.AST, name: str) -> str:
@@ -428,14 +436,19 @@ def _modifiers(node: ast.AST) -> List[dict]:
                 "mod.select(…), mod.retry(…), …"
             )
         kind = item.func.attr
-        if kind not in grid.modifier_catalog():
+        known = _modifier_catalog()
+        if kind not in known:
             raise FormulaError(
                 f"unknown modifier mod.{kind}; the modifiers are "
-                f"{', '.join('mod.' + k for k in sorted(grid.modifier_catalog()))}"
+                f"{', '.join('mod.' + k for k in sorted(known))}"
             )
-        if item.args:
-            raise FormulaError(f"mod.{kind}(…) takes keyword settings, e.g. mod.{kind}(name=\"x\")")
         params: Dict[str, Any] = {}
+        if item.args:
+            # mod.name("score"), mod.name(["a", "b"]): the one positional
+            # setting core has, which it calls `to`.
+            if kind != "name" or len(item.args) != 1:
+                raise FormulaError(f"mod.{kind}(…) takes keyword settings, e.g. mod.{kind}(by=\"x\")")
+            params["to"] = _setting(item.args[0], kind, "to")
         for kw in item.keywords:
             if kw.arg is None:
                 raise FormulaError("**kwargs aren't allowed in a formula")
@@ -508,7 +521,7 @@ def _argument(node: ast.AST, name: str) -> Any:
 
 def _check_settings(kind: str, params: Dict[str, Any]) -> None:
     """A modifier's settings, checked as you type rather than when it runs."""
-    problems = grid.check_modifier(kind, params)
+    problems = check_modifier(kind, params)
     if problems:
         raise FormulaError("; ".join(problems))
 
@@ -518,8 +531,8 @@ def _check_stack(modifiers: List[dict], tool: str, written: str) -> None:
     one shape verb per step, and a verb that applies no tool keeps its own
     (``identity[mod.select(…)]``). *written* is the tool as the formula
     spells it, for the message."""
-    catalog = grid.modifier_catalog()
-    shapes = [m["kind"] for m in reversed(modifiers) if m["kind"] in grid.shape_verbs()]
+    catalog = _modifier_catalog()
+    shapes = [m["kind"] for m in reversed(modifiers) if m["kind"] in shape_verbs()]
     if len(shapes) > 1:
         raise FormulaError(
             f"{len(shapes)} shape verbs in one step ({', '.join(shapes)}); at most one "
@@ -627,11 +640,14 @@ def _body(formula: Optional[str]) -> str:
 
 def _written(modifiers: List[dict]) -> str:
     """The modifier stack as written (outermost first), for messages."""
-    parts = []
-    for m in reversed(modifiers):
-        settings = ", ".join(f"{k}={v!r}" for k, v in m["params"].items())
-        parts.append(f"mod.{m['kind']}({settings})")
-    return ", ".join(parts)
+    return ", ".join(_modifier(m["kind"], m["params"], repr) for m in reversed(modifiers))
+
+
+def _modifier(kind: str, params: Dict[str, Any], lit) -> str:
+    """One modifier as written: ``mod.map()``, ``mod.name("score")``."""
+    if kind == "name" and set(params) == {"to"}:
+        return f"mod.name({lit(params['to'])})"
+    return f"mod.{kind}({', '.join(f'{k}={lit(v)}' for k, v in params.items())})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -676,9 +692,7 @@ def format_parts(parts: dict) -> str:
         modifiers = parts.get("modifiers")
         if modifiers is not None:
             head += "[" + ", ".join(
-                f"mod.{m['kind']}({', '.join(f'{k}={_lit(v)}' for k, v in (m.get('params') or {}).items())})"
-                for m in modifiers
-            ) + "]"
+                _modifier(m["kind"], m.get("params") or {}, _lit) for m in modifiers) + "]"
         args = [_ref("wf", parts["input"])] if parts.get("input") else []
         args += [_ref("res", name) for name in parts.get("resources") or []]
         args += [f"{k}={_value(v)}" for k, v in arguments.items()]

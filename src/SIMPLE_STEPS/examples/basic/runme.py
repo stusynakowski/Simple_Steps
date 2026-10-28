@@ -41,7 +41,7 @@ example.check("basic", "all-orchestrations", twin=pipeline.build_all_orchestrati
     "auto_expand": verb("expand"),
     "from_list": {"value": [1, 2, 3, 4]},
     "split": {"c0": [10, 20, 30, 20], "c1": [1, 4, 9, 4]},
-    "gathered": {"value": [[1, 2, 3, 2]]},
+    "gathered": {"n": [[1, 2, 3, 2]]},           # one list per column
     "enriched": {"region": ["west", "east", "west", "west"]},
     "all_readings": {"city": ["SF", "NYC", "SF", "LA", "BOS", "SEA"]},
     # rows 1 and 3 have n == 2, which risky refuses; try_except lets them through

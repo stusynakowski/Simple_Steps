@@ -42,11 +42,11 @@ useful:
 | category | tools | formula, as in `table-tools` |
 |---|---|---|
 | Sources | `make_range`, `sample_people`, `split_text`, `empty_table` | `make_range[mod.source()](n=6, start=1)` |
-| Text | `word_count`, `to_upper`, `reverse_text` | `word_count[mod.map(name="words")](wf["words"])` |
-| Analysis | `classify_age`, `bucket_score` | `bucket_score[mod.map(name="band")](wf["people"], scheme="halves")` |
-| Diagnostics | `slow_double`, `sometimes_fails` | `sometimes_fails[mod.map(name="checked"), mod.try_except(default=-1)](wf["numbers"])` |
+| Text | `word_count`, `to_upper`, `reverse_text` | `word_count[mod.map(), mod.name("words")](wf["words"])` |
+| Analysis | `classify_age`, `bucket_score` | `bucket_score[mod.map(), mod.name("band")](wf["people"], scheme="halves")` |
+| Diagnostics | `slow_double`, `sometimes_fails` | `sometimes_fails[mod.map(), mod.name("checked"), mod.try_except(default=-1)](wf["numbers"])` |
 | Table | `add_computed`, `top_n`, `describe_table`, `count_by` | `top_n[mod.table()](wf["people"], column="score", n=3)` |
-| Shapes | `build_record`, `make_series` | `make_series[mod.expand(name="item")](wf["numbers"], length=2)` |
+| Shapes | `build_record`, `make_series` | `make_series[mod.expand(), mod.name("item")](wf["numbers"], length=2)` |
 
 A per-row tool reads columns **by name**: `word_count(text)` reads the `text`
 column, which is why `split_text` writes one. A whole-table tool,

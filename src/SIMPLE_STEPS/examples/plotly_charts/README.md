@@ -36,9 +36,9 @@ To chart your own data, make the first step
 
 | step | formula | each cell is |
 |---|---|---|
-| `swatches` | `swatch[mod.map(name="swatch")](wf["readings"])` | an image: a uint8 numpy array |
-| `bright` | `brightness[mod.map(name="brightness")](wf["swatches"])` | a number read from the real image |
-| `profiles` | `profile[mod.map(name="profile")](wf["readings"])` | a one-row table |
+| `swatches` | `swatch[mod.map(), mod.name("swatch")](wf["readings"])` | an image: a uint8 numpy array |
+| `bright` | `brightness[mod.map(), mod.name("brightness")](wf["swatches"])` | a number read from the real image |
+| `profiles` | `profile[mod.map(), mod.name("profile")](wf["readings"])` | a one-row table |
 | `chart` | `city_chart[mod.source()](cities=[…], counts=[…])` | a Plotly figure |
 
 ## What `runme.py` checks

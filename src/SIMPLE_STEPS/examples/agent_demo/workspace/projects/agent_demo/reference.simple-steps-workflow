@@ -12,7 +12,7 @@
     },
     {
       "name": "totals",
-      "expression": "line_total[mod.map(name=\"total\")](wf[\"orders\"])",
+      "expression": "line_total[mod.map(), mod.name(\"total\")](wf[\"orders\"])",
       "meta": {
         "label": "totals"
       }
@@ -47,7 +47,7 @@
     },
     {
       "name": "months",
-      "expression": "month_of[mod.map(name=\"month\")](wf[\"orders\"])",
+      "expression": "month_of[mod.map(), mod.name(\"month\")](wf[\"orders\"])",
       "meta": {
         "label": "months"
       }

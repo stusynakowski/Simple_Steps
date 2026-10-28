@@ -45,7 +45,7 @@ Modifier settings (inside `mod.verb(...)`) are always literals.
 | `filter` | `=is_big[mod.filter()](wf["readings"])` | keeps rows where the tool returns true |
 | `expand` | `=fan_out[mod.expand(name="item")](wf["readings"])` | each row becomes several |
 | `collapse` | `=add_n[mod.collapse(initial=0)](wf["readings"])` | all rows reduce to one |
-| `collapse` per group | `=add_n[mod.collapse(by="bucket", initial=0)](wf["bucketed"])` | one row per group |
+| `collapse` per group | `=add_n[mod.collapse(by="bucket", initial=0)](wf["bucket"])` | one row per group |
 | `group` | `=label_city[mod.group(name="bucket")](wf["readings"])` | adds a group-key column |
 | `table` | `=top_n[mod.table()](wf["people"], column="score", n=3)` | tool gets and returns the whole table |
 | `sweep` | `=grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` | runs every combination; no input |

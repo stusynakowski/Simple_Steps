@@ -27,7 +27,7 @@ from SIMPLE_STEPS.example_check import SESSION, Example  # noqa: E402
 with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
     Example(app_path)
 
-from SIMPLE_STEPS.decorators import OPERATION_REGISTRY  # noqa: E402
+from SIMPLE_STEPS.catalog import palette  # noqa: E402
 from SIMPLE_STEPS.engine import run_operation  # noqa: E402
 from SIMPLE_STEPS.operation_formula import describe, format_parts  # noqa: E402
 
@@ -55,11 +55,10 @@ def root(exc: BaseException) -> BaseException:
 # mapped column.
 run("nums", '=make_range[mod.source()](n=5)')
 run("people", '=sample_people[mod.source()](count=4)')
-run("scored", '=scale[mod.map(name="score")](wf["nums"])')
+run("scored", '=scale[mod.map(), mod.name("score")](wf["nums"])')
 
 # The editor's partsForTool + autoForWiring (frontend/src/utils/formulaParts.ts).
-tools = sorted((k, v.get("type")) for k, v in OPERATION_REGISTRY.items()
-               if v.get("type") not in ("verb", "orchestrator"))
+tools = sorted((op.id, op.type) for op in palette())
 ran = refused = 0
 internal = []
 for upstream in ("nums", "people", "scored"):

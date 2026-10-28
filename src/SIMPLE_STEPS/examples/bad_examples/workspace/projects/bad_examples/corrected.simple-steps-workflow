@@ -44,7 +44,7 @@
     },
     {
       "name": "doubled",
-      "expression": "double_n[mod.map(name=\"n\")](wf[\"readings\"])",
+      "expression": "double_n[mod.map(), mod.name(\"n\")](wf[\"readings\"])",
       "meta": {
         "label": "doubled"
       }
@@ -114,7 +114,7 @@
     },
     {
       "name": "misspelt_setting",
-      "expression": "double_n[mod.map(name=\"doubled\")](wf[\"readings\"])",
+      "expression": "double_n[mod.map(), mod.name(\"doubled\")](wf[\"readings\"])",
       "meta": {
         "label": "misspelt_setting"
       }

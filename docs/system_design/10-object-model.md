@@ -38,7 +38,7 @@ cooked, with its results so far. Code: `src/SIMPLE_STEPS/kernels.py`
 ## The chain, from text to screen
 
 ```
- formula text            "scale[mod.map(name=\"score\")](wf[\"readings\"])"      app: a step's `expression`
+ formula text            "scale[mod.map("modifiers": [{"kind": "map", …}]), mod.name(\"score\")](wf[\"readings\"])"      app: a step's `expression`
       │  operation_formula.compile_formula     (the app parses; core only prints:
       │                                          Operation.to_source() → text)
       ▼
@@ -46,7 +46,7 @@ cooked, with its results so far. Code: `src/SIMPLE_STEPS/kernels.py`
       │  .operation(...)
       ▼
  operation dict          {"tool_id": "scale", "input": {"$ref": "readings"},       core's saved form
-                          "arguments": {}, "modifiers": [{"kind": "map", …}]}
+                          "arguments": {})
       │  grid.Operation.from_dict(…, tools)
       ▼
  Operation               tool + modifier stack + input + arguments                 core

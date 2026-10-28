@@ -120,8 +120,7 @@ def check_step(step: Dict[str, str], earlier: List[str],
     """Why *step* can't be used, or None. *earlier*: the steps it may read.
     *existing*: it changes a step that's already there, whose name (a UI label
     such as "Step 1") is kept as it is."""
-    from simple_steps_core import grid
-    from ..decorators import OPERATION_REGISTRY
+    from ..catalog import catalog
     from ..operation_formula import FormulaError, compile_formula, is_canonical
     from ..resources import ResourceError, resource_type
 
@@ -151,12 +150,12 @@ def check_step(step: Dict[str, str], earlier: List[str],
             cls = resource_type(resources[compiled.bound_to], compiled.bound_to)
         except ResourceError as exc:
             return str(exc)
-        tools = grid.resource_entry(cls).get("tools", {})
+        tools = catalog().describe()["resource_types"].get(cls.__name__, {}).get("tools", {})
         if f"{cls.__name__}.{compiled.tool_id}" not in tools:
             shown = ", ".join(t.split(".", 1)[1] for t in tools) or "none"
             return f"{compiled.tool_id} is not a tool of {cls.__name__}; its tools are: {shown}"
         return None
-    if compiled.tool_id not in OPERATION_REGISTRY and compiled.tool_id not in grid.BUILTIN_TOOLS:
+    if compiled.tool_id not in catalog().functions:
         return f"there's no tool named {compiled.tool_id}"
     return None
 

@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from .decorators import simple_step_tool, DEFINITIONS_LIST
+from .decorators import simple_step_tool
 
 # --- Standard Library of Operations ---
 
@@ -290,7 +290,3 @@ def format_string(cell: str = "", template: str = "{value}") -> str:
         return template.format(value=cell)
     except (ValueError, KeyError):
         return template.replace("{value}", str(cell))
-
-
-# The palette's list, shared so tools registered later appear in it too.
-DEFINITIONS = DEFINITIONS_LIST

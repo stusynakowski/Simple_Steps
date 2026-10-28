@@ -113,6 +113,8 @@ def save_dataframe(
     session_id: Optional[str] = None,
     store_mode: Optional[str] = None,
 ) -> str:
+    """Store a step's output under a new ref: all of it, with the ``#``
+    columns that say where each row came from (see :func:`values`)."""
     token = _session_token(session_id)
     ref_id = f"{token}__{uuid.uuid4().hex}"
     DATA_STORE.setdefault(token, {})[ref_id] = df
@@ -124,6 +126,13 @@ def save_dataframe(
             print(f"  ⚠ Failed to persist parquet cache for '{ref_id}': {e}")
 
     return ref_id
+
+
+def values(df: pd.DataFrame) -> pd.DataFrame:
+    """*df* without core's ``#`` columns (where each row came from): what the
+    grid shows by default, and what a tool or a loaded table may see (core
+    rules 2, 3). The index grid shows them on demand (``?index=true``)."""
+    return df[[c for c in df.columns if not str(c).startswith("#")]]
 
 
 def get_value(ref_id: str, session_id: Optional[str] = None) -> Any:

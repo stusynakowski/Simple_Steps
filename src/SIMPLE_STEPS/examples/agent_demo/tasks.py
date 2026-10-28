@@ -71,7 +71,7 @@ def _months(data):
 
 TASKS: List[Task] = [
     Task("totals", "Add a step called totals with each order's total: price times quantity.",
-         '=line_total[mod.map(name="total")](wf["orders"])', _totals),
+         '=line_total[mod.map(), mod.name("total")](wf["orders"])', _totals),
     # A map step is only its results: totals holds the totals, on the orders'
     # row ids. zip_ puts each order beside its total for the steps after.
     Task("with_totals", "Add a step called with_totals: each order beside its total.",
@@ -83,7 +83,7 @@ TASKS: List[Task] = [
     Task("per_city", "Add a step called per_city with the total revenue for each city.",
          '=sum_totals[mod.collapse(by="city", initial=0)](wf["with_totals"])', _per_city),
     Task("months", "Add a step called months with the month each order was placed.",
-         '=month_of[mod.map(name="month")](wf["orders"])', _months),
+         '=month_of[mod.map(), mod.name("month")](wf["orders"])', _months),
 ]
 
 

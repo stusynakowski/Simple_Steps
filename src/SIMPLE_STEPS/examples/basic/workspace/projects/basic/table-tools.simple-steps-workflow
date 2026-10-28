@@ -16,21 +16,21 @@
     },
     {
       "name": "doubled",
-      "expression": "slow_double[mod.map(name=\"doubled\")](wf[\"numbers\"], delay_ms=0)",
+      "expression": "slow_double[mod.map(), mod.name(\"doubled\")](wf[\"numbers\"], delay_ms=0)",
       "meta": {
         "label": "doubled"
       }
     },
     {
       "name": "checked",
-      "expression": "sometimes_fails[mod.map(name=\"checked\"), mod.try_except(default=-1)](wf[\"numbers\"])",
+      "expression": "sometimes_fails[mod.map(), mod.name(\"checked\"), mod.try_except(default=-1)](wf[\"numbers\"])",
       "meta": {
         "label": "checked"
       }
     },
     {
       "name": "series",
-      "expression": "make_series[mod.expand(name=\"item\")](wf[\"numbers\"], length=2)",
+      "expression": "make_series[mod.expand(), mod.name(\"item\")](wf[\"numbers\"], length=2)",
       "meta": {
         "label": "series"
       }
@@ -44,14 +44,14 @@
     },
     {
       "name": "staged",
-      "expression": "classify_age[mod.map(name=\"stage\")](wf[\"people\"])",
+      "expression": "classify_age[mod.map(), mod.name(\"stage\")](wf[\"people\"])",
       "meta": {
         "label": "staged"
       }
     },
     {
       "name": "banded",
-      "expression": "bucket_score[mod.map(name=\"band\")](wf[\"people\"], scheme=\"halves\")",
+      "expression": "bucket_score[mod.map(), mod.name(\"band\")](wf[\"people\"], scheme=\"halves\")",
       "meta": {
         "label": "banded"
       }
@@ -93,21 +93,21 @@
     },
     {
       "name": "counted",
-      "expression": "word_count[mod.map(name=\"words\")](wf[\"words\"])",
+      "expression": "word_count[mod.map(), mod.name(\"words\")](wf[\"words\"])",
       "meta": {
         "label": "counted"
       }
     },
     {
       "name": "shout",
-      "expression": "to_upper[mod.map(name=\"upper\")](wf[\"words\"])",
+      "expression": "to_upper[mod.map(), mod.name(\"upper\")](wf[\"words\"])",
       "meta": {
         "label": "shout"
       }
     },
     {
       "name": "backward",
-      "expression": "reverse_text[mod.map(name=\"reversed\")](wf[\"words\"])",
+      "expression": "reverse_text[mod.map(), mod.name(\"reversed\")](wf[\"words\"])",
       "meta": {
         "label": "backward"
       }
@@ -121,7 +121,7 @@
     },
     {
       "name": "records",
-      "expression": "build_record[mod.map(name=\"record\")](wf[\"as_values\"])",
+      "expression": "build_record[mod.map(), mod.name(\"record\")](wf[\"as_values\"])",
       "meta": {
         "label": "records"
       }
