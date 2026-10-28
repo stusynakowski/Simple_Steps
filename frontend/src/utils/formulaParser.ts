@@ -26,7 +26,9 @@ export interface ParsedFormula {
 }
 
 /** A tool argument: a literal, another step's value, or a resource. */
-export type ArgValue = unknown | { $ref: string } | { $res: string };
+/** `{ $expr }`: formula text only the backend reads, such as a selection
+ *  `wf["r"][0:2][cols["n"]]` (dev_plan/126 D1); it parses and prints it. */
+export type ArgValue = unknown | { $ref: string } | { $res: string } | { $expr: string };
 
 /** One modifier as written, e.g. `mod.map(name="score")`. */
 export interface ModifierPart {

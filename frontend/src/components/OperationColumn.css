@@ -664,6 +664,8 @@
 .row-index-header {
   border-right: 1px solid #ddd;
   background: #eaeaea;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 /* The row margin (DataOutputGrid): a thin strip left of the cells that
@@ -706,6 +708,12 @@
   color: #888;
   border-right: 1px solid #ddd;
   text-align: center;
+  /* As narrow as its widest id allows (the column is max-content), never cut. */
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 0.7rem;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 /* zebra striping logic requires specificity or JS, 
@@ -1019,6 +1027,37 @@
 .grid-cell.empty-frame-cell {
   color: #999;
   font-style: italic;
+}
+
+/* Core's cell states (dev_plan/126 R5, D7). pending: not run, a light blue
+   cell holding its type, <int>;
+   failed: tinted, the error in the tooltip; stale: dimmed, its value kept;
+   absent: grey, no value here at all; a known null: a dim "null". */
+.grid-cell.cell-pending { background: #eef4fc; }
+/* maybe: planned, but a filter or slice may drop the row. */
+.grid-cell.cell-maybe { background: #eef4fc; border-bottom-style: dashed; }
+.cell-staged-type { color: #7f9cc4; font-family: Menlo, Monaco, Consolas, monospace; font-size: 0.7rem; }
+.grid-cell.cell-failed { background: #ffebee; color: #b71c1c; }
+.grid-cell.cell-stale { color: #9a9a9a; }
+.grid-cell.cell-absent { background: #e4e4e4; }
+.cell-null { color: #aaa; font-style: italic; }
+
+/* A column's type from core, after its name. */
+.col-type {
+  margin-left: 5px;
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: #999;
+}
+
+/* A staged step whose row count isn't known: core's reason, under the header. */
+.grid-plan-note {
+  grid-column: 1 / -1;
+  padding: 6px 8px;
+  color: #888;
+  font-size: 0.72rem;
+  font-style: italic;
+  white-space: normal;
 }
 
 

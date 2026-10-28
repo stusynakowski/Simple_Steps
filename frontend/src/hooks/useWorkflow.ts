@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { Workflow, Step, StepStatus, Cell } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
 import { declareResource } from '../services/api';
-import { runStep as runStepApi, fetchDataView, getOperations,
+import { runStep as runStepApi, fetchDataView, fetchStepView, getOperations,
   listProjects, createProject, deleteProject,
   listPipelines, loadPipeline, savePipeline, deletePipeline,
   listenProgress,
@@ -131,7 +131,36 @@ export default function useWorkflow() {
   const workflowDecl = (): WorkflowStepDecl[] => workflowRef.current.steps.map((s) => ({
     id: s.id, name: s.label, formula: s.formula ?? '', ...(s.outputRefId ? { ref: s.outputRefId } : {}),
   }));
-  /** Mark each step out of date, or not, as core says. */
+  /**
+   * Fetch the view of each step whose view key changed (dev_plan/126 R5, R6):
+   * its cells with core's states, types and row ids, and its plan, run or not.
+   * Like a sync, a courtesy: a view that can't be fetched leaves the step as it is.
+   */
+  const refreshViews = useCallback(async (states: Record<string, WorkflowStepState>) => {
+    const key = workflowKey();
+    for (const [name, state] of Object.entries(states)) {
+      const before = workflowRef.current.steps.find((s) => s.label === name);
+      if (!before || !state.view_key || before.viewKey === state.view_key) continue;
+      try {
+        const view = await fetchStepView(key, name);
+        const latest = workflowRef.current;
+        workflowRef.current = {
+          ...latest,
+          steps: latest.steps.map((s) => (s.label !== name ? s : {
+            ...s,
+            viewKey: state.view_key,
+            coreState: view.state,
+            problems: view.problems,
+            plan: view.plan ?? undefined,
+            viewColumns: view.columns,
+            output_preview: view.cells,
+          })),
+        };
+        setWorkflow(workflowRef.current);
+      } catch { /* the step keeps what it shows */ }
+    }
+  }, []);
+  /** Each step as core says: its state, its problems, out of date or not; then its view. */
   const applyStepStates = useCallback((states?: Record<string, WorkflowStepState>) => {
     if (!states) return;
     const patch = (wf: Workflow): Workflow => ({
@@ -140,12 +169,16 @@ export default function useWorkflow() {
         const state = states[s.label];
         const staleReason = state?.status === 'stale' && s.outputRefId
           ? (state.stale_reason || 'an earlier step changed') : undefined;
-        return staleReason === s.staleReason ? s : { ...s, staleReason };
+        const coreState = state?.status ?? s.coreState;
+        const problems = state?.problems ?? s.problems;
+        return staleReason === s.staleReason && coreState === s.coreState && problems === s.problems
+          ? s : { ...s, staleReason, coreState, problems };
       }),
     });
     workflowRef.current = patch(workflowRef.current);
     setWorkflow(patch);
-  }, []);
+    void refreshViews(states);
+  }, [refreshViews]);
   /**
    * Show outputs the server produced or kept that the UI doesn't have yet —
    * steps run first because a later one read them, or a reopened workflow's
@@ -174,7 +207,7 @@ export default function useWorkflow() {
    * edit, to learn which later steps are out of date; when a workflow becomes
    * active, so its kernel comes back from disk with its outputs.
    */
-  const scheduleSync = useCallback(() => {
+  const scheduleSync = useCallback((delay = 300) => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       syncTimer.current = null;
@@ -186,9 +219,12 @@ export default function useWorkflow() {
           applyStepStates(steps);
         })
         .catch(() => {});
-    }, 300);
+    }, delay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyStepStates, showOutputs]);
+  /** Enter in a formula bar: declare the workflow now (core checks and plans
+   *  every step), running nothing (dev_plan/126 D3). */
+  const declareWorkflow = useCallback(() => scheduleSync(0), [scheduleSync]);
   // A workflow becoming active (a tab switch, one opened): bring its kernel back.
   const activeWorkflowId = workflow.id;
   useEffect(() => {
@@ -378,31 +414,6 @@ export default function useWorkflow() {
     }
   }
 
-  /**
-   * Insert a step at *index* with a name and formula, and return its id.
-   * Reference picking uses it to add a select step just before the step being
-   * edited (utils/selection.ts).
-   */
-  function insertStep(index: number, label: string, formula: string): string {
-    const newStep: Step = {
-      id: genId('step'),
-      sequence_index: index,
-      label,
-      formula,
-      operation: formula,
-      process_type: 'identity',
-      configuration: {},
-      status: 'pending',
-    };
-    announce({ kind: 'add', name: label, after: index > 0 ? `step${index}` : null });
-    setWorkflow((prev) => {
-      const steps = [...prev.steps];
-      steps.splice(index, 0, newStep);
-      return { ...prev, steps: steps.map((s, i) => ({ ...s, sequence_index: i })) };
-    });
-    return newStep.id;
-  }
-
   /** Hide the step's UI and shrink its header to fit its name. */
   function minimizeStep(id: string) {
     collapseStep(id);
@@ -522,24 +533,12 @@ export default function useWorkflow() {
       
       const elapsed = Math.round(performance.now() - startTime);
 
-      // Fetch preview — backend returns Cell[] directly ({row_id, column_id, value, display_value})
-      const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
-
-      // Which columns the Data panel shows: all of a core-syntax step's grid,
-      // or the columns an older formula added (see columnsToShow).
-      // Use prevStep.outputColumns (full accumulated column list), not output_preview (filtered).
+      // The cells come from core's view of the step (states, types, row ids),
+      // fetched when the run's step states arrive below (refreshViews).
       const outputCols: string[] = stableMeta.columns.length > 0
         ? stableMeta.columns
         : (res.metrics.columns ?? []);
-      const displayCols = columnsToShow(outputCols, prevStep?.outputColumns, !!parsed?.operation);
       const newCols = outputCols.filter((c) => !(prevStep?.outputColumns ?? []).includes(c));
-
-      // rawData is already Cell[] — just filter to this step's own columns
-      const previewCells = withRowErrors(
-        rawData.filter((cell) => displayCols.has(cell.column_id)),
-        res.metrics.row_errors,
-        res.metrics.payload_column,
-      );
 
       // ── Log: Step succeeded ──
       addLog('success', `Step "${step.label}" completed — ${stableMeta.rows} rows, ${outputCols.length} columns`, {
@@ -584,7 +583,6 @@ export default function useWorkflow() {
             outputRefId: res.output_ref_id,
             outputRows: stableMeta.rows,
             outputColumns: outputCols,
-            output_preview: previewCells,
             warnings,
             uncaughtFailed: res.metrics.uncaught_failed ?? 0,
           };
@@ -965,6 +963,7 @@ export default function useWorkflow() {
         status: 'pending' as StepStatus,
         outputRefId: undefined,
         output_preview: undefined,
+        viewKey: undefined,
       })),
     };
     setWorkflow(reset);
@@ -1166,13 +1165,13 @@ export default function useWorkflow() {
     toggleMaximizeStep,
     minimizedStepIds,
     minimizeStep,
-    insertStep,
     collapseStep, 
     updateStep,
     dispatchCommand,
     consoleStepMap,
     resolveStepId,
-    runStep, 
+    runStep,
+    declareWorkflow, 
     previewStep,
     runPipeline,
     pausePipeline,

@@ -12,12 +12,15 @@ const isRef = (v: unknown): v is { $ref: string } =>
   typeof v === 'object' && v !== null && Object.keys(v).length === 1 && '$ref' in v;
 const isRes = (v: unknown): v is { $res: string } =>
   typeof v === 'object' && v !== null && Object.keys(v).length === 1 && '$res' in v;
+const isExpr = (v: unknown): v is { $expr: string } =>
+  typeof v === 'object' && v !== null && Object.keys(v).length === 1 && '$expr' in v;
 
 /** A value as its field text. `undefined` (not passed) is an empty field. */
 export function toFieldText(v: ArgValue): string {
   if (v === undefined) return '';
   if (isRef(v)) return `wf["${v.$ref}"]`;
   if (isRes(v)) return `res["${v.$res}"]`;
+  if (isExpr(v)) return v.$expr;
   if (typeof v === 'string') return v;
   if (v === true) return 'True';
   if (v === false) return 'False';
@@ -35,6 +38,8 @@ export function fromFieldText(text: string, type?: string | null): ArgValue | un
   if (t === '') return undefined;
   const ref = REF.exec(t);
   if (ref) return ref[1] === 'wf' ? { $ref: ref[3] } : { $res: ref[3] };
+  // Part of a step, wf["r"][0:2][cols["n"]]: the backend's parser reads it.
+  if (/^wf\[\s*["']/.test(t)) return { $expr: t };
   const declared = (type ?? '').toLowerCase();
   if (/(number|int|float)/.test(declared) && t !== '' && Number.isFinite(Number(t))) return Number(t);
   if (/bool/.test(declared)) {

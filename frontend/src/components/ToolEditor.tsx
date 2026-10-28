@@ -75,6 +75,9 @@ export default function ToolEditor({
   /** The committed formula is valid but isn't a tool call (a literal, a legacy formula). */
   const [notATool, setNotATool] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
+  /** The formula doesn't parse: only the tool picker works, and it starts the
+   *  formula over (dev_plan/126 D4). Everything else waits for the formula bar. */
+  const [frozen, setFrozen] = useState(false);
   const [catalog, setCatalog] = useState<Record<string, ModifierInfo>>({});
   /** What `auto` (or a bracket-less formula) resolved to, and for which tool and wiring. */
   const [answer, setAnswer] = useState<{ key: string; resolved: Resolved } | null>(null);
@@ -84,15 +87,16 @@ export default function ToolEditor({
   const refOf = (stepName: string | null) =>
     previousSteps.find((s) => s.label === stepName)?.outputRefId;
 
-  // Redraw from the committed formula. An invalid one keeps the last good parts.
+  // Redraw from the formula. One that doesn't parse freezes the panel.
   useEffect(() => {
     let cancelled = false;
     const empty = !formula.trim();
     (empty ? Promise.resolve(null) : parseFormula(formula)).then((p) => {
       if (cancelled) return;
-      if (!p) { setParts(null); setNotATool(false); setWarning(null); return; }
-      if (!p.isValid) { setWarning(p.error ?? 'This formula has a syntax error.'); return; }
+      if (!p) { setParts(null); setNotATool(false); setWarning(null); setFrozen(false); return; }
+      if (!p.isValid) { setWarning(p.error ?? 'This formula has a syntax error.'); setFrozen(true); return; }
       setWarning(null);
+      setFrozen(false);
       setParts(p.parts ?? null);
       setNotATool(!p.parts);
     }).catch(() => { if (!cancelled) setWarning('Could not reach the server to check this formula.'); });
@@ -121,7 +125,10 @@ export default function ToolEditor({
 
   // Edits arrive faster than the server answers; only the latest one counts.
   const writeSeq = useRef(0);
-  const write = async (requested: FormulaParts) => {
+  // Every change here re-enters the whole formula. While frozen, only choosing
+  // a tool does (`restart`), replacing the text that doesn't parse.
+  const write = async (requested: FormulaParts, restart = false) => {
+    if (frozen && !restart) return;
     const seq = ++writeSeq.current;
     // A wiring change on an undecided step: auto (or source, if it reads nothing).
     const next = !requested.inputs.length && wiringChanged(parts, requested)
@@ -152,7 +159,8 @@ export default function ToolEditor({
   const chooseTool = (id: string) => {
     if (!id) return;
     const chosen = tools.find((o) => o.id === id);
-    void write(partsForTool(id, chosen?.type, parts?.input ?? previous));
+    // Frozen, the last parts are stale: start from the tool alone.
+    void write(partsForTool(id, chosen?.type, frozen ? previous : parts?.input ?? previous), frozen);
   };
 
   return (
@@ -161,9 +169,9 @@ export default function ToolEditor({
         <span className="te-bar-label">Tool:</span>
         <select
           className="te-tool-select"
-          value={parts?.tool ?? ''}
+          value={frozen ? '' : parts?.tool ?? ''}
           onChange={(e) => chooseTool(e.target.value)}
-          disabled={isCombine}
+          disabled={isCombine && !frozen}
           title={op?.description}
         >
           <option value="">Choose a tool…</option>
@@ -180,21 +188,23 @@ export default function ToolEditor({
       {warning && (
         <div className="te-warning" role="status" title={warning}>
           <SymbolIcon name="warning" size={13} /> {warning}
+          {frozen && <div className="te-frozen-note">Fix it in the formula bar, or choose a tool to start the formula over.</div>}
         </div>
       )}
 
-      {notATool && (
+      {notATool && !frozen && (
         <div className="te-panel te-note">This step is a value or a reference, not a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
       )}
 
-      {parts && isCombine && (
+      {parts && isCombine && !frozen && (
         <div className="te-panel te-note">
           A <code>{parts.tool}</code> of {parts.inputs.map((n) => `wf["${n}"]`).join(', ')}. Edit it in the formula bar.
         </div>
       )}
 
       {parts && !isCombine && (
-        <>
+        <fieldset className="te-fieldset" disabled={frozen} aria-disabled={frozen}
+          style={frozen ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
           <Bar title="Inputs" defaultOpen>
             <InputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
               onWrite={write} onDefineResource={onDefineResource} />
@@ -204,7 +214,7 @@ export default function ToolEditor({
             <ModifierList parts={parts} catalog={catalog} resolved={resolved}
               onWrite={write} />
           </Bar>
-        </>
+        </fieldset>
       )}
     </div>
   );

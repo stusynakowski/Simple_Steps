@@ -114,6 +114,9 @@ def main():
 
     if backend_port != args.port:
         print(f"  ⚠️  Backend port {args.port} is in use, using port {backend_port} instead.")
+    # Vite proxies /api here (frontend/vite.config.ts), not to a fixed :8000 —
+    # which may be another server entirely when that port was taken.
+    env["SIMPLE_STEPS_BACKEND"] = f"http://{args.host}:{backend_port}"
     if frontend_port != args.frontend_port:
         print(f"  ⚠️  Frontend port {args.frontend_port} is in use, using port {frontend_port} instead.")
 

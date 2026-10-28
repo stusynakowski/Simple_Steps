@@ -1,0 +1,43 @@
+{
+  "format_version": 2,
+  "id": "01-formula-bar-and-panel",
+  "name": "01 Formula bar and panel",
+  "meta": {
+    "about": "R1, D3, D4, F1: the formula bar and the Formula panel (fx) agree; Enter declares, Cmd/Ctrl+Enter runs.",
+    "plan": "docs/dev_plan/126-formula-ui.md"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"ward\": [\"A\", \"B\", \"A\", \"C\"], \"n\": [10, 20, 30, 40]}')",
+      "meta": {
+        "label": "readings",
+        "notes": "Run this first: Cmd/Ctrl+Enter in its formula bar (Enter only declares it)."
+      }
+    },
+    {
+      "name": "doubled",
+      "expression": "double[mod.map()](wf[\"readings\"])",
+      "meta": {
+        "label": "doubled",
+        "notes": "R1: open fx. In the bar, change wf[\"readings\"] to wf[\"edit_me\"] and click away WITHOUT Enter. Expect: the panel shows the new input at once. Today: it keeps the old one, and editing the panel puts the old formula back. D3: press Enter. Expect: nothing runs (no new output; an edit upstream shows doubled as out of date). Cmd/Ctrl+Enter runs it. The staged shape itself shows with R6. D4: type a stray ( so it doesn't parse. Expect: the panel freezes (greyed) with core's reason; its inputs and modifiers write nothing; its Tool picker still works and starts the formula over from the chosen tool, reading the previous step."
+      }
+    },
+    {
+      "name": "edit_me",
+      "expression": "to_rows[mod.source()](data='{\"n\": [1, 2]}')",
+      "meta": {
+        "label": "edit_me",
+        "notes": "A second input, for R1's edit."
+      }
+    },
+    {
+      "name": "pick_a_tool",
+      "expression": "",
+      "meta": {
+        "label": "pick_a_tool",
+        "notes": "F1: type =is_ in the bar and choose is_big from the autocomplete. Expect: =is_big(wf[\"edit_me\"]), the formula the panel's Tool picker writes, reading the previous step; verbs and orchestrators aren't offered as tools. Before 2026-10-28: =is_big.map( which doesn't parse."
+      }
+    }
+  ]
+}

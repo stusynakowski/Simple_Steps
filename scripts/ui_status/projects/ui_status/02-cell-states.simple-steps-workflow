@@ -1,0 +1,67 @@
+{
+  "format_version": 2,
+  "id": "02-cell-states",
+  "name": "02 Cell states",
+  "meta": {
+    "about": "R5, R6, D7: every cell state core gives, drawn in the grid.",
+    "plan": "docs/dev_plan/126-formula-ui.md"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"n\": [1, 2, 3, null]}')",
+      "meta": {
+        "label": "readings",
+        "notes": "Four rows; the last is null."
+      }
+    },
+    {
+      "name": "doubled",
+      "expression": "double[mod.map(), mod.try_except()](wf[\"readings\"])",
+      "meta": {
+        "label": "doubled",
+        "notes": "R5 after a run: rows 0-1 known (2, 4), row 2 failed (three is refused), row 3 known null. D7a: failed tinted, null a dim null."
+      }
+    },
+    {
+      "name": "staged",
+      "expression": "double[mod.map(), mod.try_except()](wf[\"readings\"])",
+      "meta": {
+        "label": "staged",
+        "notes": "R6: declare but DON'T run. Expect: 4 rows of empty pending cells under a typed header (value: int), from core's plan. Today: guessed staged columns and arrow text."
+      }
+    },
+    {
+      "name": "other",
+      "expression": "to_rows[mod.source()](data='{\"n\": [5], \"extra\": [\"x\"]}')",
+      "meta": {
+        "label": "other",
+        "notes": "A table with a column readings lacks."
+      }
+    },
+    {
+      "name": "stacked",
+      "expression": "stack(wf[\"readings\"], wf[\"other\"])",
+      "meta": {
+        "label": "stacked",
+        "notes": "D7: the readings rows have no 'extra': those cells are absent, and absent is grey."
+      }
+    },
+    {
+      "name": "empty_step",
+      "expression": "",
+      "meta": {
+        "label": "empty_step",
+        "notes": "Rule 9: a step with no formula is the empty step: one cell, 'empty'."
+      }
+    },
+    {
+      "name": "go_stale",
+      "expression": "",
+      "meta": {
+        "label": "go_stale",
+        "notes": "Stale: run all, then change readings' data (e.g. 1 -> 7). Expect doubled marked stale, values dimmed, core's reason 'input readings changed'."
+      }
+    }
+  ]
+}

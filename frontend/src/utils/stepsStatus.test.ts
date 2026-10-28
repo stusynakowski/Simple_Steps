@@ -1,7 +1,7 @@
 // TEST: the steps bar's status text — what the pointer is over in a step's
 // grid, else what a formula bar is selecting.
 import { describe, it, expect } from 'vitest';
-import { compactRows, describeHover, describeSelection, stepsStatusText } from './stepsStatus';
+import { compactRows, describeHover, stepsStatusText } from './stepsStatus';
 
 describe('steps bar status text', () => {
   it('names what the pointer is over', () => {
@@ -21,19 +21,11 @@ describe('steps bar status text', () => {
     expect(text.length).toBeLessThan(60);
   });
 
-  it('describes a selection being made', () => {
-    expect(describeSelection({ step: 'readings', kind: 'columns', columns: ['score', 'n'], rows: [] }))
-      .toBe('Selecting wf["readings"] · columns score, n');
-    expect(describeSelection({ step: 'readings', kind: 'rows', columns: [], rows: [3, 1, 2, 7] }))
-      .toBe('Selecting wf["readings"] · rows 1–3, 7');
-    expect(describeSelection({ step: 'readings', kind: 'all', columns: [], rows: [] }))
-      .toBe('Selecting wf["readings"] · whole table');
-  });
-
-  it('prefers the hover, then the selection, else shows nothing', () => {
-    const sel = { step: 'r', kind: 'all' as const, columns: [], rows: [] };
-    expect(stepsStatusText({ step: 'r', kind: 'row', row: 1 }, sel)).toBe('r · row 1');
-    expect(stepsStatusText(null, sel)).toBe('Selecting wf["r"] · whole table');
+  // A pick for a formula is shown as it is written (dev_plan/126 D1).
+  it('prefers the hover, then the pick being made, else shows nothing', () => {
+    const pick = 'wf["r"][1:3][cols["n"]]';
+    expect(stepsStatusText({ step: 'r', kind: 'row', row: 1 }, pick)).toBe('r · row 1');
+    expect(stepsStatusText(null, pick)).toBe('Selecting wf["r"][1:3][cols["n"]]');
     expect(stepsStatusText(null, null)).toBe('');
   });
 

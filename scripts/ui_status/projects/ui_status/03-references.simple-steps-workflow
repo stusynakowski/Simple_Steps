@@ -1,0 +1,35 @@
+{
+  "format_version": 2,
+  "id": "03-references",
+  "name": "03 References and selection",
+  "meta": {
+    "about": "D1, D5, D6, R3, R7, F7-F11: picking parts of a step while writing a formula.",
+    "plan": "docs/dev_plan/126-formula-ui.md"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"ward\": [\"A\", \"B\", \"A\", \"C\"], \"n\": [10, 20, 30, 40]}')",
+      "meta": {
+        "label": "readings",
+        "notes": "Run this first. Then click into 'reader' and pick from this grid."
+      }
+    },
+    {
+      "name": "reader",
+      "expression": "double[mod.map()](wf[\"readings\"])",
+      "meta": {
+        "label": "reader",
+        "notes": "Click into this formula after n= (e.g. double[mod.map()](wf[\"readings\"], n=)), then pick in readings' grid. Each pick is written at the caret in core's notation and the next pick replaces it (as in Excel): a cell -> wf[\"readings\"][0][cols[\"n\"]] (row id); Shift-click or drag to a block -> wf[\"readings\"][0:2][cols[\"n\"]] (positions); a column header -> wf[\"readings\"][cols[\"n\"]]; Cmd/Ctrl-click rows -> wf[\"readings\"][[0, 2]]; the corner -> wf[\"readings\"]. The pick is the bold outline in readings' grid; no select step is added, and the window never opens while picking. Scattered cells that aren't one rectangle write nothing. Still to come: dashed reference boxes in the bar and the grid (R3)."
+      }
+    },
+    {
+      "name": "by_position",
+      "expression": "double[mod.map()](wf[\"readings\"])",
+      "meta": {
+        "label": "by_position",
+        "notes": "F11: change wf[\"readings\"] to wf[0]. Decided: it works and is saved by name. Today: refused."
+      }
+    }
+  ]
+}

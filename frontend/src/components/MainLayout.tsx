@@ -120,9 +120,9 @@ export default function MainLayout() {
     collapseStep,
     minimizedStepIds,
     minimizeStep,
-    insertStep,
     updateStep,
     runStep,
+    declareWorkflow,
     runPipeline,
     pausePipeline,
     stopPipeline,
@@ -838,19 +838,15 @@ export default function MainLayout() {
                   onActivate={() => toggleStep(step.id)}
                   onUpdate={(id, updates) => updateStep(id, updates)}
                   onRun={runStep}
+                  onDeclare={declareWorkflow}
                   onPreview={previewStep}
                   onPause={id => console.log('Pause', id)}
                   onDelete={deleteStep}
                   onMinimize={() => collapseStep(step.id)}
                   onMaximize={() => toggleMaximizeStep(step.id)}
                   onMinimizeStep={() => minimizeStep(step.id)}
-                  allStepNames={workflow.steps.map((s) => s.label)}
                   resources={workflow.resources}
                   onDefineResource={defineResource}
-                  onInsertStepBefore={(label, formula) => insertStep(index, label, formula)}
-                  onSetStepFormula={(id, formula) => updateStep(id, {
-                    formula, operation: formula, process_type: 'identity', configuration: {},
-                  })}
                   onDetach={(pos) => handleDetach(step.id, pos)}
                 />
               </div>
@@ -1060,6 +1056,7 @@ export default function MainLayout() {
               onClose={() => closeDetachedWindow(dw.id)}
               onUpdate={(id, updates) => updateStep(id, updates)}
               onRun={runStep}
+                  onDeclare={declareWorkflow}
               onPreview={previewStep}
               onDelete={deleteStep}
             />

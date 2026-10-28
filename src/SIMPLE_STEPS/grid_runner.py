@@ -99,7 +99,7 @@ def infer_verb_for(parts: dict, upstream: Any = None,
         except (ResourceError, TypeError) as exc:
             return "map", str(exc)
     literals = {key: v for key, v in (parts.get("arguments") or {}).items()
-                if not (isinstance(v, dict) and set(v) & {"$ref", "$res"})}
+                if not (isinstance(v, dict) and set(v) & {"$ref", "$res", "$expr"})}
     try:
         return k.infer_verb(parts.get("tool") or "", "input", literals, bound_to)
     except Exception as exc:     # core's inference is advice; never block the editor on it

@@ -2,7 +2,6 @@
  * The steps bar's status text: what the pointer is over in a step's grid, or
  * — while a formula bar is picking a reference — what it has selected.
  */
-import type { Selection } from './selection';
 
 /** A spot in a step's data grid, as the grid reports it on hover. */
 export type GridHover =
@@ -51,21 +50,13 @@ export function compactRows(rows: number[]): string {
   return parts.join(', ');
 }
 
-/** `Selecting wf["readings"] · columns score, n` */
-export function describeSelection(sel: Selection): string {
-  const ref = `wf[${JSON.stringify(sel.step)}]`;
-  if (sel.kind === 'columns' && sel.columns.length) {
-    return `Selecting ${ref} · ${sel.columns.length === 1 ? 'column' : 'columns'} ${sel.columns.join(', ')}`;
-  }
-  if (sel.kind === 'rows' && sel.rows.length) {
-    return `Selecting ${ref} · ${sel.rows.length === 1 ? 'row' : 'rows'} ${compactRows(sel.rows)}`;
-  }
-  return `Selecting ${ref} · whole table`;
-}
-
-/** What the bar shows: the hover if there is one, else a selection being made, else nothing. */
-export function stepsStatusText(hover: GridHover | null, selection: Selection | null): string {
+/**
+ * What the bar shows: the hover if there is one, else the pick being made
+ * for a formula, as it is written (`Selecting wf["readings"][cols["n"]]`),
+ * else nothing.
+ */
+export function stepsStatusText(hover: GridHover | null, selection: string | null): string {
   if (hover) return describeHover(hover);
-  if (selection) return describeSelection(selection);
+  if (selection) return `Selecting ${selection}`;
   return '';
 }

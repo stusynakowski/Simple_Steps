@@ -324,7 +324,13 @@ def compile_formula(formula: str) -> Compiled:
                 f'wf["{name}"] on its own is a reference, not a step. To copy it, '
                 f'write identity[mod.slice()](wf["{name}"])'
             )
-        _reject_column_ref(tree)
+        picked = _selection(tree)
+        if picked is not None:                           # wf["r"][0:2][cols["n"]]: a select step
+            step, sel = picked
+            settings = dict(sel)
+            if "columns" in settings and "names" in settings["columns"]:
+                settings["columns"] = list(settings["columns"]["names"])
+            return Compiled("identity", [{"kind": "select", "params": settings}], step, {})
         tool = _tool_name(tree.value)                    # tool[mods]: no input
         modifiers = _modifiers(tree.slice)
         compiled = Compiled(tool, modifiers, None, {})
@@ -509,7 +515,10 @@ def _argument(node: ast.AST, name: str) -> Any:
     resource = _res_name(node)
     if resource is not None:
         return {"$res": resource}
-    _reject_column_ref(node)
+    picked = _selection(node)
+    if picked is not None:                               # n=wf["r"][cols["n"]]: part of a step
+        step, sel = picked
+        return {"$ref": step, **sel}
     if isinstance(node, ast.Call):
         raise FormulaError(
             f"{name}: an operation can't be an argument; make it its own step "
@@ -584,15 +593,93 @@ def _setting(node: ast.AST, kind: str, name: str) -> Any:
 
 
 def _reject_column_ref(node: ast.AST) -> None:
-    """``wf["x"]["n"]`` — there are no column references."""
-    if isinstance(node, ast.Subscript) and _wf_name(node.value) is not None:
-        step = _wf_name(node.value)
+    """A selection as a tool's input (``tool(wf["x"][cols["n"]])``): core
+    refuses it, so say so here, with its remedy."""
+    picked = _selection(node) if isinstance(node, ast.Subscript) else None
+    if picked is not None:
+        written = _selection_text({"$ref": picked[0], **picked[1]})
         raise FormulaError(
-            f'wf["{step}"][…]: a step reads a whole step, not part of one. Make the '
-            f'part its own step — identity[mod.slice(start=…, stop=…)](wf["{step}"]) '
-            f'for rows, identity[mod.select(columns=[…])](wf["{step}"]) for columns — '
-            "and read that"
+            f"a selection can't be a tool's input: make it its own step, whose formula "
+            f"is {written}, and pass that step. As an argument it works: "
+            f'tool(wf["…"], n={written})'
         )
+
+
+def _selection(node: ast.AST) -> Optional[tuple]:
+    """``wf["r"][0:2][cols["n"]]`` → ``("r", {"rows": …, "columns": …})`` in core's
+    spec (dev_plan/126 D1, F7); ``None`` for anything that isn't one.
+
+    Rows go by core's row id, ``[1]`` and ``[[0, 2]]``, or by position,
+    ``[1:3]``; a text row id (after ``expand`` or ``collapse``) is
+    ``rows["0.1"]`` or ``rows[["A", "C"]]``, as in core's Python, since a plain
+    ``["…"]`` would read as a column. Columns are ``cols["n"]``,
+    ``cols[["a", "b"]]`` or ``cols["a":"b"]``. Syntax only: whether the rows
+    and columns exist is core's check.
+    """
+    picks = []
+    while isinstance(node, ast.Subscript) and not _is_name(node.value, "wf"):
+        picks.append(node.slice)
+        node = node.value
+    if not picks or not (isinstance(node, ast.Subscript) and _is_name(node.value, "wf")):
+        return None
+    step = _wf_name(node)
+    sel: Dict[str, Any] = {}
+    for pick in reversed(picks):
+        kind, value = _pick(pick, step)
+        if kind in sel:
+            raise FormulaError(f'wf["{step}"]: pick the {kind} once, e.g. wf["{step}"][0:2][cols["n"]]')
+        sel[kind] = value
+    return step, sel
+
+
+def _pick(node: ast.AST, step: str) -> tuple:
+    """One subscript of a selection: ``("rows", …)`` or ``("columns", …)``."""
+    if isinstance(node, ast.Subscript) and _is_name(node.value, "cols"):
+        key = node.slice
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            return "columns", {"names": [key.value]}
+        if isinstance(key, (ast.List, ast.Tuple)) and all(
+                isinstance(e, ast.Constant) and isinstance(e.value, str) for e in key.elts):
+            return "columns", {"names": [e.value for e in key.elts]}
+        if (isinstance(key, ast.Slice) and key.step is None
+                and all(isinstance(e, ast.Constant) and isinstance(e.value, str) for e in (key.lower, key.upper))):
+            return "columns", {"from": key.lower.value, "to": key.upper.value}
+        raise FormulaError('cols[…] takes a column name, a list of names or a range: '
+                           'cols["n"], cols[["a", "b"]], cols["a":"b"]')
+    if isinstance(node, ast.Slice):
+        if node.step is not None:
+            raise FormulaError(f'wf["{step}"][a:b]: a range of rows takes no step')
+        ends = []
+        for end in (node.lower, node.upper):
+            if end is not None and not (isinstance(end, ast.Constant) and isinstance(end.value, int)):
+                raise FormulaError(f'wf["{step}"][a:b]: a range of rows is two numbers, either one left out')
+            ends.append(None if end is None else end.value)
+        return "rows", {"start": ends[0], "stop": ends[1]}
+    if isinstance(node, ast.Subscript) and _is_name(node.value, "rows"):
+        ids = _row_ids(node.slice, (int, str))
+        if ids is None:
+            raise FormulaError('rows[…] takes a row id or a list of them: rows["0.1"], rows[["A", "C"]]')
+        return "rows", ids
+    ids = _row_ids(node, (int,))
+    if ids is not None:
+        return "rows", ids
+    if _row_ids(node, (str,)) is not None:                # core's own wording
+        written = ast.unparse(node).replace("'", '"')
+        raise FormulaError(
+            f'a plain bracket selects rows by int id; a text row id goes through rows: '
+            f'wf["{step}"][rows[{written}]]. Columns use cols: wf["{step}"][cols[{written}]]')
+    raise FormulaError(f'wf["{step}"][…] takes rows ([1], [[0, 2]], [1:3], rows["0.1"]) or columns (cols["n"])')
+
+
+def _row_ids(node: ast.AST, kinds: tuple) -> Any:
+    """One row id or a list of them, each of *kinds*; ``None`` if it isn't."""
+    ok = lambda e: (isinstance(e, ast.Constant) and isinstance(e.value, kinds)
+                    and not isinstance(e.value, bool))
+    if ok(node):
+        return node.value
+    if isinstance(node, ast.List) and node.elts and all(ok(e) for e in node.elts):
+        return [e.value for e in node.elts]
+    return None
 
 
 def _wf_name(node: ast.AST) -> Optional[str]:
@@ -637,7 +724,27 @@ def _is_name(node: ast.AST, name: str) -> bool:
 
 
 def _is_ref(value: Any) -> bool:
-    return isinstance(value, dict) and set(value) == {"$ref"}
+    """``{"$ref": step}``, or part of a step: with ``rows`` and/or ``columns``."""
+    return isinstance(value, dict) and "$ref" in value and set(value) <= {"$ref", "rows", "columns"}
+
+
+def _selection_text(v: dict) -> str:
+    """A selection argument as written: ``wf["r"][0:2][cols["n"]]``."""
+    text = _ref("wf", v["$ref"])
+    rows = v.get("rows")
+    if isinstance(rows, dict):
+        text += f'[{"" if rows.get("start") is None else rows["start"]}:{"" if rows.get("stop") is None else rows["stop"]}]'
+    elif rows is not None:
+        texty = isinstance(rows, str) or (isinstance(rows, list) and any(isinstance(r, str) for r in rows))
+        text += f"[rows[{_lit(rows)}]]" if texty else f"[{_lit(rows)}]"
+    columns = v.get("columns")
+    if columns is not None:
+        if "names" in columns:
+            names = columns["names"]
+            text += f"[cols[{_lit(names[0]) if len(names) == 1 else _lit(list(names))}]]"
+        else:
+            text += f'[cols[{_lit(columns["from"])}:{_lit(columns["to"])}]]'
+    return text
 
 
 def _is_res(value: Any) -> bool:
@@ -680,7 +787,9 @@ def to_parts(c: Compiled) -> dict:
         ],
         "input": c.input,
         "resources": list(c.positional_resources),
-        "arguments": dict(c.arguments),
+        # A selection travels as its text ({"$expr": …}): the parser here reads it back.
+        "arguments": {k: ({"$expr": _selection_text(v)} if _is_ref(v) and set(v) != {"$ref"} else v)
+                      for k, v in c.arguments.items()},
         "inputs": list(c.inputs),
     }
 
@@ -693,6 +802,19 @@ def format_parts(parts: dict) -> str:
         raise FormulaError("choose a tool")
     inputs = parts.get("inputs") or []
     arguments = parts.get("arguments") or {}
+    modifiers = parts.get("modifiers")
+    if (tool == "identity" and parts.get("input") and not inputs and not arguments
+            and not parts.get("resources") and not parts.get("bound_to")
+            and modifiers and len(modifiers) == 1 and modifiers[0]["kind"] == "select"
+            and set(modifiers[0].get("params") or {}) <= {"rows", "columns"}
+            and modifiers[0].get("params")):
+        # A select step, written as core prints it: wf["r"][0:2][cols["n"]].
+        settings = dict(modifiers[0]["params"])
+        if isinstance(settings.get("columns"), list):
+            settings["columns"] = {"names": settings["columns"]}
+        formula = _selection_text({"$ref": parts["input"], **settings})
+        compile_formula(formula)
+        return formula
     if inputs:                                           # a combine
         args = [_ref("wf", name) for name in inputs]
         args += [f"{k}={_lit(v)}" for k, v in arguments.items()]
@@ -720,9 +842,11 @@ def _ref(kind: str, name: str) -> str:
 def _value(v: Any) -> str:
     """A tool argument: a reference, a resource, or a literal."""
     if _is_ref(v):
-        return _ref("wf", v["$ref"])
+        return _selection_text(v)
     if _is_res(v):
         return _ref("res", v["$res"])
+    if isinstance(v, dict) and set(v) == {"$expr"}:      # text the editor can't read: parsed here
+        return str(v["$expr"])
     return _lit(v)
 
 

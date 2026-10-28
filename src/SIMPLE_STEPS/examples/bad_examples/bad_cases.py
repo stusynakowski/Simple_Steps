@@ -73,9 +73,9 @@ CASES = [
          "A step reads one input. Reading several is a combine.",
          'stack(wf["readings"], wf["more"])'),
     Case("row_selection", "Referring to steps",
-         'double_n[mod.map()](wf["readings"][0:2])', "refused", 'a step reads a whole step, not part of one',
-         "A step can't read part of another; make the part its own step.",
-         'identity[mod.slice(stop=2)](wf["readings"])'),
+         'double_n[mod.map()](wf["readings"][0:2])', "refused", "a selection can't be a tool's input",
+         "A tool's input is a whole step; make the part its own step (or pass it as an argument, n=wf[\"readings\"][cols[\"n\"]]).",
+         'wf["readings"][0:2]'),
 
     # ── tools and modifiers ──────────────────────────────────────────────
     Case("unknown_tool", "Tools and modifiers",

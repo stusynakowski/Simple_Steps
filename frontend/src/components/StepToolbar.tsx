@@ -1,9 +1,10 @@
-import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import type { PanelId } from './stepPanels';
 import type { GridPick } from '../utils/selection';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
-import { parseFormula } from '../utils/formulaParser';
+import { formatFormula, parseFormula } from '../utils/formulaParser';
+import { partsForTool } from '../utils/formulaParts';
 import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 import SymbolIcon from './SymbolIcon';
@@ -30,11 +31,13 @@ interface StepToolbarProps {
   stepIndex?: number;
   availableOperations?: OperationDefinition[];
   onRun?: (id: string) => void;
+  /** Enter in the formula bar: declare the step, running nothing. */
+  onDeclare?: () => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onFormulaChange?: (id: string, formula: string, parsed: ParsedFormula) => void;
-  /** Enter in the formula bar: the formula is committed (the step editor redraws). */
-  onFormulaCommit?: (formula: string) => void;
+  /** The step a newly chosen tool reads by default (wf["…"]); null for the first step. */
+  previousStep?: string | null;
   // Allow parent to push a formula update (from UI config changes → formula bar)
   externalFormula?: string;
   // Widget toggles — any number of widgets can be open at once
@@ -54,9 +57,10 @@ export default function StepToolbar({
   stepIndex = 0,
   availableOperations = [], 
   onRun, 
+  onDeclare,
   onDelete, 
   onFormulaChange,
-  onFormulaCommit,
+  previousStep = null,
   externalFormula,
   openPanels,
   onTogglePanel,
@@ -70,8 +74,6 @@ export default function StepToolbar({
   const [formula, setFormula] = useState(initFormula);
   // Enter commits what the bar shows; read it through a ref so the handler
   // never sees an older formula than the one on screen.
-  const formulaRef = useRef(formula);
-  useLayoutEffect(() => { formulaRef.current = formula; }, [formula]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -114,7 +116,8 @@ export default function StepToolbar({
     if (raw.startsWith('=') && !raw.includes('(')) {
       const partial = raw.slice(1).toUpperCase();
       return availableOperations.filter(op =>
-        op.id.toUpperCase().startsWith(partial) || op.label.toUpperCase().startsWith(partial)
+        op.type !== 'verb' && op.type !== 'orchestrator' &&
+        (op.id.toUpperCase().startsWith(partial) || op.label.toUpperCase().startsWith(partial))
       );
     }
     return [];
@@ -163,13 +166,18 @@ export default function StepToolbar({
   }, [formula]);
 
   const handleSuggestionClick = async (op: OperationDefinition) => {
-    // Stamp the operation's default orchestration type as the modifier so it's
-    // immediately visible and editable in the formula bar.
-    // e.g. "source" → =fetch_videos.source(   "map" → =yt_extract_metadata.map(
-    const modifier = op.type ? `.${op.type}` : '';
-    const newFormula = `=${op.id}${modifier}(`;
-    setFormula(newFormula);
     setShowSuggestions(false);
+    // The same writer as the Formula panel's Tool picker: core syntax, built by
+    // the backend, reading the previous step unless the tool is a source.
+    let newFormula: string;
+    try {
+      const res = await formatFormula(partsForTool(op.id, op.type, previousStep));
+      newFormula = res.formula.startsWith('=') ? res.formula : `=${res.formula}`;
+    } catch (e) {
+      console.warn(`[StepToolbar] could not write a formula for ${op.id}:`, e);
+      return;
+    }
+    setFormula(newFormula);
     const parsed = await parseFormula(newFormula);
     onFormulaChange?.(step.id, newFormula, parsed);
     // Re-focus and move cursor to end
@@ -353,7 +361,7 @@ export default function StepToolbar({
         <button 
           className="btn-icon" 
           onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }} 
-          title={step.status === 'running' ? 'Stop' : 'Run'}
+          title={step.status === 'running' ? 'Stop' : 'Run (⌘/Ctrl+Enter in the formula bar)'}
           data-testid="btn-run"
           style={{ 
             color: step.status === 'running' ? '#e74c3c' : '#2ecc71',
@@ -429,7 +437,10 @@ export default function StepToolbar({
             }}
             onEnter={() => {
               setShowSuggestions(false);
-              onFormulaCommit?.(formulaRef.current);
+              onDeclare?.();
+            }}
+            onModEnter={() => {
+              setShowSuggestions(false);
               onRun?.(step.id);
             }}
             onBlur={() => {
@@ -553,7 +564,7 @@ export default function StepToolbar({
                         color: ORCHESTRATION_BADGE_COLORS[op.type]?.fg ?? '#333',
                         letterSpacing: '0.03em',
                       }}>
-                        .{op.type}
+                        {op.type}
                       </span>
                     )}
                   </div>

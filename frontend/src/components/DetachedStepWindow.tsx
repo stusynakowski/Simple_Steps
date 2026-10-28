@@ -19,6 +19,7 @@ interface DetachedStepWindowProps {
   onClose: () => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
   onRun: (id: string) => void;
+  onDeclare?: () => void;
   onPreview?: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -53,6 +54,7 @@ export default function DetachedStepWindow({
   onClose,
   onUpdate,
   onRun,
+  onDeclare,
   onPreview,
   onDelete,
 }: DetachedStepWindowProps) {
@@ -316,6 +318,7 @@ export default function DetachedStepWindow({
               onActivate={() => {/* always active in detached */}}
               onUpdate={onUpdate}
               onRun={onRun}
+              onDeclare={onDeclare}
               onPreview={onPreview}
               onPause={() => {/* no-op in detached */}}
               onDelete={onDelete}

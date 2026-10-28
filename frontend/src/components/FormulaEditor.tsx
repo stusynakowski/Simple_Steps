@@ -50,6 +50,8 @@ export interface FormulaEditorProps {
   onChange: (next: string) => void;
   /** Fired when the editor's textarea-equivalent receives an Enter (no shift). */
   onEnter?: () => void;
+  /** Cmd/Ctrl+Enter. */
+  onModEnter?: () => void;
   onFocus?: () => void;
   onBlur?: () => void;
   placeholder?: string;
@@ -74,7 +76,7 @@ const COLLAPSED_HEIGHT = 28;
 const MAX_EXPANDED_HEIGHT = 200;
 
 const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function FormulaEditor(
-  { value, onChange, onEnter, onFocus, onBlur, placeholder, shadowRef, testId },
+  { value, onChange, onEnter, onModEnter, onFocus, onBlur, placeholder, shadowRef, testId },
   ref,
 ) {
   const monacoRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -94,8 +96,8 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
   // Monaco's listeners are registered once, at mount. Calling the props
   // directly would run the FIRST render's handlers forever — and with them the
   // step as it was then. Route them through a ref that tracks every render.
-  const handlers = useRef({ onChange, onEnter, onFocus, onBlur });
-  useLayoutEffect(() => { handlers.current = { onChange, onEnter, onFocus, onBlur }; });
+  const handlers = useRef({ onChange, onEnter, onModEnter, onFocus, onBlur });
+  useLayoutEffect(() => { handlers.current = { onChange, onEnter, onModEnter, onFocus, onBlur }; });
 
   // Expose imperative API.
   useImperativeHandle(ref, () => ({
@@ -173,14 +175,10 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       }
     });
 
-    // Enter (no shift) submits.
-    editor.addCommand(
-      // monaco.KeyCode.Enter = 3
-      3,
-      () => {
-        handlers.current.onEnter?.();
-      },
-    );
+    // Enter (no shift) declares; Cmd/Ctrl+Enter runs (dev_plan/126 D3).
+    // monaco.KeyCode.Enter = 3, monaco.KeyMod.CtrlCmd = 2048.
+    editor.addCommand(3, () => { handlers.current.onEnter?.(); });
+    editor.addCommand(2048 | 3, () => { handlers.current.onModEnter?.(); });
 
     // Grow to fit while editing; one line otherwise.
     const fit = () => {

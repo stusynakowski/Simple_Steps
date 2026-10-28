@@ -47,6 +47,8 @@ then come here.
 - `src/SIMPLE_STEPS/README.md`: the package's modules.
 - `src/SIMPLE_STEPS/examples/README.md`: the shipped examples, which check themselves.
 - `frontend/README.md`: the frontend build.
+- `scripts/ui_status/`: a workspace and a status report for the open
+  formula-UI items in `dev_plan/126`. Not shipped.
 - Root `usage_docs/`: **stale**, old syntax, not served by the app. Only
   `developers/desktop-mode.md` has no current equivalent. Staged for removal
   (it's outside the cleanup phase's allowed paths).

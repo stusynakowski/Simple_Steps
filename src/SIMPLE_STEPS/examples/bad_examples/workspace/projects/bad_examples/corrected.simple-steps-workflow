@@ -86,7 +86,7 @@
     },
     {
       "name": "row_selection",
-      "expression": "identity[mod.slice(stop=2)](wf[\"readings\"])",
+      "expression": "wf[\"readings\"][0:2]",
       "meta": {
         "label": "row_selection"
       }

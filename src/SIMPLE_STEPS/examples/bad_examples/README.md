@@ -33,7 +33,7 @@ add an entry there and run that.
 | `quoted_name` | `double_n[mod.map()]("readings")` | **refused**: "readings" is a string. Did you mean wf["readings"]? | A quoted string is text, never a step. | `double_n[mod.map()](wf["readings"])` |
 | `missing_step` | `double_n[mod.map()](wf["reading"])` | **refused**: input 'reading', which is not an earlier step | There's no step called that (a typo), or it hasn't run yet. | `double_n[mod.map()](wf["readings"])` |
 | `two_inputs` | `double_n[mod.map()](wf["readings"], wf["more"])` | **refused**: a step reads one input; to combine steps use join | A step reads one input. Reading several is a combine. | `stack(wf["readings"], wf["more"])` |
-| `row_selection` | `double_n[mod.map()](wf["readings"][0:2])` | **refused**: a step reads a whole step, not part of one | A step can't read part of another; make the part its own step. | `identity[mod.slice(stop=2)](wf["readings"])` |
+| `row_selection` | `double_n[mod.map()](wf["readings"][0:2])` | **refused**: a selection can't be a tool's input | A tool's input is a whole step; make the part its own step (or pass it as an argument, n=wf["readings"][cols["n"]]). | `wf["readings"][0:2]` |
 
 ## Tools and modifiers
 
