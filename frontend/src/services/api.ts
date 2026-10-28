@@ -1,4 +1,4 @@
-import type { StepConfiguration } from '../types/models';
+import type { Cell, StepConfiguration, StepPlan } from '../types/models';
 
 // When the frontend is bundled and served by the backend, use same-origin.
 // When running via Vite dev server, the backend defaults to :8000 but can
@@ -135,6 +135,31 @@ export interface WorkflowStepState {
   /** Why it is out of date: `input r changed`, `updated args`, `r is stale`. */
   stale_reason: string | null;
   problems: string[];
+  /** Changes when the step's view would (state, data version, formula, plan). */
+  view_key?: string;
+}
+
+/** A page of a step as the grid draws it, run or not (`/api/view`, kernels.view). */
+export interface StepView {
+  step: string;
+  state: string;
+  summary: string;
+  problems: string[];
+  plan: StepPlan | null;
+  columns: { name: string; type?: string }[];
+  row_count: unknown;
+  window: { start: number; stop: number; of: number | null } | null;
+  cells: Cell[];
+}
+
+/** A page of a step from the session's live kernel: states, types, row ids, plan. */
+export async function fetchStepView(
+  workflowKey: string, step: string, offset = 0, limit = 50,
+): Promise<StepView> {
+  const q = new URLSearchParams({ workflow_key: workflowKey, step, offset: String(offset), limit: String(limit) });
+  const response = await fetch(`${API_BASE}/view?${q}`, { credentials: 'include' });
+  if (!response.ok) throw new Error(`No view of ${step}: ${response.statusText}`);
+  return response.json();
 }
 
 /** What the session's core workflow is told about each step. */

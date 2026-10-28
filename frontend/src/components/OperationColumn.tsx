@@ -326,10 +326,14 @@ export default function OperationColumn({
         ? 'scheduled'
         : 'idle';
 
-  const showExecutionStagedCells =
+  // The guessed staged columns, only until core's view of the step arrives:
+  // after that the grid draws core's own cells (pending, known, failed, …).
+  const showExecutionStagedCells = !step.coreState && (
     hasUncommittedFormula ||
     step.status === 'running' ||
-    isScheduledInPipeline;
+    isScheduledInPipeline);
+  // Core's reason a staged step's rows aren't known yet (its plan, R6).
+  const planNote = step.plan?.rows?.certainty === 'unknown' ? step.plan.rows.because : undefined;
 
   // Handler for Formula-based updates (Toolbar Input)
   // The formula bar is the canonical write path. Everything else is derived from it.
@@ -645,6 +649,8 @@ export default function OperationColumn({
                         onPick={(pick) => pickFrom(step.label, pick)}
                         highlight={wiringState.activeSelection?.step === step.label ? wiringState.activeSelection : null}
                         stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
+                        columns={step.viewColumns}
+                        planNote={planNote}
                         stagedCellMode={stagedCellMode}
                         onHoverChange={(spot) => setGridHover(spot && { ...spot, step: step.label })}
                         onNoteChange={setDataNote}

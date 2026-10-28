@@ -13,6 +13,22 @@ export interface Cell {
   summary?: string;
   /** Small inline data shown in the cell, e.g. an image thumbnail (data: URL). */
   preview?: string;
+  /** Core's state for this cell (/api/view): pending, known, failed, stale, absent. */
+  state?: string;
+  /** Core's type for the cell's column: int, str, int | None, any, … */
+  type?: string;
+  /** Why a failed cell failed. */
+  error?: string;
+  /** Core's row id `#` (row_id is the position on screen). */
+  id?: string | number;
+}
+
+/** A step's plan, as core states it (rows, columns, types, or why they're unknown). */
+export interface StepPlan {
+  rows?: { certainty: string; count?: number; because?: string; resolve?: string[] };
+  columns?: { certainty: string; names?: string[]; because?: string };
+  types?: Record<string, string>;
+  [key: string]: unknown;
 }
 
 export type StepConfiguration = Record<string, unknown>;
@@ -54,6 +70,16 @@ export interface Step {
    * `r is stale`). Its output stays; re-running brings it up to date.
    */
   staleReason?: string;
+  /** Core's state for the step (staged, completed, stale, failed, invalid), from the last sync or run. */
+  coreState?: string;
+  /** Core's reasons a step can't run or is suspect. */
+  problems?: string[];
+  /** The server's key for the step's view: a new one means fetch it again (/api/view). */
+  viewKey?: string;
+  /** The columns core plans or has, with their types. */
+  viewColumns?: { name: string; type?: string }[];
+  /** The step's plan, from core. */
+  plan?: StepPlan;
   /**
    * The step's colour, chosen in its Settings (a CSS colour, e.g. `#22aa88`).
    * Unset = the palette colour for its position. Saved in the step's `meta`.

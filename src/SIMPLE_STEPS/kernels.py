@@ -22,6 +22,8 @@ with the parser's reason, so nothing reads what it used to compute.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import threading
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -364,21 +366,81 @@ def _upstream(s: Kernel, name: str) -> List[str]:
     return seen
 
 
+def _plain(value: Any) -> Any:
+    """*value* as JSON: core's problems and numpy scalars as text or numbers."""
+    return json.loads(json.dumps(value, default=str))
+
+
+def _view_key(*parts: Any) -> str:
+    """Changes whenever what :func:`view` returns for a step would."""
+    return hashlib.sha1(json.dumps(parts, default=str).encode()).hexdigest()[:12]
+
+
 def summary(s: Kernel) -> Dict[str, dict]:
-    """Every step's state, for the UI: core's state, why it's stale, problems."""
+    """Every step's state, for the UI: core's state, why it's stale, problems,
+    and a ``view_key`` that changes when the step's view does (its state, data
+    version, formula or plan), so the UI fetches a view only then."""
     out: Dict[str, dict] = {}
     for step in s.k.steps:
         problems = [str(p) for p in step.problems]
         if step.name in s.problems:
             problems.insert(0, s.problems[step.name])
+        status = "invalid" if step.name in s.problems else step.state
         out[step.name] = {
-            "status": "invalid" if step.name in s.problems else step.state,
+            "status": status,
             "stale_reason": step.output.stale_reason,
             "problems": problems,
+            "view_key": _view_key(status, step.output.version, step.formula, step.plan, problems),
         }
     for name, problem in s.problems.items():
-        out.setdefault(name, {"status": "invalid", "stale_reason": None, "problems": [problem]})
+        out.setdefault(name, {"status": "invalid", "stale_reason": None, "problems": [problem],
+                              "view_key": _view_key("invalid", problem)})
     return out
+
+
+def view(session_id: str, key: str, name: str, start: int = 0, stop: int = 50) -> Optional[Dict[str, Any]]:
+    """A page of step *name* as the grid draws it, from core's ``k.view``, run
+    or not (dev_plan/126 R5, R6): every cell with its state (``pending``,
+    ``known``, ``failed``, ``stale``, ``absent``), type, error and row id ``#``;
+    the step's state, problems and plan (rows, columns, types, or why they're
+    unknown). Core's ``#`` lineage columns are left out, as in ``/api/data``.
+
+    ``None`` when the workflow has no live kernel or no such step: the UI
+    syncs first.
+    """
+    from .cell_types import cell
+    with _GUARD:
+        s = _LIVE.get(session_id, {}).get(key)
+    if s is None:
+        return None
+    with s.lock:
+        if name in s.problems:
+            return {"step": name, "state": "invalid", "summary": s.problems[name],
+                    "problems": [s.problems[name]], "plan": None, "columns": [],
+                    "row_count": None, "window": None, "cells": []}
+        try:
+            step = s.k.step(name)
+        except KeyError:
+            return None
+        v = s.k.view(name, (start, stop))
+        columns = [c for c in v["columns"] if not str(c["name"]).startswith("#")]
+        cells = []
+        for row in v["rows"]:
+            for column in columns:
+                found = row["cells"].get(column["name"], {})
+                out = cell(int(row["position"]), str(column["name"]), found.get("value"))
+                out.update(state=found.get("state"), type=found.get("type"), id=_plain(row["id"]))
+                if found.get("error"):
+                    out["error"] = str(found["error"])
+                cells.append(out)
+        return {
+            "step": name, "state": v["state"], "summary": v["summary"],
+            "problems": [str(p) for p in step.problems],
+            "plan": _plain(step.plan),
+            "columns": [{"name": str(c["name"]), "type": c.get("type")} for c in columns],
+            "row_count": _plain(v["row_count"]), "window": _plain(v.get("window")),
+            "cells": cells,
+        }
 
 
 def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,

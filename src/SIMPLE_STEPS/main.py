@@ -654,6 +654,27 @@ async def get_data_view(
     return cells
 
 
+@app.get("/api/view")
+async def get_step_view(
+    workflow_key: str,
+    step: str,
+    offset: int = 0,
+    limit: int = 50,
+    session_id: str = Depends(get_session_id),
+):
+    """A page of a step as the grid draws it, run or not: each cell with core's
+    state (pending, known, failed, stale, absent), type, error and row id
+    ``#``, and the step's state, problems and plan (kernels.view). Read from
+    the session's live kernel, so a staged step shows its planned shape.
+    """
+    from . import kernels
+    from .engine import _normalize_session_id
+    found = kernels.view(_normalize_session_id(session_id), workflow_key, step, offset, offset + limit)
+    if found is None:
+        raise HTTPException(status_code=404, detail=f"No step {step!r} in workflow {workflow_key!r}: sync first")
+    return found
+
+
 @app.get("/api/cell/{ref_id}")
 async def get_cell_view(
     ref_id: str,

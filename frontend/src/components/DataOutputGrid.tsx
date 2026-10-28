@@ -57,6 +57,19 @@ const EMPTY_FRAME_CELL: Cell = {
 };
 const isEmptyFrameCell = (cell?: Cell) => cell?.metadata?.empty === true;
 
+/** A cell's tooltip: its value, and core's state when it isn't plainly known. */
+function cellTitle(cell?: Cell): string {
+  if (!cell) return '';
+  const shown = cell.cell_type ? (cell.summary ?? cell.display_value) : cell.display_value;
+  switch (cell.state) {
+    case 'pending': return `not run yet${cell.type ? ` · ${cell.type}` : ''}`;
+    case 'failed': return `failed: ${cell.error ?? 'no reason given'}`;
+    case 'stale': return `${shown} · out of date`;
+    case 'absent': return 'absent: no value here';
+    default: return shown ?? '';
+  }
+}
+
 interface DataOutputGridProps {
   cells?: Cell[];
   onCellClick?: (cell: Cell) => void;
@@ -86,6 +99,11 @@ interface DataOutputGridProps {
   stepName?: string;
   stepColor?: string;
   formula?: string;
+  /** Core's columns for the step, with their types (its view or plan): a step
+   *  that hasn't run shows them as its header (dev_plan/126 R6). */
+  columns?: { name: string; type?: string }[];
+  /** Why a staged step's rows aren't known yet, from its plan. */
+  planNote?: string;
 }
 
 /**
@@ -111,6 +129,8 @@ function Grid({
   stepName = 'step',
   stepColor,
   formula,
+  columns,
+  planNote,
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   // Looking at data (spec 014 §6, §8): a click selects — a cell, a row, a
@@ -143,6 +163,15 @@ function Grid({
           state: cell.state,
         };
       }
+    }
+
+    if (safeCells.length === 0 && sColNames.length === 0 && columns?.length) {
+      // Planned but no rows yet (a staged step whose row count isn't known):
+      // its typed header, and the plan's reason below it.
+      return {
+        cols: columns.map((c) => c.name), rows: [] as number[], gridData: {} as Record<string, Cell>,
+        structureType: 'grid', stagedColNames: [], stagedData: {},
+      };
     }
 
     if (safeCells.length === 0 && sColNames.length === 0) {
@@ -189,7 +218,20 @@ function Grid({
       stagedColNames: sColNames,
       stagedData: sData,
     };
-  }, [cells, stagedColumns]);
+  }, [cells, stagedColumns, columns]);
+
+  // Core's type for each column, and its row id for each row (dev_plan/126 R5, D8).
+  const typeOf = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const c of columns ?? []) if (c.type) out[c.name] = c.type;
+    for (const c of cells ?? []) if (c.type && !(c.column_id in out)) out[c.column_id] = c.type;
+    return out;
+  }, [cells, columns]);
+  const idOf = useMemo(() => {
+    const out: Record<number, string | number> = {};
+    for (const c of cells ?? []) if (c.id !== undefined && !(c.row_id in out)) out[c.row_id] = c.id;
+    return out;
+  }, [cells]);
 
   // ── Looking: selection and the popover ──────────────────────────────────
   const looking = !wiringMode;
@@ -569,7 +611,7 @@ function Grid({
             className="grid-header-cell"
             data-sel-key={cellKey(-1, col)}
             role="columnheader"
-            title={wiringMode ? `Select column ${col} (Shift: range, ⌘/Ctrl: add)` : col}
+            title={wiringMode ? `Select column ${col} (Shift: range, ⌘/Ctrl: add)` : typeOf[col] ? `${col}: ${typeOf[col]}` : col}
             style={{
               ...wiringColHeaderStyle(col),
               ...(stagedColNames.includes(col) ? { background: '#fff8dc', color: '#665e30' } : {}),
@@ -582,6 +624,7 @@ function Grid({
             onMouseLeave={() => wiringMode && setHoveredCol(null)}
           >
             {col}
+            {typeOf[col] && <span className="col-type">{typeOf[col]}</span>}
           </div>
         ))}
 
@@ -651,7 +694,7 @@ function Grid({
               className="grid-cell row-index"
               data-sel-key={cellKey(r, INDEX_COL)}
               role="rowheader"
-              title={wiringMode ? "The index can't be referenced yet" : `index ${r}`}
+              title={wiringMode ? "The row ids (#) can't be referenced yet" : `# ${idOf[r] ?? r}`}
               style={wiringMode ? {
                 cursor: 'default',
                 background: isRowSelected(r) ? SELECTED_BG : hoveredRow === r ? HOVER_BG : undefined,
@@ -663,9 +706,9 @@ function Grid({
               }}
               onMouseDown={(e) => startDrag({ kind: 'cell', row: r, col: INDEX_COL }, e)}
               onClick={(e) => handleIndexCellClick(r, e)}
-              onMouseEnter={() => { dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'cell', row: r, column: '#', value: String(r) }); }}
+              onMouseEnter={() => { dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'cell', row: r, column: '#', value: String(idOf[r] ?? r) }); }}
             >
-              {r}
+              {idOf[r] ?? r}
             </div>
 
             {/* Cells */}
@@ -725,7 +768,8 @@ function Grid({
               return (
                 <div
                   key={cellKey}
-                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}${isEmptyFrameCell(cell) ? ' empty-frame-cell' : ''}`}
+                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}${isEmptyFrameCell(cell) ? ' empty-frame-cell' : ''}${cell?.state ? ` cell-${cell.state}` : ''}`}
+                  data-state={cell?.state}
                   role="gridcell"
                   data-sel-key={cellKey}
                   aria-selected={looking ? inGridSel(shownSel, r, c) : undefined}
@@ -734,7 +778,7 @@ function Grid({
                     if (cell) handleCellWireClick(cell, e);
                     else if (looking) clickCell(r, c, e);
                   }}
-                  title={cell?.cell_type ? (cell.summary ?? cell.display_value) : (cell?.display_value ?? '')}
+                  title={cellTitle(cell)}
                   style={{ ...wiringCellStyle(cellKey, c), ...outline(r, c) }}
                   onMouseEnter={() => {
                     if (wiringMode) {
@@ -751,12 +795,19 @@ function Grid({
                     }
                   }}
                 >
-                  {cell ? <CellContent cell={cell} /> : ''}
+                  {cell?.state === 'pending'
+                    ? (stagedCellMode !== 'idle' ? <span className="cell-wait-spinner" /> : '')
+                    : cell?.state === 'known' && cell.value === null && !cell.cell_type
+                      ? <span className="cell-null">null</span>
+                      : cell ? <CellContent cell={cell} /> : ''}
                 </div>
               );
             })}
           </div>
         ))}
+        {rows.length === 0 && planNote && (
+          <div className="grid-plan-note" role="note">rows not known yet: {planNote}</div>
+        )}
       </div>
     </div>
   );

@@ -83,9 +83,13 @@ def app_refs(name):
     return refs
 
 
-def api_cells(ref):
-    from SIMPLE_STEPS.main import get_data_view
-    return asyncio.run(get_data_view(ref, offset=0, limit=50, index=False, session_id=SESSION))
+def view_cells(name, step):
+    """What the grid draws for *step*: /api/view, from the kernel app_refs ran it in."""
+    from SIMPLE_STEPS.main import get_step_view
+    try:
+        return asyncio.run(get_step_view(f"ui_status/{name}", step, session_id=SESSION))["cells"]
+    except Exception:
+        return []
 
 
 # ── Writing a formula ─────────────────────────────────────────────────────
@@ -167,19 +171,19 @@ plan = staged.step("doubled").plan
 report("R6  core: a staged step's planned shape", True, "",
        f"rows {plan.get('rows')}, types {plan.get('types')}", kind="CORE")
 
-refs = app_refs("02-cell-states")
-sent = api_cells(refs["doubled"]) if "doubled" in refs else []
-report("R5  /api/data sends each cell's state",
-       bool(sent) and all("state" in c for c in sent),
+app_refs("02-cell-states")
+sent = view_cells("02-cell-states", "doubled")
+report("R5  the grid's cells carry core's state",
+       bool(sent) and all(c.get("state") for c in sent),
        f"cells carry {sorted(sent[0]) if sent else 'nothing'}: no state",
-       "cells carry a state; look at 02-cell-states")
+       f"doubled: {[c['state'] for c in sent]}; look at 02-cell-states")
 
 from SIMPLE_STEPS.main import app as server  # noqa: E402
 paths = {getattr(r, "path", "") for r in server.routes}
 report("R6  an endpoint serves core's view / plan",
-       any("view" in p or "preview" in p for p in paths),
+       "/api/view" in paths,
        "no /api route calls k.view or reads step.plan",
-       "a view route exists; declare 02/staged without running")
+       "/api/view exists (kernels.view); declare 02/staged without running: pending cells under a typed header")
 
 report("F12 staged cells carry no formula text",
        "↳" not in source("hooks/useStagedPreview.ts"),
@@ -194,14 +198,14 @@ for step in ["filtered", "sorted", "distinct_wards", "split", "per_ward", "stack
     hashes = [c for c in d.columns if str(c).startswith("#")]
     report(f"D8  core: {step}", True, "", f"# = {list(d.index)[:6]}, lineage columns {hashes or 'none'}", kind="CORE")
 
-refs = app_refs("04-lineage")
-sent = api_cells(refs["sorted"]) if "sorted" in refs else []
-shown = sorted({c["row_id"] for c in sent})
+app_refs("04-lineage")
+sent = view_cells("04-lineage", "sorted")
+shown = list(dict.fromkeys(c.get("id", c["row_id"]) for c in sent))
 ids = list(lineage.step("sorted").data.index)
 report("R9  the grid's index is core's #, not the position",
-       bool(sent) and shown != list(range(len(ids))),
-       f"/api/data row_id = {shown} (positions); core's # = {ids}",
-       f"/api/data row_id = {shown}; core's # = {ids}")
+       bool(sent) and shown == ids,
+       f"the grid's row ids = {shown}; core's # = {ids}",
+       f"the grid's row ids = {shown} = core's #")
 
 # ── Report ────────────────────────────────────────────────────────────────
 
