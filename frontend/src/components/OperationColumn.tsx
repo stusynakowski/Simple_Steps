@@ -4,8 +4,8 @@ import type { OperationDefinition, ResourceDeclaration } from '../services/api';
 import type { ProgressEvent } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
-import { applyPick, parseSelectionFormula, selectionFormula, selectStepName, stepRef } from '../utils/selection';
-import type { GridPick, Selection } from '../utils/selection';
+import { placePick, stepRef } from '../utils/selection';
+import type { GridPick, PlacedPick } from '../utils/selection';
 import { parseFormula } from '../utils/formulaParser';
 import type { ParsedFormula } from '../utils/formulaParser';
 import ToolEditor from './ToolEditor';
@@ -44,11 +44,8 @@ interface OperationColumnProps {
   /** The header's minimize button: hide the step UI, shrink the header. */
   onMinimizeStep?: () => void;
   /** Every step's name, so a new select step gets a unique one. */
-  allStepNames?: string[];
   /** Insert a step (name, formula) just before this one; returns its id. */
-  onInsertStepBefore?: (label: string, formula: string) => string;
   /** Replace another step's formula (a select step this one made). */
-  onSetStepFormula?: (id: string, formula: string) => void;
   /** Called with the pointer position when the user drags the header far enough to detach */
   onDetach?: (position: { x: number; y: number }) => void;
   /** Live progress for row-iterating operations */
@@ -81,9 +78,6 @@ export default function OperationColumn({
   onMinimize,
   onMaximize,
   onMinimizeStep,
-  allStepNames = [],
-  onInsertStepBefore,
-  onSetStepFormula,
   resources,
   onDefineResource,
   onDetach,
@@ -131,13 +125,14 @@ export default function OperationColumn({
   const formulaBarRef = useRef<HTMLTextAreaElement | null>(null);
 
   // ── Picking data from an earlier step ────────────────────────────────────
-  // A pick (whole table, columns, rows) becomes a select operation — see
-  // utils/selection.ts. The formula bar is written through its hidden
-  // textarea plus an `input` event, the same path typing takes, so the
-  // formula is parsed and committed exactly as if it had been typed.
+  // A pick (a cell, a block, rows, columns, the whole table) arrives in core's
+  // notation (utils/selection.ts) and is written where the caret is (D1). The
+  // formula bar is written through its hidden textarea plus an `input` event,
+  // the same path typing takes, so the formula is parsed and committed exactly
+  // as if it had been typed.
 
-  /** The select step this step made while its formula was being written. */
-  const madeSelectStep = useRef<{ id: string; name: string; selection: Selection } | null>(null);
+  /** Where the last pick was written, so the next one replaces it (as in Excel). */
+  const lastPick = useRef<PlacedPick | null>(null);
 
   const writeFormulaBar = (value: string, cursor = value.length) => {
     const el = formulaBarRef.current;
@@ -151,62 +146,18 @@ export default function OperationColumn({
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
 
-  /** Insert *text* at the formula bar's caret — only the text, nothing added.
-   *  The caret is the one Monaco last had (FormulaEditor keeps it on the
-   *  element), since a grid click has already blurred the formula bar. */
-  const insertAtCursor = (text: string) => {
-    const el = formulaBarRef.current;
-    if (!el) return;
-    // The common case doesn't depend on the caret: a formula waiting for its
-    // input — `tool[mod.verb()](` or `…]()` — takes the reference inside the
-    // call, which is the only place an input can go.
-    const open = /^(.*)\(\s*(\))?\s*$/s.exec(el.value);
-    if (open && /\]\s*$/.test(open[1])) {
-      const value = `${open[1]}(${text})`;
-      writeFormulaBar(value, value.length);
-      return;
-    }
-    const clamp = (n: number) => Math.max(0, Math.min(el.value.length, n));
-    const start = clamp(Number(el.dataset.selStart ?? el.selectionStart ?? el.value.length));
-    const end = clamp(Number(el.dataset.selEnd ?? start));
-    writeFormulaBar(el.value.slice(0, start) + text + el.value.slice(end), start + text.length);
-  };
-
   const handleReferencePick = (sourceStep: string, pick: GridPick) => {
-    const current = formulaBarRef.current?.value ?? step.formula ?? '';
-    const body = current.trim().replace(/^=/, '').trim();
-    const ownSelection = parseSelectionFormula(current);
-
-    // An empty formula, or one that is already a selection: the pick writes
-    // this step's own select operation.
-    if (!body || ownSelection) {
-      const prev = ownSelection && ownSelection.step === sourceStep ? ownSelection : null;
-      writeFormulaBar(selectionFormula(applyPick(prev, sourceStep, pick)));
-      return;
-    }
-
-    // Writing some other formula: a whole table is just a reference.
-    if (pick.kind === 'all') {
-      insertAtCursor(stepRef(sourceStep));
-      return;
-    }
-
-    // Part of a step: its own select step, just before this one, referenced
-    // here. Picking again updates that same select step.
-    const made = madeSelectStep.current;
-    if (made && made.selection.step === sourceStep && current.includes(stepRef(made.name))) {
-      const next = applyPick(made.selection, sourceStep, pick);
-      madeSelectStep.current = { ...made, selection: next };
-      onSetStepFormula?.(made.id, selectionFormula(next));
-      setActiveSelection(next);
-      return;
-    }
-    const selection = applyPick(null, sourceStep, pick);
-    const name = selectStepName(selection, new Set(allStepNames));
-    const id = onInsertStepBefore?.(name, selectionFormula(selection));
-    if (!id) return;
-    madeSelectStep.current = { id, name, selection };
-    insertAtCursor(stepRef(name));
+    const el = formulaBarRef.current;
+    if (!pick.text || !el) return;
+    setActiveSelection(pick.text);
+    // The caret is the one Monaco last had (FormulaEditor keeps it on the
+    // element), since a grid click has already blurred the formula bar.
+    const start = Number(el.dataset.selStart ?? el.selectionStart ?? el.value.length);
+    const caret = { start, end: Number(el.dataset.selEnd ?? start) };
+    const { value, cursor, placed } = placePick(el.value, caret, lastPick.current, pick.text,
+      pick.text === stepRef(sourceStep));
+    writeFormulaBar(value, cursor);
+    lastPick.current = placed;
   };
 
   // The formula bar always reflects step.formula (the canonical field);
@@ -218,15 +169,12 @@ export default function OperationColumn({
   // Starts from the saved formula; follows every keystroke from then on.
   const [liveFormula, setLiveFormula] = useState<string>(savedFormula);
 
-  // While this step's formula bar is the one receiving picks, tell the source
-  // grids what it selects, so the selected columns / rows stay highlighted.
+  // A new round of picking starts fresh: the last pick is only replaced while
+  // this formula bar is still receiving.
   const isReceiving = wiringState.receivingStepId === step.id;
   useEffect(() => {
-    if (!isReceiving) return;
-    const own = parseSelectionFormula(liveFormula);
-    const made = madeSelectStep.current;
-    setActiveSelection(own ?? (made && liveFormula.includes(stepRef(made.name)) ? made.selection : null));
-  }, [isReceiving, liveFormula, setActiveSelection]);
+    if (!isReceiving) lastPick.current = null;
+  }, [isReceiving]);
 
   // Keep liveFormula in sync when the step is updated externally.
   useEffect(() => {
@@ -648,7 +596,6 @@ export default function OperationColumn({
                         refId={step.outputRefId}
                         wiringMode={isWiringSource}
                         onPick={(pick) => pickFrom(step.label, pick)}
-                        highlight={wiringState.activeSelection?.step === step.label ? wiringState.activeSelection : null}
                         stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
                         columns={step.viewColumns}
                         planNote={planNote}

@@ -20,7 +20,7 @@
 
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { stepRef } from '../utils/selection';
-import type { GridPick, Selection } from '../utils/selection';
+import type { GridPick } from '../utils/selection';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -38,7 +38,8 @@ export interface WiringState {
    */
   onPick: ((sourceStep: string, pick: GridPick) => void) | null;
   /** What the receiving step currently selects, so the source grid can show it. */
-  activeSelection: Selection | null;
+  /** The pick being made for the receiving formula, as written (`wf["r"][0:2]`). */
+  activeSelection: string | null;
 }
 
 export interface StepWiringContextValue {
@@ -56,7 +57,7 @@ export interface StepWiringContextValue {
   /** A click in an earlier step's grid: hand it to the receiving step. */
   pickFrom: (sourceStep: string, pick: GridPick) => void;
   /** The receiving step publishes its current selection here. */
-  setActiveSelection: (selection: Selection | null) => void;
+  setActiveSelection: (selection: string | null) => void;
   /**
    * Called on blur (with a small delay so grid clicks can fire first).
    */
@@ -173,13 +174,13 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
       if (wiringState.onPick) {
         wiringState.onPick(sourceStep, pick);
       } else {
-        injectReference(stepRef(sourceStep));
+        injectReference(pick.text ?? stepRef(sourceStep));
       }
     },
     [wiringState, injectReference]
   );
 
-  const setActiveSelection = useCallback((selection: Selection | null) => {
+  const setActiveSelection = useCallback((selection: string | null) => {
     setWiringState((prev) => (prev.activeSelection === selection ? prev : { ...prev, activeSelection: selection }));
   }, []);
 

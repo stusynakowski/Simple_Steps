@@ -52,12 +52,16 @@ describe('typed cells in the grid', () => {
     expect(screen.getAllByText('16×16 RGB image')).toHaveLength(2);
   });
 
-  it('a click opens the cell in place, fetching that one cell, in the inspector', async () => {
-    // Spec 014 §8: the inspector wraps the cell's full view (REQ-VIS-040/041);
-    // a plain click on a cell opens it (owner, 2026-10-22).
+  it('a click selects the cell; its corner opens it in place, fetching that one cell, in the inspector', async () => {
+    // Spec 014 §8: the inspector wraps the cell's full view (REQ-VIS-040/041).
+    // A click only draws the selection's box; the corner control opens the
+    // inspector (owner, 2026-10-28, dev_plan/126 D5; replaces click-to-open, 2026-10-22).
     render(<DataOutputGrid cells={cells} refId="ref1" stepName="pics" />);
     const cell = screen.getAllByText('16×16 RGB image')[1];
     fireEvent.click(cell);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(fetchCellView).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText('Open the selection'));
     await waitFor(() => expect(fetchCellView).toHaveBeenCalledWith('ref1', 1, 'img'));
     const popover = screen.getByRole('dialog', { name: 'pics · row 1, img' });
     // The cell view sits inside the popover, without controls of its own.

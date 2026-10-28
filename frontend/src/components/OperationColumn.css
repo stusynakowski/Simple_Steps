@@ -664,6 +664,8 @@
 .row-index-header {
   border-right: 1px solid #ddd;
   background: #eaeaea;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 
 /* The row margin (DataOutputGrid): a thin strip left of the cells that
@@ -706,6 +708,12 @@
   color: #888;
   border-right: 1px solid #ddd;
   text-align: center;
+  /* As narrow as its widest id allows (the column is max-content), never cut. */
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 0.7rem;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 /* zebra striping logic requires specificity or JS, 

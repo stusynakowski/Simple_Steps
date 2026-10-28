@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isErrorCell } from '../utils/errorCells';
-import type { GridPick, Selection } from '../utils/selection';
+import { selectionText } from '../utils/selection';
+import type { GridPick } from '../utils/selection';
 import {
   INDEX_COL, applyGridPick, cellKey, describeGridSel, drawnIn, inGridSel, selectionEdges, selectionExtent,
   selectionBottomRight, selectionTopLeft, takesWholeColumns,
@@ -78,7 +79,6 @@ interface DataOutputGridProps {
   /** In wiring mode: a click on the whole table, a column header or a row number. */
   onPick?: (pick: GridPick) => void;
   /** What the step being edited currently selects from this grid. */
-  highlight?: Selection | null;
   /** Staged columns to render as light-yellow pending cells alongside real data */
   stagedColumns?: StagedColumn[];
   /** Visual mode for staged cells when pipeline is queued/running */
@@ -121,7 +121,6 @@ function Grid({
   onCellClick,
   wiringMode = false,
   onPick,
-  highlight = null,
   stagedColumns = [],
   stagedCellMode = 'idle',
   refId,
@@ -236,21 +235,20 @@ function Grid({
 
   // ── Looking: selection and the popover ──────────────────────────────────
   const looking = !wiringMode;
-  const shownSel = looking && selection.of === cells ? selection.sel : null;
-  // The last cell clicked: a plain click opens it in the inspector and leaves
-  // nothing selected, but Shift-click still extends from it, as in Excel.
-  const lastCell = useRef<{ row: number; col: string } | null>(null);
+  // The selection, bold, in both modes (D6): looking, or picking for a formula.
+  const shownSel = selection.of === cells ? selection.sel : null;
+  /** While a formula is being written, tell it what the selection reads (D1). */
+  const sendPick = (sel: GridSel | null) => {
+    if (wiringMode) onPick?.({ text: selectionText(stepName, sel, rows, cols, idOf) });
+  };
   const select = (pick: GridSelPick, e: React.MouseEvent) => {
     // The click that ends a drag: the drag already made the selection.
     if (dragEnded.current) { dragEnded.current = false; return; }
     const mods = { extend: e.shiftKey, toggle: e.metaKey || e.ctrlKey };
-    setSelection((prev) => {
-      const current = prev.of === cells ? prev.sel : null;
-      const from = current ?? (mods.extend && lastCell.current
-        ? applyGridPick(null, { kind: 'cell', ...lastCell.current }, { extend: false, toggle: false }, rows, cols)
-        : null);
-      return { sel: applyGridPick(from, pick, mods, rows, cols), of: cells };
-    });
+    const current = selection.of === cells ? selection.sel : null;
+    const next = applyGridPick(current, pick, mods, rows, cols);
+    setSelection({ sel: next, of: cells });
+    sendPick(next);
   };
 
   // Drag to select, as in Excel (REQ-VIS-011): press on a cell, a row's strip
@@ -261,7 +259,7 @@ function Grid({
   const startDrag = (pick: { kind: 'cell'; row: number; col: string } | { kind: 'row'; row: number } | { kind: 'column'; col: string },
     e: React.MouseEvent) => {
     dragEnded.current = false;
-    if (wiringMode || e.button !== 0 || e.shiftKey || e.metaKey || e.ctrlKey) return;
+    if (e.button !== 0 || e.shiftKey || e.metaKey || e.ctrlKey) return;
     e.preventDefault();                       // no text selection while dragging
     drag.current = { kind: pick.kind, start: applyGridPick(null, pick, { extend: false, toggle: false }, rows, cols), moved: false };
     const end = () => {
@@ -286,7 +284,9 @@ function Grid({
           : col === INDEX_COL ? null : { kind: 'column', col };
     if (!pick) return;
     d.moved = true;
-    setSelection({ sel: applyGridPick(d.start, pick, { extend: true, toggle: false }, rows, cols), of: cells });
+    const next = applyGridPick(d.start, pick, { extend: true, toggle: false }, rows, cols);
+    setSelection({ sel: next, of: cells });
+    sendPick(next);
   };
   const activeCell = shownSel?.kind === 'cell' ? shownSel.anchor : null;
 
@@ -402,18 +402,11 @@ function Grid({
   };
 
   /**
-   * A click on a cell (the index's too): a plain click opens it in the
-   * inspector, in place; Shift and ⌘/Ctrl select, as they always have; the
-   * click that ends a drag does nothing more.
+   * A click on a cell (the index's too) selects it: the box only. The
+   * selection's corner control opens the inspector (owner, 2026-10-28, D5).
    */
   const clickCell = (row: number, col: string, e: React.MouseEvent) => {
-    if (e.shiftKey || e.metaKey || e.ctrlKey || dragEnded.current) {
-      select({ kind: 'cell', row, col }, e);
-      return;
-    }
-    lastCell.current = { row, col };
-    const sel = applyGridPick(null, { kind: 'cell', row, col }, { extend: false, toggle: false }, rows, cols);
-    if (sel) inspect(sel);
+    select({ kind: 'cell', row, col }, e);
   };
 
   // While a selection is inspected, it is marked in the grid: a dashed
@@ -446,38 +439,27 @@ function Grid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectedKey, shape]);
 
-  // ── Wiring: picks ───────────────────────────────────────────────────────
-  // A click while a later step's formula bar has focus picks data for it:
-  // the # corner the whole table, a header a column, a row number a row.
-  // Shift extends from the last pick; ⌘/Ctrl toggles one more. The receiving
-  // step turns the pick into a select operation (utils/selection.ts).
-  // Cells and blocks (rows AND columns) come later — core 005 K9.
-
-  const modifiers = (e: React.MouseEvent) => ({ extend: e.shiftKey, toggle: e.metaKey || e.ctrlKey });
+  // ── Picks for a formula ─────────────────────────────────────────────────
+  // While a later step's formula bar has focus, the same selection as looking
+  // (a cell, a block, rows, columns, the # corner; Shift, ⌘/Ctrl, drag) is
+  // sent to it in core's notation (sendPick, utils/selection.ts).
 
   const handleRowClick = (rowIndex: number, e: React.MouseEvent) => {
-    if (wiringMode && onPick) onPick({ kind: 'row', row: rowIndex, order: rows, ...modifiers(e) });
-    else select({ kind: 'row', row: rowIndex }, e);
+    select({ kind: 'row', row: rowIndex }, e);
   };
 
   const handleColumnClick = (col: string, e: React.MouseEvent) => {
-    if (wiringMode && onPick) {
-      onPick({ kind: 'column', column: col, order: cols, ...modifiers(e) });
-      return;
-    }
     select({ kind: 'column', col }, e);
-    onCellClick?.({ row_id: -1, column_id: col, value: col, display_value: col } as Cell);
+    if (!wiringMode) onCellClick?.({ row_id: -1, column_id: col, value: col, display_value: col } as Cell);
   };
 
   const handleCellWireClick = (cell: Cell, e: React.MouseEvent) => {
-    if (wiringMode) return;            // single cells: later (needs rows AND columns)
     clickCell(cell.row_id, cell.column_id, e);
-    onCellClick?.(cell);
+    if (!wiringMode) onCellClick?.(cell);
   };
 
   const handleCornerClick = (e: React.MouseEvent) => {
-    if (wiringMode && onPick) onPick({ kind: 'all' });
-    else select({ kind: 'all' }, e);
+    select({ kind: 'all' }, e);
   };
 
   // The index column: its header selects it, its
@@ -495,14 +477,8 @@ function Grid({
     + (shownSel ? ` · ${describeGridSel(shownSel, rows, cols)}` : '');
   useEffect(() => { onNoteChange?.(note); }, [note, onNoteChange]);
 
-  const isColumnSelected = (col: string) =>
-    !!highlight && (highlight.kind === 'all' || (highlight.kind === 'columns' && highlight.columns.includes(col)));
-  const isRowSelected = (row: number) =>
-    !!highlight && (highlight.kind === 'all' || (highlight.kind === 'rows' && highlight.rows.includes(row)));
-
   // ── Wiring overlay styles ───────────────────────────────────────────────
 
-  const SELECTED_BG = 'rgba(255, 193, 7, 0.32)';
   const HOVER_BG = 'rgba(255, 193, 7, 0.16)';
 
   const wiringColHeaderStyle = (col: string): React.CSSProperties => {
@@ -510,19 +486,19 @@ function Grid({
     return {
       cursor: 'crosshair',
       userSelect: 'none',
-      background: isColumnSelected(col) ? SELECTED_BG : hoveredCol === col ? HOVER_BG : undefined,
+      background: hoveredCol === col ? HOVER_BG : undefined,
       transition: 'background 0.1s ease',
     };
   };
 
   const wiringCellStyle = (key: string, col: string): React.CSSProperties => {
     const row = Number(key.split(':')[0]);
-    const selected = isColumnSelected(col) || isRowSelected(row);
-    if (!wiringMode) return { cursor: 'pointer', ...(selected ? { background: SELECTED_BG } : {}) };
+    if (!wiringMode) return { cursor: 'pointer' };
     const hovered = hoveredCol === col || hoveredRow === row || hoveredCol === '__table__';
     return {
-      cursor: 'default',
-      background: selected ? SELECTED_BG : hovered ? HOVER_BG : 'transparent',
+      cursor: 'cell',
+      // Hover shading only: a cell keeps its state's colour (pending, failed, …).
+      background: hovered ? HOVER_BG : undefined,
       transition: 'background 0.1s ease',
     };
   };
@@ -571,7 +547,8 @@ function Grid({
         ref={gridRef}
         onMouseLeave={() => onHoverChange?.(null)}
         style={{
-          gridTemplateColumns: `var(--grid-gutter) 50px repeat(${cols.length}, minmax(100px, 1fr))`,
+          // The # column fits its widest row id, and no wider (owner, 2026-10-28).
+          gridTemplateColumns: `var(--grid-gutter) max-content repeat(${cols.length}, minmax(100px, 1fr))`,
           ...(wiringMode
             ? {
                 outline: '1px solid rgba(255, 193, 7, 0.6)',
@@ -587,7 +564,7 @@ function Grid({
             Rows are selected from the margin left of them, so every cell —
             the index's included — stays a cell of its own. */}
         <div
-          className={`grid-gutter grid-gutter-left grid-gutter-corner${highlight?.kind === 'all' || shownSel?.kind === 'all' ? ' is-selected' : ''}`}
+          className={`grid-gutter grid-gutter-left grid-gutter-corner${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
           role="button"
           aria-label="Select the whole table"
           title="Select the whole table"
@@ -629,7 +606,7 @@ function Grid({
           </div>
         ))}
 
-        {shownSel && tabAt && (
+        {shownSel && tabAt && !wiringMode && (
           <button
             type="button"
             className={`sel-tab${tabInside ? ' sel-tab-inside' : ''}`}
@@ -682,7 +659,7 @@ function Grid({
           <div key={r} className="grid-row" role="row">
             {/* The margin left of the row: selects the whole row. */}
             <div
-              className={`grid-gutter grid-gutter-left${(shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0])) || isRowSelected(r) ? ' is-selected' : ''}`}
+              className={`grid-gutter grid-gutter-left${shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0]) ? ' is-selected' : ''}`}
               title={`Select row ${r} (Shift: range, ⌘/Ctrl: add)`}
               style={wiringMode ? { cursor: 'crosshair' } : undefined}
               onMouseDown={(e) => startDrag({ kind: 'row', row: r }, e)}
@@ -698,7 +675,7 @@ function Grid({
               title={wiringMode ? "The row ids (#) can't be referenced yet" : `# ${idOf[r] ?? r}`}
               style={wiringMode ? {
                 cursor: 'default',
-                background: isRowSelected(r) ? SELECTED_BG : hoveredRow === r ? HOVER_BG : undefined,
+                background: hoveredRow === r ? HOVER_BG : undefined,
                 transition: 'background 0.1s ease',
               } : {
                 cursor: 'pointer',

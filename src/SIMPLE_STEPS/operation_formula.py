@@ -609,9 +609,12 @@ def _selection(node: ast.AST) -> Optional[tuple]:
     """``wf["r"][0:2][cols["n"]]`` → ``("r", {"rows": …, "columns": …})`` in core's
     spec (dev_plan/126 D1, F7); ``None`` for anything that isn't one.
 
-    Rows go by core's row id: ``[1]``, ``[[0, 2]]``, ``[1:3]``. Columns are
-    ``cols["n"]``, ``cols[["a", "b"]]`` or ``cols["a":"b"]``. Syntax only:
-    whether the rows and columns exist is core's check.
+    Rows go by core's row id, ``[1]`` and ``[[0, 2]]``, or by position,
+    ``[1:3]``; a text row id (after ``expand`` or ``collapse``) is
+    ``rows["0.1"]`` or ``rows[["A", "C"]]``, as in core's Python, since a plain
+    ``["…"]`` would read as a column. Columns are ``cols["n"]``,
+    ``cols[["a", "b"]]`` or ``cols["a":"b"]``. Syntax only: whether the rows
+    and columns exist is core's check.
     """
     picks = []
     while isinstance(node, ast.Subscript) and not _is_name(node.value, "wf"):
@@ -652,11 +655,31 @@ def _pick(node: ast.AST, step: str) -> tuple:
                 raise FormulaError(f'wf["{step}"][a:b]: a range of rows is two numbers, either one left out')
             ends.append(None if end is None else end.value)
         return "rows", {"start": ends[0], "stop": ends[1]}
-    if isinstance(node, ast.Constant) and isinstance(node.value, (int, str)) and not isinstance(node.value, bool):
-        return "rows", node.value
-    if isinstance(node, ast.List) and all(isinstance(e, ast.Constant) and isinstance(e.value, (int, str)) for e in node.elts):
-        return "rows", [e.value for e in node.elts]
-    raise FormulaError(f'wf["{step}"][…] takes rows ([1], [[0, 2]], [1:3]) or columns (cols["n"])')
+    if isinstance(node, ast.Subscript) and _is_name(node.value, "rows"):
+        ids = _row_ids(node.slice, (int, str))
+        if ids is None:
+            raise FormulaError('rows[…] takes a row id or a list of them: rows["0.1"], rows[["A", "C"]]')
+        return "rows", ids
+    ids = _row_ids(node, (int,))
+    if ids is not None:
+        return "rows", ids
+    if _row_ids(node, (str,)) is not None:                # core's own wording
+        written = ast.unparse(node).replace("'", '"')
+        raise FormulaError(
+            f'a plain bracket selects rows by int id; a text row id goes through rows: '
+            f'wf["{step}"][rows[{written}]]. Columns use cols: wf["{step}"][cols[{written}]]')
+    raise FormulaError(f'wf["{step}"][…] takes rows ([1], [[0, 2]], [1:3], rows["0.1"]) or columns (cols["n"])')
+
+
+def _row_ids(node: ast.AST, kinds: tuple) -> Any:
+    """One row id or a list of them, each of *kinds*; ``None`` if it isn't."""
+    ok = lambda e: (isinstance(e, ast.Constant) and isinstance(e.value, kinds)
+                    and not isinstance(e.value, bool))
+    if ok(node):
+        return node.value
+    if isinstance(node, ast.List) and node.elts and all(ok(e) for e in node.elts):
+        return [e.value for e in node.elts]
+    return None
 
 
 def _wf_name(node: ast.AST) -> Optional[str]:
@@ -712,7 +735,8 @@ def _selection_text(v: dict) -> str:
     if isinstance(rows, dict):
         text += f'[{"" if rows.get("start") is None else rows["start"]}:{"" if rows.get("stop") is None else rows["stop"]}]'
     elif rows is not None:
-        text += f"[{_lit(rows)}]"
+        texty = isinstance(rows, str) or (isinstance(rows, list) and any(isinstance(r, str) for r in rows))
+        text += f"[rows[{_lit(rows)}]]" if texty else f"[{_lit(rows)}]"
     columns = v.get("columns")
     if columns is not None:
         if "names" in columns:
