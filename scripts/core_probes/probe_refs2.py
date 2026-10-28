@@ -1,10 +1,6 @@
-# Core probe (2026-10-26), see docs/core-proposals/011-core-handover.md. Run: .venv/bin/python scripts/core_probes/probe_refs2.py
-from simple_steps_core import grid
-from simple_steps_core.grid import mod, op, tool
-import simple_steps_core.grid as g
+# Core probe (2026-10-26; on core's kernel API 2026-10-27), see docs/core-proposals/011-core-handover.md. Run: .venv/bin/python scripts/core_probes/probe_refs2.py
+from simple_steps_core import Catalog, Kernel, cols, mod, op, tool
 import pandas as pd
-cols = getattr(g, "cols", None)
-print("grid.cols exists:", cols is not None)
 
 @tool
 def make():
@@ -20,13 +16,13 @@ def attempt(label, build, target="s"):
         wf.run_all()
         st = wf.step(target)
         probs = getattr(st, "problems", None)
-        data = st.output.data
+        data = st.data
         print(f"OK   {label}  problems={probs}\n     -> {data.to_dict('list') if hasattr(data,'to_dict') else data}")
     except Exception as e:
         print(f"FAIL {label}: {type(e).__name__}: {str(e)[:170]}")
 
 def base():
-    wf = grid.Workflow(); wf["r"] = make[mod.source()](); return wf
+    wf = Kernel(Catalog(tools=[make, scale])); wf["r"] = make[mod.source()](); return wf
 def sel_step():                     # a selection as its own step
     wf = base(); wf["s"] = wf["r"][0:2]; return wf
 def col_step():
@@ -40,7 +36,7 @@ def mod_from_step():
 def computed_arg():
     wf = base(); wf["s"] = scale[mod.map()](wf["r"], weight=len("abc")); return wf
 def later_ref():
-    wf = grid.Workflow(); wf["s"] = scale[mod.map()](wf["later"]); wf["later"] = make[mod.source()](); return wf
+    wf = Kernel(Catalog(tools=[make, scale])); wf["s"] = scale[mod.map()](wf["later"]); wf["later"] = make[mod.source()](); return wf
 def sorted_then_cell():             # does a cell selection follow the row when upstream is re-sorted?
     wf = base(); wf["srt"] = op("identity")[mod.sort(by="n")](wf["r"]); wf["s"] = wf["srt"][0][cols["w"]]; return wf
 
