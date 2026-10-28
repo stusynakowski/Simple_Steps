@@ -20,7 +20,7 @@
       "expression": "double[mod.map()](wf[\"readings\"])",
       "meta": {
         "label": "doubled",
-        "notes": "R1: open fx. In the bar, change wf[\"readings\"] to wf[\"edit_me\"] and click away WITHOUT Enter. Expect: the panel shows the new input at once. Today: it keeps the old one, and editing the panel puts the old formula back. D3: press Enter. Expect: the step is declared (staged), not run. Cmd/Ctrl+Enter runs it. D4: type a stray ( so it doesn't parse. Expect: the panel freezes with core's reason; choosing a tool unfreezes it."
+        "notes": "R1: open fx. In the bar, change wf[\"readings\"] to wf[\"edit_me\"] and click away WITHOUT Enter. Expect: the panel shows the new input at once. Today: it keeps the old one, and editing the panel puts the old formula back. D3: press Enter. Expect: the step is declared (staged), not run. Cmd/Ctrl+Enter runs it. D4: type a stray ( so it doesn't parse. Expect: the panel freezes (greyed) with core's reason; its inputs and modifiers write nothing; its Tool picker still works and starts the formula over from the chosen tool, reading the previous step."
       }
     },
     {
@@ -36,7 +36,7 @@
       "expression": "",
       "meta": {
         "label": "pick_a_tool",
-        "notes": "F1: type =is_ in the bar and choose is_big from the autocomplete. Expect: a formula that parses, the same one the panel's Tool picker writes (is_big[mod.map()](wf[...])). Today: =is_big.map( which doesn't parse."
+        "notes": "F1: type =is_ in the bar and choose is_big from the autocomplete. Expect: =is_big(wf[\"edit_me\"]), the formula the panel's Tool picker writes, reading the previous step; verbs and orchestrators aren't offered as tools. Before 2026-10-28: =is_big.map( which doesn't parse."
       }
     }
   ]

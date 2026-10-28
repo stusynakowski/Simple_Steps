@@ -142,6 +142,11 @@ report("R7  cells can be picked while writing a formula",
        "DataOutputGrid ignores cell clicks while a formula has focus",
        "the cell-click guard is gone; try 03/reader")
 
+report("R9  the index column is named #",
+       ">\n          #\n        </div>" in grid,
+       "the index header reads 'index'",
+       "the header reads '#' (its values are R9 below)")
+
 # ── Cell states and staged shape ──────────────────────────────────────────
 
 cells = core_kernel("02-cell-states")
