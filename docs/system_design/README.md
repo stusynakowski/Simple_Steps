@@ -17,21 +17,11 @@ Start here. These describe the system as built on `simple-steps-core`
 
 ## Earlier documents
 
-Written before the app moved its engine to `simple-steps-core`. Parts are out
-of date — notably the formula syntax (`=op.map(…)` is now the older syntax),
-the engine (core runs core-syntax steps), and the data flow. Read the current
-documents above first.
-
-| Document | Description |
-|---|---|
-| [Architecture Overview](./01-architecture-overview.md) | High-level system architecture, component map, and data flow |
-| [Formula System](./02-formula-system.md) | The formula bar as the single source of truth — parsing, building, quoting rules, and bidirectional sync |
-| [Orchestration Engine](./03-orchestration-engine.md) | How the backend executes operations — wrappers, reference passing, and the DATA_STORE |
-| [Operation Registration](./04-operation-registration.md) | `@simple_step` decorator, `register_operation()`, registry structure, and parameter inference |
-| [Frontend Architecture](./06-frontend-architecture.md) | React component tree, state management via `useWorkflow`, and the wiring context |
-| [Data Flow & API Contract](./07-data-flow-api-contract.md) | REST API endpoints, request/response shapes, reference-passing pattern, and the step map |
-| [Pipeline Persistence](./08-pipeline-persistence.md) | Save/load lifecycle, `PipelineFile` model, hydration logic, and backward compatibility |
+The pre-core design docs (01–08: architecture, formula system, orchestration
+engine, operation registration, frontend, API contract, persistence) are in
+[`../archive/system_design/`](../archive/system_design/). They describe the
+retired syntax and engine; read them for history only.
 
 ## Reading Order
 
-If you're new to the codebase, read the **Object Model**, then **Core and App**, then **Data Flow & Storage**. The earlier documents are background on how the app worked before core.
+If you're new to the codebase, read the **Object Model**, then **Core and App**, then **Data Flow & Storage**.

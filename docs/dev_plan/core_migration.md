@@ -1,12 +1,18 @@
 # Moving Simple Steps onto the new core
 
-> Step G of [phase4-plan.md](phase4-plan.md), brought forward: what the app
+> Step G of [phase4-plan.md](../../external/simple-steps-core/docs/design/phase4-plan.md), brought forward: what the app
 > repo (`Simple_Steps`) changes to run on this core, in what order, and what
 > it adopts later. Derived 2026-10-27 at core `fdd3b62`, from the app at
 > `1139779` (pin `86170a3`, 69 core commits behind). The app's own maps of
 > the same work are its `docs/cleanup-map.md` (round 4, stages A–D) and
 > `docs/system_design/12-core-and-app.md`; this page says which of their
 > rows core now makes possible.
+>
+> **Written in core and copied here; §8–9 are the app's.** It absorbs the
+> app's [124](../archive/dev_plan/124-core-009-integration.md) and
+> [125](../archive/dev_plan/125-migrate-to-core-kernel.md) (§9). Their UI
+> work (the grid, selection, the parser's reference spans) is in
+> [126](126-formula-ui.md).
 
 ## 1. Can the app move now?
 
@@ -146,7 +152,7 @@ Renames from phase 3:
 
 Behaviour from phase 4, which the UI and its tests will see:
 
-| Change | Rule ([rules.md](rules.md)) |
+| Change | Rule ([rules.md](../../external/simple-steps-core/docs/design/rules.md)) |
 |---|---|
 | a step's `.data` has its row id `#` as the index, and starts with the `#` columns that say where each row came from (`#v`, …); tools never see them | 2, 3 |
 | `k.view` rows carry the row id under `#`, the screen position under `position`; `k.cell` takes a row id | 2 |
@@ -235,7 +241,7 @@ one piece, confirmed before it lands; ✓ when done.
 
 ### After the move: the rest of phase 4
 
-In order, each as its step in [phase4-plan.md](phase4-plan.md), and each
+In order, each as its step in [phase4-plan.md](../../external/simple-steps-core/docs/design/phase4-plan.md), and each
 followed by its small pass in the app (§5):
 
 | | Step | Needs first |
@@ -281,3 +287,34 @@ declaration (`source: "loaded"`, `as_loaded`, `overrides`), and step `meta`
 (label, colour, notes). Both would ride in `extras["simple_steps.ui"]`. Once
 moved, every format-2 file (the examples are re-saved; a user's are not) gets
 core's "saved before the redesign" message (G-D2).
+
+## 9. Earlier steps on the app side (from 124 and 125)
+
+**124, core 009 (2026-10-21 to 10-23), done.** Phases 0–2, each piece
+confirmed by the owner:
+- Pins `b9f66d5` → `523ad1d` → `86170a3`. Results-only steps (traced through
+  row ids, spec 014 REQ-VIS-058); implicit steps save `mod.auto()` (and the
+  orchestration auto chose is to be shown, REQ-VIS-059); input values only in
+  the popover (REQ-VIS-060).
+- One core workflow per session, then **kernels**: one per (session,
+  workflow), `MAX_LIVE = 1`, the least recently used saved to disk and
+  restored without recomputing. Code: `kernels.py`, and the comments citing
+  "dev_plan/124 phase 2".
+- Phases 3–6 (the grid from core, selection, the popover, editing) moved to
+  [126](126-formula-ui.md); a first slice of selection and the popover was
+  built.
+
+**125, the kernel move.** Its order of work became §3 and §8 here; its
+parser section is 126 F7–F8.
+
+**Decisions (owner, 2026-10-27)**, from 125:
+
+| # | Question | Decided |
+|---|---|---|
+| 1 | Which core commit to pin | a core `main` commit once `core-handover` merges (done: `58bc115`, 0.2.0) |
+| 2 | Step identity | **the name is the identity**; references and hashes use names, and `insert`/`move` change a step's position. **Both `wf["name"]` and `wf[index]` work** in a formula; an index reference is saved by name. Not yet: `wf[0]` is refused ([008 K30](../core-proposals/008-core-changes.md#k30-wfindex-in-a-formula-saved-by-name), 126 F11) |
+| 3 | Where the parser lives | in the app: central and thin, syntax only; meaning is `k.check` |
+| 4 | Delete L4 and L10 before migrating | yes (done, `41100a0`) |
+| 5 | Old kernel snapshots | discard; the kernel re-runs |
+| 6 | Core's §7 choices | the kernel is what you hold; `step.state` replaces `step.status`. **Agent permissions live in the app's `App` object**, not in a step and not in core's catalog extras |
+| 7 | A kernel's catalog is fixed | yes: a new or changed tool means restarting the server. A resource's methods come with its *type*, which is in the catalog at boot |

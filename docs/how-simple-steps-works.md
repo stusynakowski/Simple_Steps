@@ -61,9 +61,9 @@ below come from the old layer still being reachable.
 | **Starting the app** | `simple-steps run app.py` opens a browser tab | `cli.py` | built. A user still needs Python and pip to do this; see [§3](#3-the-maintainer) |
 | **Workflow tabs and the File menu** | one tab per open workflow; new, save, save as, rename | `WorkflowTabs`, `MenuBar`, `SaveModal` | built |
 | **Steps** | one column per step, left to right; header, toolbar, formula row, panels | `OperationColumn`, `StepToolbar` | built |
-| **Formula bar** | the step's one-line expression, and its truth | `FormulaEditor` | built. Autocomplete writes a different form from the fx panel ([123](dev_plan/123-tool-picker-discrepancy.md)) |
+| **Formula bar** | the step's one-line expression, and its truth | `FormulaEditor` | built. Autocomplete writes a different form from the fx panel ([123](archive/dev_plan/123-tool-picker-discrepancy.md)) |
 | **Formula panel (fx)** | pick a tool, fill its inputs, add modifiers; rewrites the formula bar. It edits a step's **operation**, never a tool's code | `ToolEditor` | built. The component's name is misleading; `OperationEditor` or `FormulaPanel` would say what it does. This is also where a developer's own components would go: a custom input for their tool's arguments (a date picker, a file chooser). That doesn't exist yet |
-| **The grid (Data panel)** | the step's output as cells, first 50 rows | `DataOutputGrid` | partly. It doesn't show core's per-cell states (failed, stale, staged) yet ([124](dev_plan/124-core-009-integration.md) phase 3) |
+| **The grid (Data panel)** | the step's output as cells, first 50 rows | `DataOutputGrid` | partly. It doesn't show core's per-cell states (failed, stale, staged) yet ([124](archive/dev_plan/124-core-009-integration.md) phase 3) |
 | **Selection and inspector** | pick cells, rows or columns; see them up close; the selection popover | `gridSelection.ts`, `SelectionInspector` | partly. Phases 4–5 of 124 |
 | **Cell viewer** | the full value of an image, figure, table or dict cell | `CellViewer`, `/api/cell` | built |
 | **Running** | ▶ runs a step; Run runs all of them; progress; the console log | `/api/run`, SSE `/api/progress`, `ConsoleView` | built |
@@ -229,7 +229,7 @@ section.
 | 1 | **The server imports Python from the workspace.** `POST /api/projects/{id}/load-ops` imports every `.py` file in a project folder. The pack loader discovers `packs/` and `ops/` in the workspace. `App()` with no tools scans the workspace's top-level `*.py`. By default, the workspace is `app.py`'s own folder. Since the browser can write files there (`/api/files/write`, with no session check), anyone who can reach the server can run Python on it. Read from the code; not run | nothing in the workspace is ever imported as code | `main.py:519`, `main.py:681`, `pack_loader.py`, `application.py` | **Decided:** tools come only from `App(tools=…)` and the standard set, fixed at boot. Remove `load-ops`, workspace discovery and the no-tools scan. The workspace is a mount the app defines, never its code folder (as the examples already do with `workspace="workspace"`). Saved sessions move there too, from `.simple_steps_cache` in the server's start-up folder |
 | 2 | **Eval mode**: a Settings switch turns the formula bar into a Python `exec()`, for every user of that server | no runtime path runs Python a user typed | `settings.eval_mode`, `eval_engine.py`, `engine.run_operation` §2b and its fallback | **Decided:** remove it. The console already uses `safe_formula`, which allows only calls to registered tools |
 | 3 | **Six execution paths in one function.** `run_operation` tries, in order: kernel, core alone, passthrough, eval, a single core op, then the legacy orchestrators | one execution path | `engine.py:743-997` | Keep the kernel path; remove the rest, starting with the four that the shipped examples never reach |
-| 4 | **Four formula parsers** on the server (`formula_parser`, `safe_formula`, `operation_formula`, `eval_engine`) and three in the browser (`formulaParser.ts`, `formulaParts.ts`, `consoleParser.ts`). The autocomplete and the fx panel disagree | one syntax, one parser | [123](dev_plan/123-tool-picker-discrepancy.md) | One parser, `operation_formula`; the browser asks the server, or one TypeScript port is tested against it |
+| 4 | **Four formula parsers** on the server (`formula_parser`, `safe_formula`, `operation_formula`, `eval_engine`) and three in the browser (`formulaParser.ts`, `formulaParts.ts`, `consoleParser.ts`). The autocomplete and the fx panel disagree | one syntax, one parser | [123](archive/dev_plan/123-tool-picker-discrepancy.md) | One parser, `operation_formula`; the browser asks the server, or one TypeScript port is tested against it |
 | 5 | **Four tool registries**: `OPERATION_REGISTRY`, `operations.DEFINITIONS`, the pack loader, and core's `grid.catalog()` | one registry | `decorators.py`, `operations.py`, `pack_loader.py` | `App(tools=…)` → core's catalog, and nothing else |
 | 6 | **Results stored twice and never freed** | airtight; robust | [11 — what's wrong](system_design/11-data-flow-and-storage.md#whats-wrong-with-it) | Keeping results in memory is fine for now; storage may change when the app scales (owner, 2026-10-24). The leak is separate: every run adds a copy that is never freed, so a long session grows without bound even at small scale. The fix is 11's target: the kernel holds outputs, and the browser reads by step and version |
 | 7 | **Global, per-process settings and agent config that any browser can change**, including the agent's system prompt | the maintainer controls the app | `/api/settings`, `/api/agent/config` | **Decided** for the agent: maintainer only, in `App(...)`. Settings: the same, with users getting read-only views |
@@ -245,23 +245,11 @@ the safest place to start.
 
 ## 6. One home for each kind of doc
 
-Today there are 12 doc locations. A proposed map:
-
-| Question | One place |
-|---|---|
-| Why does this exist, and for whom? | `docs/why-we-are-building-this.md` |
-| What are the components, and what's their state? | this doc |
-| How does it work inside? | `docs/system_design/10–12` |
-| How do I use it, or build on it? | `docs/usage_docs/user/` and `docs/usage_docs/developer/` (also in the app) |
-| What are we changing next? | `docs/dev_plan/` (active plans only) |
-| What do we need from core? | `docs/core-proposals/` |
-
-Retire or fold in:
-- the root `usage_docs/`;
-- `docs/introduction.md`;
-- `system_design/01–08`;
-- `core-adoption-status.md` and `simple-steps-core-updates.md` (both stale);
-- the old-syntax parts of `README.md`.
+**Done 2026-10-27.** The map is [`docs/README.md`](README.md): one home per
+question, and an `archive/` for `system_design/01–08`, `dev_plan/100–119`,
+`spec/000–008`, `introduction.md`, `core-adoption-status.md` and
+`simple-steps-core-updates.md`. Still open: the root `usage_docs/` (outside
+the cleanup phase's paths; only `desktop-mode.md` has no current equivalent).
 
 ---
 

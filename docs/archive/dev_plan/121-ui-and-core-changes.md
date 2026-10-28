@@ -1,7 +1,7 @@
 # 121 — What to change: the UI, core, and the app backend
 
 > Status: proposed, 2026-10-05. Core pinned at `d8b6979`. Builds on
-> [`120-literals-and-references.md`](./120-literals-and-references.md), which
+> [`120-literals-and-references.md`](../../dev_plan/120-literals-and-references.md), which
 > sets the rule this document implements: **a reference is `wf["<step>"]`;
 > everything else is a literal.** Every "today" below was observed in the
 > running app or by running core, not read from code.
@@ -225,7 +225,7 @@ with a 160-character formula; the start of the formula scrolled out of view.
 
 ## 3. Core
 
-> **Consolidated:** every open core ask now lives in [`docs/core-proposals/005-core-changes.md`](../core-proposals/005-core-changes.md), with new IDs (K1–K18) and a script that checks each one. The table below is kept for its context.
+> **Consolidated:** every open core ask now lives in [`docs/core-proposals/005-core-changes.md`](../../core-proposals/archive/005-core-changes.md), with new IDs (K1–K18) and a script that checks each one. The table below is kept for its context.
 
 Ordered by what unblocks the app. C1–C6 keep their numbers from 120 §8;
 C7–C11 are new here. Each was produced by running core at `d8b6979`.

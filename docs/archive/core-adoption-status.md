@@ -3,7 +3,7 @@
 > Working doc. Tracks the five updates against `simple_steps_core` as the
 > backend's heart. Core is **read-only** from this repo: gaps are shimmed in
 > `src/SIMPLE_STEPS/core_bridge.py` and recorded in
-> [`core-proposals/008-core-changes.md`](core-proposals/008-core-changes.md).
+> [`core-proposals/008-core-changes.md`](../core-proposals/008-core-changes.md).
 >
 > Last verified: 2026-09-30, core submodule `52092ba`.
 
@@ -238,7 +238,7 @@ with `main.py` importing the configured app rather than scanning for it.
 
 ## Notes
 
-- **Phase guardrail.** [`context.md`](context.md) still has
+- **Phase guardrail.** [`context.md`](../context.md) still has
   `Phase: IDEA | SPEC | TESTS | IMPL` as an unedited placeholder, and none of
   the four phases lists `docs/core-proposals/**` or this file as writable.
   Items 1–5 all need IMPL. Worth setting that line.
