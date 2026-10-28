@@ -134,7 +134,12 @@
   color: #8a5a00;
   border-left: 2px solid #f0a500;
   font-size: 0.74rem;
+  flex-wrap: wrap;
 }
+
+/* The formula doesn't parse: the panel waits (dev_plan/126 D4). */
+.te-frozen-note { flex-basis: 100%; font-style: italic; }
+.te-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 /* The step column sets nowrap; notes carry core's reasons and must wrap. */
 .te-note, .te-arg-detail, .te-warning, .te-bad { white-space: normal; overflow-wrap: anywhere; }

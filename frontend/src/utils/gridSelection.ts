@@ -19,7 +19,7 @@ import { compactRows } from './stepsStatus';
 export const INDEX_COL = '\u0000index';
 
 /** A column's name as shown: the index column is `index`. */
-export const colLabel = (col: string) => (col === INDEX_COL ? 'index' : col);
+export const colLabel = (col: string) => (col === INDEX_COL ? '#' : col);
 
 export type GridSelKind = 'cell' | 'block' | 'rows' | 'columns' | 'all' | 'cells' | 'index';
 

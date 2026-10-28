@@ -210,15 +210,6 @@ export default function OperationColumn({
   // useWorkflow fills it in for legacy steps saved without one.
   const savedFormula = step.formula || step.operation || '';
 
-  // What the step editor shows: the formula as last committed — Enter in the
-  // formula bar, the editor's own write, or a change from outside (a load, the
-  // agent). Not every keystroke: a half-typed formula would flash a warning.
-  const [editorFormula, setEditorFormula] = useState(savedFormula);
-  const lastTyped = useRef<string | null>(null);
-  useEffect(() => {
-    if (savedFormula !== lastTyped.current) setEditorFormula(savedFormula);
-  }, [savedFormula]);
-
   // ── Staged preview state ───────────────────────────────────────────────────
   // Track what the user is typing live — separate from committed step.formula
   // Starts from the saved formula; follows every keystroke from then on.
@@ -340,7 +331,6 @@ export default function OperationColumn({
   // Handler for Formula-based updates (Toolbar Input)
   // The formula bar is the canonical write path. Everything else is derived from it.
   const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
-    lastTyped.current = formula;
     setLiveFormula(formula); // immediately drive staged preview
     if (parsed.isValid && parsed.operationId) {
       // Preserve internal keys (e.g. _orchestrator) that aren't in the formula.
@@ -513,7 +503,7 @@ export default function OperationColumn({
               onTogglePanel={togglePanel}
               onFormulaChange={handleFormulaUpdate}
               externalFormula={savedFormula}
-              onFormulaCommit={setEditorFormula}
+              previousStep={previousSteps.length ? previousSteps[previousSteps.length - 1].label : null}
               isLocked={isLocked}
               onLock={() => setIsLocked(!isLocked)}
               onFormulaBarRef={(el) => { formulaBarRef.current = el; }}
@@ -619,13 +609,12 @@ export default function OperationColumn({
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                       {/* The formula as a form: Tool, then Inputs and Modifiers. */}
                       <ToolEditor
-                        formula={editorFormula}
+                        formula={savedFormula}
                         availableOperations={availableOperations}
                         previousSteps={previousSteps}
                         resources={resources as Record<string, ResourceDeclaration> | undefined}
                         onDefineResource={onDefineResource}
                         onChange={(formula, parsed) => {
-                          setEditorFormula(formula);
                           handleFormulaUpdate(step.id, formula, parsed);
                           onPreview?.(step.id);
                         }}

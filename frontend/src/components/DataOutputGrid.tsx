@@ -556,12 +556,12 @@ function Grid({
         <div
           className="grid-header-cell row-index-header"
           data-sel-key={cellKey(-1, INDEX_COL)}
-          title={wiringMode ? "The index can't be referenced yet" : 'index (Shift: range, ⌘/Ctrl: add)'}
+          title={wiringMode ? "The row ids (#) can't be referenced yet" : '# row ids (Shift: range, ⌘/Ctrl: add)'}
           style={{ cursor: wiringMode ? 'default' : 'pointer', ...outline(-1, INDEX_COL) }}
           onClick={handleIndexClick}
-          onMouseEnter={() => { onHoverChange?.({ kind: 'column', column: 'index' }); }}
+          onMouseEnter={() => { onHoverChange?.({ kind: 'column', column: '#' }); }}
         >
-          index
+          #
         </div>
         {cols.map((col) => (
           <div
@@ -663,7 +663,7 @@ function Grid({
               }}
               onMouseDown={(e) => startDrag({ kind: 'cell', row: r, col: INDEX_COL }, e)}
               onClick={(e) => handleIndexCellClick(r, e)}
-              onMouseEnter={() => { dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'cell', row: r, column: 'index', value: String(r) }); }}
+              onMouseEnter={() => { dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'cell', row: r, column: '#', value: String(r) }); }}
             >
               {r}
             </div>
