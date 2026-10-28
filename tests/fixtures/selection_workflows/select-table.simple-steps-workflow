@@ -7,7 +7,7 @@
   "steps": [
     {
       "name": "step_table",
-      "expression": "make_table(rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')",
+      "expression": "make_table[mod.source()](rows='[{\"name\":\"alice\",\"score\":90,\"age\":30},{\"name\":\"bob\",\"score\":75,\"age\":25},{\"name\":\"carol\",\"score\":88,\"age\":28}]')",
       "meta": {
         "label": "Create Table",
         "legacy_step_id": "step-table"
@@ -15,7 +15,7 @@
     },
     {
       "name": "step_select_table",
-      "expression": "step1",
+      "expression": "identity[mod.slice()](wf[\"step_table\"])",
       "meta": {
         "label": "Select Table",
         "legacy_step_id": "step-select-table"

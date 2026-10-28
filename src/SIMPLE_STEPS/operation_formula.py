@@ -54,8 +54,8 @@ reserved — a tool called ``join`` can still be written with brackets,
 Built-in tools are written by name: ``identity[mod.select(…)]``,
 ``count[mod.collapse()]``, ``gather``, ``total``, ``first``, ``last``.
 
-Formulas without ``wf[…]`` or ``mod.`` are not this syntax; they keep going
-through ``formula_parser`` / ``safe_formula`` as before.
+A step is also a value: ``=[1, 2]``, ``={"x": 1}``, ``=7`` (:func:`is_literal`).
+Anything else is the old syntax, which was removed (:data:`OLD_SYNTAX`).
 
 Nothing here runs anything: :func:`compile_formula` is pure, so the formula
 bar can validate as you type. ``grid_runner.run_formula`` runs the result.
@@ -188,6 +188,49 @@ def is_canonical(formula: Optional[str]) -> bool:
         if isinstance(node, ast.Attribute) and _is_name(node.value, "mod"):
             return True
     return False
+
+
+#: What a formula in the removed syntax (``=scale(n=step1["n"])``,
+#: ``step1["score"][1]``) is told.
+OLD_SYNTAX = (
+    "this formula is in the old syntax, which was removed. Write it in core's: "
+    'tool[mod.map()](wf["step"], …) for a tool over a step, '
+    'tool[mod.source()](…) for one with no input'
+)
+
+
+def is_literal(formula: Optional[str]) -> bool:
+    """Whether *formula* is a value — ``[1, 2]``, ``{"x": 1}``, ``7``, ``"text"``."""
+    body = _body(formula)
+    if not body:
+        return False
+    try:
+        ast.literal_eval(body)
+    except (ValueError, SyntaxError, MemoryError, RecursionError):
+        return False
+    return True
+
+
+def describe(formula: Optional[str]) -> Dict[str, Any]:
+    """A formula as ``/api/parse_formula`` answers it: the tool, whether it is
+    valid and why not, core's operation, and the step editor's parts."""
+    raw = (formula or "").strip()
+    out: Dict[str, Any] = {"operationId": None, "orchestration": None, "args": {},
+                           "isValid": False, "rawInput": raw}
+    body = _body(raw)
+    if not body:
+        return out
+    if is_canonical(raw):
+        try:
+            compiled = compile_formula(raw)
+        except FormulaError as exc:
+            return {**out, "error": str(exc)}
+        return {**out, "operationId": compiled.tool_id, "isValid": True,
+                "operation": compiled.operation(), "parts": to_parts(compiled)}
+    if is_literal(raw):
+        return {**out, "operationId": "literal", "isValid": True,
+                "args": {"expr": body, "_literal": body}}
+    return {**out, "error": OLD_SYNTAX}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -29,9 +29,8 @@ Each live workflow is a *kernel* (see "Kernels" below): one is live per
 session (owner, 2026-10-21); switching workflows saves the current one to disk
 and restores — or starts — the other, without recomputing anything.
 
-Only formulas in core's syntax (``operation_formula.is_canonical``) live here.
-A step in the app's older syntax still runs on the old path; a core step that
-reads one gets its stored output as a table, as before.
+Formulas are in core's syntax (``operation_formula``) or are values; a step in
+the removed older syntax is a problem on that step.
 """
 
 from __future__ import annotations
@@ -65,8 +64,6 @@ class Kernel:
     uses: Dict[str, List[str]] = field(default_factory=dict)
     #: step → why it couldn't be declared (a formula that doesn't compile, …).
     problems: Dict[str, str] = field(default_factory=dict)
-    #: step → the stored ref an old-syntax step was loaded from.
-    loaded: Dict[str, str] = field(default_factory=dict)
     #: the app's step id → its name, as last synced (to follow renames).
     ids: Dict[str, str] = field(default_factory=dict)
     #: When it was last used (time.monotonic), for the idle culler.
@@ -132,7 +129,7 @@ def _save(session_id: str, s: Kernel) -> bool:
             text = json.dumps({
                 "key": s.key, "declarations": s.declarations,
                 "formulas": s.formulas, "operations": s.operations, "reads": s.reads,
-                "uses": s.uses, "problems": s.problems, "loaded": s.loaded, "ids": s.ids,
+                "uses": s.uses, "problems": s.problems, "ids": s.ids,
                 "core": core,
             })
         except (TypeError, ValueError) as exc:
@@ -168,7 +165,7 @@ def _restore(session_id: str, key: str, declarations: Dict[str, Any]) -> Optiona
         print(f"  kernel '{key}' not restored, starting fresh: {exc}")
         return None
     s = Kernel(key, wf, dict(declarations), types=types)
-    for name in ("formulas", "operations", "reads", "uses", "problems", "loaded", "ids"):
+    for name in ("formulas", "operations", "reads", "uses", "problems", "ids"):
         setattr(s, name, blob.get(name) or {})
     return s
 
@@ -290,16 +287,14 @@ def _operation_for(s: Kernel, formula: str, tools: Dict[str, Any]) -> Tuple[dict
     return compiled.operation(inferred, bound_type), compiled
 
 
-def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
-         load: Callable[[str], Any]) -> None:
+def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any]) -> None:
     """Make the workflow's steps match *steps* (``[{name, formula}]``, in order).
 
     An unchanged formula is left alone, so its output stays current; a changed
     one is re-declared and core marks it — and what reads it — stale. A step
-    the app no longer has is removed. *load(name)* is an old-syntax step's
-    stored output, loaded as a table for core steps that read it.
+    the app no longer has is removed.
     """
-    from .operation_formula import is_canonical
+    from .operation_formula import OLD_SYNTAX, is_canonical
 
     names = [str(step["name"]) for step in steps]
     # Renamed in the app (same id, new name): rename in core, which keeps the
@@ -312,7 +307,7 @@ def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
                 s.wf.rename(old, name)
             except (KeyError, ValueError):
                 continue
-            for table in (s.formulas, s.operations, s.reads, s.uses, s.problems, s.loaded):
+            for table in (s.formulas, s.operations, s.reads, s.uses, s.problems):
                 if old in table:
                     table[name] = table.pop(old)
             for reads in s.reads.values():
@@ -325,7 +320,7 @@ def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
                 s.wf.remove(name)
             except (KeyError, ValueError):
                 continue
-            for table in (s.formulas, s.operations, s.reads, s.uses, s.problems, s.loaded):
+            for table in (s.formulas, s.operations, s.reads, s.uses, s.problems):
                 table.pop(name, None)
 
     for step in steps:
@@ -345,14 +340,8 @@ def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
                 s.problems.pop(name, None)
             continue
         if not is_canonical(formula):
-            # The app's older syntax: run on the old path. A core step that
-            # reads it gets its stored output, as a table.
-            ref = step.get("ref")
-            if ref and s.loaded.get(name) != ref:
-                data = load(name)
-                if data is not None:
-                    s.wf[name] = data
-                    s.loaded[name] = ref
+            s.problems[name] = OLD_SYNTAX
+            s.formulas.pop(name, None)
             continue
         if s.formulas.get(name) == formula and name in s.wf.steps:
             continue
@@ -376,7 +365,6 @@ def sync(s: Kernel, steps: List[Dict[str, Any]], tools: Dict[str, Any],
         s.reads[name] = list(compiled.reads)
         s.uses[name] = list(compiled.resources)
         s.problems.pop(name, None)
-        s.loaded.pop(name, None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -418,8 +406,12 @@ def summary(s: Kernel) -> Dict[str, dict]:
     return out
 
 
+#: What a value step reports as its operation.
+_VALUE = {"tool_id": "value", "input": None, "arguments": {}, "modifiers": []}
+
+
 def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
-             declarations: Optional[Dict[str, Any]], load: Callable[[str], Any],
+             declarations: Optional[Dict[str, Any]],
              live: Callable[[str, Any], Any], store: Callable[[Any], str]) -> Tuple[str, dict]:
     """Run step *name* of the session's workflow. Returns ``(output_ref, metrics)``.
 
@@ -430,11 +422,11 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
     s = _kernel_for(session_id, key, declarations or {})
     tools = _tools()
     with s.lock:
-        sync(s, steps, tools, load)
+        sync(s, steps, tools)
         if name in s.problems:
             raise GridStepError(s.problems[name])
-        if name not in s.operations:
-            raise GridStepError(f"step '{name}' has no formula in core's syntax to run")
+        if name not in s.formulas:
+            raise GridStepError(f"step '{name}' has no formula to run")
         step = s.wf.step(name)
         if step.problems:
             raise GridStepError("; ".join(step.problems))
@@ -448,6 +440,10 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
 
         outputs: Dict[str, str] = {}
         for step_name in first + [name]:
+            if step_name not in s.operations:
+                # A value (`[1, 2]`): core holds it as declared; nothing to run.
+                outputs[step_name] = store(s.wf.step(step_name).output.data)
+                continue
             try:
                 s.wf.run(step_name, tools, resources=objects)
             except grid.ResourceNotLoaded as exc:
@@ -463,7 +459,7 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
         metrics = {
             "rows": len(frame),
             "columns": [str(c) for c in frame.columns],
-            **_engine_metrics(s.operations[name], step, step.output),
+            **_engine_metrics(s.operations.get(name, _VALUE), step, step.output),
             "steps": summary(s),
         }
         if first:
@@ -473,7 +469,7 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
 
 
 def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
-              declarations: Optional[Dict[str, Any]], load: Callable[[str], Any],
+              declarations: Optional[Dict[str, Any]],
               store: Optional[Callable[[Any], str]] = None) -> Dict[str, Any]:
     """Declare the app's steps without running anything.
 
@@ -487,7 +483,7 @@ def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
     """
     s = _kernel_for(session_id, key, declarations or {})
     with s.lock:
-        sync(s, steps, _tools(), load)
+        sync(s, steps, _tools())
         outputs: Dict[str, str] = {}
         if store is not None:
             for step in steps:

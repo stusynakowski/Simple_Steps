@@ -8,10 +8,9 @@ Usage:
     simple-steps-dev                     # backend :8000, frontend :5173
     simple-steps-dev --port 9000         # backend on custom port
     simple-steps-dev --workspace ~/my-repo  # use a different workspace root
-    simple-steps-dev --ops ./my_ops      # extra operation plugin dirs
 
 The current working directory (or --workspace) becomes the workspace root.
-Simple Steps discovers projects/, packs/, ops/ relative to this root.
+Workflows live in this root's projects/ folder.
 """
 
 import argparse
@@ -69,15 +68,7 @@ def main():
     parser.add_argument(
         "--workspace", type=str, default=None,
         help="Workspace root directory (default: cwd). "
-             "Simple Steps discovers projects/, packs/, and ops/ relative to this.",
-    )
-    parser.add_argument(
-        "--ops", nargs="*", default=[],
-        help="Additional directories to scan for *_ops.py plugins",
-    )
-    parser.add_argument(
-        "--packs", nargs="*", default=[],
-        help="Additional developer pack directories to scan for @simple_step functions",
+             "Workflows live in its projects/ folder.",
     )
     parser.add_argument(
         "--projects-dir", type=str, default=None,
@@ -112,15 +103,7 @@ def main():
     env = os.environ.copy()
     env["SIMPLE_STEPS_WORKSPACE"] = workspace
 
-    if args.ops:
-        env["SIMPLE_STEPS_EXTRA_OPS"] = ";".join(
-            os.path.abspath(p) for p in args.ops
-        )
 
-    if args.packs:
-        env["SIMPLE_STEPS_PACKS_DIR"] = ";".join(
-            os.path.abspath(p) for p in args.packs
-        )
 
     if args.projects_dir:
         env["SIMPLE_STEPS_PROJECTS_DIR"] = os.path.abspath(args.projects_dir)
@@ -136,8 +119,6 @@ def main():
 
     # ── Detect workspace contents ────────────────────────────────────────
     has_projects = os.path.isdir(os.path.join(workspace, "projects"))
-    has_packs = os.path.isdir(os.path.join(workspace, "packs"))
-    has_ops = os.path.isdir(os.path.join(workspace, "ops"))
 
     project_count = 0
     if has_projects:
@@ -158,10 +139,6 @@ def main():
     print(f"  │  Workspace:    {workspace}")
     if has_projects:
         print(f"  │    📋 {project_count} project(s)")
-    if has_packs:
-        print(f"  │    📦 packs/ discovered")
-    if has_ops:
-        print(f"  │    🔧 ops/ discovered")
     print("  ├──────────────────────────────────────────────┤")
     print("  │  ✏️  Backend auto-reloads on Python changes   │")
     print("  │  ✏️  Frontend hot-reloads on React/TS changes │")

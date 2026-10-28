@@ -1,13 +1,13 @@
 {
   "format_version": 2,
-  "name": "Make Table \u2014 Direct Creation",
+  "name": "Make Table — Direct Creation",
   "meta": {
     "legacy_id": "make-table-direct"
   },
   "steps": [
     {
       "name": "step_table",
-      "expression": "make_table(rows='[{\"product\":\"apple\",\"qty\":10,\"price\":1.5},{\"product\":\"banana\",\"qty\":6,\"price\":0.75},{\"product\":\"cherry\",\"qty\":100,\"price\":3.0}]')",
+      "expression": "make_table[mod.source()](rows='[{\"product\":\"apple\",\"qty\":10,\"price\":1.5},{\"product\":\"banana\",\"qty\":6,\"price\":0.75},{\"product\":\"cherry\",\"qty\":100,\"price\":3.0}]')",
       "meta": {
         "label": "Create Product Table",
         "legacy_step_id": "step-table"

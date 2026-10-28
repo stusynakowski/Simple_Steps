@@ -131,30 +131,3 @@ export async function parseFormula(input: string): Promise<ParsedFormula> {
   return resp.json();
 }
 
-/**
- * Builds a formula string from an operation ID, an optional orchestration
- * modifier, and a key→value config map.
- *
- * Examples:
- *   buildFormula('yt_extract_metadata', 'map', { url: 'step1.url' })
- *   → `=yt_extract_metadata.map(url=step1.url)`
- *
- *   buildFormula('fetch_videos', 'source', { channel_url: 'https://...' })
- *   → `=fetch_videos.source(channel_url="https://...")`
- *
- *   buildFormula('fetch_videos', null, { channel_url: 'https://...' })
- *   → `=fetch_videos(channel_url="https://...")`  ← no modifier
- */
-export async function buildFormula(
-  operationId: string,
-  config: Record<string, any>,
-  orchestration?: OrchestrationMode | null,
-): Promise<string> {
-  const resp = await fetch(`${API_BASE}/build_formula`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ operation_id: operationId, config, orchestration }),
-  });
-  const data = await resp.json();
-  return data.formula;
-}

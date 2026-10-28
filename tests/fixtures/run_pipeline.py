@@ -54,6 +54,9 @@ sys.path.insert(0, str(HERE))
 
 import mock_table_ops             # noqa: F401 — registers expand_cell, make_table
 
+from SIMPLE_STEPS import kernels  # noqa: E402
+kernels.PERSIST = False           # throwaway runs: never save their kernels
+
 
 # ---------------------------------------------------------------------------
 # StepResult / PipelineRunner  (same pattern as other mock runners)
@@ -161,13 +164,14 @@ class PipelineRunner:
             t0 = time.perf_counter()
             try:
                 with _maybe_suppress_stderr(self.on_error == "warn"):
+                    # Like the UI: the whole workflow with each request, so
+                    # the step runs in the workflow's kernel.
                     ref_id, metrics = run_operation(
-                        op_id=op_id,
-                        config=config,
-                        input_ref_id=input_ref_id,
-                        step_label_map=self._step_map,
-                        formula=step_cfg.formula or None,
+                        step_cfg.formula or None,
                         step_id=step_cfg.step_id,
+                        workflow_key=str(self.workflow_path),
+                        workflow_steps=[{"id": s.step_id, "name": s.name, "formula": s.formula,
+                                         "ref": self._stage.get(s.step_id)} for s in steps],
                     )
             except Exception as exc:
                 elapsed = time.perf_counter() - t0

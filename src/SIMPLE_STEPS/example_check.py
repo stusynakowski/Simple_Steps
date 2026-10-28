@@ -4,9 +4,8 @@ example_check.py — run a saved workflow the way the UI does, and check it.
 The examples' ``runme.py`` scripts are built on this. For each saved workflow
 (``workspace/projects/<project>/<name>.simple-steps-workflow``) it:
 
-1. runs every step the way the UI's Run does — the formula parsed, the
-   previous step's output as the input, a step map of names and ``stepN``
-   aliases, the workflow's ``resources`` section — through the same
+1. runs every step the way the UI's Run does — the whole workflow and its
+   ``resources`` section with each request — through the same
    ``engine.run_operation`` that ``/api/run`` calls;
 2. runs the same workflow written in Python (its *twin*: one line per step,
    in core's syntax) directly in ``simple_steps_core``, step by step;
@@ -95,35 +94,29 @@ class Example:
     def run_saved(self, project: str, name: str) -> Dict[str, StepRun]:
         """Every step of a saved workflow, run the way the UI runs it."""
         from .engine import get_value, run_operation
-        from .formula_parser import parse_formula
 
         saved = self.workflow(project, name)
         resources = saved.get("resources") or None
         runs: Dict[str, StepRun] = {}
         refs: Dict[str, str] = {}
-        previous = None
-        # Like the UI: every request carries the whole workflow, so its core
-        # steps run in the workflow's kernel (kernels.py).
+        # Like the UI: every request carries the whole workflow, so its steps
+        # run in the workflow's kernel (kernels.py).
         key = f"{project}/{name}"
         for step in saved["steps"]:
             name_, expression = step["name"], step["expression"]
             run = runs[name_] = StepRun(name_, expression)
-            formula = "=" + expression
-            parsed = parse_formula(formula).as_dict()
-            step_map = dict(refs)
-            step_map.update({f"step{i + 1}": ref for i, ref in enumerate(refs.values())})
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
                     ref, run.metrics = run_operation(
-                        parsed.get("operationId"), parsed.get("args") or {}, previous,
-                        step_map, False, formula, name_, SESSION, None, resources,
-                        key, [{"name": s["name"], "formula": "=" + s["expression"], "ref": refs.get(s["name"])}
-                              for s in saved["steps"]],
+                        "=" + expression, step_id=name_, session_id=SESSION,
+                        resources=resources, workflow_key=key,
+                        workflow_steps=[{"name": s["name"], "formula": "=" + s["expression"],
+                                         "ref": refs.get(s["name"])} for s in saved["steps"]],
                     )
             except Exception as exc:          # the step refused or failed: say why
                 run.error = str(exc)
                 continue
-            refs[name_] = previous = ref
+            refs[name_] = ref
             run.data = as_table(get_value(ref, session_id=SESSION))
         return runs
 

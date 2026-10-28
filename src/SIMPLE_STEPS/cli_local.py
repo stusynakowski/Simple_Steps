@@ -15,7 +15,6 @@ Usage:
     simple-steps-local                          # launch from cwd
     simple-steps-local --workspace ~/my-data    # explicit workspace
     simple-steps-local --port 9000              # custom backend port
-    simple-steps-local --packs ./my_packs       # extra operation packs
     simple-steps-local --width 1400 --height 900
 
 Requirements:
@@ -91,14 +90,6 @@ def main():
         help="Workspace root directory (default: current working directory)",
     )
     parser.add_argument(
-        "--ops", nargs="*", default=[],
-        help="Additional directories to scan for *_ops.py plugins",
-    )
-    parser.add_argument(
-        "--packs", nargs="*", default=[],
-        help="Additional developer pack directories to scan",
-    )
-    parser.add_argument(
         "--projects-dir", type=str, default=None,
         help="Directory for project/pipeline storage (default: <workspace>/projects)",
     )
@@ -138,14 +129,6 @@ def main():
     workspace = os.path.abspath(args.workspace or os.getcwd())
     os.environ["SIMPLE_STEPS_WORKSPACE"] = workspace
 
-    if args.ops:
-        os.environ["SIMPLE_STEPS_EXTRA_OPS"] = ";".join(
-            os.path.abspath(p) for p in args.ops
-        )
-    if args.packs:
-        os.environ["SIMPLE_STEPS_PACKS_DIR"] = ";".join(
-            os.path.abspath(p) for p in args.packs
-        )
     if args.projects_dir:
         os.environ["SIMPLE_STEPS_PROJECTS_DIR"] = os.path.abspath(args.projects_dir)
 
@@ -159,13 +142,6 @@ def main():
 
     # ── Detect workspace contents (for banner) ───────────────────────────
     has_projects = os.path.isdir(os.path.join(workspace, "projects"))
-    has_packs = os.path.isdir(os.path.join(workspace, "packs"))
-    has_ops = os.path.isdir(os.path.join(workspace, "ops"))
-    has_py = any(
-        f.endswith(".py") and not f.startswith("__")
-        for f in os.listdir(workspace)
-        if os.path.isfile(os.path.join(workspace, f))
-    )
 
     project_count = 0
     pipeline_count = 0
@@ -191,12 +167,6 @@ def main():
         print(f"  │    📋 {project_count} project(s), {pipeline_count} pipeline(s)")
     else:
         print(f"  │    📋 No projects/ folder (will create on first save)")
-    if has_packs:
-        print(f"  │    📦 packs/ discovered")
-    if has_ops:
-        print(f"  │    🔧 ops/ discovered")
-    if has_py:
-        print(f"  │    🐍 Top-level .py files discovered")
     print("  └─────────────────────────────────────────────┘")
     print()
 

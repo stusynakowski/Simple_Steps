@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Body, Depends
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from .formula_parser import parse_formula, build_formula
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 import pandas as pd
@@ -18,9 +17,7 @@ from .models import (
     PipelineFile,
 )
 from .operations import DEFINITIONS as OPERATIONS
-from .engine import run_operation, get_dataframe, get_value, _get_raw_only, _ref_exists_in_raw_store
-from . import orchestration_ops  # noqa: F401 — registers ss_map, ss_filter, ss_expand, ss_reduce
-from .pack_loader import PackLoader, set_loader, get_loader
+from .engine import run_operation, get_dataframe, get_value
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
@@ -34,116 +31,22 @@ from .session import get_session_id
 import sys
 import os
 
-# ── Workspace-relative discovery ─────────────────────────────────────────────
-#
-# When a user boots Simple Steps from a directory (`cd ~/my-repo && simple-steps`)
-# that directory becomes the "workspace root".  The platform automatically
-# discovers:
-#
-#   <workspace>/projects/   → project folders containing pipeline JSON files
-#   <workspace>/packs/      → developer packs (Tier 2) with @simple_step_tool functions
-#   <workspace>/ops/        → workspace-level custom operations
-#   <workspace>/*.py        → top-level .py files with @simple_step_tool functions
-#
-# This means any repo that contains a projects/ folder "just works" when you
-# run `simple-steps` from inside it.
-#
-# Tier 1 — System ops: always loaded (operations.py, orchestration_ops.py)
-# Tier 2 — Developer packs: packs/ in workspace + any --packs dirs
-# Tier 3 — Project ops: per-project custom functions (projects/<name>/**)
-#
+# ── The App this process serves (application.py) ─────────────────────────────
+# The one built by `python app.py`, or the one the workspace's app.py builds
+# (`simple-steps` in that folder), or None. Tools come only from the App's
+# `tools=[…]` and the standard set (operations.py); nothing in the workspace is
+# imported as code (docs/how-simple-steps-works.md §7, item 1).
 
 _PKG_DIR = os.path.dirname(__file__)
 _WORKSPACE = os.path.abspath(WORKSPACE_ROOT)
 
-# ── The App this process serves (application.py) ─────────────────────────────
-# The one built by `python app.py`, or the one the workspace's app.py builds
-# (`simple-steps` in that folder), or None — then everything below is the
-# default App: discovery exactly as before. An App that lists its tools turns
-# off the workspace's top-level *.py scan, so a module app.py imports is never
-# imported again under another name.
-from .application import app_file as _app_file, load_app as _load_app
+from .application import load_app as _load_app
 _APP = _load_app(_WORKSPACE)
-_SCAN_WORKSPACE = (not (_APP is not None and _APP.explicit)
-                   and os.environ.get("SIMPLE_STEPS_SCAN_WORKSPACE", "1") != "0")
-
-# Developer pack directories (Tier 2)
-_DEVELOPER_PACK_DIRS: list[str] = []
-
-# 1. Workspace-local packs/ directory (primary — the user's own packs)
-_ws_packs = os.path.join(_WORKSPACE, "packs")
-if os.path.isdir(_ws_packs):
-    _DEVELOPER_PACK_DIRS.append(_ws_packs)
-
-# 2. Workspace-local ops/ directory (flat custom operations)
-_ws_ops = os.path.join(_WORKSPACE, "ops")
-if os.path.isdir(_ws_ops):
-    _DEVELOPER_PACK_DIRS.append(_ws_ops)
-
-# 3. The workspace root's own top-level *.py files are picked up separately,
-#    via PackLoader(workspace_root=...), because that scan must NOT recurse.
-#    The workspace root is just wherever the user launched from; importing a
-#    module executes it, so walking the whole tree would run every .py file
-#    under their cwd.
-_ws_has_py = _SCAN_WORKSPACE and any(
-    f.endswith(".py") and not f.startswith("__")
-    for f in os.listdir(_WORKSPACE)
-    if os.path.isfile(os.path.join(_WORKSPACE, f))
-)
-
-# 4. Additional pack dirs from environment / CLI flags
-_extra_packs = os.environ.get("SIMPLE_STEPS_PACKS_DIR", "")
-if _extra_packs:
-    _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_packs.split(";") if p.strip())
-
-_extra_ops = os.environ.get("SIMPLE_STEPS_EXTRA_OPS", "")
-if _extra_ops:
-    _DEVELOPER_PACK_DIRS.extend(p.strip() for p in _extra_ops.split(";") if p.strip())
-
-# Discover all project directories for Tier 3
-def _discover_project_dirs() -> List[str]:
-    """Find all project folders that contain Python files anywhere in the tree."""
-    projects_root = os.path.abspath(PROJECTS_DIR)
-    if not os.path.isdir(projects_root):
-        return []
-    dirs = []
-    for entry in os.listdir(projects_root):
-        proj_path = os.path.join(projects_root, entry)
-        if not os.path.isdir(proj_path):
-            continue
-        # Walk the whole project tree looking for at least one .py file
-        has_py = False
-        for root, _subdirs, files in os.walk(proj_path):
-            # Skip __pycache__ and hidden dirs
-            _subdirs[:] = [d for d in _subdirs if not d.startswith(".") and d != "__pycache__"]
-            if any(f.endswith(".py") and not f.startswith("__") for f in files):
-                has_py = True
-                break
-        if has_py:
-            dirs.append(proj_path)
-    return dirs
-
-# Initialize and run the Pack Loader
-_loader = PackLoader(
-    developer_pack_dirs=_DEVELOPER_PACK_DIRS,
-    project_dirs=_discover_project_dirs(),
-    workspace_root=_WORKSPACE if _ws_has_py else None,
-)
-# app.py is the application's entry point, never a tool file to scan.
-if _app_file(_WORKSPACE):
-    _loader._loaded_modules.add(os.path.abspath(_app_file(_WORKSPACE)))
-_loader.load_all()
-set_loader(_loader)
 if _APP is not None and _APP.freeze:
     # Served to others: no tool can be added once the server is up.
     from simple_steps_core import REGISTRY as _CORE_REGISTRY, grid as _grid
     _CORE_REGISTRY.freeze()
     _grid.freeze()          # the grid's own tool and resource-type registries
-
-# Core's shape verbs as palette operations (=select(...), =map(tool=...)),
-# built from grid.modifier_catalog() so the palette cannot drift from core.
-from .grid_runner import register_verb_operations
-register_verb_operations()
 
 
 # --- App Initialize ---
@@ -155,126 +58,14 @@ app = FastAPI(
 # --- Agent Router ---
 app.include_router(agent_router)
 
-    # --- Formula Parser API ---
+# --- Formula Parser API ---
 @app.post("/api/parse_formula")
 async def api_parse_formula(payload: dict = Body(...)):
-    """Parse a formula string and return the parsed structure."""
-    formula = payload.get("formula", "")
-    parsed = parse_formula(formula).as_dict()
-    if not parsed.get("isValid") and "error" not in parsed and formula.strip().lstrip("=").strip():
-        # Say why, so the step can show it in its output cell instead of
-        # running whatever operation it had before.
-        parsed["error"] = f"Invalid expression: {_why_invalid(formula)}"
-    return parsed
-
-
-def _why_invalid(formula: str) -> str:
-    """Python's own syntax message, or a plain reason when it parses."""
-    import ast
-
-    expr = formula.strip().lstrip("=").strip()
-    try:
-        ast.parse(expr, mode="eval")
-    except SyntaxError as exc:
-        return exc.msg
-    return "it isn't a call to an operation"
-
-@app.post("/api/console/eval")
-async def api_console_eval(
-    payload: dict = Body(...),
-    session_id: str = Depends(get_session_id),
-):
-    """
-    Evaluate one console expression against this session's live step data.
-
-    This is the read-only half of the console (see
-    ``docs/dev_plan/118-console-and-gui-parity.md`` §5). It runs through
-    :mod:`safe_formula`, the AST-allowlist interpreter whose calls must
-    target a registered operation. That is what lets the
-    console be "an interactive Python session narrowed to Simple Steps"
-    without handing the browser arbitrary code execution.
-
-    Mutations never arrive here: workflow commands are applied
-    client-side through the same dispatch the GUI uses, so there is
-    exactly one path into workflow state.
-    """
-    from . import safe_formula
-    from .engine import get_dataframe
-    from .step_proxy import StepProxy, ColumnProxy
-
-    source = (payload.get("source") or "").strip()
-    step_map = payload.get("step_map") or {}
-    if not source:
-        return {"ok": False, "error": "Empty expression."}
-
-    # Resolve every step the caller knows about to its DataFrame, so the
-    # expression's namespace matches what the GUI is showing.
-    env: Dict[str, Any] = {}
-    for key, ref_id in step_map.items():
-        df = get_dataframe(ref_id, session_id=session_id)
-        if df is not None:
-            env[key] = df
-
-    try:
-        from .operation_formula import is_canonical
-        if is_canonical(source):
-            # Core's syntax: the same compiler and runner as /api/run.
-            from .grid_runner import run_formula
-            result = run_formula(source, load=env.get)[0].output.data
-        else:
-            result = safe_formula.run_formula(source, steps=env)
-    except Exception as exc:
-        return {
-            "ok": False,
-            "error": str(exc),
-            "error_type": type(exc).__name__,
-            "available_steps": sorted(env.keys()),
-        }
-
-    # Unwrap proxies so the rendering below sees pandas objects.
-    if isinstance(result, StepProxy):
-        result = result._df
-    elif isinstance(result, ColumnProxy):
-        result = result._series
-
-    if isinstance(result, pd.DataFrame):
-        preview = result.head(20)
-        return {
-            "ok": True,
-            "kind": "dataframe",
-            "shape": f"{len(result)} rows x {len(result.columns)} cols",
-            "columns": [str(c) for c in result.columns],
-            "repr": preview.to_string(max_cols=12, max_colwidth=40),
-            "truncated": len(result) > 20,
-        }
-    if isinstance(result, pd.Series):
-        preview = result.head(20)
-        return {
-            "ok": True,
-            "kind": "series",
-            "shape": f"{len(result)} values"
-                     + (f", name={result.name!r}" if result.name is not None else ""),
-            "repr": preview.to_string(max_rows=20),
-            "truncated": len(result) > 20,
-        }
-
-    return {
-        "ok": True,
-        "kind": type(result).__name__,
-        "shape": "",
-        "repr": repr(result)[:4000],
-        "truncated": False,
-    }
-
-
-@app.post("/api/build_formula")
-async def api_build_formula(payload: dict = Body(...)):
-    """Build a formula string from operation_id, config, and orchestration."""
-    operation_id = payload.get("operation_id", "")
-    config = payload.get("config", {})
-    orchestration = payload.get("orchestration")
-    formula = build_formula(operation_id, config, orchestration)
-    return {"formula": formula}
+    """A formula as the UI needs it: its tool, whether it is valid and why
+    not, core's operation, and the step editor's parts
+    (``operation_formula.describe``)."""
+    from .operation_formula import describe
+    return describe(payload.get("formula", ""))
 
 
 @app.post("/api/format_formula")
@@ -283,12 +74,12 @@ async def api_format_formula(payload: dict = Body(...)):
     formula in core's syntax, with that formula parsed — so the editor and the
     formula bar update from one answer. 400 with the reason if the parts don't
     make a valid step."""
-    from .operation_formula import FormulaError, format_parts
+    from .operation_formula import FormulaError, describe, format_parts
     try:
         formula = format_parts(payload.get("parts") or {})
     except FormulaError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    return {"formula": formula, "parsed": parse_formula(formula).as_dict()}
+    return {"formula": formula, "parsed": describe(formula)}
 
 
 @app.post("/api/infer_verb")
@@ -355,9 +146,6 @@ async def workspace_info():
     discovered at startup.  The frontend uses this for the sidebar
     header and diagnostics.
     """
-    loader = get_loader()
-    by_tier = loader.get_ops_by_tier() if loader else {}
-
     # Count projects and pipelines
     project_count = 0
     pipeline_count = 0
@@ -381,12 +169,7 @@ async def workspace_info():
         "project_count": project_count,
         "pipeline_count": pipeline_count,
         "project_names": project_names,
-        "has_packs": os.path.isdir(os.path.join(_WORKSPACE, "packs")),
-        "has_ops": os.path.isdir(os.path.join(_WORKSPACE, "ops")),
         "has_manifest": os.path.isfile(os.path.join(_WORKSPACE, "simple_steps.toml")),
-        "developer_pack_dirs": [os.path.abspath(p) for p in _DEVELOPER_PACK_DIRS],
-        "ops_by_tier": by_tier,
-        "total_operations": sum(len(ops) for ops in by_tier.values()),
         # Multi-workspace chrome (Phase A): recent list lives in
         # ``~/.simple_steps/state.json`` and is *not* workspace-relative.
         "recent_workspaces": workspace_state.get_recent_workspaces(),
@@ -403,7 +186,7 @@ async def workspace_open(body: OpenWorkspaceRequest):
     Record ``path`` as the active workspace in ``~/.simple_steps/state.json``
     and push it to the front of the recents list.
 
-    M0 caveat: many backend modules (`file_manager`, `pack_loader`, …)
+    M0 caveat: backend modules (`file_manager`, …)
     captured ``WORKSPACE_ROOT`` at import time, so switching workspaces
     *fully* requires restarting the backend process.  This endpoint returns
     ``requires_restart: true`` so the frontend can prompt the user.
@@ -690,7 +473,7 @@ async def execute_step(
     """
     Executes a single step.
 
-    Receives: Config + Input Reference ID + Reference Map
+    Receives: the step's formula, and its workflow (every step's formula)
     Returns:  New Output Reference ID
 
     Session isolation: ``session_id`` is resolved from the ``ss_session``
@@ -704,19 +487,16 @@ async def execute_step(
         # event loop — this allows SSE progress streams to flow concurrently.
         loop = _asyncio.get_event_loop()
         out_ref, metrics = await loop.run_in_executor(None, lambda: run_operation(
-            payload.operation_id,
-            payload.config,
-            payload.input_ref_id,
-            payload.step_map,
-            payload.is_preview,
             payload.formula,
-            payload.step_id,
-            session_id,
-            payload.result_store,
-            payload.resources,
-            payload.workflow_key,
-            payload.workflow_steps,
+            step_id=payload.step_id,
+            session_id=session_id,
+            result_store=payload.result_store,
+            resources=payload.resources,
+            workflow_key=payload.workflow_key,
+            workflow_steps=payload.workflow_steps,
+            step_map=payload.step_map,
         ))
+
         
         return StepRunResponse(
             status="success",
@@ -734,7 +514,6 @@ async def execute_step(
                 "detail": str(e),
                 "error_type": type(e).__name__,
                 "traceback": error_tb,
-                "operation_id": payload.operation_id,
                 "step_id": payload.step_id,
             }
         )
@@ -752,12 +531,10 @@ async def sync_workflow(
     """
     from . import kernels
     from .engine import _normalize_session_id, save_dataframe
-    refs = {str(s.get("name")): s.get("ref") for s in payload.workflow_steps}
     try:
         return kernels.sync_only(
             _normalize_session_id(session_id), payload.workflow_key, payload.workflow_steps,
             payload.resources,
-            load=lambda name: get_value(refs[name], session_id=session_id) if refs.get(name) else None,
             store=lambda frame: save_dataframe(frame, session_id=session_id),
         )
     except Exception as e:
@@ -832,81 +609,6 @@ async def write_settings(body: dict = Body(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 # --- 3. Data View (Query) ---
-def _raw_to_cells(raw: object, *, offset: int = 0, limit: int = 50) -> list:
-    """
-    Serialise a raw (``step``-mode) value into the same ``Cell[]`` shape
-    that the DataFrame path returns.
-
-    This lets the existing frontend grid viewer render raw values without
-    any code changes.  Shapes:
-
-    * ``dict``           → one row, one cell per (key, value)
-    * ``list[dict]``     → N rows, one cell per (key, value) per row
-    * ``list[scalar]``   → N rows, one cell per row under column ``"value"``
-    * ``None``           → empty list
-    * scalar / object    → 1 row × 1 cell under column ``"value"``
-    """
-    def _cell(row_id: int, column_id: str, value: object) -> dict:
-        # The same cell builder as the DataFrame path, so a raw value that's an
-        # image or a figure gets its cell type too.
-        from .cell_types import cell
-        return cell(row_id, column_id, value)
-
-    if raw is None:
-        return []
-
-    # list[dict] → table
-    if isinstance(raw, list) and raw and isinstance(raw[0], dict):
-        # Stable column order: dict-insertion order of the first row,
-        # then any extra keys discovered in later rows.
-        seen_cols: list = []
-        for row in raw:
-            if isinstance(row, dict):
-                for k in row.keys():
-                    if k not in seen_cols:
-                        seen_cols.append(str(k))
-
-        page = raw[offset : offset + limit]
-        cells = []
-        for i, row in enumerate(page):
-            row_id = offset + i
-            if not isinstance(row, dict):
-                cells.append(_cell(row_id, "value", row))
-                continue
-            for col in seen_cols:
-                cells.append(_cell(row_id, col, row.get(col)))
-        return cells
-
-    # list[scalar | non-dict] → single 'value' column
-    if isinstance(raw, list):
-        page = raw[offset : offset + limit]
-        return [_cell(offset + i, "value", v) for i, v in enumerate(page)]
-
-    # dict → one row, one cell per key
-    if isinstance(raw, dict):
-        if offset > 0:
-            return []
-        return [_cell(0, str(k), v) for k, v in raw.items()]
-
-    # Pydantic / dataclass / object with introspectable fields
-    if hasattr(raw, "model_dump"):
-        try:
-            return _raw_to_cells(raw.model_dump(), offset=offset, limit=limit)
-        except Exception:
-            pass
-    if hasattr(raw, "__dataclass_fields__"):
-        try:
-            from dataclasses import asdict
-            return _raw_to_cells(asdict(raw), offset=offset, limit=limit)
-        except Exception:
-            pass
-
-    # Pure scalar / unknown object
-    if offset > 0:
-        return []
-    return [_cell(0, "value", raw)]
-
-
 @app.get("/api/data/{ref_id}")
 async def get_data_view(
     ref_id: str,
@@ -915,26 +617,12 @@ async def get_data_view(
     session_id: str = Depends(get_session_id),
 ):
     """
-    Returns a slice of data for the Frontend Grid as ``Cell[]``.
-
-    Handles both stores:
-      • ``RAW_STORE`` — single-cell ``step``-mode outputs.  Serialised
-        into ``Cell[]`` so the existing grid viewer works without
-        modification (dict → one row of cells, list-of-dicts → N rows,
-        scalar → 1×1 cell, list-of-scalars → N×1 cells).
-      • ``DATA_STORE`` — DataFrames from the legacy tabular ops.
+    Returns a slice of a step's output for the Frontend Grid as ``Cell[]``.
 
     Session isolation: the ``ref_id`` carries an embedded session token
     (``<token>__<uuid>``).  Lookups that don't match the cookie's session
     return 404 — no information leak about whether the ref exists.
     """
-    # ── Raw value path (step mode) ─────────────────────────────────────
-    if _ref_exists_in_raw_store(ref_id, session_id=session_id):
-        raw = _get_raw_only(ref_id, session_id=session_id)
-        cells = _raw_to_cells(raw, offset=offset, limit=limit)
-        return cells
-
-    # ── DataFrame path (legacy tabular) ────────────────────────────────
     df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
@@ -975,30 +663,14 @@ async def get_cell_view(
     summary and a small preview, so a column of images stays cheap.
     """
     from .cell_types import view
-    if _ref_exists_in_raw_store(ref_id, session_id=session_id):
-        found, value = _raw_value_at(_get_raw_only(ref_id, session_id=session_id), row, column)
-    else:
-        df = get_dataframe(ref_id, session_id=session_id)
-        if df is None:
-            raise HTTPException(status_code=404, detail="Data reference expired")
-        found = 0 <= row < len(df) and column in [str(c) for c in df.columns]
-        value = df.iloc[row][[c for c in df.columns if str(c) == column][0]] if found else None
+    df = get_dataframe(ref_id, session_id=session_id)
+    if df is None:
+        raise HTTPException(status_code=404, detail="Data reference expired")
+    found = 0 <= row < len(df) and column in [str(c) for c in df.columns]
+    value = df.iloc[row][[c for c in df.columns if str(c) == column][0]] if found else None
     if not found:
         raise HTTPException(status_code=404, detail=f"No cell at row {row}, column {column!r}")
     return view(value)
-
-
-def _raw_value_at(raw: object, row: int, column: str) -> tuple:
-    """The value ``_raw_to_cells`` shows at (*row*, *column*): ``(found, value)``."""
-    if isinstance(raw, list) and raw and isinstance(raw[0], dict):
-        if 0 <= row < len(raw) and isinstance(raw[row], dict) and column in raw[row]:
-            return True, raw[row][column]
-        return False, None
-    if isinstance(raw, dict):
-        return (row == 0 and column in raw), raw.get(column)
-    if isinstance(raw, list):
-        return (column == "value" and 0 <= row < len(raw)), (raw[row] if 0 <= row < len(raw) else None)
-    return (row == 0 and column == "value"), raw
 
 
 @app.get("/api/data-meta/{ref_id}")
@@ -1015,19 +687,8 @@ async def get_data_meta(
 
     Response shape::
 
-        {
-          "kind": "dataframe" | "raw",
-          "rows": int,
-          "columns": list[str],
-          "value_type": str | None   # only present when kind == "raw"
-        }
+        {"kind": "dataframe", "rows": int, "columns": list[str]}
     """
-    # Raw value path (step mode)
-    if _ref_exists_in_raw_store(ref_id, session_id=session_id):
-        raw = _get_raw_only(ref_id, session_id=session_id)
-        return _raw_meta(raw)
-
-    # DataFrame path (legacy tabular)
     df = get_dataframe(ref_id, session_id=session_id)
     if df is None:
         raise HTTPException(status_code=404, detail="Data reference expired")
@@ -1038,44 +699,6 @@ async def get_data_meta(
         "columns": [str(c) for c in df.columns],
     }
 
-
-def _raw_meta(raw: object) -> dict:
-    """Mirror of ``engine._step_result_metrics`` for use from the data-meta endpoint.
-
-    Both functions MUST agree on ``kind`` / ``value_type`` / ``columns`` for any
-    given value so ``/api/run`` (metrics) and ``/api/data-meta`` (meta) report
-    identical shape information.
-    """
-    if isinstance(raw, dict):
-        return {
-            "kind": "raw",
-            "value_type": "dict",
-            "rows": 1,
-            "columns": [str(k) for k in raw.keys()],
-        }
-    if isinstance(raw, list):
-        if raw and isinstance(raw[0], dict):
-            cols: list = []
-            for row in raw:
-                if isinstance(row, dict):
-                    for k in row.keys():
-                        if k not in cols:
-                            cols.append(str(k))
-            return {"kind": "raw", "value_type": "list[dict]", "rows": len(raw), "columns": cols}
-        return {"kind": "raw", "value_type": "list", "rows": len(raw), "columns": ["value"]}
-    if raw is None:
-        return {"kind": "raw", "value_type": "none", "rows": 0, "columns": []}
-    cols: list = []
-    if hasattr(raw, "model_fields"):
-        cols = list(raw.model_fields.keys())
-    elif hasattr(raw, "__dataclass_fields__"):
-        cols = list(raw.__dataclass_fields__.keys())
-    return {
-        "kind": "raw",
-        "value_type": type(raw).__name__,
-        "rows": 1,
-        "columns": cols if cols else ["value"],
-    }
 
 # ── Serve bundled frontend (SPA) ────────────────────────────────────────────
 # The built React app lives in the package at SIMPLE_STEPS/frontend_dist/.

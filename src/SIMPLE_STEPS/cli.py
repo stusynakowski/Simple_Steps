@@ -13,14 +13,10 @@ Usage:
     simple-steps --host 0.0.0.0     # bind to all interfaces
     simple-steps --dev              # dev mode: reload on file changes
     simple-steps --no-browser       # don't auto-open browser
-    simple-steps --packs ./my_packs # add extra operation pack directories
 
-The current working directory becomes the "workspace root".  Simple Steps
-will automatically discover:
-    <cwd>/projects/   → project folders with pipeline JSON files
-    <cwd>/packs/      → developer packs with @simple_step functions
-    <cwd>/ops/        → workspace-level custom operations
-    <cwd>/*.py        → top-level Python files with @simple_step decorators
+The current working directory becomes the "workspace root": its projects/
+folder holds the workflow files, and its app.py (if any) is the App served.
+Tools come only from that App's ``tools=[…]`` and the standard set.
 """
 
 import argparse
@@ -207,15 +203,7 @@ def main():
     parser.add_argument(
         "--workspace", type=str, default=None,
         help="Workspace root directory (default: current working directory). "
-             "Simple Steps discovers projects/, packs/, and ops/ relative to this.",
-    )
-    parser.add_argument(
-        "--ops", nargs="*", default=[],
-        help="Additional directories to scan for *_ops.py plugins (legacy — prefer --packs)",
-    )
-    parser.add_argument(
-        "--packs", nargs="*", default=[],
-        help="Additional developer pack directories to scan for @simple_step functions",
+             "Workflows live in its projects/ folder.",
     )
     parser.add_argument(
         "--projects-dir", type=str, default=None,
@@ -241,10 +229,6 @@ def main():
             rebuilt += ["--host", args.host]
         if args.workspace:
             rebuilt += ["--workspace", args.workspace]
-        for p in args.ops:
-            rebuilt += ["--ops", p]
-        for p in args.packs:
-            rebuilt += ["--packs", p]
         if args.projects_dir:
             rebuilt += ["--projects-dir", args.projects_dir]
         sys.argv = rebuilt
@@ -257,16 +241,6 @@ def main():
 
     # ── Pass configuration via environment variables ─────────────────────
     # These are picked up by main.py and file_manager.py at import time
-
-    if args.ops:
-        os.environ["SIMPLE_STEPS_EXTRA_OPS"] = ";".join(
-            os.path.abspath(p) for p in args.ops
-        )
-
-    if args.packs:
-        os.environ["SIMPLE_STEPS_PACKS_DIR"] = ";".join(
-            os.path.abspath(p) for p in args.packs
-        )
 
     if args.projects_dir:
         os.environ["SIMPLE_STEPS_PROJECTS_DIR"] = os.path.abspath(args.projects_dir)
@@ -288,24 +262,7 @@ def main():
 
     # ── Detect workspace contents ────────────────────────────────────────
     has_projects = os.path.isdir(os.path.join(workspace, "projects"))
-    has_packs = os.path.isdir(os.path.join(workspace, "packs"))
-    has_ops = os.path.isdir(os.path.join(workspace, "ops"))
-    has_py = any(
-        f.endswith(".py") and not f.startswith("__")
-        for f in os.listdir(workspace)
-        if os.path.isfile(os.path.join(workspace, f))
-    )
-    has_manifest = os.path.isfile(os.path.join(workspace, "simple_steps.toml"))
-
-    # Count manifest packs
-    manifest_pack_count = 0
-    if has_manifest:
-        try:
-            from .pack_manager import load_manifest
-            _m = load_manifest(workspace)
-            manifest_pack_count = len(_m.packs)
-        except Exception:
-            pass
+    has_app = os.path.isfile(os.path.join(workspace, "app.py"))
 
     # Count projects
     projects_dir = os.path.join(workspace, "projects")
@@ -334,26 +291,10 @@ def main():
         print(f"  │    📋 {project_count} project(s), {pipeline_count} pipeline(s)")
     else:
         print(f"  │    📋 No projects/ folder found (will create on first save)")
-    if has_packs:
-        print(f"  │    📦 packs/ discovered")
-    if has_ops:
-        print(f"  │    🔧 ops/ discovered")
-    if has_py:
-        print(f"  │    🐍 Top-level .py files discovered")
-    if has_manifest:
-        print(f"  │    📄 simple_steps.toml ({manifest_pack_count} pack(s) declared)")
+    if has_app:
+        print(f"  │    app.py: the App served")
     print("  └─────────────────────────────────────────────┘")
     print()
-
-    if args.ops:
-        for p in args.ops:
-            print(f"  📂 Extra ops: {os.path.abspath(p)}")
-        print()
-
-    if args.packs:
-        for p in args.packs:
-            print(f"  📦 Pack dir:  {os.path.abspath(p)}")
-        print()
 
     # ── Start uvicorn ────────────────────────────────────────────────────
     import uvicorn

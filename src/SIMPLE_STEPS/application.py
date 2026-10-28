@@ -27,12 +27,9 @@ application. Two ways to start it, both equivalent:
 - ``simple-steps`` (or ``simple-steps-dev``, ``--local``) in that folder: the
   server finds ``app.py`` in the workspace and uses the ``App`` it defines.
 
-**Explicit vs. discovered tools.** ``App(tools=[…])`` *is* the list of tools:
-the workspace's top-level ``*.py`` files are not scanned, so a module that
-``app.py`` imports is never imported a second time under another name (which
-would register every tool and resource class twice). ``App()`` with no tools —
-and a workspace with no ``app.py`` at all — keep today's discovery exactly.
-``packs/``, ``ops/`` and project folders are discovered either way.
+**Tools.** ``App(tools=[…])`` *is* the list of tools, beside the standard set.
+Nothing in the workspace is imported as code; a workspace with no ``app.py``
+offers the standard set only.
 
 What isn't swappable yet (122 S1.2, after the MVP): the workspace format,
 session store and result store keep their current implementations, and the
@@ -85,8 +82,7 @@ class App:
         """
         Args:
             tools: modules whose ``@simple_step_tool`` functions to offer, or
-                single tools. Given → the workspace's ``*.py`` files are not
-                scanned. Empty → they are, as before.
+                single tools.
             resources: resource types users may create. A class not yet
                 decorated is declared with ``@simple_step_resource`` here.
             loaded: ready-made resources, ``{"name": Loaded(Type, …)}``.
@@ -113,8 +109,6 @@ class App:
         self.tool_ids: List[str] = []
         for item in tools:
             self.tool_ids += _tool_ids(item)
-        #: Whether tools were listed. If so, the workspace isn't scanned.
-        self.explicit = bool(self.tool_ids)
         self.resource_types: List[type] = [_resource_type(cls) for cls in resources]
         self.loaded: Dict[str, Any] = {}
         from .resources import ResourceError, register_loaded
@@ -190,7 +184,7 @@ def load_app(workspace: str) -> Optional[App]:
         return None
     _import_app_file(path)
     if CURRENT is None:
-        print(f"  ⚠️  {path} defines no App; discovering tools in the workspace instead.")
+        print(f"  ⚠️  {path} defines no App; offering the standard tools only.")
     return CURRENT
 
 
@@ -282,5 +276,3 @@ def _resource_type(cls: Any) -> type:
 def _configure_environment(app: App) -> None:
     """What ``SIMPLE_STEPS.main`` reads when it is first imported."""
     os.environ["SIMPLE_STEPS_WORKSPACE"] = app.workspace
-    if app.explicit:
-        os.environ["SIMPLE_STEPS_SCAN_WORKSPACE"] = "0"

@@ -58,7 +58,7 @@ def tool_ids() -> List[str]:
     from ..decorators import OPERATION_REGISTRY
 
     app = application.CURRENT
-    if app is not None and app.explicit:
+    if app is not None and app.tool_ids:
         ids = list(app.tool_ids)
     else:
         ids = [i for i, e in OPERATION_REGISTRY.items()

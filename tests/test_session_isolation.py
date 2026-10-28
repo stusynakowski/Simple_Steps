@@ -56,11 +56,8 @@ def _run_test_source(client: TestClient) -> str:
         "/api/run",
         json={
             "step_id": "step-1",
-            "operation_id": "session_test_source",
-            "config": {},
-            "input_ref_id": None,
+            "formula": "=session_test_source[mod.source()]()",
             "step_map": {},
-            "is_preview": False,
         },
     )
     assert r.status_code == 200, r.text
@@ -136,11 +133,8 @@ def test_step_run_request_rejects_session_id_in_body_silently():
         "/api/run",
         json={
             "step_id": "step-1",
-            "operation_id": "session_test_source",
-            "config": {},
-            "input_ref_id": None,
+            "formula": "=session_test_source[mod.source()]()",
             "step_map": {},
-            "is_preview": False,
             "session_id": "attacker-controlled-id-xxx",
         },
     )

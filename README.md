@@ -15,7 +15,7 @@ Think of it as a spreadsheet where every cell is a Python operation, every colum
 You define operations as ordinary Python functions. Simple Steps wraps them in a React UI where users can:
 
 - **Build pipelines** by chaining steps in a visual canvas
-- **Wire data** between steps using a formula bar (`=extract_metadata.map(url=step1.output)`)
+- **Wire data** between steps using a formula bar (`=extract_metadata[mod.map()](wf["videos"])`)
 - **Run steps** individually or as a full pipeline, seeing live row-by-row output
 - **Save and reload** workflows as portable JSON files
 - **Export** any workflow as a plain Python script — the formula syntax is valid Python
@@ -224,13 +224,13 @@ if __name__ == "__main__":
 ```
 
 Start it with `python app.py`, or run `simple-steps` in that folder: the server
-finds `app.py` and serves the `App` it defines. Because `app.py` lists its
-tools, the folder's other `.py` files aren't scanned. Without an `app.py`,
-Simple Steps discovers tools in the folder as before.
+finds `app.py` and serves the `App` it defines. Tools come only from the
+`App`'s `tools=[…]` and the standard set: nothing else in the folder is
+imported. Without an `app.py`, the standard tools are offered.
 
 | `App(…)` setting | default |
 |---|---|
-| `tools` | none listed → the folder's `*.py` files are scanned for tools |
+| `tools` | none: the standard tools only |
 | `resources`, `loaded` | none |
 | `workspace` | the folder `app.py` is in |
 | `title`, `host`, `port` | `"Simple Steps"`, `127.0.0.1`, `8000` (the next free port if taken) |
@@ -285,7 +285,6 @@ That's it — a native window opens with the full Simple Steps UI. The directory
   │  Backend API: http://127.0.0.1:8000/api      │
   │  Workspace:   /Users/you/my-data-project     │
   │    📋 2 project(s), 5 pipeline(s)            │
-  │    📦 packs/ discovered                      │
   └─────────────────────────────────────────────┘
 ```
 
@@ -298,7 +297,7 @@ That's it — a native window opens with the full Simple Steps UI. The directory
 | `--title TEXT` | Custom window title | `Simple Steps — <workspace>` |
 | `--debug` | Enable right-click → Inspect (web dev tools inside the window) | off |
 
-All other flags (`--port`, `--host`, `--workspace`, `--packs`, `--ops`, `--projects-dir`) work identically to the browser version.
+All other flags (`--port`, `--host`, `--workspace`, `--projects-dir`) work identically to the browser version.
 
 #### How it works
 
@@ -320,8 +319,8 @@ simple-steps-local --width 1600 --height 1000
 # Use a workspace other than cwd
 simple-steps-local --workspace ~/shared-team-repo
 
-# With extra packs and a custom title
-simple-steps-local --packs ./my_packs --title "Team Pipeline Tool"
+# With a custom title
+simple-steps-local --title "Team Pipeline Tool"
 
 # Enable dev tools (right-click → Inspect in the window)
 simple-steps-local --debug
@@ -341,9 +340,7 @@ simple-steps --local --port 9000
 | `--dev` | Enable auto-reload on Python file changes | off |
 | `--no-browser` | Don't auto-open the browser on start | off |
 | `--local` | Launch as a native desktop window instead of a browser (requires `pip install simple-steps[desktop]`) | off |
-| `--workspace DIR` | Workspace root (projects/, packs/, ops/ are discovered here) | current directory |
-| `--ops DIR [DIR ...]` | Extra directories to scan for `*_ops.py` plugins | none |
-| `--packs DIR [DIR ...]` | Extra developer pack directories | none |
+| `--workspace DIR` | Workspace root (its `projects/` holds the workflows; its `app.py` is served) | current directory |
 | `--projects-dir DIR` | Directory for saved workflows | `<workspace>/projects` |
 
 ### Examples
@@ -354,9 +351,6 @@ simple-steps --port 9000 --no-browser
 
 # Launch as a native desktop window
 simple-steps --local
-
-# Load extra operations from a custom folder
-simple-steps --ops ./my_custom_ops /shared/team_ops
 
 # Dev mode with auto-reload
 simple-steps --dev
@@ -379,8 +373,6 @@ simple-steps-local --workspace ~/my-analysis-repo --width 1600 --height 1000
 | Variable | Description |
 |---|---|
 | `SIMPLE_STEPS_WORKSPACE` | Workspace root directory (alternative to `--workspace`) |
-| `SIMPLE_STEPS_EXTRA_OPS` | Semicolon-separated list of extra plugin directories (alternative to `--ops`) |
-| `SIMPLE_STEPS_PACKS_DIR` | Semicolon-separated list of extra pack directories (alternative to `--packs`) |
 | `SIMPLE_STEPS_PROJECTS_DIR` | Override the project storage directory (alternative to `--projects-dir`) |
 
 ---
@@ -424,81 +416,55 @@ This runs `npm run build`, patches the API URL for same-origin serving, and copi
 
 ---
 
-## How Operations Work
+## How Tools Work
 
-An **operation** is a plain Python function registered into the backend. Once registered, it:
-
-- Appears in the formula bar autocomplete
-- Shows its parameters in the UI parameter panel
-- Can be wired to the output of any previous step
-
-### Define and register a function
+A **tool** is a plain Python function, decorated and listed in your `App`:
 
 ```python
-# src/my_ops/video_ops.py
+# my_tools.py
+from SIMPLE_STEPS import simple_step_tool
 
-from SIMPLE_STEPS.decorators import simple_step
-
-@simple_step(
-    id="extract_metadata",
-    name="Extract Video Metadata",
-    category="YouTube",
-    operation_type="map",        # called once per row
-)
+@simple_step_tool(name="Extract Video Metadata", category="YouTube")
 def extract_metadata(url: str) -> dict:
     """Fetch title, views, and author for a video URL."""
     return {"title": "...", "views": 9000, "author": "..."}
 ```
 
-The file name ends in `_ops.py` — the backend finds and imports it automatically on startup. No config needed.
-
-### Or register without a decorator
-
 ```python
-# src/my_ops/analysis.py
+# app.py
+from SIMPLE_STEPS import App
+import my_tools
 
-from SIMPLE_STEPS.decorators import register_operation
-
-def sentiment_score(text: str, model: str = "default") -> float:
-    return 0.87
-
-register_operation(sentiment_score, "sentiment", "Sentiment Score", "AI", "map")
+App(tools=[my_tools]).serve()
 ```
 
-Any file containing `register_operation` is auto-imported regardless of its name.
+It then appears in the formula bar's autocomplete and the Environment panel,
+with its parameters read from its signature and `Args:` docstring.
 
 ### Use it in the formula bar
 
+A step is written in core's syntax: the tool, its modifiers in brackets (the
+outermost is the *shape verb*), and the step it reads.
+
 ```
-=extract_metadata.map(url=step1.output)
-=sentiment.map(text=step2.transcript, model="fast")
+=fetch_videos[mod.source()](channel_url="https://youtube.com/@mkbhd")
+=extract_metadata[mod.map()](wf["videos"])
+=extract_metadata(wf["videos"])              # the verb inferred from the tool
+=identity[mod.select(columns=["title"])](wf["meta"])
+=join(wf["meta"], wf["stats"], on="url")
 ```
 
----
-
-## Operation Types
-
-| Type | Engine behaviour | Your function signature |
-|---|---|---|
-| `source` | No input — starts a pipeline | `def fn(param=val) -> list \| DataFrame` |
-| `map` | Called once per row | `def fn(col1, col2, ...) -> dict \| scalar` |
-| `filter` | Keep rows where fn returns `True` | `def fn(col1, col2, ...) -> bool` |
-| `expand` | Explode list results into new rows | `def fn(col1, ...) -> list[dict]` |
-| `dataframe` | Receives the full DataFrame | `def fn(df: pd.DataFrame) -> pd.DataFrame` |
-| `raw_output` | Receives the full DataFrame, returns anything | `def fn(df: pd.DataFrame) -> Any` |
-
----
-
-## Built-in Orchestration Operations
-
-Four built-in `ss_*` operations let you compose other registered functions dynamically:
-
-| Formula | What it does |
+| Verb | What the step does |
 |---|---|
-| `=ss_map(fn="my_op", url=step1.url)` | Apply `my_op` row-by-row |
-| `=ss_filter(fn="my_filter", views=step2.views)` | Keep rows where `my_filter` is `True` |
-| `=ss_expand(fn="my_expander", text=step2.body)` | Explode list results into new rows |
-| `=ss_reduce(fn="my_summary")` | Pass the full DataFrame to `my_summary` |
+| `source` | runs the tool once, with no input |
+| `map` | one call per row of the input |
+| `filter` | keeps the rows where the tool returns `True` |
+| `expand` | one row per item of the list the tool returns |
+| `collapse`, `group` | many rows into one, overall or per group |
+| `table` | the tool gets the whole input table |
+| `select`, `drop`, `rename`, `sort`, `slice`, `distinct`, `widen` | reshape without a tool (`identity`) |
+
+`=[1, 2, 3]`, `={"x": 1}` and `=7` are steps too: values.
 
 ---
 
@@ -508,28 +474,16 @@ Workflows are saved as plain JSON in `projects/`:
 
 ```json
 {
-  "id": "wf-abc123",
+  "format_version": 2,
   "name": "YouTube Analysis",
   "steps": [
-    {
-      "step_id": "step-1",
-      "operation_id": "yt_fetch_videos",
-      "label": "Fetch Videos",
-      "formula": "=yt_fetch_videos.source(channel_url=\"https://youtube.com/@mkbhd\")",
-      "config": {}
-    },
-    {
-      "step_id": "step-2",
-      "operation_id": "yt_extract_metadata",
-      "label": "Extract Metadata",
-      "formula": "=yt_extract_metadata.map(url=step-1.output)",
-      "config": {}
-    }
+    {"name": "videos", "expression": "fetch_videos[mod.source()](channel_url=\"https://youtube.com/@mkbhd\")"},
+    {"name": "meta", "expression": "extract_metadata[mod.map()](wf[\"videos\"])"}
   ]
 }
 ```
 
-The `formula` field is the canonical source of truth — `operation_id` and `config` are derived from it on load.
+Each step is a name and its expression.
 
 ---
 
@@ -548,17 +502,14 @@ Simple_Steps/
 │       ├── build_frontend.py      # Bundle builder (python -m SIMPLE_STEPS.build_frontend)
 │       ├── main.py                # FastAPI app, REST endpoints, SPA serving
 │       ├── core_bridge.py         # The seam to simple-steps-core (contracts, resources)
-│       ├── decorators.py          # @simple_step_tool + register_operation
-│       ├── engine.py              # Execution engine (reference passing)
-│       ├── orchestrators.py       # map / filter / expand / dataframe wrappers
-│       ├── orchestration_ops.py   # Built-in ss_map, ss_filter, ss_expand, ss_reduce
-│       ├── operations.py          # Built-in tools (reshaping, cleaning, sources, file IO)
-│       ├── safe_formula.py        # The formula grammar: parse + validate, no eval
-│       ├── formula_parser.py      # Legacy shape adapter over safe_formula
-│       ├── step_proxy.py          # StepProxy / ColumnProxy for Python-side chaining
+│       ├── application.py         # App: the tools, resources and settings of an app
+│       ├── decorators.py          # @simple_step_tool
+│       ├── operation_formula.py   # The formula parser: core's syntax → core's operation
+│       ├── kernels.py             # Each open workflow, live, as a core workflow
+│       ├── engine.py              # Runs a step; stores its output for /api/data
+│       ├── operations.py          # The standard tools (sources, JSON, cleaning)
 │       ├── models.py              # Pydantic models
 │       ├── file_manager.py        # Workflow JSON persistence
-│       ├── pack_loader.py         # Operation discovery (being retired — see docs)
 │       ├── agent/                 # LangGraph chat agent (optional extra)
 │       └── frontend_dist/         # Bundled production frontend (generated)
 ├── frontend/                      # React + TypeScript app (source)
@@ -633,7 +584,7 @@ Notes:
 | Desktop window: right-click doesn't show Inspect | Launch with `--debug` flag: `simple-steps-local --debug` |
 | Frontend shows "no frontend build found" JSON | Run `python -m SIMPLE_STEPS.build_frontend` to compile the React app into the package |
 | Port already in use | Use `--port` to pick a different port, or `kill $(lsof -t -i:8000)`. Desktop mode auto-picks a free port. |
-| Operations not appearing in the UI | Ensure your file ends in `_ops.py` and is in a scanned directory (see `--ops`) |
+| Tools not appearing in the UI | List their module in `app.py`'s `App(tools=[…])`, and decorate each with `@simple_step_tool` |
 
 ---
 ## Architecture

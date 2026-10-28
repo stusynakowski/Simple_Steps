@@ -22,12 +22,6 @@ def th_scale(n: int, weight: int = 1) -> int:
     return n * 10 * weight
 
 
-@simple_step_tool(id="th_listed", apply="map")
-def th_listed(n: int) -> int:
-    """One more."""
-    return n + 1
-
-
 def _readings() -> grid.Workflow:
     wf = grid.Workflow()
     wf["r"] = pd.DataFrame({"n": [1, 2, 3]})
@@ -75,13 +69,6 @@ def test_plain_calls_are_unchanged():
     """REQ-TOOL-002: a plain call runs the function."""
     assert th_scale(3) == 30
     assert th_scale(3, weight=2) == 60
-    assert th_scale.run_raw(1) == 10
-
-
-def test_apply_keeps_its_list_behaviour():
-    """REQ-TOOL-002: apply="map" maps a list argument, as before."""
-    assert th_listed([1, 2, 3]) == [2, 3, 4]
-    assert th_scale.apply_across_rows([1, 2]) == [10, 20]
 
 
 def test_name_doc_and_signature_are_the_functions():
@@ -89,4 +76,3 @@ def test_name_doc_and_signature_are_the_functions():
     assert th_scale.__name__ == "th_scale"
     assert th_scale.__doc__ == "Ten times n, weighted."
     assert list(inspect.signature(th_scale).parameters) == ["n", "weight"]
-    assert th_scale._raw_func.__name__ == "th_scale"
