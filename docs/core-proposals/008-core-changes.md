@@ -74,7 +74,7 @@ Running them found C20 below, and that K2 is only half fixed.
 The app was moved to `b9f66d5` (core 009: results-only steps, `Output(data,
 states, meta)`, row ids, strict `zip_`, data-hash versions, implicit
 `mod.auto()`, `wf.preview` / `wf.cell`) on 2026-10-21. Plan:
-[`dev_plan/124`](../dev_plan/124-core-009-integration.md).
+[`dev_plan/124`](../archive/dev_plan/124-core-009-integration.md).
 
 - **`SHIM(core §C21)` rewritten**, not deleted: `core_bridge.uncaught_failed`
   now reads `row_states` and `notes` (the ledger is gone). Checked by running

@@ -8,7 +8,7 @@
 > Core's own checklist for the app is §5 of its
 > [`docs/design/cleanup-plan.md`](https://github.com/stusynakowski/simple-steps-core/blob/core-handover/docs/design/cleanup-plan.md).
 > This page maps it onto this repo's files, in order. Cleanup items (L1–L12,
-> stages A–D) are in [`cleanup-map.md`](../cleanup-map.md) Round 4.
+> stages A–D) are in [`cleanup-map.md`](../../cleanup-map.md) Round 4.
 
 ## Where core is
 
@@ -124,7 +124,7 @@ the code:
 | # | Question | Decided |
 |---|---|---|
 | 1 | Which core commit to pin | `core-handover` is merged to core's `main` shortly; pin a `main` commit then |
-| 2 | Step identity | **the name is the identity**; references and hashes use names, and `insert`/`move` change a step's position. **Both `wf["name"]` and `wf[index]` work** in a formula; an index reference is saved by name. *Core today:* `k[0]`, `k[-1]` and `k.step(0)` work, but `wf[0]` in a formula is refused (*"a step reference takes a step id (a string), got 0"*): [008 K30](../core-proposals/008-core-changes.md#k30-wfindex-in-a-formula-saved-by-name) |
+| 2 | Step identity | **the name is the identity**; references and hashes use names, and `insert`/`move` change a step's position. **Both `wf["name"]` and `wf[index]` work** in a formula; an index reference is saved by name. *Core today:* `k[0]`, `k[-1]` and `k.step(0)` work, but `wf[0]` in a formula is refused (*"a step reference takes a step id (a string), got 0"*): [008 K30](../../core-proposals/008-core-changes.md#k30-wfindex-in-a-formula-saved-by-name) |
 | 3 | Where the parser lives | in the app (accepted) |
 | 4 | Delete L4 and L10 before migrating | yes |
 | 5 | Old kernel snapshots | discard; the kernel re-runs |

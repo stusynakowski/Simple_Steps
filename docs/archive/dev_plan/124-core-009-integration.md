@@ -3,7 +3,7 @@
 > Status: proposed, 2026-10-21. App pinned at core `9a86a0d`; target
 > `b9f66d5` (core `origin/main`). Everything marked **verified** was found by
 > running the app's backend tests against `b9f66d5`, or by running core
-> directly, on 2026-10-20/21. Specs: [`spec/014`](../spec/014-output-state-and-wiring.md)
+> directly, on 2026-10-20/21. Specs: [`spec/014`](../../spec/014-output-state-and-wiring.md)
 > (what the grid shows). Core's own notes:
 > [`009-status.md`](../../external/simple-steps-core/docs/core-proposals/009-status.md),
 > [`ui-context.md`](../../external/simple-steps-core/docs/ui-context.md).
@@ -282,7 +282,7 @@ identical result leaves them fresh.
 
 ## Asks for core
 
-Record in [`core-proposals/008-core-changes.md`](../core-proposals/008-core-changes.md).
+Record in [`core-proposals/008-core-changes.md`](../../core-proposals/008-core-changes.md).
 
 1. **`wf.cell(...)["inputs"][].state`** returns step statuses
    (`"completed"`), not cell states (`"known"`) — contradicts 009 §4.

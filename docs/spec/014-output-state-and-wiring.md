@@ -10,7 +10,7 @@ per cell, data-hash versions.
 The working mockup is the "Cell State Mockup" artifact. It predates §8 (the
 selection popover) and still shows the earlier double-click strip.
 
-Implementation order: [dev_plan/124](../dev_plan/124-core-009-integration.md).
+Implementation order: [dev_plan/124](../archive/dev_plan/124-core-009-integration.md).
 Core integration comes first; this spec builds on it.
 
 ## The problem

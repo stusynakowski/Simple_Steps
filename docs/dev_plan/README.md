@@ -3,17 +3,15 @@
 What we are changing next. Only active plans live here; when one is done or
 superseded, what it decided moves to `../system_design/` or `../spec/` and the
 plan moves to [`../archive/dev_plan/`](../archive/dev_plan/). The map of all
-docs is [`../README.md`](../README.md).
+docs is [`../README.md`](../README.md). Code comments cite plans by number
+(`dev_plan/124 phase 2`); a number not here is in `../archive/dev_plan/`.
 
 | File | Status | What it covers |
 |---|---|---|
-| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core 0.2.0 and its kernel: what's done (§8), what's open (§3.5 save/load), what follows as core lands |
+| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core 0.2.0 and its kernel: what's done (§8), what's open (§3.5 save/load), what follows as core lands; the earlier app-side steps and the owner's decisions (§9) |
 | [`120-literals-and-references.md`](./120-literals-and-references.md) | rule, partly built | Only `wf["step"]` is a reference; everything else is a literal. The canonical `tool[modifiers](input, arguments)` form. Cited by `operation_formula.py` |
-| [`121-ui-and-core-changes.md`](./121-ui-and-core-changes.md) | partly done | Formula-bar and reference-picking changes U1–U9, with evidence |
 | [`122-skeleton-complete.md`](./122-skeleton-complete.md) | mostly built | Object model, resources, the agent, custom cell types. Cited by `application.py`, `resources.py`, `cell_types.py`, `agent/proposals.py` |
-| [`123-tool-picker-discrepancy.md`](./123-tool-picker-discrepancy.md) | **open** | The formula-bar autocomplete writes the retired `tool.type(` form; the Formula panel writes core syntax |
-| [`124-core-009-integration.md`](./124-core-009-integration.md) | largely superseded | Core 009 and the spec-014 grid, in six phases |
-| [`125-migrate-to-core-kernel.md`](./125-migrate-to-core-kernel.md) | decided, in progress | The kernel move's costs, order, the thin formula parser, and the owner's decisions of 2026-10-27 |
+| [`126-formula-ui.md`](./126-formula-ui.md) | **active** | The formula UI: what each path writes today (run), the open items F1–F16 (writing formulas, references and selection, showing cells), and decision D1. Replaces the open parts of 121, 123, 124 and 125 |
 | [`200-shell-infrastructure-plan.md`](./200-shell-infrastructure-plan.md) | active | The "Jupyter-on-VS-Code" shell: S0 done, phase A mostly done |
 
 ## One-paragraph summary

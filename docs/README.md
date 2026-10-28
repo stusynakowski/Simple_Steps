@@ -35,6 +35,7 @@ then come here.
 | | What | Superseded by |
 |---|---|---|
 | `archive/dev_plan/100–119` | The pre-core formula language, grammar, shapes, extension model, early referencing and console plans (May–Oct 2026) | `system_design/10–12`, `dev_plan/120`, core's spec |
+| `archive/dev_plan/121, 123–125` | The formula-bar and picking changes, the two tool pickers, core 009 and the kernel move (Oct 2026); code still cites 121 and 124 by number | `dev_plan/126` (open UI work), `dev_plan/core_migration.md` §9 (history, decisions) |
 | `archive/system_design/01–08` | Architecture before the engine moved to core (April 2026) | `system_design/10–12` |
 | `archive/spec/000–008` | The January UI and data-model specs; no REQ ID in them is cited by a test | `spec/009–014` |
 | `archive/introduction.md` | The first product statement | `why-we-are-building-this.md` |
