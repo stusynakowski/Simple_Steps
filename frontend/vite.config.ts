@@ -33,7 +33,8 @@ export default defineConfig({
     fs: { allow: ['..'] },
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        // simple-steps-dev sets the backend it actually started (8000 may be taken).
+        target: process.env.SIMPLE_STEPS_BACKEND || 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
     },

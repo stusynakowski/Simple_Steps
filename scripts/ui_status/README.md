@@ -41,6 +41,7 @@ what to try and what the decision expects.
 | `02-cell-states` | R5, R6, D7 | run all: known, failed, null, absent (`stacked.extra`), the empty step; declare `staged` without running; edit `readings` and watch `doubled` go stale |
 | `03-references` | D1, D5, D6, R3, R7, F11 | with the caret in `reader`, pick a column, rows, a cell, a block from `readings` |
 | `04-lineage` | D8, R9 | the index after filter, slice, sort, distinct, expand, collapse, stack, join, and a chain |
+| `05-staged` | R6 | **don't Run All.** Open it: every step is staged, with core's reason its rows aren't known. Run only `readings` (⌘/Ctrl+Enter): `doubled` and `by_n` show 4 pending rows, `big_only` and `top2` 4 `maybe` rows (dashed: a filter or slice may drop them), `split` and `per_ward` a typed header and core's reason |
 
 ## Adding a check
 

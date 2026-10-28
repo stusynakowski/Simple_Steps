@@ -332,8 +332,9 @@ export default function OperationColumn({
     hasUncommittedFormula ||
     step.status === 'running' ||
     isScheduledInPipeline);
-  // Core's reason a staged step's rows aren't known yet (its plan, R6).
-  const planNote = step.plan?.rows?.certainty === 'unknown' ? step.plan.rows.because : undefined;
+  // Core's reason a staged step's rows aren't exactly known yet (its plan, R6):
+  // unknown ("its input doesn't know its row count") or bounded ("one row per group").
+  const planNote = step.plan?.rows && step.plan.rows.certainty !== 'exact' ? step.plan.rows.because : undefined;
 
   // Handler for Formula-based updates (Toolbar Input)
   // The formula bar is the canonical write path. Everything else is derived from it.

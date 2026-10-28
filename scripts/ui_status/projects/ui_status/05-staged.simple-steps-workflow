@@ -1,0 +1,75 @@
+{
+  "format_version": 2,
+  "id": "05-staged",
+  "name": "05 Staged output",
+  "meta": {
+    "about": "R6: what each step shows before it runs: core's plan (rows, columns, types) as pending or maybe cells, or the reason the rows aren't known.",
+    "plan": "docs/dev_plan/126-formula-ui.md"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"ward\": [\"A\", \"B\", \"A\", \"C\"], \"n\": [10, 20, 30, 40]}')",
+      "meta": {
+        "label": "readings",
+        "notes": "The input. Open the workflow and run ONLY this step: Cmd/Ctrl+Enter in its formula bar (not Run All). Before it runs, every step below is staged with 'rows not known yet'."
+      }
+    },
+    {
+      "name": "doubled",
+      "expression": "double[mod.map()](wf[\"readings\"])",
+      "meta": {
+        "label": "doubled",
+        "notes": "map: one result per row. After readings runs: exactly 4 rows of empty pending cells under 'value int | None'."
+      }
+    },
+    {
+      "name": "big_only",
+      "expression": "is_big[mod.filter()](wf[\"readings\"])",
+      "meta": {
+        "label": "big_only",
+        "notes": "filter: keeps some rows. After readings runs: 4 'maybe' cells per column (dashed: the row may not be kept), columns ward str, n int."
+      }
+    },
+    {
+      "name": "top2",
+      "expression": "identity[mod.slice(stop=2)](wf[\"readings\"])",
+      "meta": {
+        "label": "top2",
+        "notes": "slice: at most the rows it reads. Planned as 'maybe' cells, like a filter."
+      }
+    },
+    {
+      "name": "by_n",
+      "expression": "identity[mod.sort(by=\"n\", ascending=False)](wf[\"readings\"])",
+      "meta": {
+        "label": "by_n",
+        "notes": "sort: the same 4 rows, reordered: exactly 4 pending rows."
+      }
+    },
+    {
+      "name": "split",
+      "expression": "split_in_two[mod.expand()](wf[\"readings\"])",
+      "meta": {
+        "label": "split",
+        "notes": "expand: how many rows each splits into is only known by running. Stays 'rows not known yet: expand: how many items split_in_two returns per row is only known by running'."
+      }
+    },
+    {
+      "name": "per_ward",
+      "expression": "add_up[mod.collapse(by=\"ward\")](wf[\"readings\"])",
+      "meta": {
+        "label": "per_ward",
+        "notes": "collapse(by=): one row per group. After readings runs: header ward str, value int, and 'rows not known yet: one row per group; the groups come from the data'."
+      }
+    },
+    {
+      "name": "after_split",
+      "expression": "double[mod.map()](wf[\"split\"], n=wf[\"split\"][cols[\"value\"]])",
+      "meta": {
+        "label": "after_split",
+        "notes": "Reads split's value column as double's n: n=wf[\"split\"][cols[\"value\"]] (a column as an argument). Before split runs: 'rows not known yet: its input split doesn't know its row count yet'. Run it (Cmd/Ctrl+Enter): split runs first, then 8 doubled values. Without the n= argument it is refused: double() needs 'n', which 'split' does not have (it has value)."
+      }
+    }
+  ]
+}

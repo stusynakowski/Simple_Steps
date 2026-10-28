@@ -1021,10 +1021,14 @@
   font-style: italic;
 }
 
-/* Core's cell states (dev_plan/126 R5, D7). pending: not run, left empty;
+/* Core's cell states (dev_plan/126 R5, D7). pending: not run, a light blue
+   cell holding its type, <int>;
    failed: tinted, the error in the tooltip; stale: dimmed, its value kept;
    absent: grey, no value here at all; a known null: a dim "null". */
-.grid-cell.cell-pending { background: #fcfcfc; }
+.grid-cell.cell-pending { background: #eef4fc; }
+/* maybe: planned, but a filter or slice may drop the row. */
+.grid-cell.cell-maybe { background: #eef4fc; border-bottom-style: dashed; }
+.cell-staged-type { color: #7f9cc4; font-family: Menlo, Monaco, Consolas, monospace; font-size: 0.7rem; }
 .grid-cell.cell-failed { background: #ffebee; color: #b71c1c; }
 .grid-cell.cell-stale { color: #9a9a9a; }
 .grid-cell.cell-absent { background: #e4e4e4; }

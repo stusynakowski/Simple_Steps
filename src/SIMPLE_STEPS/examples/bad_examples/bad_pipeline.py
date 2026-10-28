@@ -39,7 +39,7 @@ def build_corrected() -> Kernel:
     wf["quoted_name"] = double_n[mod.map()](wf["readings"])
     wf["missing_step"] = double_n[mod.map()](wf["readings"])
     wf["two_inputs"] = stack(wf["readings"], wf["more"])
-    wf["row_selection"] = identity[mod.slice(stop=2)](wf["readings"])
+    wf["row_selection"] = wf["readings"][0:2]
 
     # tools and modifiers
     wf["unknown_tool"] = double_n[mod.map()](wf["readings"])

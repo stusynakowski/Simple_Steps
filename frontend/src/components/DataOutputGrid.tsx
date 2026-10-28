@@ -63,6 +63,7 @@ function cellTitle(cell?: Cell): string {
   const shown = cell.cell_type ? (cell.summary ?? cell.display_value) : cell.display_value;
   switch (cell.state) {
     case 'pending': return `not run yet${cell.type ? ` · ${cell.type}` : ''}`;
+    case 'maybe': return `not run yet; this row may not be kept${cell.type ? ` · ${cell.type}` : ''}`;
     case 'failed': return `failed: ${cell.error ?? 'no reason given'}`;
     case 'stale': return `${shown} · out of date`;
     case 'absent': return 'absent: no value here';
@@ -795,8 +796,10 @@ function Grid({
                     }
                   }}
                 >
-                  {cell?.state === 'pending'
-                    ? (stagedCellMode !== 'idle' ? <span className="cell-wait-spinner" /> : '')
+                  {cell?.state === 'pending' || cell?.state === 'maybe'
+                    ? (stagedCellMode !== 'idle'
+                      ? <span className="cell-wait-spinner" />
+                      : <span className="cell-staged-type">{`<${cell.type ?? 'any'}>`}</span>)
                     : cell?.state === 'known' && cell.value === null && !cell.cell_type
                       ? <span className="cell-null">null</span>
                       : cell ? <CellContent cell={cell} /> : ''}
@@ -805,7 +808,7 @@ function Grid({
             })}
           </div>
         ))}
-        {rows.length === 0 && planNote && (
+        {(cells ?? []).length === 0 && planNote && (
           <div className="grid-plan-note" role="note">rows not known yet: {planNote}</div>
         )}
       </div>

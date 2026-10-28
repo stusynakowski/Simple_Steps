@@ -127,7 +127,8 @@ report("F3  highlighting knows wf[\"x\"]",
 
 # ── References and selection ──────────────────────────────────────────────
 
-for item, formula in [("D1  parser: a column", 'double[mod.map()](wf["readings"][cols["n"]])'),
+for item, formula in [("D1  parser: a column as an argument", 'double[mod.map()](wf["readings"], n=wf["readings"][cols["n"]])'),
+                      ("D1  parser: a selection as a step", 'wf["readings"][0:2][cols["n"]]'),
                       ("D1  parser: rows", 'wf["readings"][1:3]'),
                       ("D1  parser: a cell as an argument", 'double[mod.map()](wf["readings"], n=wf["readings"][0][cols["n"]])'),
                       ("F11 parser: wf[0]", 'double[mod.map()](wf[0])')]:
