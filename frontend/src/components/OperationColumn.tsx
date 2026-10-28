@@ -34,6 +34,8 @@ interface OperationColumnProps {
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
   onRun: (id: string) => void;
+  /** Declare the workflow, running nothing (Enter in the formula bar). */
+  onDeclare?: () => void;
   onPreview?: (id: string) => void;
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
@@ -73,6 +75,7 @@ export default function OperationColumn({
   onActivate,
   onUpdate,
   onRun,
+  onDeclare,
   onPreview,
   onDelete,
   onMinimize,
@@ -498,6 +501,7 @@ export default function OperationColumn({
               stepIndex={stepIndex}
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
+              onDeclare={onDeclare}
               onDelete={() => onDelete(step.id)}
               openPanels={openPanels}
               onTogglePanel={togglePanel}

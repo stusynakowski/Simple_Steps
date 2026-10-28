@@ -182,21 +182,20 @@ exist, opened on demand. What a row pick refers to is D8.
 | 2026-10-28 | **F1** (and F2's list) | The autocomplete writes through the panel's writer, `formatFormula(partsForTool(tool, type, previous step))`, so it gives `=is_big(wf["readings"])` (core's implicit auto), not `=is_big.map(`. It lists tools only, as the panel does; the badge no longer shows a `.` | a throwaway vitest (type `=is_`, pick, check the formula and the parts sent), deleted after; to try in the browser: 01/pick_a_tool |
 | 2026-10-28 | the index header | reads `#` (header, tooltip, hover, `colLabel`). Its values are still screen positions: R9 | — |
 | 2026-10-28 | **D4** | `ToolEditor` freezes while the formula doesn't parse: core's reason shown, inputs and modifiers greyed in a disabled fieldset, and `write()` refuses every edit but a tool choice. Choosing a tool starts the formula over (`partsForTool(tool, type, previous step)`), replacing the text that doesn't parse; the picker shows no tool, so any choice fires | a throwaway vitest (freeze, an argument edit writes nothing, a tool choice writes `=reduce(wf["r"])`); it failed with `write()`'s guard removed, so the guard, not only the fieldset, holds; deleted after |
+| 2026-10-28 | **D3** | **Enter declares, ⌘/Ctrl+Enter runs.** Enter syncs the workflow at once (`useWorkflow.declareWorkflow`: `/api/workflow/sync`, nothing run; core's stale marks applied), where it used to run the step. ⌘/Ctrl+Enter is a new Monaco command (`KeyMod.CtrlCmd \| KeyCode.Enter`, 2048 \| 3, checked in the installed package) that runs it. Passed through both `OperationColumn` callers (`MainLayout`, `DetachedStepWindow`); the Run button's tooltip names the key. Edits were already declared 300 ms after each change; Enter now does it at once | a throwaway vitest (a stand-in editor: Enter calls declare, not run; ⌘Enter runs), deleted after. Monaco doesn't load in jsdom, so the real keys are to try in the browser: 01/doubled |
 
-Checks after: tsc clean, vitest 149/149, pytest 1 failed (the known `test_select_cell`, after R1/F1; no backend change since), preflight clean (bundle rebuilt), `scripts/ui_status/status.py` 12 open / 4 changed.
+Checks after: tsc clean, vitest 149/149, pytest 1 failed (the known `test_select_cell`, after R1/F1; no backend change since), preflight clean (bundle rebuilt), `scripts/ui_status/status.py` 11 open / 5 changed (after D3; tsc clean, vitest 149/149, bundle rebuilt, preflight clean).
 
 R1 made the panel see each keystroke, so a formula that doesn't parse
 showed the last one that did, still editable; D4's freeze closed that.
 
-**Still on Enter (D3).** Enter still runs the step; it no longer commits
-anything, since there is nothing left to commit.
 
 ## Decisions (owner, 2026-10-28)
 
 | | Question | Decided | What it means for the work |
 |---|---|---|---|
 | D1 | What a pick of columns, rows or cells writes | **Core's notation, inline**: `wf["r"][0:2][cols["n"]]` where the pick is used, no select step | F6: `utils/selection.ts` writes the notation, and `selectionFormula` / the select-step insertion (`onInsertStepBefore`) go. F7: the parser accepts it. Unblocks F8–F10, R3, R7 |
-| D3 | What Enter does | **Enter declares the step** (instantiates it, so core checks and plans it) **without running the operation. ⌘/Ctrl+Enter declares and runs** | Enter → `/api/workflow/sync` (declare only), and the step shows as staged with its plan (R6). ⌘Enter → run. Today Enter runs (`StepToolbar.tsx:430`). The panel follows every change that parses, not only Enter (R1) |
+| D3 | What Enter does | **Enter declares the step** (instantiates it, so core checks and plans it) **without running the operation. ⌘/Ctrl+Enter declares and runs** | Built 2026-10-28 (Progress). What a declared step shows (staged, its plan, invalid with core's reason) comes with R6: the sync already returns each step's state and problems, but a `Step` has no field for them yet |
 | D4 | The panel while the formula doesn't parse | **Freeze it**, with core's reason. **Its tool picker still works: choosing a tool rewrites the formula for that tool. Any state change in the panel re-enters the whole formula** (owner, 2026-10-28) | Built 2026-10-28 (Progress). A tool chosen in the autocomplete does the same, through F1's writer |
 | D5 | What opens the selection window | **Only the corner control.** A click never opens it | No change to today's behaviour. R4 is closed: a click draws the outline only |
 | D6 | How references and selections are drawn | **Dashed = a reference** (the cells a formula's reference covers, in the source step's colour). **Bold = the selection** | Two separate marks, and they can overlap. R3: the formula's reference box and the source grid's box are dashed in the same colour. The selection is bold (today's solid outline) |

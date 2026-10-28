@@ -174,7 +174,7 @@ export default function useWorkflow() {
    * edit, to learn which later steps are out of date; when a workflow becomes
    * active, so its kernel comes back from disk with its outputs.
    */
-  const scheduleSync = useCallback(() => {
+  const scheduleSync = useCallback((delay = 300) => {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       syncTimer.current = null;
@@ -186,9 +186,12 @@ export default function useWorkflow() {
           applyStepStates(steps);
         })
         .catch(() => {});
-    }, 300);
+    }, delay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyStepStates, showOutputs]);
+  /** Enter in a formula bar: declare the workflow now (core checks and plans
+   *  every step), running nothing (dev_plan/126 D3). */
+  const declareWorkflow = useCallback(() => scheduleSync(0), [scheduleSync]);
   // A workflow becoming active (a tab switch, one opened): bring its kernel back.
   const activeWorkflowId = workflow.id;
   useEffect(() => {
@@ -1172,7 +1175,8 @@ export default function useWorkflow() {
     dispatchCommand,
     consoleStepMap,
     resolveStepId,
-    runStep, 
+    runStep,
+    declareWorkflow, 
     previewStep,
     runPipeline,
     pausePipeline,

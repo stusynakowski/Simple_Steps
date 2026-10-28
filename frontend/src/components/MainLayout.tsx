@@ -123,6 +123,7 @@ export default function MainLayout() {
     insertStep,
     updateStep,
     runStep,
+    declareWorkflow,
     runPipeline,
     pausePipeline,
     stopPipeline,
@@ -838,6 +839,7 @@ export default function MainLayout() {
                   onActivate={() => toggleStep(step.id)}
                   onUpdate={(id, updates) => updateStep(id, updates)}
                   onRun={runStep}
+                  onDeclare={declareWorkflow}
                   onPreview={previewStep}
                   onPause={id => console.log('Pause', id)}
                   onDelete={deleteStep}
@@ -1060,6 +1062,7 @@ export default function MainLayout() {
               onClose={() => closeDetachedWindow(dw.id)}
               onUpdate={(id, updates) => updateStep(id, updates)}
               onRun={runStep}
+                  onDeclare={declareWorkflow}
               onPreview={previewStep}
               onDelete={deleteStep}
             />

@@ -31,6 +31,8 @@ interface StepToolbarProps {
   stepIndex?: number;
   availableOperations?: OperationDefinition[];
   onRun?: (id: string) => void;
+  /** Enter in the formula bar: declare the step, running nothing. */
+  onDeclare?: () => void;
   onDelete?: (id: string) => void;
   onEdit?: (id: string) => void;
   onFormulaChange?: (id: string, formula: string, parsed: ParsedFormula) => void;
@@ -55,6 +57,7 @@ export default function StepToolbar({
   stepIndex = 0,
   availableOperations = [], 
   onRun, 
+  onDeclare,
   onDelete, 
   onFormulaChange,
   previousStep = null,
@@ -358,7 +361,7 @@ export default function StepToolbar({
         <button 
           className="btn-icon" 
           onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }} 
-          title={step.status === 'running' ? 'Stop' : 'Run'}
+          title={step.status === 'running' ? 'Stop' : 'Run (⌘/Ctrl+Enter in the formula bar)'}
           data-testid="btn-run"
           style={{ 
             color: step.status === 'running' ? '#e74c3c' : '#2ecc71',
@@ -433,6 +436,10 @@ export default function StepToolbar({
               handleInputChange(fakeEvent);
             }}
             onEnter={() => {
+              setShowSuggestions(false);
+              onDeclare?.();
+            }}
+            onModEnter={() => {
               setShowSuggestions(false);
               onRun?.(step.id);
             }}
