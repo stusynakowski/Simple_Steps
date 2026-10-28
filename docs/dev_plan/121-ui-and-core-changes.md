@@ -159,7 +159,9 @@ Not built yet — a **subset of rows and columns together**:
 - **Reference chips** in the formula bar, each in its own colour, matching a
   box drawn around the cells it covers (§1.4).
 
-What it waits on: core taking rows and columns in one step — either one
+*Unblocked (2026-10-27):* core now takes `wf["r"][0][cols["w"]]` and `wf["r"][0:2][cols["n"]]` directly, as a step or an argument; see [125](125-migrate-to-core-kernel.md#the-formula-parser-central-and-thin) for the notation and the parser's reference spans. The text below is the earlier plan.
+
+What it waited on: core taking rows and columns in one step — either one
 `select(columns=…, rows=…)` (core 005 **K9**) or letting the tool-less verbs
 (`select`, `slice`, `sort`, …) stack in one step. Until then a cell or block
 would be two steps, `slice` then `select`. When it lands, a cell pick writes
