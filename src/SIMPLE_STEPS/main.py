@@ -190,8 +190,7 @@ async def api_console_eval(
     This is the read-only half of the console (see
     ``docs/dev_plan/118-console-and-gui-parity.md`` §5). It runs through
     :mod:`safe_formula`, the AST-allowlist interpreter whose calls must
-    target a registered operation — **not** ``eval_engine``, which is
-    ``exec()`` and gated behind ``eval_mode``. That is what lets the
+    target a registered operation. That is what lets the
     console be "an interactive Python session narrowed to Simple Steps"
     without handing the browser arbitrary code execution.
 
@@ -563,8 +562,7 @@ async def list_modifiers():
     from what core runs (core react-api.md, ``GET /modifiers``).
     """
     from simple_steps_core.grid import modifier_catalog
-    from .settings import get_settings
-    return {"engine": get_settings().engine, "modifiers": modifier_catalog()}
+    return {"modifiers": modifier_catalog()}
 
 
 @app.get("/api/resources")
@@ -616,90 +614,6 @@ async def declare_resource(payload: _ResourceDeclaration):
                 "declaration": declare(payload.name, payload.definition)}
     except ResourceError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-
-
-# --- 1.1 Diagnostics / Debug ---
-@app.get("/api/debug/registry")
-async def debug_registry():
-    """
-    Returns the raw registry state for debugging — shows every registered
-    operation ID, category, type, and the number of params.
-    Useful for diagnosing 'function not registered' errors.
-    """
-    from .decorators import OPERATION_REGISTRY, DEFINITIONS_LIST
-    loader = get_loader()
-    return {
-        "registered_operations": {
-            op_id: {
-                "label": entry["definition"].label,
-                "category": entry["category"],
-                "type": entry["type"],
-                "tier": entry.get("tier", "system"),
-                "source_file": entry.get("source_file", "<built-in>"),
-                "params_count": len(entry["definition"].params),
-                "func_name": entry["func"].__name__,
-                "func_module": getattr(entry["func"], "__module__", "unknown"),
-            }
-            for op_id, entry in OPERATION_REGISTRY.items()
-        },
-        "definitions_count": len(DEFINITIONS_LIST),
-        "ops_by_tier": loader.get_ops_by_tier() if loader else {},
-        "developer_pack_dirs": [os.path.abspath(p) for p in _DEVELOPER_PACK_DIRS],
-    }
-
-
-# --- 1.3 Pack Loader Status ---
-@app.get("/api/loader")
-async def loader_status():
-    """
-    Returns the three-tier pack loader state — what was loaded from
-    where, organized by tier (system / developer_pack / project).
-    """
-    loader = get_loader()
-    if not loader:
-        return {"error": "Pack loader not initialized"}
-
-    by_tier = loader.get_ops_by_tier()
-    results = loader.get_results()
-    return {
-        "ops_by_tier": by_tier,
-        "total_operations": sum(len(ops) for ops in by_tier.values()),
-        "load_results": [
-            {
-                "file": r.file_path,
-                "tier": r.tier.value,
-                "success": r.success,
-                "ops_registered": r.ops_registered,
-                "error": r.error,
-            }
-            for r in results
-        ],
-    }
-
-
-# --- 1.4 Load Project Ops On-Demand ---
-@app.post("/api/projects/{project_id}/load-ops")
-async def load_project_ops(project_id: str):
-    """
-    Scan a project's directory recursively and register any @simple_step
-    functions found.  Call this when switching projects or after adding
-    new .py files to a project.
-    """
-    loader = get_loader()
-    if not loader:
-        raise HTTPException(status_code=500, detail="Pack loader not initialized")
-
-    project_dir = os.path.join(os.path.abspath(PROJECTS_DIR), project_id)
-    if not os.path.isdir(project_dir):
-        raise HTTPException(status_code=404, detail=f"Project '{project_id}' not found")
-
-    results = loader.load_project(project_dir)
-    return {
-        "project_id": project_id,
-        "files_scanned": len(results),
-        "ops_registered": [op for r in results if r.success for op in r.ops_registered],
-        "errors": [{"file": r.file_path, "error": r.error} for r in results if not r.success],
-    }
 
 
 # --- 1.5 Project / Pipeline Management ---
@@ -909,7 +823,7 @@ async def read_settings():
 async def write_settings(body: dict = Body(...)):
     """
     Update runtime settings. Example:
-      POST /api/settings  {"eval_mode": true}
+      POST /api/settings  {"result_store": "parquet"}
     """
     try:
         updated = update_settings(**body)

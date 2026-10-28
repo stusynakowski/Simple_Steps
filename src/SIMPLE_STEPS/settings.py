@@ -3,12 +3,7 @@ Simple Steps — Runtime Settings
 ================================
 Controls runtime behavior flags. These are in-memory settings that can be
 toggled via the API at runtime.
-
-⚠️  EVAL_MODE is dangerous — it allows arbitrary Python code execution
-    from the formula bar. Only enable in trusted development environments.
 """
-
-import os
 
 from pydantic import BaseModel
 from typing import Dict, Any, Literal
@@ -17,30 +12,10 @@ from typing import Dict, Any, Literal
 class SimpleStepsSettings(BaseModel):
     """Runtime settings for the Simple Steps engine."""
 
-    # ── Eval Mode ────────────────────────────────────────────────────────
-    # When True, formulas starting with =!  are executed as raw Python via
-    # exec/eval. The code has access to:
-    #   - df_in   : the input DataFrame (from the previous step)
-    #   - pd      : pandas
-    #   - np      : numpy
-    #   - step_map: resolved references dict
-    #   - Any imported module the user chooses
-    #
-    # This is essentially Python's eval() — treat it with the same caution.
-    eval_mode: bool = False
     # Controls where step outputs are persisted by default:
     # - memory: in-process RAM only
     # - parquet: RAM + parquet files under SIMPLE_STEPS_RESULT_CACHE_DIR
     result_store: Literal['memory', 'parquet'] = 'memory'
-    # Which engine runs a step:
-    # - grid:   simple_steps_core's grid model (the default; see grid_runner.py)
-    # - legacy: the app's own orchestrators — an escape hatch until they are
-    #           deleted (SIMPLE_STEPS_ENGINE=legacy)
-    # Core verb operations (=select(...), =map(tool=...)) always run on grid.
-    engine: Literal['legacy', 'grid'] = (
-        'legacy' if os.environ.get('SIMPLE_STEPS_ENGINE', '').strip().lower() == 'legacy'
-        else 'grid'
-    )
 
     class Config:
         # Allow mutation so we can toggle at runtime

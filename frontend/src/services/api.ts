@@ -775,7 +775,6 @@ export async function writeWorkspaceFile(path: string, content: string): Promise
 // --- Settings ---
 
 export interface SimpleStepsSettings {
-    eval_mode: boolean;
     result_store: 'memory' | 'parquet';
 }
 

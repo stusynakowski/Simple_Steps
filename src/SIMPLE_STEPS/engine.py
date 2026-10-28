@@ -729,15 +729,8 @@ def _step_result_metrics(result: Any) -> dict:
 
 
 def _runs_on_grid(op_id: str) -> bool:
-    """Core verb operations always run on the grid; tools do when the
-    ``engine`` setting says so."""
-    entry = OPERATION_REGISTRY.get(op_id) or {}
-    if entry.get("type") == "verb":
-        return True
-    if not entry:
-        return False
-    from .settings import get_settings
-    return get_settings().engine == "grid"
+    """Every registered operation runs on core's grid."""
+    return op_id in OPERATION_REGISTRY
 
 
 def run_operation(
@@ -811,16 +804,6 @@ def run_operation(
         out_ref = save_dataframe(result_df, session_id=session_id, store_mode=result_store)
         return out_ref, {"rows": len(result_df), "columns": list(result_df.columns)}
 
-    # 2b. Eval mode: explicit _eval operation or fallback for unregistered ops
-    if op_id == '_eval':
-        from .eval_engine import run_eval
-        code = config.get('code', '')
-        orchestrator_type = config.get('_orchestrator', None)
-        print(f"⚡ Running eval mode (orchestrator={orchestrator_type})")
-        result_df = run_eval(code, df_in, step_map, orchestrator_type, session_id=session_id)
-        out_ref = save_dataframe(result_df, session_id=session_id, store_mode=result_store)
-        return out_ref, {"rows": len(result_df), "columns": list(result_df.columns)}
-
     # 2c. Core's grid model. Returns None for what core cannot run yet
     # (a table tool whose table isn't its first parameter —
     # core_bridge.needs_whole_frame_shim), which then
@@ -839,18 +822,6 @@ def run_operation(
     # 3. Find Operation
     op_def = OPERATION_REGISTRY.get(op_id)
     if not op_def:
-        # ── Eval-mode fallback: if the operation isn't registered and eval_mode
-        # is on, treat the raw formula (everything after '=') as Python code.
-        from .settings import get_settings
-        if get_settings().eval_mode and formula:
-            from .eval_engine import run_eval
-            # Strip the leading '=' and optional orchestration prefix
-            code = formula.lstrip('=').strip()
-            orchestrator_type = config.get('_orchestrator', None)
-            print(f"⚡ Eval-mode fallback for unregistered op '{op_id}' — running raw formula as code")
-            result_df = run_eval(code, df_in, step_map, orchestrator_type, session_id=session_id)
-            out_ref = save_dataframe(result_df, session_id=session_id, store_mode=result_store)
-            return out_ref, {"rows": len(result_df), "columns": list(result_df.columns)}
         raise ValueError(f"Operation '{op_id}' not registered")
     
     func = op_def['func']
