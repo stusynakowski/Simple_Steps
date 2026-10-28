@@ -297,7 +297,7 @@ read.
    `WHY_WE ARE_BUILDING_THIS.md`: users don't trust what they can't see,
    and the agent has to be able to propose *which* resource a step uses.
 
-**Ask of core**: written up as [`core-proposals/006-mvp-requests.md`](../core-proposals/006-mvp-requests.md)
+**Ask of core**: written up as [`core-proposals/006-mvp-requests.md`](../core-proposals/archive/006-mvp-requests.md)
 (R1–R5), checked against core `66afce2`. In short: resource types built from literals
 only; marked methods as bound tools (`res["db"].query`); typed resource parameters
 on unbound tools, checked at declaration; a resource reference in operation
@@ -472,7 +472,7 @@ with, and opening it elsewhere knows what to ask for:
 
 - **S2.1** (core) the grid-side resource model above, porting
   `ResourceContainer` / `ResourceSpec` where they fit
-  ([`core-proposals/006-mvp-requests.md`](../core-proposals/006-mvp-requests.md) R1–R4).
+  ([`core-proposals/006-mvp-requests.md`](../core-proposals/archive/006-mvp-requests.md) R1–R4).
 - **S2.2** `simple_step_resource` as a class decorator (§2.4): constructor
   literals = settings, methods marked `@simple_step_tool` = bound tools
   (unmarked methods are never exposed), docstrings = their contracts, `shared=` for one app-wide instance. The current function form

@@ -8,7 +8,7 @@ Set this manually before using an agent:
 - Phase: CLEANUP
 
 ## Phase edit rules (hard guardrails)
-- IDEA: may edit only `docs/introduction.md` and `docs/context.md`
+- IDEA: may edit only `docs/why-we-are-building-this.md` and `docs/context.md`
 - SPEC: may edit only `docs/spec/**`, `docs/adr/**`, `docs/core-proposals/**`, and `docs/context.md`
 - TESTS: may edit only `tests/**`, `docs/testplan/**`, and `docs/context.md`
 - IMPL: may edit only `src/**`, `frontend/**`, `examples/**`, `scripts/**`, `docs/**`, `README.md`, and `pyproject.toml`
@@ -107,18 +107,17 @@ time.
 ---
 
 ## Canonical docs
-- Introduction: `docs/introduction.md`
-- Specs: `docs/spec/`
-- Test plans: `docs/testplan/`
-- ADRs: `docs/adr/`
-- Core adoption status and next steps: `docs/core-adoption-status.md`
-- Changes requested of core: `docs/core-proposals/`; the handover for the
-  grid-only core update: `docs/core-proposals/011-core-handover.md`
+**The map is [`docs/README.md`](README.md)**: one home for each kind of
+question, and what's in `docs/archive/` (historical, retired syntax; never a
+description of the system). In short:
+- Why: `docs/why-we-are-building-this.md`
+- Components and their state: `docs/how-simple-steps-works.md`
+- User and developer docs (bundled into the app): `docs/usage_docs/`
+- System design on core: `docs/system_design/10–12`
+- Specs and test plans: `docs/spec/` (009–014), `docs/testplan/`; ADRs: `docs/adr/`
+- Active plans: `docs/dev_plan/` (its README lists them)
+- Changes requested of core: `docs/core-proposals/` (008 is the live list)
 - What was removed and what is staged for removal: `docs/cleanup-map.md`
-- Architecture as built: `docs/dev_plan/` (its README marks it active)
-- System design on core — object model, data flow and storage, what core
-  owns vs this repo: `docs/system_design/10-object-model.md`,
-  `11-data-flow-and-storage.md`, `12-core-and-app.md`
 - The shipped examples, and how they check themselves: `src/SIMPLE_STEPS/examples/README.md`
 
 ## Commands

@@ -9,7 +9,7 @@ from typing import Iterable
 
 PHASE_ALLOWLIST = {
     "idea": [
-        "docs/introduction.md",
+        "docs/why-we-are-building-this.md",
         "docs/context.md",
     ],
     "spec": [

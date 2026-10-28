@@ -1,7 +1,7 @@
 # 117 — Referencing previous steps: suggestions for the selection UI
 
 *Date: 2026-10-05*
-*Status: **suggestions, nothing agreed**. Companion to [`103`](./103-ui-as-formula-formulator.md) (the UI's brief) and [`../core-proposals/001-index-selection.md`](../core-proposals/001-index-selection.md) (the core ask).*
+*Status: **suggestions, nothing agreed**. Companion to [`103`](./103-ui-as-formula-formulator.md) (the UI's brief) and [`../../core-proposals/archive/001-index-selection.md`](../../core-proposals/archive/001-index-selection.md) (the core ask).*
 
 Note 103 says the UI's only job is to help the user write a valid expression,
 and names "insert reference" affordances as one of five obligations — "same
@@ -182,7 +182,7 @@ container-generic today: an int means a row, a string means a column, and a
 list of strings means a projection — none of which it knows.
 
 **SR-14 — resolve the contradiction with proposal 001.**
-[`001-index-selection.md`](../core-proposals/001-index-selection.md) §C argues
+[`001-index-selection.md`](../../core-proposals/archive/001-index-selection.md) §C argues
 *against* subscripting a `StepRef` at all, which is the opposite of what a
 click-the-grid UI implies. 001 is still marked "proposal, not agreed"; that
 disagreement should be settled before SR-04 is built on top of it.

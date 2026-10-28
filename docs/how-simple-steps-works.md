@@ -245,23 +245,11 @@ the safest place to start.
 
 ## 6. One home for each kind of doc
 
-Today there are 12 doc locations. A proposed map:
-
-| Question | One place |
-|---|---|
-| Why does this exist, and for whom? | `docs/why-we-are-building-this.md` |
-| What are the components, and what's their state? | this doc |
-| How does it work inside? | `docs/system_design/10–12` |
-| How do I use it, or build on it? | `docs/usage_docs/user/` and `docs/usage_docs/developer/` (also in the app) |
-| What are we changing next? | `docs/dev_plan/` (active plans only) |
-| What do we need from core? | `docs/core-proposals/` |
-
-Retire or fold in:
-- the root `usage_docs/`;
-- `docs/introduction.md`;
-- `system_design/01–08`;
-- `core-adoption-status.md` and `simple-steps-core-updates.md` (both stale);
-- the old-syntax parts of `README.md`.
+**Done 2026-10-27.** The map is [`docs/README.md`](README.md): one home per
+question, and an `archive/` for `system_design/01–08`, `dev_plan/100–119`,
+`spec/000–008`, `introduction.md`, `core-adoption-status.md` and
+`simple-steps-core-updates.md`. Still open: the root `usage_docs/` (outside
+the cleanup phase's paths; only `desktop-mode.md` has no current equivalent).
 
 ---
 

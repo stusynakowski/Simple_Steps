@@ -225,7 +225,7 @@ with a 160-character formula; the start of the formula scrolled out of view.
 
 ## 3. Core
 
-> **Consolidated:** every open core ask now lives in [`docs/core-proposals/005-core-changes.md`](../core-proposals/005-core-changes.md), with new IDs (K1–K18) and a script that checks each one. The table below is kept for its context.
+> **Consolidated:** every open core ask now lives in [`docs/core-proposals/005-core-changes.md`](../core-proposals/archive/005-core-changes.md), with new IDs (K1–K18) and a script that checks each one. The table below is kept for its context.
 
 Ordered by what unblocks the app. C1–C6 keep their numbers from 120 §8;
 C7–C11 are new here. Each was produced by running core at `d8b6979`.

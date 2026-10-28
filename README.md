@@ -522,8 +522,7 @@ Simple_Steps/
 │   └── simple-steps-core/         # Submodule. The backend's heart; read-only here
 ├── tests/                         # pytest tests
 │   └── fixtures/                  # Workflow fixtures + the PipelineRunner harness
-├── docs/                          # Architecture, specs, ADRs, core proposals
-├── usage_docs/                    # User + developer guides (served in the UI)
+├── docs/                          # Map in docs/README.md; user + developer guides in docs/usage_docs (served in the UI)
 ├── scripts/                       # Guardrails, coverage, install smoke test
 └── pyproject.toml                 # Package config, dependencies, CLI entry points
 ```
@@ -560,14 +559,15 @@ Notes:
 
 ## Documentation
 
+Start at [`docs/README.md`](docs/README.md), the map of every doc. The main ones:
+
 | Doc | Description |
 |---|---|
-| [`usage_docs/developers/adding-operations.md`](usage_docs/developers/adding-operations.md) | How to define and register operations |
+| [`docs/usage_docs/user/`](docs/usage_docs/user/) | Using the app (also in the app's Docs panel) |
+| [`docs/usage_docs/developer/`](docs/usage_docs/developer/) | Building an app from your Python functions |
 | [`usage_docs/developers/desktop-mode.md`](usage_docs/developers/desktop-mode.md) | Running Simple Steps as a native desktop app (no browser) |
-| [`docs/introduction.md`](docs/introduction.md) | Product overview and problem statement |
-| [`docs/spec/`](docs/spec/) | Feature specifications |
-| [`docs/adr/`](docs/adr/) | Architecture decision records |
-| [`docs/core-adoption-status.md`](docs/core-adoption-status.md) | Status of the `simple-steps-core` adoption and what is next |
+| [`docs/system_design/`](docs/system_design/) | How it works inside, on `simple-steps-core` |
+| [`docs/dev_plan/`](docs/dev_plan/) | What is being changed next |
 | [`docs/core-proposals/`](docs/core-proposals/) | Changes requested of `simple-steps-core` |
 | [`docs/cleanup-map.md`](docs/cleanup-map.md) | What was removed, what is staged for removal |
 

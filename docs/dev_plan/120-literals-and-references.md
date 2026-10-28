@@ -272,7 +272,7 @@ those tests.
 
 ## 8. Asks for core
 
-> **Consolidated:** every open core ask now lives in [`docs/core-proposals/005-core-changes.md`](../core-proposals/005-core-changes.md), with new IDs (K1–K18) and a script that checks each one. The table below is kept for its context.
+> **Consolidated:** every open core ask now lives in [`docs/core-proposals/005-core-changes.md`](../core-proposals/archive/005-core-changes.md), with new IDs (K1–K18) and a script that checks each one. The table below is kept for its context.
 
 Running core turned up four places where its own call form is ambiguous or
 incomplete. None block the app, which compiles formulas to operation JSON

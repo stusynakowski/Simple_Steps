@@ -1,40 +1,28 @@
-# Dev Plan — Current Architecture
+# Dev plan — active plans
 
-> Status: active as of 2026-05-16
-> Previous plan notes are archived in `./old_notes/`.
+What we are changing next. Only active plans live here; when one is done or
+superseded, what it decided moves to `../system_design/` or `../spec/` and the
+plan moves to [`../archive/dev_plan/`](../archive/dev_plan/). The map of all
+docs is [`../README.md`](../README.md).
 
-This directory holds the small set of notes that describe **how Simple Steps
-is intended to work today**. The earlier numbered notes (`001-` through
-`011-`) described an older "operation + configuration" model; that model has
-been superseded by the unified-expression model documented here.
-
-## Index
-
-| File | What it covers |
-|---|---|
-| [`100-architecture.md`](./100-architecture.md) | The mental model: formulas, steps, workflows, sessions, and the registry. |
-| [`101-formula-language.md`](./101-formula-language.md) | What is and isn't allowed in a formula. The safe-AST interpreter. |
-| [`102-workflow-and-session-shapes.md`](./102-workflow-and-session-shapes.md) | Canonical data shapes for workflows on disk and sessions in memory. |
-| [`103-ui-as-formula-formulator.md`](./103-ui-as-formula-formulator.md) | What the UI is responsible for, framed as "help the user write a valid formula." |
-| [`104-equals-sign-convention.md`](./104-equals-sign-convention.md) | Where the leading `=` lives and where it doesn't. |
-| [`105-validation-flow.md`](./105-validation-flow.md) | How validation flows between UI and backend, and what "commit on run" means. |
-| [`117-referencing-previous-steps.md`](./117-referencing-previous-steps.md) | Suggestions for the step-reference selection UI (Excel-style cell/row/column/range picking). |
-| [`118-console-and-gui-parity.md`](./118-console-and-gui-parity.md) | Plan for a console, and for keeping GUI actions and console commands in exact correspondence. |
-| [`119-grid-integration.md`](./119-grid-integration.md) | Step execution on simple-steps-core's grid model: how a UI step becomes a core operation, what changed for users, and what is still shimmed. |
-| [`120-literals-and-references.md`](./120-literals-and-references.md) | The rule that only `wf["step"]` is a reference and everything else is a literal; the canonical `tool[modifiers](input, arguments)` formula; requirements, tests and asks for core. |
-| [`121-ui-and-core-changes.md`](./121-ui-and-core-changes.md) | What to change in the UI (reference picking, the formula bar), in core, and in the app backend, with the evidence for each and an order of work. |
-| [`122-skeleton-complete.md`](./122-skeleton-complete.md) | **Draft.** The four pieces that complete the skeleton (object model, resources, the agent, custom cell types), the decisions to settle first, and what's deferred to cleanup. |
-| [`124-core-009-integration.md`](./124-core-009-integration.md) | **Proposed.** Taking core 009 (results-only steps, per-cell states, row ids, `wf.preview`), a core `Workflow` per session, then the grid of spec 014, in six phases. |
-| [`123-tool-picker-discrepancy.md`](./123-tool-picker-discrepancy.md) | **Note.** The formula-bar autocomplete and the Formula panel's tool picker list, show and write tools differently (the autocomplete's formulas don't parse for most tools); suggestions to unify them. |
-| [`125-migrate-to-core-kernel.md`](./125-migrate-to-core-kernel.md) | **Proposed.** Moving to core's kernel (branch `core-handover`, phase 3): what it costs here, the order of work, and the decisions to make. |
+| File | Status | What it covers |
+|---|---|---|
+| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core 0.2.0 and its kernel: what's done (§8), what's open (§3.5 save/load), what follows as core lands |
+| [`120-literals-and-references.md`](./120-literals-and-references.md) | rule, partly built | Only `wf["step"]` is a reference; everything else is a literal. The canonical `tool[modifiers](input, arguments)` form. Cited by `operation_formula.py` |
+| [`121-ui-and-core-changes.md`](./121-ui-and-core-changes.md) | partly done | Formula-bar and reference-picking changes U1–U9, with evidence |
+| [`122-skeleton-complete.md`](./122-skeleton-complete.md) | mostly built | Object model, resources, the agent, custom cell types. Cited by `application.py`, `resources.py`, `cell_types.py`, `agent/proposals.py` |
+| [`123-tool-picker-discrepancy.md`](./123-tool-picker-discrepancy.md) | **open** | The formula-bar autocomplete writes the retired `tool.type(` form; the Formula panel writes core syntax |
+| [`124-core-009-integration.md`](./124-core-009-integration.md) | largely superseded | Core 009 and the spec-014 grid, in six phases |
+| [`125-migrate-to-core-kernel.md`](./125-migrate-to-core-kernel.md) | decided, in progress | The kernel move's costs, order, the thin formula parser, and the owner's decisions of 2026-10-27 |
+| [`200-shell-infrastructure-plan.md`](./200-shell-infrastructure-plan.md) | active | The "Jupyter-on-VS-Code" shell: S0 done, phase A mostly done |
 
 ## One-paragraph summary
 
-A **step** owns one Python **expression**. That expression is built only out
-of registered functions, references to earlier steps (`step1["col"]`),
-and literals. Running the expression produces an **output value** (typically
-a DataFrame or Series) that is bound to the step's name and made available
-to later steps. A **workflow** is just an ordered list of these
-`(step_name, expression)` pairs. A **session** is a workflow plus the
-materialised outputs of any steps that have already run. The **UI's only
-job** is to help the user construct a valid expression for each step.
+A **step** holds one formula in core's syntax,
+`tool[mod.verb(…)](wf["step"], arg=…)`, which is valid Python. The app's
+parser (`operation_formula.py`) maps that text to a core operation spec and
+nothing more; whether the step makes sense is core's check. A **workflow** is
+the ordered, named steps; core's **kernel** holds the workflow, the catalog
+and the outputs, one per session. The **UI's job** is to help the user write
+a valid formula; the formula is the single source of truth. Details:
+[`../system_design/10-object-model.md`](../system_design/10-object-model.md).
