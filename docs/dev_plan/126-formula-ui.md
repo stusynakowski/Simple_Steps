@@ -10,6 +10,10 @@
 > (the parser and reference spans). Those keep the evidence; this page keeps
 > the status. The rule underneath is [120](120-literals-and-references.md):
 > a reference is `wf["<step>"]`, and everything else is a literal.
+>
+> **To check where each item stands:** `python scripts/ui_status/status.py`;
+> to try them in the UI: `simple-steps-dev --workspace scripts/ui_status`
+> ([its README](../../scripts/ui_status/README.md)).
 
 ## What each path writes today (run 2026-10-27)
 
@@ -58,17 +62,169 @@ Each is the text a UI path writes, put through `operation_formula.compile_formul
 | F15 | **The popover's inputs and outputs toggles**: traced boxes into the frame from `k.cell(…)` inputs, and out from references and row ids | `SelectionInspector.tsx` | 124 phase 5 |
 | F16 | **Editing shows consequences**: on each edit, re-declare without running and mark later steps stale, invalid or reshaped | `useWorkflow.ts` | 124 phase 6 |
 
-### Reported by the owner
+## Reported by the owner (2026-10-28)
 
-*To fill: the issues seen in the running app, each with the formula and what
-happened, checked against the items above.*
+From the owner's notes ([`noticed_issues_with_UI.md`](../archive/dev_plan/noticed_issues_with_UI.md), archived 2026-10-28), each checked in the
+code or by running core at `58bc115`. "Traced" means read in the code and
+not yet reproduced in the browser.
 
-## Decisions to make
+### R1 — The formula bar and the Formula panel don't stay in sync
 
-| | Question | The two positions |
+**Bar → panel: traced.** Each keystroke in the bar writes `step.formula`,
+but the panel's own copy (`editorFormula`) skips any change the bar made
+(`OperationColumn.tsx:216–220`, the `lastTyped` guard). It catches up only on
+Enter (`StepToolbar.tsx:430`), and **Enter also runs the step**. Blur doesn't
+commit (`:435`). So after a valid edit and a click away, the step holds the
+new formula and the panel shows the old one. Editing the panel then writes
+from its old parts (`ToolEditor.write`) and **overwrites the bar's edit**.
+
+**Panel → bar: not found in the code.** The panel's write reaches
+`step.formula`, and the bar takes an outside value (`FormulaEditor.tsx:214`).
+Needs the steps that showed it.
+
+**Update.** One formula, one state: the panel re-reads the formula on every
+change that parses, from either side. Committing and running are separate
+actions (D3).
+
+### R2 — What the panel does with a formula that doesn't parse
+
+**Today** (`ToolEditor.tsx:94`): the panel keeps the last formula that parsed,
+still editable, under a warning. Editing it writes that older formula back
+and replaces the text being typed. This is D4.
+
+### R3 — Box each reference in the colour of the step it reads
+
+**Update** (F8, F9): each reference in the formula gets a box in its source
+step's colour. The same colour boxes the cells it covers in the source grid:
+dashed when that source's output is shown, none while it is staged (D6).
+Needs the parser's reference spans (F8).
+
+### R4 — A click draws the box, but doesn't open the window
+
+**Today:** a click or a drag draws the solid outline. The window (the
+selection inspector) opens only from the control on the selection's corner
+(`DataOutputGrid.tsx:595`). This is D5.
+
+### R5 — Cell states aren't shown: staged, failed, empty, stale, absent
+
+**Today:** the grid can't show them. The `Cell` type has no state
+(`types/models.ts`), and no endpoint calls `k.view`. Cell states are
+guessed in the browser (`useStagedPreview`, `errorCells`).
+
+**Core has them** (run 2026-10-28, `k.view(step)`): each row and each cell
+carries `state`. Seen: `pending` for a staged step, `known`, `failed` (with
+`error`), `stale` (with a marker: *stale output (input r changed)*). A
+`None` result is `known` with value `None`. `absent` and `empty` are core's
+rule 9 (`docs/design/rules.md`): null, absent and `[]` are three different
+things. Neither appeared in this probe.
+
+**Update** (F13): serve `k.view` for a step, add `state`, `type` and `error`
+to `Cell`, and draw each state (D7).
+
+### R6 — Staged steps: show the cell types and the expected shape
+
+**Core has it** (run 2026-10-28). A staged `double[mod.map()](wf["r"])` over
+4 rows gives `plan` = rows **exact 4**, columns `["value"]`, types
+`{"value": "int"}`. Its view gives 4 rows of `pending` cells, each typed.
+Where a count isn't known, `plan` says why and how to find out (`size`:
+*unknown*, *d hasn't run…*, `resolve: ["run 'd'"]`).
+
+**Update** (F13): a staged step's grid is its planned shape: the planned
+rows of empty `pending` cells under typed headers, with core's reason in
+place of any count it can't give. This replaces the guessed staged columns
+and the `↳` text (F12).
+
+### R7 — Cells can't be picked as a reference while writing a formula
+
+**Traced.** It's deliberate in the code: while a formula bar has focus, a
+cell click is ignored (`DataOutputGrid.tsx:430`: *single cells: later*).
+There are also **two selection models**:
+- exploring (`utils/gridSelection.ts`) does cells, blocks, rows, columns;
+- picking (`utils/selection.ts`) does only rows, columns, or the whole table.
+
+**Update** (F10): one selection model. While a formula bar has focus, the
+same selection you explore with is the pick. What it writes is D1.
+
+### R8 — Reference boxes during deep exploration
+
+The owner has more to add. Depends on R3 and R7.
+
+### R9 — Index and `#` columns: shown as a hint, expandable
+
+**Core** (rules 2, 3): every row has an id `#`, which follows it through
+sorts and filters. `#v` holds the row of step `v` it came from. Tools never
+see them.
+
+**Today:**
+- The grid's index column is the **screen position** (`String(r)`), not
+  core's `#`.
+- `/api/data?index=true` returns the `#` columns, but the grid never asks
+  for them.
+- Owner, 2026-10-27: lineage columns are kept in stored data and hidden by
+  default, with an expander planned.
+
+**Update:** show core's `#` as the index. `#v` and the other lineage
+columns go in a hidden side expander to the right of `#`: a hint that they
+exist, opened on demand. What a row pick refers to is D8.
+
+### Unfinished in the notes
+
+- *"make sure the data is …"*
+- *"and rules"* (under staged results). Possibly core's rule 7, *you see the
+  shape before you run*: the plan's `inverse` (`rebuild`, `trace`, `opaque`,
+  `generated`).
+
+## Decisions (owner, 2026-10-28)
+
+| | Question | Decided | What it means for the work |
+|---|---|---|---|
+| D1 | What a pick of columns, rows or cells writes | **Core's notation, inline**: `wf["r"][0:2][cols["n"]]` where the pick is used, no select step | F6: `utils/selection.ts` writes the notation, and `selectionFormula` / the select-step insertion (`onInsertStepBefore`) go. F7: the parser accepts it. Unblocks F8–F10, R3, R7 |
+| D3 | What Enter does | **Enter declares the step** (instantiates it, so core checks and plans it) **without running the operation. ⌘/Ctrl+Enter declares and runs** | Enter → `/api/workflow/sync` (declare only), and the step shows as staged with its plan (R6). ⌘Enter → run. Today Enter runs (`StepToolbar.tsx:430`). The panel follows every change that parses, not only Enter (R1) |
+| D4 | The panel while the formula doesn't parse | **Freeze it**, with core's reason. **It must still follow an operation choice** | Choosing a tool (autocomplete or panel) writes a complete formula that parses, so the panel unfreezes onto it. This needs F1: the autocomplete's `=tool.type(` leaves a formula that doesn't parse. *Check:* should the panel's own tool picker stay usable while frozen, replacing the text that doesn't parse? |
+| D5 | What opens the selection window | **Only the corner control.** A click never opens it | No change to today's behaviour. R4 is closed: a click draws the outline only |
+| D6 | How references and selections are drawn | **Dashed = a reference** (the cells a formula's reference covers, in the source step's colour). **Bold = the selection** | Two separate marks, and they can overlap. R3: the formula's reference box and the source grid's box are dashed in the same colour. The selection is bold (today's solid outline) |
+| D7 | Cell states | **Grey for absent** (written "abstract"; *check* that absent is what was meant) | The other states' look is still open; see D7a |
+| D8 | Lineage after re-indexing and filtering | **Keep the link to the previous row, and show it only when the user asks**: an expander for each `#<step>` column | See *Lineage columns* below |
+
+Still open:
+
+| | Question | Recommended |
 |---|---|---|
-| D1 | What does picking columns or rows write? | **A select step** (121 §1.2, built): visible in the workflow, one shape change per step. **Core's notation inline** (124 phase 4, 125): `wf["r"][0:2][cols["n"]]` where the pick is used, no extra step; core now runs it. F7–F10 depend on this |
-| D2 | Order | Recommended: F1 (a silent dead end today) → F3, F12 (small) → D1, then F7, F8, F9 → F13 → the rest |
+| D7a | How `pending`, `failed`, `stale`, null and `empty` look | pending: empty cell, type dimmed. failed: tinted, error in the popover. stale: values dimmed. null: a dim `null`. empty step: one `empty` cell. Checked in light and dark |
+| D2 | Order | R1 and F1 (both lose edits or dead-end) → D3 (Enter declares) and D4 (frozen panel) → F3, F12 → R5, R6 (F13) → D1: F6, F7, F8, then R3, R7, F10 → R9 / D8 → the rest |
+
+## Lineage columns (D8)
+
+Run at `58bc115` with `kernels.operation_for` (the UI's path), on
+`r` = 4 rows (`ward`, `n`):
+
+| Step | Row ids `#` | Lineage columns |
+|---|---|---|
+| `filter`, `slice` | the input's ids, with gaps: `1, 2, 3` | none: `#` **is** the input's row |
+| `sort` | the input's ids, reordered: `3, 2, 1, 0` | none: `#` **is** the input's row |
+| `distinct(columns=["ward"])` | the kept ids: `0, 1, 3` | `#r` = the rows each stands for: `[0, 2], [1], [3]` |
+| `expand` | new: `0.0, 0.1, 1.0, …` | `#r` = the parent row: `0, 0, 1, …` |
+| `collapse(by="ward")`, `gather` | the key: `A, B, C` | `#r` = the member rows: `[0, 2], [1], [3]` |
+| `stack(wf["r"], wf["filter"])` | new: `0…6` | `#r` and `#filter`, one per input; `None` where the row came from the other |
+| `join(…, on="ward")` | the left side's: `0…3` | `#r`, `#collapse` |
+| `filter → sort → expand` | `3.0, 3.1, 2.0, …` | `#s2` only: **one hop back**, to the step it read |
+
+What the grid does with this:
+
+- **The index column shows `#`**, never the screen position (R9). After a
+  filter or sort it shows the gaps and the order: that is the link back, so
+  there's no column to expand.
+- **Each `#<step>` column is collapsed behind one expander**, to the right
+  of `#`, labelled with the step it points to (`#r`). Opening it shows the
+  previous step's row ids, as a list where several rows became one.
+- **One hop.** A chain is followed step by step: an expander shows the step
+  read, and going further back means opening that step's own lineage, or
+  core following the chain (ask core whether `k.cell` already traces it:
+  [008 K28](../core-proposals/008-core-changes.md#k28-cell-to-cell-lineage-stored-in-each-output)).
+- Seen in the same run: after `expand`, the step has only `value` and
+  `#s2`, so `collapse(by="ward")` on it is refused (*which 'e2' does not
+  have*). Results-only steps make the user `zip_` the parent's columns back
+  first. Worth a clearer message or a hint in the UI.
 
 ## Tests to add with each change
 
@@ -77,7 +233,10 @@ Carried from 121 §6; IDs kept.
 | ID | Checks |
 |---|---|
 | TEST-UI-002 | No pick ever inserts `data=` or any parameter name |
-| TEST-UI-003 | Each pick gesture produces exactly the formula D1 settles on |
+| TEST-UI-003 | Each pick gesture writes core's notation (`wf["r"][…][cols[…]]`) at the cursor, and it parses (D1) |
+| TEST-UI-012 | Enter declares and doesn't run; ⌘Enter runs (D3) |
+| TEST-UI-013 | A valid edit in the bar shows in the panel without Enter; editing the panel after it keeps the bar's edit (R1) |
+| TEST-UI-014 | While the formula doesn't parse, the panel writes nothing; choosing a tool unfreezes it (D4) |
 | TEST-UI-004 | Renaming a step rewrites `wf["old"]` everywhere |
 | TEST-UI-005 | A 200-character formula: the bar grows to show all of it while focused, and is one line when not |
 | TEST-UI-006 | Reopening a saved workflow shows each formula byte-for-byte as saved |

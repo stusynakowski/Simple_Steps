@@ -1,0 +1,35 @@
+{
+  "format_version": 2,
+  "id": "03-references",
+  "name": "03 References and selection",
+  "meta": {
+    "about": "D1, D5, D6, R3, R7, F7-F11: picking parts of a step while writing a formula.",
+    "plan": "docs/dev_plan/126-formula-ui.md"
+  },
+  "steps": [
+    {
+      "name": "readings",
+      "expression": "to_rows[mod.source()](data='{\"ward\": [\"A\", \"B\", \"A\", \"C\"], \"n\": [10, 20, 30, 40]}')",
+      "meta": {
+        "label": "readings",
+        "notes": "Run this first. Then click into 'reader' and pick from this grid."
+      }
+    },
+    {
+      "name": "reader",
+      "expression": "double[mod.map()](wf[\"readings\"])",
+      "meta": {
+        "label": "reader",
+        "notes": "With the caret in this formula, pick in readings' grid. D1 expects core's notation at the caret: a column -> wf[\"readings\"][cols[\"n\"]]; rows 1-2 -> wf[\"readings\"][1:3]; a cell -> wf[\"readings\"][0][cols[\"n\"]]; a block -> wf[\"readings\"][0:2][cols[\"n\"]]. No select step is added. R7: today a cell click does nothing here. D6: each reference dashed in readings' colour, in the bar and round the cells; the selection bold. D5: a click never opens the window; only the corner control does."
+      }
+    },
+    {
+      "name": "by_position",
+      "expression": "double[mod.map()](wf[\"readings\"])",
+      "meta": {
+        "label": "by_position",
+        "notes": "F11: change wf[\"readings\"] to wf[0]. Decided: it works and is saved by name. Today: refused."
+      }
+    }
+  ]
+}
