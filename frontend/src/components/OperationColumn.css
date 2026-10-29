@@ -1225,3 +1225,14 @@
 }
 
 
+
+/* A reference from the formula being written, around the cells it covers in
+   its source step: dashed, in that step's colour (dev_plan/126 R3, D6). The
+   selection is the bold box; a reference is the dashed one. */
+.reference-mark {
+  position: absolute;
+  z-index: 2;
+  border: 1.5px dashed;
+  border-radius: 2px;
+  pointer-events: none;
+}

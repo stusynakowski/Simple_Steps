@@ -20,7 +20,7 @@
       "expression": "double[mod.map()](wf[\"readings\"])",
       "meta": {
         "label": "reader",
-        "notes": "Click into this formula after n= (e.g. double[mod.map()](wf[\"readings\"], n=)), then pick in readings' grid. Each pick is written at the caret in core's notation and the next pick replaces it (as in Excel): a cell -> wf[\"readings\"][0][cols[\"n\"]] (row id); Shift-click or drag to a block -> wf[\"readings\"][0:2][cols[\"n\"]] (positions); a column header -> wf[\"readings\"][cols[\"n\"]]; Cmd/Ctrl-click rows -> wf[\"readings\"][[0, 2]]; the corner -> wf[\"readings\"]. The pick is the bold outline in readings' grid; no select step is added, and the window never opens while picking. Scattered cells that aren't one rectangle write nothing. Still to come: dashed reference boxes in the bar and the grid (R3)."
+        "notes": "Click into this formula after n= (e.g. double[mod.map()](wf[\"readings\"], n=)), then pick in readings' grid. Each pick is written at the caret in core's notation and the next pick replaces it (as in Excel): a cell -> wf[\"readings\"][0][cols[\"n\"]] (row id); Shift-click or drag to a block -> wf[\"readings\"][0:2][cols[\"n\"]] (positions); a column header -> wf[\"readings\"][cols[\"n\"]]; Cmd/Ctrl-click rows -> wf[\"readings\"][[0, 2]]; the corner -> wf[\"readings\"]. The pick is the bold outline in readings' grid; no select step is added, and the window never opens while picking. Scattered cells that aren't one rectangle write nothing. R3: each reference is dashed in readings' colour in the formula bar and, while the bar has focus, boxed dashed around the cells it covers in readings' grid (not while readings is staged)."
       }
     },
     {

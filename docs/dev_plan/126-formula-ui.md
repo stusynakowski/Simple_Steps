@@ -184,6 +184,9 @@ exist, opened on demand. What a row pick refers to is D8.
 | 2026-10-28 | **D4** | `ToolEditor` freezes while the formula doesn't parse: core's reason shown, inputs and modifiers greyed in a disabled fieldset, and `write()` refuses every edit but a tool choice. Choosing a tool starts the formula over (`partsForTool(tool, type, previous step)`), replacing the text that doesn't parse; the picker shows no tool, so any choice fires | a throwaway vitest (freeze, an argument edit writes nothing, a tool choice writes `=reduce(wf["r"])`); it failed with `write()`'s guard removed, so the guard, not only the fieldset, holds; deleted after |
 | 2026-10-28 | **D3** | **Enter declares, ⌘/Ctrl+Enter runs.** Enter syncs the workflow at once (`useWorkflow.declareWorkflow`: `/api/workflow/sync`, nothing run; core's stale marks applied), where it used to run the step. ⌘/Ctrl+Enter is a new Monaco command (`KeyMod.CtrlCmd \| KeyCode.Enter`, 2048 \| 3, checked in the installed package) that runs it. Passed through both `OperationColumn` callers (`MainLayout`, `DetachedStepWindow`); the Run button's tooltip names the key. Edits were already declared 300 ms after each change; Enter now does it at once | a throwaway vitest (a stand-in editor: Enter calls declare, not run; ⌘Enter runs), deleted after. Monaco doesn't load in jsdom, so the real keys are to try in the browser: 01/doubled |
 | 2026-10-28 | **R5, R6** (and R9's values) | **The grid draws core's view of each step, run or not.** Server: `kernels.view` (core's `k.view` and `step.plan`) behind `GET /api/view?workflow_key&step&offset&limit`: each cell with `state`, `type`, `error` and row id `#`; the step's state, problems and plan; `#` lineage columns left out. Each step's summary (sync and run) gains a `view_key` (state, data version, formula, plan, problems). Frontend: `useWorkflow.refreshViews` fetches a step's view only when its key changes, and fills its cells from it; `runStep` no longer reads cells from `/api/data` or guesses failed rows (`withRowErrors`). The grid marks each cell by state (D7a as recommended: pending empty, or a spinner while running; failed tinted with the error as its tooltip; stale dimmed; absent grey; a known null a dim `null`), shows each column's type after its name, shows core's `#` in the index (D8), and draws a staged step with no rows as its typed header plus the plan's reason. The guessed staged columns (`useStagedPreview`) show only until core's view arrives | server: a TestClient run of 02-cell-states (sync → staged view with its plan; run → `failed` cell with its error; `view_key` changes; 404 for an unknown workflow). Frontend: two throwaway vitests, deleted after (the grid: states, tooltip, `null`, ids `3,2,1,0,0.1`, types, planned header, the empty frame kept; `refreshViews`: fetches on a new key only, a run fills cells from the view with `/api/data` stubbed to throw) |
+| 2026-10-28 | **F8, R3** | **References are dashed in the formula bar and boxed in their source grid** (D6). Server: `operation_formula.references` (in `/api/parse_formula`) gives each `wf["…"]`, plain or a selection, its span in the formula's characters (the `=` included; UTF-8 columns converted) and what it covers in core's spec; from `ast` alone, so an unknown tool still has its references, mid-typing none, a refused selection covers nothing. Formula bar: a dashed box per reference in its step's colour (Monaco decorations; a span that lags a keystroke and no longer starts at `wf[` is skipped). Source grid: while a formula bar has focus its references are shared (`StepWiringContext.references`) and each referenced grid draws a dashed box, in its colour, around the cells covered (`referenceBoxes`: ids for single and listed rows, positions for ranges, one box per run); only when the output is shown, not while staged | spans checked on 9 formulas (non-ASCII, two lines, a combine, mid-typing, a refused form); throwaway vitests, deleted after: `referenceBoxes` on a sorted step, the grid's boxes (only its own references, none while staged); pytest 1 failed (the known one); every example's runme |
+| 2026-10-28 | **F12, F13** | **The guessed staged preview is gone**: `hooks/useStagedPreview.ts` (it invented `<op>_result` columns and wrote `↳ <ref>` into cells), the grid's staged overlay (`stagedColumns`, its header tint and cells), and what fed it in `OperationColumn` (`liveFormula`, `liveParsed`, the upstream rows and columns). Staged cells come only from core's view (R6); the spinner for a running step stays | vitest 148/148; `status.py` F12 |
+| 2026-10-28 | **F3** | **The formula bar colours core's syntax**: `wf["x"]` as a reference, `res["x"]` as a resource, `mod.verb` and `cols[…]`/`rows[…]` as keywords, the tool, parameter names, literals. The retired `.mode` and `step1` rules are gone | the rules run over a real formula (`=double[mod.map(), mod.name("score")](wf["split"], n=wf["split"][rows["0.1"]][cols["value"]], llm=res["llm"], …)`): each part its token |
 | 2026-10-28 | **D5, as the owner meant it** | **A click draws the box; the selection's corner control opens the inspector.** A plain cell click used to open the inspector (owner, 2026-10-22); the owner reversed that ("when I select I don't want to see the panel, just the box; the corner opens the inspector"). `clickCell` now only selects; the cell viewer test changed with it, to click then open from the corner | the updated test; vitest 148/148 |
 | 2026-10-28 | **text row ids: `rows[…]`** | As core's Python says, a plain bracket takes int row ids (or positions, for a range); a text id goes through `rows["0.1"]` / `rows[["A", "C"]]`, since `["n"]` would read as a column. The parser had taken `wf["per_ward"]["A"]` as a row; it now refuses a plain `["…"]` with core's wording (`wf["readings"]["n"]` → use `cols["n"]`, or `rows["n"]` for a text row id), and picks on expand / collapse steps write `rows[…]` | each form parsed, run in core and round-tripped; a throwaway vitest for the pick text, deleted after; pytest 1 failed (the known one); every example's runme |
 | 2026-10-28 | the `#` column | as narrow as its widest row id (`max-content`, smaller digits, tight padding), never cut | — |
@@ -200,6 +203,13 @@ not be kept), and a `collapse(by=)` as `bounded` with no cells ("one row per
 group; the groups come from the data"). The grid now draws `maybe` cells
 (dashed, their own tooltip) and shows core's reason for any rows that aren't
 exactly known, not only `unknown` ones, also under the empty frame.
+
+**Found 2026-10-28, for the owner:** `useWorkflow.previewStep` runs the step
+in full on every Formula panel edit (`ToolEditor` → `onPreview`): the server
+ignores `is_preview`. Since core's view shows a staged step without running
+it (R6) and Enter only declares (D3), it looks like a leftover that runs
+tools on every edit. Removing it (and `errorCells.withRowErrors`, which only
+it uses) changes behaviour, so it waits for the owner.
 
 **Left from R5/R6:** `previewStep` and `showOutputs` still fill cells from
 `/api/data` first (the view replaces them as its key arrives); `useStagedPreview`,
@@ -263,6 +273,17 @@ What the grid does with this:
   `#s2`, so `collapse(by="ward")` on it is refused (*which 'e2' does not
   have*). Results-only steps make the user `zip_` the parent's columns back
   first. Worth a clearer message or a hint in the UI.
+
+## Later: UI cleanup (owner, 2026-10-28)
+
+Not started; for after the items above. In the owner's words, with where
+each would land today.
+
+| # | Item | Today |
+|---|---|---|
+| L1 | **Step controller at the top** | a step's controls are spread over its toolbar (`StepToolbar`: run, the panel toggles, lock, delete), its header (minimize / maximize on hover) and the steps bar |
+| L2 | **Function UI cleanup** | the Formula panel (`ToolEditor`: Tool, Inputs, Modifiers) and the formula bar's autocomplete; ties to F2 (one tool list, one look) and to how the verb core chose is shown (open: show it with core's reason, or always write it) |
+| L3 | **Output selection and examination** | the grid's selection (bold box) and the inspector opened from its corner (`SelectionInspector`, `CellViewer`); ties to F15 (inputs / outputs toggles), R8 (deep exploration) and D8 (the `#<step>` lineage expanders) |
 
 ## Tests to add with each change
 

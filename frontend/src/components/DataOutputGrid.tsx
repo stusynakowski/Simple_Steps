@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isErrorCell } from '../utils/errorCells';
-import { selectionText } from '../utils/selection';
+import { referenceBoxes, selectionText } from '../utils/selection';
+import { useStepWiring } from '../context/StepWiringContext';
 import type { GridPick } from '../utils/selection';
 import {
   INDEX_COL, applyGridPick, cellKey, describeGridSel, drawnIn, inGridSel, selectionEdges, selectionExtent,
@@ -9,7 +10,6 @@ import {
 import type { GridSel, GridSelPick } from '../utils/gridSelection';
 import type { GridSpot } from '../utils/stepsStatus';
 import type { Cell } from '../types/models';
-import type { StagedColumn } from '../hooks/useStagedPreview';
 import { InspectorProvider, useInspectors } from '../context/InspectorContext';
 import { textOn, withAlpha } from '../utils/contrast';
 import SymbolIcon from './SymbolIcon';
@@ -78,9 +78,6 @@ interface DataOutputGridProps {
   wiringMode?: boolean;
   /** In wiring mode: a click on the whole table, a column header or a row number. */
   onPick?: (pick: GridPick) => void;
-  /** What the step being edited currently selects from this grid. */
-  /** Staged columns to render as light-yellow pending cells alongside real data */
-  stagedColumns?: StagedColumn[];
   /** Visual mode for staged cells when pipeline is queued/running */
   stagedCellMode?: 'idle' | 'scheduled' | 'running';
   /** The output these cells come from; lets a typed cell open its full view. */
@@ -121,7 +118,6 @@ function Grid({
   onCellClick,
   wiringMode = false,
   onPick,
-  stagedColumns = [],
   stagedCellMode = 'idle',
   refId,
   onHoverChange,
@@ -149,38 +145,25 @@ function Grid({
   const [, setHoveredCell] = useState<string | null>(null);
 
   // Memoize grid structure calculation
-  const { cols, rows, gridData, structureType, stagedColNames, stagedData } = useMemo(() => {
+  const { cols, rows, gridData, structureType } = useMemo(() => {
     const safeCells = cells ?? [];
 
-    // Build staged lookup: "rowIndex:colName" -> staged metadata
-    const sColNames: string[] = [];
-    const sData: Record<string, { formula: string; state: string }> = {};
-    for (const sc of stagedColumns) {
-      if (!sColNames.includes(sc.name)) sColNames.push(sc.name);
-      for (const cell of sc.cells) {
-        sData[`${cell.rowIndex}:${sc.name}`] = {
-          formula: cell.formula,
-          state: cell.state,
-        };
-      }
-    }
-
-    if (safeCells.length === 0 && sColNames.length === 0 && columns?.length) {
+    if (safeCells.length === 0 && columns?.length) {
       // Planned but no rows yet (a staged step whose row count isn't known):
       // its typed header, and the plan's reason below it.
       return {
         cols: columns.map((c) => c.name), rows: [] as number[], gridData: {} as Record<string, Cell>,
-        structureType: 'grid', stagedColNames: [], stagedData: {},
+        structureType: 'grid',
       };
     }
 
-    if (safeCells.length === 0 && sColNames.length === 0) {
+    if (safeCells.length === 0) {
       // A step's Data is always a dataframe. With nothing in it yet — an empty
       // or undefined expression, or a step not run — it is a 1×1 frame whose
       // one cell says "empty", drawn by the same grid as any other output.
       return {
         cols: [EMPTY_FRAME_COLUMN], rows: [0], gridData: { [`0:${EMPTY_FRAME_COLUMN}`]: EMPTY_FRAME_CELL },
-        structureType: 'grid', stagedColNames: [], stagedData: {},
+        structureType: 'grid',
       };
     }
 
@@ -188,18 +171,6 @@ function Grid({
     const uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort(
       (a, b) => a - b
     );
-
-    // Merge staged column names (only add ones not already in real data)
-    const allCols = [...uniqueCols];
-    for (const sc of sColNames) {
-      if (!allCols.includes(sc)) allCols.push(sc);
-    }
-
-    // If we have staged columns but no real rows, generate row indices from staged data
-    let allRows = uniqueRows;
-    if (allRows.length === 0 && sColNames.length > 0 && stagedColumns[0]?.cells.length > 0) {
-      allRows = Array.from({ length: stagedColumns[0].cells.length }, (_, i) => i);
-    }
 
     // Create a lookup map for faster access: "rowId:colId" -> Cell
     const dataMap: Record<string, Cell> = {};
@@ -211,14 +182,12 @@ function Grid({
     const type = 'grid';
 
     return {
-      cols: allCols,
-      rows: allRows,
+      cols: uniqueCols,
+      rows: uniqueRows,
       gridData: dataMap,
       structureType: type,
-      stagedColNames: sColNames,
-      stagedData: sData,
     };
-  }, [cells, stagedColumns, columns]);
+  }, [cells, columns]);
 
   // Core's type for each column, and its row id for each row (dev_plan/126 R5, D8).
   const typeOf = useMemo(() => {
@@ -439,6 +408,39 @@ function Grid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectedKey, shape]);
 
+  // ── References from the formula being written (R3, D6) ──────────────────
+  // While a formula bar has focus, each of its references to this step is
+  // boxed, dashed, in this step's colour, around the cells it covers: only
+  // when this step's output is shown, not while it's staged.
+  const { wiringState } = useStepWiring();
+  const myRefs = wiringState.references.filter((r) => r.step === stepName);
+  const outputShown = (cells ?? []).some((c) => !c.state || ['known', 'failed', 'stale', 'absent'].includes(c.state));
+  const refsKey = outputShown ? JSON.stringify(myRefs) : '';
+  const [refMarks, setRefMarks] = useState<Omit<Mark, 'id'>[]>([]);
+  useLayoutEffect(() => {
+    const place = () => {
+      const next: Omit<Mark, 'id'>[] = [];
+      if (outputShown) {
+        for (const ref of myRefs) {
+          for (const box of referenceBoxes(ref, rows, cols, idOf)) {
+            const a = elementAt(box.rows[0], box.cols[0]);
+            const b = elementAt(box.rows[box.rows.length - 1], box.cols[box.cols.length - 1]);
+            if (!a || !b) continue;
+            next.push({ left: a.offsetLeft, top: a.offsetTop,
+              width: b.offsetLeft + b.offsetWidth - a.offsetLeft, height: b.offsetTop + b.offsetHeight - a.offsetTop });
+          }
+        }
+      }
+      setRefMarks((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    place();
+    if (typeof ResizeObserver === 'undefined' || !gridRef.current) return;
+    const ro = new ResizeObserver(place);
+    ro.observe(gridRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refsKey, shape]);
+
   // ── Picks for a formula ─────────────────────────────────────────────────
   // While a later step's formula bar has focus, the same selection as looking
   // (a cell, a block, rows, columns, the # corner; Shift, ⌘/Ctrl, drag) is
@@ -592,7 +594,6 @@ function Grid({
             title={wiringMode ? `Select column ${col} (Shift: range, ⌘/Ctrl: add)` : typeOf[col] ? `${col}: ${typeOf[col]}` : col}
             style={{
               ...wiringColHeaderStyle(col),
-              ...(stagedColNames.includes(col) ? { background: '#fff8dc', color: '#665e30' } : {}),
               ...(activeCell?.col === col ? { background: ACTIVE_HEADER_BG } : {}),
               ...outline(-1, col),
             }}
@@ -620,6 +621,10 @@ function Grid({
             {!tabInside && describeGridSel(shownSel, rows, cols)}
           </button>
         )}
+        {refMarks.map((m, i) => (
+          <div key={`ref-${i}`} className="reference-mark" aria-hidden="true"
+            style={{ left: m.left, top: m.top, width: m.width, height: m.height, borderColor: edge }} />
+        ))}
         {marks.map((m) => (
           <div
             key={m.id}
@@ -693,55 +698,6 @@ function Grid({
             {cols.map((c) => {
               const cell = gridData[`${r}:${c}`];
               const cellKey = `${r}:${c}`;
-              const stagedInfo = stagedData[cellKey];
-              const isStaged = stagedInfo !== undefined && stagedColNames.includes(c);
-
-              if (isStaged) {
-                const isError = stagedInfo.state === 'error';
-                const showSpinner = !isError && (stagedCellMode === 'running' || stagedCellMode === 'scheduled');
-                const modeLabel = stagedCellMode === 'running'
-                  ? 'running'
-                  : stagedCellMode === 'scheduled'
-                    ? 'scheduled'
-                    : 'staged';
-                return (
-                  <div
-                    key={cellKey}
-                    className="grid-cell staged"
-                    role="gridcell"
-                    title={stagedInfo.formula}
-                    style={{
-                      background: isError ? '#ffebee' : '#fffde7',
-                      borderLeft: showSpinner ? '2px solid #ffb300' : undefined,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 600,
-                        color: isError ? '#b71c1c' : '#b8960c',
-                        marginRight: 6,
-                        fontStyle: 'italic',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
-                      }}
-                    >
-                      {showSpinner && <span className="cell-wait-spinner" />}
-                      ({modeLabel})
-                    </span>
-                    <span
-                      style={{
-                        color: isError ? '#8e0000' : '#7a6e30',
-                        fontSize: '0.72rem',
-                        fontFamily: 'Menlo, Monaco, Consolas, monospace',
-                      }}
-                    >
-                      {stagedInfo.formula}
-                    </span>
-                  </div>
-                );
-              }
 
               return (
                 <div

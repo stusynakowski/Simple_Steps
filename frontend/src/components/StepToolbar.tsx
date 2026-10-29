@@ -50,6 +50,8 @@ interface StepToolbarProps {
   onFormulaBarRef?: (ref: HTMLTextAreaElement | null) => void;
   /** A pick in an earlier step's grid while this formula bar has focus. */
   onReferencePick?: (sourceStep: string, pick: GridPick) => void;
+  /** The formula's step references and their steps' colours, drawn dashed in the bar (R3). */
+  references?: { start: number; end: number; color: string }[];
 }
 
 export default function StepToolbar({ 
@@ -68,6 +70,7 @@ export default function StepToolbar({
   isLocked,
   onFormulaBarRef,
   onReferencePick,
+  references,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const initFormula = step.formula || step.operation || '';
@@ -427,6 +430,7 @@ export default function StepToolbar({
           >
             <FormulaEditor
             value={formula}
+            references={references}
             onChange={(next) => {
               // Build a synthetic event so we reuse handleInputChange's logic
               // without duplicating its body.
