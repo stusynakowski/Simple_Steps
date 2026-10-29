@@ -68,7 +68,11 @@ function referenceClass(color: string): string {
   if (typeof document !== 'undefined' && !document.getElementById(name)) {
     const style = document.createElement('style');
     style.id = name;
-    style.textContent = `.${name} { outline: 1px dashed ${color}; outline-offset: -1px; border-radius: 2px; }`;
+    // Drawn behind the text, the line's full height (a decoration's className,
+    // not inlineClassName), and a little wider than the reference, so the box
+    // surrounds the whole object and never covers a character.
+    style.textContent = `.${name} { border: 1.5px dashed ${color}; border-radius: 3px; box-sizing: content-box;`
+      + ` padding: 0 2px; margin-left: -3px; background: color-mix(in srgb, ${color} 10%, transparent); }`;
     document.head.appendChild(style);
   }
   return name;
@@ -137,7 +141,7 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
         const b = model.getPositionAt(r.end);
         return {
           range: new api.Range(a.lineNumber, a.column, b.lineNumber, b.column),
-          options: { inlineClassName: referenceClass(r.color) },
+          options: { className: referenceClass(r.color) },
         };
       });
     if (referenceMarks.current) referenceMarks.current.set(marks);

@@ -408,6 +408,23 @@ function Grid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectedKey, shape]);
 
+  // ── Resizing columns and rows, as in a spreadsheet (L5) ─────────────────
+  // Drag a column header's right edge, or a # cell's bottom edge. The sizes
+  // last while the grid is open; saving them with the workflow comes later.
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
+  const startResize = (e: React.MouseEvent, axis: 'x' | 'y', apply: (size: number) => void) => {
+    e.preventDefault();
+    e.stopPropagation();                      // a resize never starts a selection
+    const cell = (e.currentTarget as HTMLElement).parentElement!;
+    const from = axis === 'x' ? e.clientX : e.clientY;
+    const size = axis === 'x' ? cell.offsetWidth : cell.offsetHeight;
+    const move = (m: MouseEvent) => apply(Math.max(axis === 'x' ? 40 : 18, size + (axis === 'x' ? m.clientX : m.clientY) - from));
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
   // ── References from the formula being written (R3, D6) ──────────────────
   // While a formula bar has focus, each of its references to this step is
   // boxed, dashed, in this step's colour, around the cells it covers: only
@@ -464,14 +481,10 @@ function Grid({
     select({ kind: 'all' }, e);
   };
 
-  // The index column: its header selects it, its
-  // cells select like any cell. Looking only — a formula can't reference the
-  // index yet.
+  // The # column: its header selects it (looking only — a formula can't
+  // reference the row ids); its cells select their rows (handleRowClick).
   const handleIndexClick = (e: React.MouseEvent) => {
     if (!wiringMode) select({ kind: 'index' }, e);
-  };
-  const handleIndexCellClick = (row: number, e: React.MouseEvent) => {
-    if (!wiringMode) clickCell(row, INDEX_COL, e);
   };
 
 
@@ -481,7 +494,8 @@ function Grid({
 
   // ── Wiring overlay styles ───────────────────────────────────────────────
 
-  const HOVER_BG = 'rgba(255, 193, 7, 0.16)';
+  // Hover shading only, neutral: a reference's colour is its dashed box (R3).
+  const HOVER_BG = 'rgba(0, 0, 0, 0.05)';
 
   const wiringColHeaderStyle = (col: string): React.CSSProperties => {
     if (!wiringMode) return { cursor: 'pointer', userSelect: 'none' as const };
@@ -550,31 +564,15 @@ function Grid({
         onMouseLeave={() => onHoverChange?.(null)}
         style={{
           // The # column fits its widest row id, and no wider (owner, 2026-10-28).
-          gridTemplateColumns: `var(--grid-gutter) max-content repeat(${cols.length}, minmax(100px, 1fr))`,
-          ...(wiringMode
-            ? {
-                outline: '1px solid rgba(255, 193, 7, 0.6)',
-                outlineOffset: -1,
-                borderRadius: 3,
-              }
-            : {}),
+          gridTemplateColumns: `max-content ${cols.map((c) => (colWidths[c] ? `${colWidths[c]}px` : 'minmax(100px, 1fr)')).join(' ')}`,
+          gridTemplateRows: `auto ${rows.map((r) => (rowHeights[r] ? `${rowHeights[r]}px` : 'auto')).join(' ')}`,
         }}
         role="grid"
       >
-        {/* Header row. Left of it, the top of the row margin: selects the
-            whole table. Then the index column's header, then the columns'.
-            Rows are selected from the margin left of them, so every cell —
-            the index's included — stays a cell of its own. */}
-        <div
-          className={`grid-gutter grid-gutter-left grid-gutter-corner${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
-          role="button"
-          aria-label="Select the whole table"
-          title="Select the whole table"
-          style={wiringMode ? { cursor: 'crosshair' } : undefined}
-          onClick={handleCornerClick}
-          onMouseEnter={() => { setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
-          onMouseLeave={() => setHoveredCol(null)}
-        />
+        {/* Header row: the # header, then the columns'. As in a spreadsheet,
+            the triangle in the # header's top-left corner selects the whole
+            table; the rest of it selects the # column. A row is selected from
+            its # cell, as a column is from its header (owner, 2026-10-28). */}
         <div
           className="grid-header-cell row-index-header"
           data-sel-key={cellKey(-1, INDEX_COL)}
@@ -583,6 +581,15 @@ function Grid({
           onClick={handleIndexClick}
           onMouseEnter={() => { onHoverChange?.({ kind: 'column', column: '#' }); }}
         >
+          <span
+            className={`corner-triangle${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
+            role="button"
+            aria-label="Select the whole table"
+            title="Select the whole table"
+            onClick={(e) => { e.stopPropagation(); handleCornerClick(e); }}
+            onMouseEnter={(e) => { e.stopPropagation(); setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
+            onMouseLeave={() => setHoveredCol(null)}
+          />
           #
         </div>
         {cols.map((col) => (
@@ -604,6 +611,12 @@ function Grid({
           >
             {col}
             {typeOf[col] && <span className="col-type">{typeOf[col]}</span>}
+            <span
+              className="col-resizer"
+              aria-hidden="true"
+              onMouseDown={(e) => startResize(e, 'x', (w) => setColWidths((p) => ({ ...p, [col]: w })))}
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         ))}
 
@@ -662,36 +675,29 @@ function Grid({
         {/* Data Rows */}
         {rows.map((r) => (
           <div key={r} className="grid-row" role="row">
-            {/* The margin left of the row: selects the whole row. */}
+            {/* The row's # cell selects the row (Shift: range, ⌘/Ctrl: add, drag). */}
             <div
-              className={`grid-gutter grid-gutter-left${shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0]) ? ' is-selected' : ''}`}
-              title={`Select row ${r} (Shift: range, ⌘/Ctrl: add)`}
-              style={wiringMode ? { cursor: 'crosshair' } : undefined}
-              onMouseDown={(e) => startDrag({ kind: 'row', row: r }, e)}
-              onClick={(e) => handleRowClick(r, e)}
-              onMouseEnter={() => { if (wiringMode) setHoveredRow(r); dragOver(r, cols[0]); onHoverChange?.({ kind: 'row', row: r }); }}
-              onMouseLeave={() => wiringMode && setHoveredRow(null)}
-            />
-            {/* The index: a cell of its own. */}
-            <div
-              className="grid-cell row-index"
+              className={`grid-cell row-index${shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0]) ? ' is-selected' : ''}`}
               data-sel-key={cellKey(r, INDEX_COL)}
               role="rowheader"
-              title={wiringMode ? "The row ids (#) can't be referenced yet" : `# ${idOf[r] ?? r}`}
-              style={wiringMode ? {
-                cursor: 'default',
-                background: hoveredRow === r ? HOVER_BG : undefined,
-                transition: 'background 0.1s ease',
-              } : {
+              title={`Select row # ${idOf[r] ?? r} (Shift: range, ⌘/Ctrl: add)`}
+              style={{
                 cursor: 'pointer',
-                ...(activeCell?.row === r ? { background: ACTIVE_HEADER_BG, color: '#222' } : {}),
-                ...outline(r, INDEX_COL),
+                ...(wiringMode && hoveredRow === r ? { background: HOVER_BG } : {}),
+                ...(!wiringMode && activeCell?.row === r ? { background: ACTIVE_HEADER_BG, color: '#222' } : {}),
               }}
-              onMouseDown={(e) => startDrag({ kind: 'cell', row: r, col: INDEX_COL }, e)}
-              onClick={(e) => handleIndexCellClick(r, e)}
-              onMouseEnter={() => { dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'cell', row: r, column: '#', value: String(idOf[r] ?? r) }); }}
+              onMouseDown={(e) => startDrag({ kind: 'row', row: r }, e)}
+              onClick={(e) => handleRowClick(r, e)}
+              onMouseEnter={() => { if (wiringMode) setHoveredRow(r); dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'row', row: r }); }}
+              onMouseLeave={() => wiringMode && setHoveredRow(null)}
             >
               {idOf[r] ?? r}
+              <span
+                className="row-resizer"
+                aria-hidden="true"
+                onMouseDown={(e) => startResize(e, 'y', (h) => setRowHeights((p) => ({ ...p, [r]: h })))}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
 
             {/* Cells */}

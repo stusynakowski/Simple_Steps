@@ -662,29 +662,31 @@
 }
 
 .row-index-header {
+  position: relative;
   border-right: 1px solid #ddd;
   background: #eaeaea;
-  padding-left: 4px;
+  padding-left: 9px;
   padding-right: 4px;
 }
 
-/* The row margin (DataOutputGrid): a thin strip left of the cells that
-   selects rows; its top, beside the header, selects the whole table. Quiet
-   until hovered; a selected row darkens its strip. */
-.op-data-grid {
-  --grid-gutter: 10px;
-}
-
-.grid-gutter {
-  background: #f4f4f4;
-  border-right: 1px solid #e6e6e6;
+/* The # header's top-left corner: a triangle that selects the whole table,
+   as in a spreadsheet (owner, 2026-10-28). */
+.corner-triangle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  background: #b8b8b8;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
   cursor: pointer;
-  transition: background 0.1s ease;
 }
+.corner-triangle:hover { background: #8a8a8a; }
+.corner-triangle.is-selected { background: #6b7280; }
 
-.grid-gutter-corner { border-bottom: 1px solid #ddd; }
-.grid-gutter:hover { background: #dadada; }
-.grid-gutter.is-selected { background: #9ca3af; }
+/* A row's # cell selects the row; a selected row's # cell darkens. */
+.grid-cell.row-index:hover { background: #ececec; }
+.grid-cell.row-index.is-selected { background: #d4d7dc; color: #333; }
 
 /* Data Rows */
 .grid-row {
@@ -762,34 +764,6 @@
 }
 
 /* ── Wiring mode styles ──────────────────────────────────────────────────── */
-
-@keyframes wiring-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.45); }
-  50%  { box-shadow: 0 0 0 6px rgba(255, 193, 7, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
-}
-
-/* Column-level wiring glow — applied when this column is a selectable source */
-.operation-column.wiring-source-column {
-  animation: wiring-pulse 1.6s ease-in-out infinite;
-}
-
-/* Grid wiring source overlay */
-.op-data-grid.wiring-source .grid-header-cell:not(.row-index-header) {
-  position: relative;
-}
-
-.op-data-grid.wiring-source .grid-header-cell:not(.row-index-header)::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: #ffc107;
-  border-radius: 1px;
-}
-
 
 /* ── Step overview panel (toggled by info button) ──────────────────────── */
 .step-overview-panel {
@@ -1236,6 +1210,20 @@
   border-radius: 2px;
   pointer-events: none;
 }
+
+/* Resizing, as in a spreadsheet (dev_plan/126 L5): a column header's right
+   edge and a # cell's bottom edge are handles. */
+.grid-header-cell { position: relative; }
+.grid-cell.row-index { position: relative; }
+.col-resizer,
+.row-resizer {
+  position: absolute;
+  z-index: 3;
+}
+.col-resizer { top: 0; right: 0; width: 5px; height: 100%; cursor: col-resize; }
+.row-resizer { left: 0; bottom: 0; width: 100%; height: 4px; cursor: row-resize; }
+.col-resizer:hover,
+.row-resizer:hover { background: rgba(0, 0, 0, 0.15); }
 
 /* The step's control bar (StepToolbar): three widgets by use case — running,
    the step's views, managing it — each a divided segment (owner, 2026-10-28;

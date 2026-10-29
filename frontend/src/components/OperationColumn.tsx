@@ -112,9 +112,6 @@ export default function OperationColumn({
     wiringState.receivingStepIndex !== null &&
     stepIndex < wiringState.receivingStepIndex;
 
-  // Track whether the user is hovering over this column while it's a wiring source.
-  // The yellow highlight and wiring UI only appear on hover, not automatically.
-  const [isWiringHovered, setIsWiringHovered] = useState(false);
 
   // Refs for parameter inputs so they can also participate in wiring
 
@@ -530,9 +527,6 @@ export default function OperationColumn({
                 <StepWidget id="data" collapsed={collapsedPanels.has('data')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight} note={dataNote}>
                   <div
                     className="tab-content status-content"
-                    onMouseEnter={() => { if (isWiringSource) setIsWiringHovered(true); }}
-                    onMouseLeave={() => setIsWiringHovered(false)}
-                    style={isWiringSource && isWiringHovered ? { outline: '2px solid #ffc107', outlineOffset: -2, borderRadius: 4 } : {}}
                   >
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
                       <DataOutputGrid
