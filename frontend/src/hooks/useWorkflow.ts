@@ -13,8 +13,7 @@ import type {
   OperationDefinition, PipelineFile, BackendError, ProgressEvent, WorkflowStepDecl, WorkflowStepState,
 } from '../services/api';
 import { parseFormula } from '../utils/formulaParser';
-import { errorCell, withRowErrors } from '../utils/errorCells';
-import { columnsToShow } from '../utils/stepColumns';
+import { errorCell } from '../utils/errorCells';
 import { stepsUsingResource } from '../utils/resources';
 import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 import type { WorkflowCommand } from '../types/commands';
@@ -647,111 +646,18 @@ export default function useWorkflow() {
     }
   }, [addLog, waitForStableOutput]);
 
-  const previewStep = useCallback(async (id: string, config?: Record<string, unknown>) => {
+  /**
+   * Preview a step: core's view of it, run or not, as core's `wf.preview` —
+   * the workflow is declared and the step shows its planned or current cells.
+   * Nothing runs (dev_plan/126 D3); only Run, or ⌘/Ctrl+Enter, runs a step.
+   * It used to run the step in full, on every Formula panel edit: the
+   * backend never honoured its `is_preview`.
+   */
+  const previewStep = useCallback(async (id: string) => {
     announce({ kind: 'preview', target: stepAlias(id) });
-     // Similar to runStep but with isPreview=true
-    const currentSteps = workflowRef.current.steps;
-    const step = currentSteps.find((s) => s.id === id);
-    if (!step) return;
-
-    const stepIndex = currentSteps.indexOf(step);
-    const prevStep = stepIndex > 0 ? currentSteps[stepIndex - 1] : undefined;
-    
-    const stepMap: Record<string, string> = {};
-    for (const [index, s] of currentSteps.entries()) {
-        if (s.outputRefId) {
-            stepMap[s.id] = s.outputRefId;
-            stepMap[s.label] = s.outputRefId;
-            stepMap[`step${index + 1}`] = s.outputRefId;
-        }
-    }
-
-    // Derive operation_id and args from the formula (the canonical source)
-    const parsed = step.formula ? await parseFormula(step.formula) : null;
-    const previewOperationId = (parsed?.isValid && parsed.operationId)
-      ? parsed.operationId
-      : step.process_type;
-    const internalKeys = Object.fromEntries(
-      Object.entries(step.configuration).filter(([k]) => k.startsWith('_'))
-    );
-    const formulaArgs = (parsed?.isValid && parsed.args) ? parsed.args : {};
-    const hasPreviewFormulaArgs = Object.keys(formulaArgs).length > 0;
-    const previewConfig: Record<string, unknown> = config ?? (
-      hasPreviewFormulaArgs
-        ? { ...internalKeys, ...formulaArgs }
-        : { ...step.configuration }
-    );
-    
-    addLog('debug', `Preview requested for "${step.label}" (${previewOperationId})`, {
-      stepId: id,
-      stepLabel: step.label,
-      operationId: previewOperationId,
-    });
-
-    try {
-      assertFormulaParses(step.formula, parsed);
-      const res = await runStepApi(
-          id, 
-          previewOperationId, 
-          previewConfig, 
-          prevStep?.outputRefId ?? null,
-          stepMap,
-          true, // isPreview
-          step.formula || undefined,
-          // No sessionId — see runStep above.  The cookie carries identity.
-          undefined,
-          workflowRef.current.resources,
-      );
-      
-      const rawData: Cell[] = await fetchDataView(res.output_ref_id) as Cell[];
-
-      // Same column choice as runStep — use outputColumns (full list), not output_preview
-      const outputCols: string[] = res.metrics.columns ?? [];
-      const displayCols = columnsToShow(outputCols, prevStep?.outputColumns, !!parsed?.operation);
-
-      // rawData is already Cell[] — just filter to this step's own columns
-      const previewCells = withRowErrors(
-        rawData.filter((cell) => displayCols.has(cell.column_id)),
-        res.metrics.row_errors,
-        res.metrics.payload_column,
-      );
-
-      addLog('success', `Preview for "${step.label}" ready — ${res.metrics.rows} rows`, {
-        stepId: id,
-        stepLabel: step.label,
-        operationId: previewOperationId,
-      });
-
-      setWorkflow((prev) => {
-        const next = prev.steps.map((s) => {
-          if (s.id !== id) return s;
-          return {
-            ...s,
-            // We do NOT mark it as completed status, as it's just a preview/staged state.
-            // But we DO update the outputRefId so that subsequent steps can preview off this one.
-            outputRefId: res.output_ref_id,
-            outputColumns: outputCols,
-            output_preview: previewCells,
-          };
-        });
-        return { ...prev, steps: next };
-      });
-    } catch (error) {
-       const backendErr = (error as { backendError?: BackendError })?.backendError;
-       const errorMessage = backendErr?.detail || (error instanceof Error ? error.message : String(error));
-       addLog('warn', `Preview failed for "${step.label}": ${errorMessage}`, {
-         stepId: id,
-         stepLabel: step.label,
-         operationId: previewOperationId,
-         detail: backendErr?.traceback || undefined,
-       });
-       console.error("Preview failed", error);
-       setWorkflow((prev) => ({
-         ...prev,
-         steps: prev.steps.map((s) => (s.id === id ? { ...s, output_preview: [errorCell(errorMessage)] } : s)),
-       }));
-    }
-  }, [addLog]);
+    declareWorkflow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [declareWorkflow]);
 
   const runPipeline = useCallback(() => {
     if (pipelineStatusRef.current === 'running') return;

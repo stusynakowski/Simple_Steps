@@ -119,6 +119,11 @@ report("D4  the panel freezes on a formula that doesn't parse",
        "ToolEditor keeps the last parsed parts editable under a warning",
        "ToolEditor's invalid branch changed; try 01/doubled with a stray (")
 
+report("--  the Formula panel doesn't run its step on edit",
+       "onPreview" not in column,
+       "each Formula panel edit runs the step (onPreview -> previewStep)",
+       "no onPreview; a preview declares (useWorkflow.previewStep)")
+
 monaco = source("shell/monacoSetup.ts")
 report("F3  highlighting knows wf[\"x\"]",
        bool(re.search(r"wf\\?\[", monaco)),

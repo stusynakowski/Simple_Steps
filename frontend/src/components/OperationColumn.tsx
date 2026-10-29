@@ -36,7 +36,6 @@ interface OperationColumnProps {
   onRun: (id: string) => void;
   /** Declare the workflow, running nothing (Enter in the formula bar). */
   onDeclare?: () => void;
-  onPreview?: (id: string) => void;
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
   onMinimize?: () => void;
@@ -73,7 +72,6 @@ export default function OperationColumn({
   onUpdate,
   onRun,
   onDeclare,
-  onPreview,
   onDelete,
   onMinimize,
   onMaximize,
@@ -520,7 +518,6 @@ export default function OperationColumn({
                         onDefineResource={onDefineResource}
                         onChange={(formula, parsed) => {
                           handleFormulaUpdate(step.id, formula, parsed);
-                          onPreview?.(step.id);
                         }}
                       />
                     </div>
