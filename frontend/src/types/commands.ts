@@ -28,6 +28,8 @@ export type WorkflowCommand =
   | { kind: 'add'; name?: string; after?: string | null }
   | { kind: 'remove'; target: string }
   | { kind: 'rename'; target: string; to: string }
+  /** Move a step to a position, 0 the first (core's `k.move`). */
+  | { kind: 'move'; target: string; to: number }
   | { kind: 'run'; target: string | null }
   | { kind: 'preview'; target: string }
   // Resources belong to the workflow, not to a step (122 §2.4): the toolbar's
@@ -58,6 +60,8 @@ export function formatCommand(cmd: WorkflowCommand): string {
       return `wf.remove(${q(cmd.target)})`;
     case 'rename':
       return `wf.rename(${q(cmd.target)}, ${q(cmd.to)})`;
+    case 'move':
+      return `wf.move(${q(cmd.target)}, ${cmd.to})`;
     case 'run':
       return cmd.target ? `wf.run(${q(cmd.target)})` : 'wf.run()';
     case 'preview':
@@ -72,14 +76,15 @@ export function formatCommand(cmd: WorkflowCommand): string {
 
 /** The commands the console understands, for help text and autocomplete. */
 export const COMMAND_HELP: { form: string; what: string }[] = [
-  { form: 'wf["step2"] = \'=op(arg=step1["col"])\'', what: "set a step's expression" },
+  { form: 'wf["step2"] = \'=double[mod.map()](wf["step1"])\'', what: "set a step's expression" },
   { form: 'wf.add()', what: 'append a step' },
   { form: 'wf.add("name", after="step1")', what: 'insert a named step' },
   { form: 'wf.remove("step2")', what: 'delete a step' },
   { form: 'wf.rename("step2", "scored")', what: 'rename a step' },
+  { form: 'wf.move("step2", 0)', what: 'move a step to a position (0 is first)' },
   { form: 'wf.run()', what: 'run the whole pipeline' },
   { form: 'wf.run("step2")', what: 'run one step' },
-  { form: 'wf.preview("step2")', what: 'preview one step' },
+  { form: 'wf.preview("step2")', what: 'stage one step: its plan, nothing runs' },
   { form: 'wf.steps', what: 'list the steps' },
   { form: 'res["llm"] = FakeLLM(model="fake-1")', what: 'create or change a resource' },
   { form: 'del res["llm"]', what: 'delete a resource no step uses' },

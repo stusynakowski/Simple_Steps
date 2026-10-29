@@ -234,7 +234,8 @@ def describe(formula: Optional[str]) -> Dict[str, Any]:
     valid and why not, core's operation, and the step editor's parts."""
     raw = (formula or "").strip()
     out: Dict[str, Any] = {"operationId": None, "orchestration": None, "args": {},
-                           "isValid": False, "rawInput": raw}
+                           "isValid": False, "rawInput": raw,
+                           "references": references(formula or "")}
     body = _body(raw)
     if not body:
         return out
@@ -249,6 +250,59 @@ def describe(formula: Optional[str]) -> Dict[str, Any]:
         return {**out, "operationId": "literal", "isValid": True,
                 "args": {"expr": body, "_literal": body}}
     return {**out, "error": not_a_step(raw)}
+
+
+def references(formula: str) -> List[Dict[str, Any]]:
+    """Every step reference in *formula*, where it is and what it covers
+    (dev_plan/126 F8): ``{"span": [start, end], "step": "r"}``, plus ``rows``
+    and ``columns`` (core's spec) for a selection, ``wf["r"][0:2][cols["n"]]``.
+
+    *span* is in characters of *formula* exactly as given, the leading ``=``
+    included, so the formula bar can mark each reference and the source grid
+    box what it covers. Syntax only, from Python's ``ast``: a formula that
+    names an unknown tool still has its references; one that isn't Python
+    yet (mid-typing) has none.
+    """
+    lead = len(formula) - len(formula.lstrip())
+    start = lead + 1 if formula[lead:lead + 1] == "=" else lead
+    start += len(formula[start:]) - len(formula[start:].lstrip(" \t"))   # spaces after the `=`
+    body = formula[start:]
+    try:
+        tree = ast.parse(body, mode="eval")
+    except SyntaxError:
+        return []
+    lines = body.split("\n")
+    line_starts = [0]
+    for line in lines[:-1]:
+        line_starts.append(line_starts[-1] + len(line) + 1)
+
+    def offset(lineno: int, col: int) -> int:
+        # ast's columns are UTF-8 bytes; the formula bar counts characters.
+        line = lines[lineno - 1]
+        return start + line_starts[lineno - 1] + len(line.encode("utf-8")[:col].decode("utf-8", "ignore"))
+
+    found: List[Dict[str, Any]] = []
+
+    def visit(node: ast.AST) -> None:
+        if isinstance(node, ast.Subscript):
+            ref = None
+            try:
+                picked = _selection(node)
+                if picked is not None:
+                    ref = {"step": picked[0], **picked[1]}
+                elif _wf_name(node) is not None:
+                    ref = {"step": _wf_name(node)}
+            except FormulaError:
+                return                      # a selection core refuses covers nothing
+            if ref is not None:
+                span = [offset(node.lineno, node.col_offset), offset(node.end_lineno, node.end_col_offset)]
+                found.append({"span": span, **ref})
+                return
+        for child in ast.iter_child_nodes(node):
+            visit(child)
+
+    visit(tree.body)
+    return found
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import type { PanelId } from './stepPanels';
+import { PANEL_META } from './stepPanels';
+import type { SymbolName } from './SymbolIcon';
+
+/** Each panel's icon in the Panels menu. */
+const PANEL_ICON: Record<'overview' | 'data' | 'settings', SymbolName> = {
+  overview: 'analytics',
+  data: 'database',
+  settings: 'settings',
+};
 import type { GridPick } from '../utils/selection';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
@@ -8,6 +17,7 @@ import { partsForTool } from '../utils/formulaParts';
 import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 import SymbolIcon from './SymbolIcon';
+import StepMenu from './StepMenu';
 
 // Lazy-load the Monaco-backed formula editor so the ~2 MB editor bundle
 // stays out of the initial JS payload.  While it's loading we render a
@@ -31,6 +41,12 @@ interface StepToolbarProps {
   stepIndex?: number;
   availableOperations?: OperationDefinition[];
   onRun?: (id: string) => void;
+  /** Run every step (the pipeline). */
+  onRunAll?: () => void;
+  /** Move this step to a position, 0 the first (core's `k.move`). */
+  onMove?: (to: number) => void;
+  /** How many steps the workflow has, so a move knows its ends. */
+  stepCount?: number;
   /** Enter in the formula bar: declare the step, running nothing. */
   onDeclare?: () => void;
   onDelete?: (id: string) => void;
@@ -50,6 +66,8 @@ interface StepToolbarProps {
   onFormulaBarRef?: (ref: HTMLTextAreaElement | null) => void;
   /** A pick in an earlier step's grid while this formula bar has focus. */
   onReferencePick?: (sourceStep: string, pick: GridPick) => void;
+  /** The formula's step references and their steps' colours, drawn dashed in the bar (R3). */
+  references?: { start: number; end: number; color: string }[];
 }
 
 export default function StepToolbar({ 
@@ -58,6 +76,9 @@ export default function StepToolbar({
   availableOperations = [], 
   onRun, 
   onDeclare,
+  onRunAll,
+  onMove,
+  stepCount = 1,
   onDelete, 
   onFormulaChange,
   previousStep = null,
@@ -68,6 +89,7 @@ export default function StepToolbar({
   isLocked,
   onFormulaBarRef,
   onReferencePick,
+  references,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const initFormula = step.formula || step.operation || '';
@@ -197,152 +219,91 @@ export default function StepToolbar({
 
       <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
 
-        {/* Summary Button (Levels Icon) — toggles the step overview panel */}
+        {/* The step's control bar (owner, 2026-10-29; dev_plan/126 L1): Run and
+            its controls at the left; at the right, step tools (the Formula
+            panel), the panels menu (☰), settings, then managing the step.
+            Each menu pops up over the page (StepMenu). */}
         <button
-          className={`btn-icon tab-icon ${isOpen('overview') ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTogglePanel('overview'); }}
-          title="Step Overview"
-          style={{
-            position: 'relative',
-            color: isOpen('overview') ? '#f39c12' : '#95a5a6',
-            background: isOpen('overview') ? '#fef9e7' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
+          className="step-run-big"
+          onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }}
+          title={step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)'}
+          aria-label={step.status === 'running' ? 'Stop' : 'Run this step'}
+          data-testid="btn-run"
         >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10"></line>
-                <line x1="12" y1="20" x2="12" y2="4"></line>
-                <line x1="6" y1="20" x2="6" y2="14"></line>
-            </svg>
-            {isOpen('overview') && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '-4px',
-                    left: 0,
-                    right: 0,
-                    height: '2px',
-                    background: '#f39c12',
-                    zIndex: 10
-                }}/>
-            )}
+          <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={18} />
+          <span>{step.status === 'running' ? 'Stop' : 'Run step'}</span>
         </button>
-
-        {/* Data Button (Database Icon) */}
-        <button
-          className={`btn-icon tab-icon ${isOpen('data') ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTogglePanel('data'); }}
-          title="Data View"
-          style={{
-            position: 'relative',
-            color: isOpen('data') ? '#9b59b6' : '#95a5a6',
-            background: isOpen('data') ? '#f4ecf7' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-            </svg>
-            {isOpen('data') && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '-4px', 
-                    left: 0, 
-                    right: 0,
-                    height: '2px',
-                    background: '#9b59b6',
-                    zIndex: 10
-                }}/>
-            )}
-        </button>
-
-
-
-         {/* Settings Button (Gear Icon) - Activated Settings */}
-         <button
-          className={`btn-icon tab-icon ${isOpen('settings') ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTogglePanel('settings'); }}
-          title="Miscellaneous Settings"
-          style={{
-            position: 'relative',
-            color: isOpen('settings') ? '#7f8c8d' : '#95a5a6',
-            background: isOpen('settings') ? '#f0f3f4' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-        >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            {isOpen('settings') && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: '-4px', // Connect to content below
-                    left: 0, 
-                    right: 0,
-                    height: '2px',
-                    background: '#7f8c8d',
-                    zIndex: 10
-                }}/>
-            )}
-        </button>
-
-
-
+        <StepMenu
+          icon="more_vert"
+          iconSize={20}
+          label="Run controls"
+          testId="run-controls"
+          className="step-menu-big"
+          items={[
+            { icon: step.status === 'running' ? 'stop' : 'play_arrow', label: step.status === 'running' ? 'Stop' : 'Run this step', hint: '⌘↵', onClick: () => onRun?.(step.id) },
+            { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
+            { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
+          ]}
+        />
         <div style={{ flex: 1 }} />
-        {/* Lock Button */}
-        <button 
-          className="btn-icon" 
-          onClick={(e) => { e.stopPropagation(); onLock?.(step.id); }}
-          title={isLocked ? "Unlock Step" : "Lock Step"}
-          style={{ 
-              color: isLocked ? '#f39c12' : '#ccc', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginRight: 4
-          }}
+        <button
+          className={`btn-icon step-menu-toggle step-menu-big${isOpen('details') ? ' active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTogglePanel('details'); }}
+          title="Step tools: tool, parameters and modifiers"
+          aria-label="Step tools"
+          aria-pressed={isOpen('details')}
+          data-testid="step-tools"
         >
-          {isLocked ? (
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-             </svg>
-          ) : (
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
-             </svg>
-          )}
+          <SymbolIcon name="build" size={18} />
         </button>
-
-        {/* Delete Action - Always visible but behaves differently based on lock state */}
-        <button 
-            className="btn-icon danger" 
-            onClick={(e) => { 
-                e.stopPropagation(); 
-                if (isLocked) {
-                    alert("This operation is locked. Please unlock it to delete.");
-                } else {
-                    onDelete?.(step.id); 
-                }
-            }}
-            title={isLocked ? "Operation is locked" : "Delete Step"}
-            data-testid="btn-delete"
-            style={{ 
-                color: '#e74c3c', 
-                opacity: isLocked ? 0.3 : 1, 
-                cursor: isLocked ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center' 
-            }}
+        <StepMenu
+          icon="menu"
+          iconSize={18}
+          label="Toggle panels"
+          text="Toggle"
+          testId="panels"
+          className="step-bar-named"
+          items={(['overview', 'data'] as const).map((panel) => ({
+            icon: PANEL_ICON[panel],
+            label: PANEL_META[panel].name,
+            checked: isOpen(panel),
+            onClick: () => onTogglePanel(panel),
+            testId: `panel-${panel}`,
+          }))}
+        />
+        <button
+          className={`btn-icon step-menu-toggle step-bar-named${isOpen('settings') ? ' active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onTogglePanel('settings'); }}
+          title="Settings"
+          aria-label="Settings"
+          aria-pressed={isOpen('settings')}
+          data-testid="panel-settings"
         >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
+          <span className="step-menu-text">Settings</span>
+          <SymbolIcon name="settings" size={18} />
         </button>
+        {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
+        <StepMenu
+          icon="swap_horiz"
+          iconSize={18}
+          label="Manage step"
+          text="Manage Step"
+          align="right"
+          testId="step-management"
+          className="step-bar-named"
+          items={[
+            { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
+            { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1), disabled: !onMove || stepIndex >= stepCount - 1 },
+            { divider: true },
+            { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => onLock?.(step.id) },
+            { divider: true },
+            { icon: 'delete', label: isLocked ? 'Delete (unlock first)' : 'Delete step', onClick: () => onDelete?.(step.id),
+              disabled: isLocked, danger: true, testId: 'btn-delete' },
+          ]}
+        />
       </div>
 
-      {/* Formula Bar Section - Now on Top */}
+      {/* The f(x) button and the formula bar, on their own row */}
       <div
         className="formula-bar"
         style={{
@@ -357,29 +318,6 @@ export default function StepToolbar({
         }}
       >
         
-        {/* Run/Stop Button - Moved Next to Formula Bar */}
-        <button 
-          className="btn-icon" 
-          onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }} 
-          title={step.status === 'running' ? 'Stop' : 'Run (⌘/Ctrl+Enter in the formula bar)'}
-          data-testid="btn-run"
-          style={{ 
-            color: step.status === 'running' ? '#e74c3c' : '#2ecc71',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            padding: 4
-          }}
-        >
-          {step.status === 'running' ? (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            </svg>
-          ) : (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-          )}
-        </button>
-
         {/* Function Button (Fx Icon) - Activated Details */}
         <button
           className={`btn-icon tab-icon ${isOpen('details') ? 'active' : ''}`}
@@ -427,6 +365,7 @@ export default function StepToolbar({
           >
             <FormulaEditor
             value={formula}
+            references={references}
             onChange={(next) => {
               // Build a synthetic event so we reuse handleInputChange's logic
               // without duplicating its body.

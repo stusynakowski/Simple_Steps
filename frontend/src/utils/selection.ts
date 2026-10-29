@@ -21,6 +21,7 @@
  */
 import { INDEX_COL } from './gridSelection';
 import type { GridSel } from './gridSelection';
+import type { FormulaReference } from './formulaParser';
 
 /** What a pick in an earlier step's grid sends the formula being written. */
 export interface GridPick {
@@ -116,4 +117,56 @@ export function placePick(
   const start = clamp(caret.start);
   const end = clamp(Math.max(caret.end, start));
   return { value: value.slice(0, start) + text + value.slice(end), cursor: start + text.length, placed: { start, text } };
+}
+
+/** A rectangle of a grid: a run of adjacent rows (positions) by a run of adjacent columns. */
+export interface GridBox { rows: number[]; cols: string[] }
+
+/**
+ * The cells of this grid a formula's reference covers (dev_plan/126 R3), as
+ * rectangles to box: one per run of adjacent rows and adjacent columns.
+ * Read as core reads it: single and listed rows by row id (*idOf*), a range
+ * by position, no rows or no columns meaning all of them.
+ */
+export function referenceBoxes(
+  ref: Pick<FormulaReference, 'rows' | 'columns'>, rows: number[], cols: string[],
+  idOf: Record<number, string | number> = {},
+): GridBox[] {
+  const id = (r: number) => String(idOf[r] ?? r);
+  let rowList = rows;
+  const want = ref.rows;
+  if (want !== undefined && want !== null) {
+    if (typeof want === 'object' && !Array.isArray(want)) {
+      const start = want.start ?? 0;
+      const stop = want.stop ?? Number.POSITIVE_INFINITY;
+      rowList = rows.filter((r) => r >= start && r < stop);
+    } else {
+      const ids = new Set((Array.isArray(want) ? want : [want]).map(String));
+      rowList = rows.filter((r) => ids.has(id(r)));
+    }
+  }
+  let colList = cols;
+  const named = ref.columns;
+  if (named && 'names' in named) colList = cols.filter((c) => named.names.includes(c));
+  else if (named && 'from' in named) {
+    const a = cols.indexOf(named.from);
+    const b = cols.indexOf(named.to);
+    colList = a < 0 || b < 0 ? [] : cols.slice(Math.min(a, b), Math.max(a, b) + 1);
+  }
+  const rowRuns = runs(rows, rowList);
+  const colRuns = runs(cols, colList);
+  return rowRuns.flatMap((r) => colRuns.map((c) => ({ rows: r, cols: c })));
+}
+
+/** *picked* split into runs that are adjacent in *order*. */
+function runs<T>(order: T[], picked: T[]): T[][] {
+  const out: T[][] = [];
+  const set = new Set(picked);
+  let run: T[] = [];
+  for (const x of order) {
+    if (set.has(x)) run.push(x);
+    else if (run.length) { out.push(run); run = []; }
+  }
+  if (run.length) out.push(run);
+  return out;
 }

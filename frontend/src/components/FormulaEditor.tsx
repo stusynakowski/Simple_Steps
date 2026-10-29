@@ -58,6 +58,23 @@ export interface FormulaEditorProps {
   /** Forwarded to the hidden textarea so wiring works unchanged. */
   shadowRef?: (el: HTMLTextAreaElement | null) => void;
   testId?: string;
+  /** Each step reference's [start, end) in *value* and its step's colour: underlined dashed while editing (R3). */
+  references?: { start: number; end: number; color: string }[];
+}
+
+/** The class that draws a reference dashed in *color*; its rule is added once. */
+function referenceClass(color: string): string {
+  const name = `ss-ref-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
+  if (typeof document !== 'undefined' && !document.getElementById(name)) {
+    const style = document.createElement('style');
+    style.id = name;
+    // A dashed underline in the step's colour, below the text, never over it
+    // (owner, 2026-10-29: no box).
+    style.textContent = `.${name} { text-decoration: underline dashed ${color}; text-decoration-thickness: 1.5px;`
+      + ` text-underline-offset: 3px; text-decoration-skip-ink: none; }`;
+    document.head.appendChild(style);
+  }
+  return name;
 }
 
 /**
@@ -76,10 +93,13 @@ const COLLAPSED_HEIGHT = 28;
 const MAX_EXPANDED_HEIGHT = 200;
 
 const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function FormulaEditor(
-  { value, onChange, onEnter, onModEnter, onFocus, onBlur, placeholder, shadowRef, testId },
+  { value, onChange, onEnter, onModEnter, onFocus, onBlur, placeholder, shadowRef, testId, references },
   ref,
 ) {
   const monacoRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoApi = useRef<typeof Monaco | null>(null);
+  const referenceMarks = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
+  const [mounted, setMounted] = useState(false);
   const shadowTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   // Suppress feedback loop: when we push value Monaco → textarea (or vice
   // versa) we don't want the other side to bounce the change right back.
@@ -105,9 +125,34 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
     getValue: () => monacoRef.current?.getValue() ?? value,
   }), [value]);
 
+  // References, underlined dashed in their step's colour, only while the bar is
+  // being edited (owner, 2026-10-29). A span from the last parse may lag a
+  // keystroke behind; one that no longer starts at a `wf[` is skipped.
+  useEffect(() => {
+    const ed = monacoRef.current;
+    const api = monacoApi.current;
+    const model = ed?.getModel();
+    if (!ed || !api || !model) return;
+    const text = model.getValue();
+    const marks = (focused ? references ?? [] : [])
+      .filter((r) => r.end <= text.length && text.startsWith('wf[', r.start))
+      .map((r) => {
+        const a = model.getPositionAt(r.start);
+        const b = model.getPositionAt(r.end);
+        return {
+          range: new api.Range(a.lineNumber, a.column, b.lineNumber, b.column),
+          options: { inlineClassName: referenceClass(r.color) },
+        };
+      });
+    if (referenceMarks.current) referenceMarks.current.set(marks);
+    else referenceMarks.current = ed.createDecorationsCollection(marks);
+  }, [references, value, mounted, focused]);
+
   // Mount-time wiring of Monaco editor.
   const handleMount: OnMount = (editor, monaco) => {
     monacoRef.current = editor;
+    monacoApi.current = monaco;
+    setMounted(true);
 
     // Register our dark formula-bar theme once.  Matches the surrounding
     // VS-Code-style chrome (#1e1e1e bg, #d4d4d4 text) so the bar reads as

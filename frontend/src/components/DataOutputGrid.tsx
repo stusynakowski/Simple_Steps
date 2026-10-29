@@ -1,6 +1,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isErrorCell } from '../utils/errorCells';
-import { selectionText } from '../utils/selection';
+import { referenceBoxes, selectionText } from '../utils/selection';
+import { useStepWiring } from '../context/StepWiringContext';
 import type { GridPick } from '../utils/selection';
 import {
   INDEX_COL, applyGridPick, cellKey, describeGridSel, drawnIn, inGridSel, selectionEdges, selectionExtent,
@@ -9,7 +10,6 @@ import {
 import type { GridSel, GridSelPick } from '../utils/gridSelection';
 import type { GridSpot } from '../utils/stepsStatus';
 import type { Cell } from '../types/models';
-import type { StagedColumn } from '../hooks/useStagedPreview';
 import { InspectorProvider, useInspectors } from '../context/InspectorContext';
 import { textOn, withAlpha } from '../utils/contrast';
 import SymbolIcon from './SymbolIcon';
@@ -78,9 +78,6 @@ interface DataOutputGridProps {
   wiringMode?: boolean;
   /** In wiring mode: a click on the whole table, a column header or a row number. */
   onPick?: (pick: GridPick) => void;
-  /** What the step being edited currently selects from this grid. */
-  /** Staged columns to render as light-yellow pending cells alongside real data */
-  stagedColumns?: StagedColumn[];
   /** Visual mode for staged cells when pipeline is queued/running */
   stagedCellMode?: 'idle' | 'scheduled' | 'running';
   /** The output these cells come from; lets a typed cell open its full view. */
@@ -121,7 +118,6 @@ function Grid({
   onCellClick,
   wiringMode = false,
   onPick,
-  stagedColumns = [],
   stagedCellMode = 'idle',
   refId,
   onHoverChange,
@@ -149,38 +145,25 @@ function Grid({
   const [, setHoveredCell] = useState<string | null>(null);
 
   // Memoize grid structure calculation
-  const { cols, rows, gridData, structureType, stagedColNames, stagedData } = useMemo(() => {
+  const { cols, rows, gridData, structureType } = useMemo(() => {
     const safeCells = cells ?? [];
 
-    // Build staged lookup: "rowIndex:colName" -> staged metadata
-    const sColNames: string[] = [];
-    const sData: Record<string, { formula: string; state: string }> = {};
-    for (const sc of stagedColumns) {
-      if (!sColNames.includes(sc.name)) sColNames.push(sc.name);
-      for (const cell of sc.cells) {
-        sData[`${cell.rowIndex}:${sc.name}`] = {
-          formula: cell.formula,
-          state: cell.state,
-        };
-      }
-    }
-
-    if (safeCells.length === 0 && sColNames.length === 0 && columns?.length) {
+    if (safeCells.length === 0 && columns?.length) {
       // Planned but no rows yet (a staged step whose row count isn't known):
       // its typed header, and the plan's reason below it.
       return {
         cols: columns.map((c) => c.name), rows: [] as number[], gridData: {} as Record<string, Cell>,
-        structureType: 'grid', stagedColNames: [], stagedData: {},
+        structureType: 'grid',
       };
     }
 
-    if (safeCells.length === 0 && sColNames.length === 0) {
+    if (safeCells.length === 0) {
       // A step's Data is always a dataframe. With nothing in it yet — an empty
       // or undefined expression, or a step not run — it is a 1×1 frame whose
       // one cell says "empty", drawn by the same grid as any other output.
       return {
         cols: [EMPTY_FRAME_COLUMN], rows: [0], gridData: { [`0:${EMPTY_FRAME_COLUMN}`]: EMPTY_FRAME_CELL },
-        structureType: 'grid', stagedColNames: [], stagedData: {},
+        structureType: 'grid',
       };
     }
 
@@ -188,18 +171,6 @@ function Grid({
     const uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort(
       (a, b) => a - b
     );
-
-    // Merge staged column names (only add ones not already in real data)
-    const allCols = [...uniqueCols];
-    for (const sc of sColNames) {
-      if (!allCols.includes(sc)) allCols.push(sc);
-    }
-
-    // If we have staged columns but no real rows, generate row indices from staged data
-    let allRows = uniqueRows;
-    if (allRows.length === 0 && sColNames.length > 0 && stagedColumns[0]?.cells.length > 0) {
-      allRows = Array.from({ length: stagedColumns[0].cells.length }, (_, i) => i);
-    }
 
     // Create a lookup map for faster access: "rowId:colId" -> Cell
     const dataMap: Record<string, Cell> = {};
@@ -211,14 +182,12 @@ function Grid({
     const type = 'grid';
 
     return {
-      cols: allCols,
-      rows: allRows,
+      cols: uniqueCols,
+      rows: uniqueRows,
       gridData: dataMap,
       structureType: type,
-      stagedColNames: sColNames,
-      stagedData: sData,
     };
-  }, [cells, stagedColumns, columns]);
+  }, [cells, columns]);
 
   // Core's type for each column, and its row id for each row (dev_plan/126 R5, D8).
   const typeOf = useMemo(() => {
@@ -439,6 +408,56 @@ function Grid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inspectedKey, shape]);
 
+  // ── Resizing columns and rows, as in a spreadsheet (L5) ─────────────────
+  // Drag a column header's right edge, or a # cell's bottom edge. The sizes
+  // last while the grid is open; saving them with the workflow comes later.
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
+  const startResize = (e: React.MouseEvent, axis: 'x' | 'y', apply: (size: number) => void) => {
+    e.preventDefault();
+    e.stopPropagation();                      // a resize never starts a selection
+    const cell = (e.currentTarget as HTMLElement).parentElement!;
+    const from = axis === 'x' ? e.clientX : e.clientY;
+    const size = axis === 'x' ? cell.offsetWidth : cell.offsetHeight;
+    const move = (m: MouseEvent) => apply(Math.max(axis === 'x' ? 40 : 18, size + (axis === 'x' ? m.clientX : m.clientY) - from));
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  };
+
+  // ── References from the formula being written (R3, D6) ──────────────────
+  // While a formula bar has focus, each of its references to this step is
+  // boxed, dashed, in this step's colour, around the cells it covers: only
+  // when this step's output is shown, not while it's staged.
+  const { wiringState } = useStepWiring();
+  const myRefs = wiringState.references.filter((r) => r.step === stepName);
+  const outputShown = (cells ?? []).some((c) => !c.state || ['known', 'failed', 'stale', 'absent'].includes(c.state));
+  const refsKey = outputShown ? JSON.stringify(myRefs) : '';
+  const [refMarks, setRefMarks] = useState<Omit<Mark, 'id'>[]>([]);
+  useLayoutEffect(() => {
+    const place = () => {
+      const next: Omit<Mark, 'id'>[] = [];
+      if (outputShown) {
+        for (const ref of myRefs) {
+          for (const box of referenceBoxes(ref, rows, cols, idOf)) {
+            const a = elementAt(box.rows[0], box.cols[0]);
+            const b = elementAt(box.rows[box.rows.length - 1], box.cols[box.cols.length - 1]);
+            if (!a || !b) continue;
+            next.push({ left: a.offsetLeft, top: a.offsetTop,
+              width: b.offsetLeft + b.offsetWidth - a.offsetLeft, height: b.offsetTop + b.offsetHeight - a.offsetTop });
+          }
+        }
+      }
+      setRefMarks((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    place();
+    if (typeof ResizeObserver === 'undefined' || !gridRef.current) return;
+    const ro = new ResizeObserver(place);
+    ro.observe(gridRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refsKey, shape]);
+
   // ── Picks for a formula ─────────────────────────────────────────────────
   // While a later step's formula bar has focus, the same selection as looking
   // (a cell, a block, rows, columns, the # corner; Shift, ⌘/Ctrl, drag) is
@@ -462,14 +481,10 @@ function Grid({
     select({ kind: 'all' }, e);
   };
 
-  // The index column: its header selects it, its
-  // cells select like any cell. Looking only — a formula can't reference the
-  // index yet.
+  // The # column: its header selects it (looking only — a formula can't
+  // reference the row ids); its cells select their rows (handleRowClick).
   const handleIndexClick = (e: React.MouseEvent) => {
     if (!wiringMode) select({ kind: 'index' }, e);
-  };
-  const handleIndexCellClick = (row: number, e: React.MouseEvent) => {
-    if (!wiringMode) clickCell(row, INDEX_COL, e);
   };
 
 
@@ -479,7 +494,8 @@ function Grid({
 
   // ── Wiring overlay styles ───────────────────────────────────────────────
 
-  const HOVER_BG = 'rgba(255, 193, 7, 0.16)';
+  // Hover shading only, neutral: a reference's colour is its dashed box (R3).
+  const HOVER_BG = 'rgba(0, 0, 0, 0.05)';
 
   const wiringColHeaderStyle = (col: string): React.CSSProperties => {
     if (!wiringMode) return { cursor: 'pointer', userSelect: 'none' as const };
@@ -548,31 +564,15 @@ function Grid({
         onMouseLeave={() => onHoverChange?.(null)}
         style={{
           // The # column fits its widest row id, and no wider (owner, 2026-10-28).
-          gridTemplateColumns: `var(--grid-gutter) max-content repeat(${cols.length}, minmax(100px, 1fr))`,
-          ...(wiringMode
-            ? {
-                outline: '1px solid rgba(255, 193, 7, 0.6)',
-                outlineOffset: -1,
-                borderRadius: 3,
-              }
-            : {}),
+          gridTemplateColumns: `max-content ${cols.map((c) => (colWidths[c] ? `${colWidths[c]}px` : 'minmax(100px, 1fr)')).join(' ')}`,
+          gridTemplateRows: `auto ${rows.map((r) => (rowHeights[r] ? `${rowHeights[r]}px` : 'auto')).join(' ')}`,
         }}
         role="grid"
       >
-        {/* Header row. Left of it, the top of the row margin: selects the
-            whole table. Then the index column's header, then the columns'.
-            Rows are selected from the margin left of them, so every cell —
-            the index's included — stays a cell of its own. */}
-        <div
-          className={`grid-gutter grid-gutter-left grid-gutter-corner${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
-          role="button"
-          aria-label="Select the whole table"
-          title="Select the whole table"
-          style={wiringMode ? { cursor: 'crosshair' } : undefined}
-          onClick={handleCornerClick}
-          onMouseEnter={() => { setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
-          onMouseLeave={() => setHoveredCol(null)}
-        />
+        {/* Header row: the # header, then the columns'. As in a spreadsheet,
+            the triangle in the # header's top-left corner selects the whole
+            table; the rest of it selects the # column. A row is selected from
+            its # cell, as a column is from its header (owner, 2026-10-28). */}
         <div
           className="grid-header-cell row-index-header"
           data-sel-key={cellKey(-1, INDEX_COL)}
@@ -581,6 +581,15 @@ function Grid({
           onClick={handleIndexClick}
           onMouseEnter={() => { onHoverChange?.({ kind: 'column', column: '#' }); }}
         >
+          <span
+            className={`corner-triangle${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
+            role="button"
+            aria-label="Select the whole table"
+            title="Select the whole table"
+            onClick={(e) => { e.stopPropagation(); handleCornerClick(e); }}
+            onMouseEnter={(e) => { e.stopPropagation(); setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
+            onMouseLeave={() => setHoveredCol(null)}
+          />
           #
         </div>
         {cols.map((col) => (
@@ -592,7 +601,6 @@ function Grid({
             title={wiringMode ? `Select column ${col} (Shift: range, ⌘/Ctrl: add)` : typeOf[col] ? `${col}: ${typeOf[col]}` : col}
             style={{
               ...wiringColHeaderStyle(col),
-              ...(stagedColNames.includes(col) ? { background: '#fff8dc', color: '#665e30' } : {}),
               ...(activeCell?.col === col ? { background: ACTIVE_HEADER_BG } : {}),
               ...outline(-1, col),
             }}
@@ -603,6 +611,12 @@ function Grid({
           >
             {col}
             {typeOf[col] && <span className="col-type">{typeOf[col]}</span>}
+            <span
+              className="col-resizer"
+              aria-hidden="true"
+              onMouseDown={(e) => startResize(e, 'x', (w) => setColWidths((p) => ({ ...p, [col]: w })))}
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         ))}
 
@@ -620,6 +634,10 @@ function Grid({
             {!tabInside && describeGridSel(shownSel, rows, cols)}
           </button>
         )}
+        {refMarks.map((m, i) => (
+          <div key={`ref-${i}`} className="reference-mark" aria-hidden="true"
+            style={{ left: m.left, top: m.top, width: m.width, height: m.height, borderColor: edge }} />
+        ))}
         {marks.map((m) => (
           <div
             key={m.id}
@@ -657,91 +675,35 @@ function Grid({
         {/* Data Rows */}
         {rows.map((r) => (
           <div key={r} className="grid-row" role="row">
-            {/* The margin left of the row: selects the whole row. */}
+            {/* The row's # cell selects the row (Shift: range, ⌘/Ctrl: add, drag). */}
             <div
-              className={`grid-gutter grid-gutter-left${shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0]) ? ' is-selected' : ''}`}
-              title={`Select row ${r} (Shift: range, ⌘/Ctrl: add)`}
-              style={wiringMode ? { cursor: 'crosshair' } : undefined}
-              onMouseDown={(e) => startDrag({ kind: 'row', row: r }, e)}
-              onClick={(e) => handleRowClick(r, e)}
-              onMouseEnter={() => { if (wiringMode) setHoveredRow(r); dragOver(r, cols[0]); onHoverChange?.({ kind: 'row', row: r }); }}
-              onMouseLeave={() => wiringMode && setHoveredRow(null)}
-            />
-            {/* The index: a cell of its own. */}
-            <div
-              className="grid-cell row-index"
+              className={`grid-cell row-index${shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0]) ? ' is-selected' : ''}`}
               data-sel-key={cellKey(r, INDEX_COL)}
               role="rowheader"
-              title={wiringMode ? "The row ids (#) can't be referenced yet" : `# ${idOf[r] ?? r}`}
-              style={wiringMode ? {
-                cursor: 'default',
-                background: hoveredRow === r ? HOVER_BG : undefined,
-                transition: 'background 0.1s ease',
-              } : {
+              title={`Select row # ${idOf[r] ?? r} (Shift: range, ⌘/Ctrl: add)`}
+              style={{
                 cursor: 'pointer',
-                ...(activeCell?.row === r ? { background: ACTIVE_HEADER_BG, color: '#222' } : {}),
-                ...outline(r, INDEX_COL),
+                ...(wiringMode && hoveredRow === r ? { background: HOVER_BG } : {}),
+                ...(!wiringMode && activeCell?.row === r ? { background: ACTIVE_HEADER_BG, color: '#222' } : {}),
               }}
-              onMouseDown={(e) => startDrag({ kind: 'cell', row: r, col: INDEX_COL }, e)}
-              onClick={(e) => handleIndexCellClick(r, e)}
-              onMouseEnter={() => { dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'cell', row: r, column: '#', value: String(idOf[r] ?? r) }); }}
+              onMouseDown={(e) => startDrag({ kind: 'row', row: r }, e)}
+              onClick={(e) => handleRowClick(r, e)}
+              onMouseEnter={() => { if (wiringMode) setHoveredRow(r); dragOver(r, INDEX_COL); onHoverChange?.({ kind: 'row', row: r }); }}
+              onMouseLeave={() => wiringMode && setHoveredRow(null)}
             >
               {idOf[r] ?? r}
+              <span
+                className="row-resizer"
+                aria-hidden="true"
+                onMouseDown={(e) => startResize(e, 'y', (h) => setRowHeights((p) => ({ ...p, [r]: h })))}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
 
             {/* Cells */}
             {cols.map((c) => {
               const cell = gridData[`${r}:${c}`];
               const cellKey = `${r}:${c}`;
-              const stagedInfo = stagedData[cellKey];
-              const isStaged = stagedInfo !== undefined && stagedColNames.includes(c);
-
-              if (isStaged) {
-                const isError = stagedInfo.state === 'error';
-                const showSpinner = !isError && (stagedCellMode === 'running' || stagedCellMode === 'scheduled');
-                const modeLabel = stagedCellMode === 'running'
-                  ? 'running'
-                  : stagedCellMode === 'scheduled'
-                    ? 'scheduled'
-                    : 'staged';
-                return (
-                  <div
-                    key={cellKey}
-                    className="grid-cell staged"
-                    role="gridcell"
-                    title={stagedInfo.formula}
-                    style={{
-                      background: isError ? '#ffebee' : '#fffde7',
-                      borderLeft: showSpinner ? '2px solid #ffb300' : undefined,
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: '0.65rem',
-                        fontWeight: 600,
-                        color: isError ? '#b71c1c' : '#b8960c',
-                        marginRight: 6,
-                        fontStyle: 'italic',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 5,
-                      }}
-                    >
-                      {showSpinner && <span className="cell-wait-spinner" />}
-                      ({modeLabel})
-                    </span>
-                    <span
-                      style={{
-                        color: isError ? '#8e0000' : '#7a6e30',
-                        fontSize: '0.72rem',
-                        fontFamily: 'Menlo, Monaco, Consolas, monospace',
-                      }}
-                    >
-                      {stagedInfo.formula}
-                    </span>
-                  </div>
-                );
-              }
 
               return (
                 <div

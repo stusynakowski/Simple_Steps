@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Step } from '../types/models';
 import type { OperationDefinition, ResourceDeclaration } from '../services/api';
 import type { ProgressEvent } from '../services/api';
@@ -7,14 +7,14 @@ import StepToolbar from './StepToolbar';
 import { placePick, stepRef } from '../utils/selection';
 import type { GridPick, PlacedPick } from '../utils/selection';
 import { parseFormula } from '../utils/formulaParser';
-import type { ParsedFormula } from '../utils/formulaParser';
+import type { FormulaReference, ParsedFormula } from '../utils/formulaParser';
+import { getStepColor } from '../styles/theme';
 import ToolEditor from './ToolEditor';
 import StepWidget from './StepWidget';
 import type { PanelId } from './stepPanels';
 import StepOverview from './StepOverview';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
-import { useStagedPreview } from '../hooks/useStagedPreview';
 import './OperationColumn.css';
 
 interface OperationColumnProps {
@@ -34,9 +34,14 @@ interface OperationColumnProps {
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
   onRun: (id: string) => void;
+  /** Run every step (the pipeline): the run controls' "Run all steps". */
+  onRunAll?: () => void;
+  /** Move this step to a position, 0 the first. */
+  onMove?: (to: number) => void;
+  /** How many steps the workflow has. */
+  stepCount?: number;
   /** Declare the workflow, running nothing (Enter in the formula bar). */
   onDeclare?: () => void;
-  onPreview?: (id: string) => void;
   onPause: (id: string) => void;
   onDelete: (id: string) => void;
   onMinimize?: () => void;
@@ -72,8 +77,10 @@ export default function OperationColumn({
   onActivate,
   onUpdate,
   onRun,
+  onRunAll,
+  onMove,
+  stepCount,
   onDeclare,
-  onPreview,
   onDelete,
   onMinimize,
   onMaximize,
@@ -105,7 +112,7 @@ export default function OperationColumn({
   const [isLocked, setIsLocked] = useState(false);
 
   // Wiring context — this column is a wiring SOURCE when a later step's formula is focused
-  const { wiringState, pickFrom, setActiveSelection } = useStepWiring();
+  const { wiringState, pickFrom, setActiveSelection, setReferences } = useStepWiring();
   // What the pointer is over in this step's grid, for the steps bar's status.
   const setGridHover = useSetGridHover();
   const isWiringSource =
@@ -114,9 +121,6 @@ export default function OperationColumn({
     wiringState.receivingStepIndex !== null &&
     stepIndex < wiringState.receivingStepIndex;
 
-  // Track whether the user is hovering over this column while it's a wiring source.
-  // The yellow highlight and wiring UI only appear on hover, not automatically.
-  const [isWiringHovered, setIsWiringHovered] = useState(false);
 
   // Refs for parameter inputs so they can also participate in wiring
 
@@ -164,10 +168,23 @@ export default function OperationColumn({
   // useWorkflow fills it in for legacy steps saved without one.
   const savedFormula = step.formula || step.operation || '';
 
-  // ── Staged preview state ───────────────────────────────────────────────────
-  // Track what the user is typing live — separate from committed step.formula
-  // Starts from the saved formula; follows every keystroke from then on.
-  const [liveFormula, setLiveFormula] = useState<string>(savedFormula);
+  // ── References in the formula (R3) ──────────────────────────────────────
+  // Where each wf["…"] is in the formula and what it covers, from the parser
+  // (F8): drawn dashed in the formula bar in its step's colour, and, while this
+  // formula bar has focus, boxed in the source step's grid.
+  const [refsOf, setRefsOf] = useState<{ formula: string; refs: FormulaReference[] }>({ formula: '', refs: [] });
+  useEffect(() => {
+    if (refsOf.formula === savedFormula) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      parseFormula(savedFormula)
+        .then((p) => { if (!cancelled) setRefsOf({ formula: savedFormula, refs: p.references ?? [] }); })
+        .catch(() => {});
+    }, 150);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [savedFormula, refsOf.formula]);
+  const colorOf = Object.fromEntries(previousSteps.map((s, i) => [s.label, s.step_color ?? getStepColor(i)]));
+  const barReferences = refsOf.refs.map((r) => ({ start: r.span[0], end: r.span[1], color: colorOf[r.step] ?? '#888' }));
 
   // A new round of picking starts fresh: the last pick is only replaced while
   // this formula bar is still receiving.
@@ -175,70 +192,9 @@ export default function OperationColumn({
   useEffect(() => {
     if (!isReceiving) lastPick.current = null;
   }, [isReceiving]);
-
-  // Keep liveFormula in sync when the step is updated externally.
   useEffect(() => {
-    setLiveFormula(savedFormula);
-  }, [savedFormula]);
-
-  // Parse the live formula so the staged preview hook gets a typed ParsedFormula.
-  // parseFormula is async (it round-trips to the backend) so we cache the result
-  // in state instead of useMemo.
-  const [liveParsed, setLiveParsed] = useState<ParsedFormula | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    if (!liveFormula) {
-      setLiveParsed(null);
-      return;
-    }
-    parseFormula(liveFormula).then((p) => {
-      if (!cancelled) setLiveParsed(p);
-    });
-    return () => { cancelled = true; };
-  }, [liveFormula]);
-
-  // Derive upstream rows/columns from the last previous step's output_preview
-  const upstreamRows = useMemo<Record<string, unknown>[]>(() => {
-    const lastStep = previousSteps[previousSteps.length - 1];
-    if (!lastStep?.output_preview || lastStep.output_preview.length === 0) return [];
-    const colIds = Array.from(new Set(lastStep.output_preview.map((c) => c.column_id)));
-    const rowIds = Array.from(new Set(lastStep.output_preview.map((c) => c.row_id))).sort(
-      (a, b) => a - b
-    );
-    return rowIds.map((rowId) =>
-      Object.fromEntries(
-        colIds.map((colId) => {
-          const cell = lastStep.output_preview!.find(
-            (c) => c.row_id === rowId && c.column_id === colId
-          );
-          return [colId, cell?.value ?? null];
-        })
-      )
-    );
-  }, [previousSteps]);
-
-  const upstreamColumns = useMemo(() => {
-    const lastStep = previousSteps[previousSteps.length - 1];
-    if (!lastStep?.output_preview) return [];
-    return Array.from(new Set(lastStep.output_preview.map((c) => c.column_id)));
-  }, [previousSteps]);
-
-  const stagedPreview = useStagedPreview({
-    step,
-    parsed: liveParsed,
-    availableOperations,
-    upstreamRows,
-    upstreamColumns,
-    previewRowCount: 6,
-  });
-
-  // Show staged preview when the formula has been touched but step hasn't been
-  // (re-)run — or when the live formula differs from what was last executed
-  const hasUncommittedFormula =
-    liveFormula !== '' &&
-    (step.status === 'pending' ||
-      step.status === 'stopped' ||
-      liveFormula !== savedFormula);
+    if (isReceiving) setReferences(refsOf.refs);
+  }, [isReceiving, refsOf.refs, setReferences]);
 
   const isScheduledInPipeline =
     pipelineStatus === 'running' &&
@@ -274,12 +230,6 @@ export default function OperationColumn({
         ? 'scheduled'
         : 'idle';
 
-  // The guessed staged columns, only until core's view of the step arrives:
-  // after that the grid draws core's own cells (pending, known, failed, …).
-  const showExecutionStagedCells = !step.coreState && (
-    hasUncommittedFormula ||
-    step.status === 'running' ||
-    isScheduledInPipeline);
   // Core's reason a staged step's rows aren't exactly known yet (its plan, R6):
   // unknown ("its input doesn't know its row count") or bounded ("one row per group").
   const planNote = step.plan?.rows && step.plan.rows.certainty !== 'exact' ? step.plan.rows.because : undefined;
@@ -287,7 +237,7 @@ export default function OperationColumn({
   // Handler for Formula-based updates (Toolbar Input)
   // The formula bar is the canonical write path. Everything else is derived from it.
   const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
-    setLiveFormula(formula); // immediately drive staged preview
+    setRefsOf({ formula, refs: parsed.references ?? [] });
     if (parsed.isValid && parsed.operationId) {
       // Preserve internal keys (e.g. _orchestrator) that aren't in the formula.
       // The orchestration modifier in the formula takes precedence; store it as
@@ -455,6 +405,9 @@ export default function OperationColumn({
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
               onDeclare={onDeclare}
+              onRunAll={onRunAll}
+              onMove={onMove}
+              stepCount={stepCount}
               onDelete={() => onDelete(step.id)}
               openPanels={openPanels}
               onTogglePanel={togglePanel}
@@ -465,6 +418,7 @@ export default function OperationColumn({
               onLock={() => setIsLocked(!isLocked)}
               onFormulaBarRef={(el) => { formulaBarRef.current = el; }}
               onReferencePick={handleReferencePick}
+              references={barReferences}
             />
           )}
 
@@ -573,7 +527,6 @@ export default function OperationColumn({
                         onDefineResource={onDefineResource}
                         onChange={(formula, parsed) => {
                           handleFormulaUpdate(step.id, formula, parsed);
-                          onPreview?.(step.id);
                         }}
                       />
                     </div>
@@ -586,9 +539,6 @@ export default function OperationColumn({
                 <StepWidget id="data" collapsed={collapsedPanels.has('data')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight} note={dataNote}>
                   <div
                     className="tab-content status-content"
-                    onMouseEnter={() => { if (isWiringSource) setIsWiringHovered(true); }}
-                    onMouseLeave={() => setIsWiringHovered(false)}
-                    style={isWiringSource && isWiringHovered ? { outline: '2px solid #ffc107', outlineOffset: -2, borderRadius: 4 } : {}}
                   >
                     <div className="expander-inner data-grid-expander" onClick={(e) => e.stopPropagation()}>
                       <DataOutputGrid
@@ -596,7 +546,6 @@ export default function OperationColumn({
                         refId={step.outputRefId}
                         wiringMode={isWiringSource}
                         onPick={(pick) => pickFrom(step.label, pick)}
-                        stagedColumns={showExecutionStagedCells ? stagedPreview.columns : []}
                         columns={step.viewColumns}
                         planNote={planNote}
                         stagedCellMode={stagedCellMode}

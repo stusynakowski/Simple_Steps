@@ -23,6 +23,20 @@ export interface ParsedFormula {
   /** Set for a formula in core's syntax: the formula as the step editor edits it. */
   parts?: FormulaParts;
   rawInput: string;
+  /** Every step reference in the formula, where it is and what it covers (dev_plan/126 F8). */
+  references?: FormulaReference[];
+}
+
+/**
+ * A step reference in a formula (`operation_formula.references`): `span` is
+ * its [start, end) in the formula's characters, the `=` included; `rows` and
+ * `columns` are what a selection covers, in core's spec.
+ */
+export interface FormulaReference {
+  span: [number, number];
+  step: string;
+  rows?: number | string | (number | string)[] | { start: number | null; stop: number | null };
+  columns?: { names: string[] } | { from: string; to: string };
 }
 
 /** A tool argument: a literal, another step's value, or a resource. */

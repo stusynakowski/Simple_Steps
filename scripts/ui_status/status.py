@@ -119,6 +119,11 @@ report("D4  the panel freezes on a formula that doesn't parse",
        "ToolEditor keeps the last parsed parts editable under a warning",
        "ToolEditor's invalid branch changed; try 01/doubled with a stray (")
 
+report("--  the Formula panel doesn't run its step on edit",
+       "onPreview" not in column,
+       "each Formula panel edit runs the step (onPreview -> previewStep)",
+       "no onPreview; a preview declares (useWorkflow.previewStep)")
+
 monaco = source("shell/monacoSetup.ts")
 report("F3  highlighting knows wf[\"x\"]",
        bool(re.search(r"wf\\?\[", monaco)),
@@ -134,6 +139,16 @@ for item, formula in [("D1  parser: a column as an argument", 'double[mod.map()]
                       ("F11 parser: wf[0]", 'double[mod.map()](wf[0])')]:
     ok, why = parses(formula)
     report(item, ok, f"refused: {why}", f"parses: {formula}")
+
+from SIMPLE_STEPS.operation_formula import references  # noqa: E402
+spans = references('=double[mod.map()](wf["readings"], n=wf["readings"][0:2][cols["n"]])')
+report("F8  the parser gives each reference's span and coverage",
+       len(spans) == 2 and spans[1].get("rows") == {"start": 0, "stop": 2},
+       "parse_formula returns no references",
+       f"{len(spans)} references, e.g. {spans[1] if len(spans) > 1 else spans}")
+report("R3  references dashed in the bar and boxed in the source grid",
+       "reference-mark" in source("components/DataOutputGrid.tsx") and "referenceClass" in source("components/FormulaEditor.tsx"),
+       "no reference marks", "drawn; focus 03/reader with a selection argument")
 
 selection = source("utils/selection.ts")
 report("D1  picks write core's notation, no select step",
@@ -187,9 +202,9 @@ report("R6  an endpoint serves core's view / plan",
        "/api/view exists (kernels.view); declare 02/staged without running: pending cells under a typed header")
 
 report("F12 staged cells carry no formula text",
-       "↳" not in source("hooks/useStagedPreview.ts"),
+       not (FRONTEND / "hooks/useStagedPreview.ts").exists(),
        "useStagedPreview writes '↳ <ref>' into staged cells",
-       "no '↳' in useStagedPreview; declare 02/staged")
+       "the guessed staged preview is gone; staged cells come from core (declare 02/staged)")
 
 # ── Lineage and the index ─────────────────────────────────────────────────
 

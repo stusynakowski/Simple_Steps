@@ -21,6 +21,7 @@
 import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { stepRef } from '../utils/selection';
 import type { GridPick } from '../utils/selection';
+import type { FormulaReference } from '../utils/formulaParser';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,9 +38,10 @@ export interface WiringState {
    * Inputs without one get `wf["<step>"]` inserted at the cursor.
    */
   onPick: ((sourceStep: string, pick: GridPick) => void) | null;
-  /** What the receiving step currently selects, so the source grid can show it. */
   /** The pick being made for the receiving formula, as written (`wf["r"][0:2]`). */
   activeSelection: string | null;
+  /** The receiving formula's references: the source grids box what each covers (R3). */
+  references: FormulaReference[];
 }
 
 export interface StepWiringContextValue {
@@ -58,6 +60,8 @@ export interface StepWiringContextValue {
   pickFrom: (sourceStep: string, pick: GridPick) => void;
   /** The receiving step publishes its current selection here. */
   setActiveSelection: (selection: string | null) => void;
+  /** The receiving step publishes its formula's references here. */
+  setReferences: (references: FormulaReference[]) => void;
   /**
    * Called on blur (with a small delay so grid clicks can fire first).
    */
@@ -73,7 +77,7 @@ export interface StepWiringContextValue {
 // ── Context ────────────────────────────────────────────────────────────────
 
 const EMPTY_WIRING: WiringState = {
-  receivingStepId: null, receivingStepIndex: null, inputRef: null, onPick: null, activeSelection: null,
+  receivingStepId: null, receivingStepIndex: null, inputRef: null, onPick: null, activeSelection: null, references: [],
 };
 
 const StepWiringContext = createContext<StepWiringContextValue>({
@@ -83,6 +87,7 @@ const StepWiringContext = createContext<StepWiringContextValue>({
   injectReference: () => {},
   pickFrom: () => {},
   setActiveSelection: () => {},
+  setReferences: () => {},
 });
 
 // ── Provider ───────────────────────────────────────────────────────────────
@@ -111,6 +116,7 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
         inputRef,
         onPick: onPick ?? null,
         activeSelection: prev.receivingStepId === stepId ? prev.activeSelection : null,
+        references: prev.receivingStepId === stepId ? prev.references : [],
       }));
     },
     []
@@ -184,8 +190,12 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
     setWiringState((prev) => (prev.activeSelection === selection ? prev : { ...prev, activeSelection: selection }));
   }, []);
 
+  const setReferences = useCallback((references: FormulaReference[]) => {
+    setWiringState((prev) => (JSON.stringify(prev.references) === JSON.stringify(references) ? prev : { ...prev, references }));
+  }, []);
+
   return (
-    <StepWiringContext.Provider value={{ wiringState, activateWiring, deactivateWiring, injectReference, pickFrom, setActiveSelection }}>
+    <StepWiringContext.Provider value={{ wiringState, activateWiring, deactivateWiring, injectReference, pickFrom, setActiveSelection, setReferences }}>
       {children}
     </StepWiringContext.Provider>
   );

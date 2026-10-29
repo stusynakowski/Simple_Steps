@@ -9,8 +9,8 @@
  *   2.  Wire Monaco's web workers through Vite's `?worker` import syntax so
  *       they're code-split and served from our own origin.
  *   3.  Register the `simpleSteps` language — a Monarch tokenizer that gives
- *       us syntax highlighting for `=operation.mode(arg=value, ref=step.col)`
- *       formulas.  This is a stub today; later sprints will layer
+ *       us syntax highlighting for formulas in core's syntax,
+ *       `=tool[mod.map()](wf["step"], arg=value)`.  This is a stub today; later sprints will layer
  *       completions, hovers and diagnostics on top of the same language id.
  *
  * Import this module exactly once, from `main.tsx`, before any component
@@ -38,24 +38,21 @@ loader.config({ monaco });
 
 // ── `simpleSteps` language ─────────────────────────────────────────────────
 //
-// Grammar overview:
+// Grammar: core's syntax (dev_plan/126 F3), valid Python:
 //
-//   =OPERATION[.MODE](arg=value, ref=stepN.col, ...)
+//   =tool[mod.map(), mod.name("score")](wf["readings"], n=wf["r"][0:2][cols["n"]], llm=res["llm"])
 //
 // Tokens we colour:
-//   - leading `=`                            → operator
-//   - operation identifier (before `.` / `(`) → type.identifier
-//   - `.mode` modifier (source/map/filter/…) → keyword
-//   - parameter name before `=`              → variable.parameter
-//   - step references like `step1.col`       → variable.reference
-//   - strings, numbers, booleans             → string / number / keyword
+//   - leading `=`                                → operator
+//   - `wf["step"]`, a step reference             → variable.predefined
+//   - `res["name"]`, a resource                  → type
+//   - `mod.verb`, a modifier                     → keyword
+//   - `cols[…]`, `rows[…]` in a selection        → keyword
+//   - a tool (a name before `[` or `(`)          → type.identifier
+//   - a parameter name before `=`                → variable.parameter
+//   - strings, numbers, True / False / None      → string / number / keyword
 
-const ORCHESTRATION_MODES = [
-  'source', 'map', 'filter', 'dataframe',
-  'expand', 'raw_output', 'orchestrator', 'each',
-];
-
-const LITERALS = ['True', 'False', 'None', 'null', 'true', 'false'];
+const LITERALS = ['True', 'False', 'None'];
 
 export const SIMPLE_STEPS_LANGUAGE_ID = 'simpleSteps';
 
@@ -71,7 +68,6 @@ function registerSimpleStepsLanguage() {
     defaultToken: '',
     tokenPostfix: '.ss',
 
-    modes: ORCHESTRATION_MODES,
     literals: LITERALS,
 
     tokenizer: {
@@ -79,25 +75,19 @@ function registerSimpleStepsLanguage() {
         // Leading `=` marks a formula
         [/^=/, 'operator'],
 
-        // Operation name right after `=`
-        [/(?<==)\s*[a-zA-Z_][\w]*/, 'type.identifier'],
+        // A step reference, wf["readings"], and a resource, res["llm"]
+        [/\bwf\[\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\]/, 'variable.predefined'],
+        [/\bres\[\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\]/, 'type'],
 
-        // `.mode` after operation name
-        [
-          /\.([a-zA-Z_]\w*)/,
-          {
-            cases: {
-              '$1@modes': 'keyword',
-              '@default': 'identifier',
-            },
-          },
-        ],
+        // Modifiers, mod.map, and selection helpers, cols[…] / rows[…]
+        [/\bmod\.[a-zA-Z_]\w*/, 'keyword'],
+        [/\b(?:cols|rows)(?=\s*\[)/, 'keyword'],
 
-        // Step references: `step1.col_name` or `stepN.col_name`
-        [/\b(step\d+)\b/, 'variable.reference'],
+        // A parameter name before `=` (not `==`)
+        [/[a-zA-Z_]\w*(?=\s*=(?!=))/, 'variable.parameter'],
 
-        // Param name before `=`
-        [/[a-zA-Z_]\w*(?=\s*=)/, 'variable.parameter'],
+        // A tool: a name followed by its modifiers or its call
+        [/[a-zA-Z_]\w*(?=\s*[[(])/, 'type.identifier'],
 
         // Numbers
         [/\b\d+\.\d+\b/, 'number.float'],
