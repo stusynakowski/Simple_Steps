@@ -57,7 +57,7 @@ function HeaderButton({ icon, label, onClick, disabled }: {
   );
 }
 
-/** A side of the frame: the wiring toggle it holds, →ƒ(x) or ƒ(x)→. */
+/** A widget on one side of the box, outside its border: the wiring toggle, →ƒ(x) or ƒ(x)→. */
 function Side({ side, label }: { side: 'left' | 'right'; label: string }) {
   return (
     <div className={`si-side si-side-${side}`}>
@@ -203,7 +203,11 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
   const failed = selected.find((c) => isErrorCell(c));
   const state = failed ? `failed · ${failed.display_value}` : selected.every((c) => !c) ? 'empty' : 'current';
 
-  const single = rows.length === 1 && cols.length === 1 ? cells[`${rows[0]}:${cols[0]}`] : undefined;
+  // Only the selected cells (owner, 2026-10-29): the rows and columns that
+  // hold one, no index and no column names — the header says what they are.
+  const shownRows = rows.filter((r) => cols.some((c) => isSelected(r, c)));
+  const shownCols = cols.filter((c) => rows.some((r) => isSelected(r, c)));
+  const single = shownRows.length === 1 && shownCols.length === 1 ? cells[`${shownRows[0]}:${shownCols[0]}`] : undefined;
   const display = !!(single?.cell_type && refId);
   const expression = (formula ?? '').replace(/^=/, '');
   const ink = textOn(color);
@@ -216,7 +220,6 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
       className={`si-frame si-${mode}${maximized ? ' si-maximized' : ''}${display ? ' si-display' : ''}`}
       style={{
         ...(maximized ? {} : { left: pos?.x ?? -9999, top: pos?.y ?? -9999 }),
-        ...(display && !maximized ? DISPLAY_SIZE : {}),
         zIndex: inspector.z,
         ['--si-color' as string]: color,
       }}
@@ -261,30 +264,24 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
           </div>
         )}
       </div>
-      <div className="si-main">
+      {/* The selected cells in a tight border; the widgets sit outside it,
+          on its sides (more will join them). */}
+      <div className="si-body">
         <Side side="left" label="Inputs: what made this (coming with the wiring)" />
-        <div className="si-content">
+        <div className="si-box" style={display && !maximized ? DISPLAY_SIZE : undefined}>
           {display ? (
             <CellViewer refId={refId!} row={rows[0]} column={cols[0]} mode="embedded" onClose={() => ctx.close(id)} />
-          ) : rows.length === 1 && cols.length <= 1 ? (
-            // One cell: its value alone, as the cell itself — the header
-            // already says which cell it is. (No data column: an index cell.)
+          ) : shownRows.length <= 1 && shownCols.length <= 1 ? (
+            // One cell: its value alone. (No data column: a # cell.)
             <div className={`si-value${isErrorCell(single) ? ' si-error' : ''}`}>
-              {cols.length === 0 ? rows[0] : single ? single.display_value : ''}
+              {shownCols.length === 0 ? rows[0] : single ? single.display_value : ''}
             </div>
           ) : (
             <table className="si-table">
-              <thead>
-                <tr>
-                  <th className="si-index">index</th>
-                  {cols.map((c) => <th key={c}>{c}</th>)}
-                </tr>
-              </thead>
               <tbody>
-                {rows.map((r) => (
+                {shownRows.map((r) => (
                   <tr key={r}>
-                    <th className="si-index" scope="row">{r}</th>
-                    {cols.map((c) => {
+                    {shownCols.map((c) => {
                       const cell = cells[`${r}:${c}`];
                       const inSel = isSelected(r, c);
                       return (

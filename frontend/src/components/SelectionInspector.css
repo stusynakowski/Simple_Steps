@@ -1,44 +1,36 @@
 /* The selection inspector (spec 014 §8): a header bar in the step's colour
-   (the pull-off bar, its window controls at the right end), the enlarged
-   data, and a thin side on each edge for the wiring: inputs left, outputs
-   right. Kept quiet so the data is what's seen. Resizes from its corner. */
+   (the pull-off bar, its window controls at the right end) above the
+   selected cells, in a border wrapped tightly round them; its widgets sit
+   outside that border, on its sides (owner, 2026-10-29: no dead space; more
+   widgets will join them). The box resizes from its corner. */
 
 .si-frame {
   position: fixed;
-  display: flex;
+  display: inline-flex;
   flex-direction: column;
-  min-width: 200px;
-  min-height: 60px;
   max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
-  background: #fff;
   color: #222;
-  border: 1px solid var(--si-color, #888);
-  border-radius: 3px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   font-size: 13px;
-  overflow: hidden;
-  resize: both;
 }
 
-/* Until resized, a selection keeps to a comfortable size. */
-.si-frame:not(.si-display):not(.si-maximized) { max-width: min(760px, calc(100vw - 16px)); max-height: min(70vh, calc(100vh - 16px)); }
-.si-frame.si-docked { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16); }
-.si-frame.si-floating { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26); }
+.si-frame.si-docked .si-box { box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16); }
+.si-frame.si-floating .si-box { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.26); }
 
 /* Expanded over the whole window (Esc restores). */
 .si-frame.si-maximized {
   inset: 16px;
-  width: auto !important;
-  height: auto !important;
+  display: flex;
   max-width: none;
   max-height: none;
-  resize: none;
 }
+.si-frame.si-maximized .si-body { flex: 1; min-height: 0; }
+.si-frame.si-maximized .si-box { width: 100%; height: 100%; max-width: none; max-height: none; resize: none; }
 
 /* Header bar: the step's colour; drag to pull off, click to expand. */
 .si-header {
   flex: none;
+  border-radius: 3px 3px 0 0;
   padding: 2px 4px 2px 8px;
   font-size: 11px;
   line-height: 18px;
@@ -101,38 +93,46 @@
 .si-state { margin-top: 2px; opacity: 0.85; }
 .si-state-failed { font-weight: 600; }
 
-/* The data, between its two sides. */
-.si-main {
-  display: flex;
+/* The selected cells, in a border wrapped tightly round them. */
+.si-body {
+  position: relative;          /* the side widgets sit just outside the box */
   min-height: 0;
-  flex: 1;
 }
 
-.si-content {
-  flex: 1;
-  min-width: 0;
-  overflow: auto;            /* a big selection scrolls inside its frame */
+.si-box {
+  width: max-content;
+  min-width: 100%;             /* never narrower than its header bar */
+  max-width: min(760px, calc(100vw - 16px));
+  max-height: min(70vh, calc(100vh - 60px));
+  background: #fff;
+  border: 1px solid var(--si-color, #888);
+  border-top: none;
+  overflow: auto;              /* a big selection scrolls inside its border */
+  resize: both;
 }
 
-/* An interactive display (chart, image, table) fills the inspector, at
-   whatever size it is resized to. */
-.si-display .si-content { display: flex; overflow: hidden; }
-.si-display .si-content > .cv-embedded { flex: 1; min-width: 0; min-height: 0; }
+/* An interactive display (chart, image, table) fills the box, at whatever
+   size it is resized to. */
+.si-display .si-box { display: flex; overflow: hidden; max-width: calc(100vw - 16px); max-height: calc(100vh - 60px); }
+.si-display .si-box > .cv-embedded { flex: 1; min-width: 0; min-height: 0; }
 .si-display .cv-embedded .cv-body { flex: 1; min-height: 0; }
 .si-display .cv-embedded .cv-plotly { height: 100%; min-height: 0; }
 
-/* Each side: a thin strip for the wiring toggle — inputs left, outputs right. */
+/* The widgets, outside the border: inputs left, outputs right. */
 .si-side {
-  flex: none;
+  position: absolute;
+  top: 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 1px;
-  background: #fafafa;
+  background: #fff;
+  border: 1px solid var(--si-color, #888);
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-.si-side-left { border-right: 1px solid #eee; }
-.si-side-right { border-left: 1px solid #eee; }
+.si-side-left { right: 100%; margin-right: 2px; }
+.si-side-right { left: 100%; margin-left: 2px; }
 
 .si-side-btn {
   display: inline-flex;
@@ -155,7 +155,7 @@
 
 /* One cell: its value alone, enlarged, whole (long text wraps, scrolls). */
 .si-value {
-  padding: 10px 12px;
+  padding: 4px 8px;
   font-size: 15px;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -167,16 +167,18 @@
 
 .si-table { border-collapse: collapse; font-size: 14px; }
 
-.si-table th,
 .si-table td {
-  padding: 5px 10px;
+  padding: 3px 8px;
   border: 1px solid #ececec;
   text-align: left;
   white-space: nowrap;
 }
 
-.si-table thead th { background: #f3f3f3; color: #555; position: sticky; top: 0; }
-.si-table .si-index { background: #f7f7f7; color: #888; font-weight: 600; text-align: right; }
+/* The table's outer edges are the box's border. */
+.si-table tr:first-child td { border-top: none; }
+.si-table tr:last-child td { border-bottom: none; }
+.si-table td:first-child { border-left: none; }
+.si-table td:last-child { border-right: none; }
 .si-table .si-unselected { background: #fafafa; }
 .si-table .si-error { background: #fdeceb; color: #b42318; }
 
