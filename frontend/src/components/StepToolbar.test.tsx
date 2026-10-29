@@ -28,12 +28,13 @@ describe('StepToolbar', () => {
 
     expect(screen.getByTestId('step-toolbar')).toBeInTheDocument();
     const runBtn = screen.getByTestId('btn-run');
-    const delBtn = screen.getByTestId('btn-delete');
 
     fireEvent.click(runBtn);
     expect(onRun).toHaveBeenCalledWith('s-1');
 
-    fireEvent.click(delBtn);
+    // Delete is in the step management menu (owner, 2026-10-29, dev_plan/126 L1).
+    fireEvent.click(screen.getByTestId('step-management'));
+    fireEvent.click(screen.getByTestId('btn-delete'));
     expect(onDelete).toHaveBeenCalledWith('s-1');
   });
 });

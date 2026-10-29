@@ -58,7 +58,7 @@ export interface FormulaEditorProps {
   /** Forwarded to the hidden textarea so wiring works unchanged. */
   shadowRef?: (el: HTMLTextAreaElement | null) => void;
   testId?: string;
-  /** Each step reference's [start, end) in *value* and its step's colour: drawn dashed (dev_plan/126 R3, D6). */
+  /** Each step reference's [start, end) in *value* and its step's colour: underlined dashed while editing (R3). */
   references?: { start: number; end: number; color: string }[];
 }
 
@@ -68,11 +68,10 @@ function referenceClass(color: string): string {
   if (typeof document !== 'undefined' && !document.getElementById(name)) {
     const style = document.createElement('style');
     style.id = name;
-    // Drawn behind the text, the line's full height (a decoration's className,
-    // not inlineClassName), and a little wider than the reference, so the box
-    // surrounds the whole object and never covers a character.
-    style.textContent = `.${name} { border: 1.5px dashed ${color}; border-radius: 3px; box-sizing: content-box;`
-      + ` padding: 0 2px; margin-left: -3px; background: color-mix(in srgb, ${color} 10%, transparent); }`;
+    // A dashed underline in the step's colour, below the text, never over it
+    // (owner, 2026-10-29: no box).
+    style.textContent = `.${name} { text-decoration: underline dashed ${color}; text-decoration-thickness: 1.5px;`
+      + ` text-underline-offset: 3px; text-decoration-skip-ink: none; }`;
     document.head.appendChild(style);
   }
   return name;
@@ -126,27 +125,28 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
     getValue: () => monacoRef.current?.getValue() ?? value,
   }), [value]);
 
-  // References, dashed in their step's colour. A span from the last parse may
-  // lag a keystroke behind; one that no longer starts at a `wf[` is skipped.
+  // References, underlined dashed in their step's colour, only while the bar is
+  // being edited (owner, 2026-10-29). A span from the last parse may lag a
+  // keystroke behind; one that no longer starts at a `wf[` is skipped.
   useEffect(() => {
     const ed = monacoRef.current;
     const api = monacoApi.current;
     const model = ed?.getModel();
     if (!ed || !api || !model) return;
     const text = model.getValue();
-    const marks = (references ?? [])
+    const marks = (focused ? references ?? [] : [])
       .filter((r) => r.end <= text.length && text.startsWith('wf[', r.start))
       .map((r) => {
         const a = model.getPositionAt(r.start);
         const b = model.getPositionAt(r.end);
         return {
           range: new api.Range(a.lineNumber, a.column, b.lineNumber, b.column),
-          options: { className: referenceClass(r.color) },
+          options: { inlineClassName: referenceClass(r.color) },
         };
       });
     if (referenceMarks.current) referenceMarks.current.set(marks);
     else referenceMarks.current = ed.createDecorationsCollection(marks);
-  }, [references, value, mounted]);
+  }, [references, value, mounted, focused]);
 
   // Mount-time wiring of Monaco editor.
   const handleMount: OnMount = (editor, monaco) => {

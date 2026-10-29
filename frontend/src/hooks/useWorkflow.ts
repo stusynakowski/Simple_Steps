@@ -816,6 +816,25 @@ export default function useWorkflow() {
     setWorkflow(updated);
   }, [announce]);
 
+  /**
+   * Move a step to *index* (0 the first). The workflow is synced at once, so
+   * core moves it too (`k.move`, kernels.sync) and marks what an order change
+   * makes stale or invalid — a step moved above what it reads, say.
+   */
+  function moveStep(id: string, index: number) {
+    const steps = workflowRef.current.steps;
+    const from = steps.findIndex((s) => s.id === id);
+    const to = Math.max(0, Math.min(steps.length - 1, index));
+    if (from < 0 || from === to) return;
+    announce({ kind: 'move', target: stepAlias(id), to });
+    const next = [...steps];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    workflowRef.current = { ...workflowRef.current, steps: next.map((s, i) => ({ ...s, sequence_index: i })) };
+    setWorkflow(workflowRef.current);
+    scheduleSync(0);
+  }
+
   function deleteStep(id: string) {
     announce({ kind: 'remove', target: stepAlias(id) });
     const drop = (wf: Workflow): Workflow => ({
@@ -1020,6 +1039,11 @@ export default function useWorkflow() {
           updateStep(id, { label: cmd.to });
           return `${cmd.target} renamed to '${cmd.to}'`;
         }
+        case 'move': {
+          const id = need(cmd.target);
+          moveStep(id, cmd.to);
+          return `${cmd.target} moved to position ${cmd.to}`;
+        }
         case 'run': {
           if (cmd.target === null) { runPipeline(); return 'pipeline started'; }
           const id = need(cmd.target);
@@ -1083,6 +1107,7 @@ export default function useWorkflow() {
     pausePipeline,
     stopPipeline,
     deleteStep,
+    moveStep,
     // resources (the workflow's `resources` section)
     defineResource,
     removeResource,

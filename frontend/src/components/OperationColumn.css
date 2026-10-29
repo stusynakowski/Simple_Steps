@@ -1225,14 +1225,84 @@
 .col-resizer:hover,
 .row-resizer:hover { background: rgba(0, 0, 0, 0.15); }
 
-/* The step's control bar (StepToolbar): three widgets by use case — running,
-   the step's views, managing it — each a divided segment (owner, 2026-10-28;
-   to consolidate later, dev_plan/126 L1). */
-.step-bar-group {
+/* The step's control bar (StepToolbar; owner, 2026-10-29, dev_plan/126 L1):
+   Run and its controls left, the panels in the middle, managing the step
+   right — each an expander that pops up over the page (StepMenu). */
+/* Run: big and plain — the step runs at once; the ⋮ beside it opens the run controls. */
+/* Quiet by default (owner, 2026-10-29): no fills, no borders; muted until
+   hovered. Colour only where it informs: Run's play icon, a lock. */
+.step-run-big {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 26px;
+  padding: 0 8px 0 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #c9ccd1;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.step-run-big .symbol-icon { color: #5fbf8a; }
+.step-run-big:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.step-locked-mark { color: #c9a24a; opacity: 0.85; }
+
+/* A step toolbar expander (StepMenu): a button that pops up its actions. */
+.step-menu { display: flex; }
+.step-menu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #8b9097;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.step-menu-toggle:hover,
+.step-menu-toggle.active { color: #e6e6e6; background: rgba(255, 255, 255, 0.07); }
+.step-menu-big { width: 26px; height: 26px; }
+/* A named control on the right: its name, then its icon ("Toggle ☰"). */
+.step-bar-named { height: 26px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; }
+.step-menu-text { line-height: 1; }
+.step-menu-badges { display: inline-flex; gap: 2px; opacity: 0.75; }
+
+/* The pop-up: over the whole page (a portal, fixed under its button). */
+.step-menu-pop {
+  position: fixed;
+  z-index: 10000;
+  min-width: 190px;
+  padding: 4px;
+  background: #fff;
+  color: #222;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.step-menu-divider { height: 1px; margin: 4px 2px; background: #e6e6e6; }
+.step-menu-check { width: 14px; display: inline-flex; color: #2563eb; }
+.step-menu-item.checked { font-weight: 600; }
+.step-menu-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 4px;
-  border: 1px solid #3a3a3a;
-  border-radius: 4px;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
 }
+.step-menu-item:hover:not(:disabled) { background: #eef2f7; }
+.step-menu-item:disabled { color: #aaa; cursor: default; }
+.step-menu-item.danger:not(:disabled) { color: #c0392b; }
+.step-menu-label { flex: 1; }
+.step-menu-hint { color: #999; font-size: 11px; }

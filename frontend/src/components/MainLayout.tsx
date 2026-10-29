@@ -127,6 +127,7 @@ export default function MainLayout() {
     pausePipeline,
     stopPipeline,
     deleteStep,
+    moveStep,
     defineResource,
     removeResource,
     saveWorkflow,
@@ -838,6 +839,9 @@ export default function MainLayout() {
                   onUpdate={(id, updates) => updateStep(id, updates)}
                   onRun={runStep}
                   onDeclare={declareWorkflow}
+                  onRunAll={runPipeline}
+                  onMove={(to) => moveStep(step.id, to)}
+                  stepCount={workflow.steps.length}
                   onPause={id => console.log('Pause', id)}
                   onDelete={deleteStep}
                   onMinimize={() => collapseStep(step.id)}

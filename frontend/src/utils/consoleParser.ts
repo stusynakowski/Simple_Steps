@@ -125,6 +125,14 @@ export function parseConsoleLine(input: string): ParsedLine {
         if (!t || !to) return { kind: 'error', message: 'wf.rename() needs two names, e.g. wf.rename("step2", "scored")' };
         return { kind: 'command', command: { kind: 'rename', target: t, to } };
       }
+      case 'move': {
+        const t = pos(0);
+        const to = Number(positional[1]);
+        if (!t || !Number.isInteger(to) || to < 0) {
+          return { kind: 'error', message: 'wf.move() needs a step and a position, e.g. wf.move("step2", 0)' };
+        }
+        return { kind: 'command', command: { kind: 'move', target: t, to } };
+      }
       case 'run':
         return { kind: 'command', command: { kind: 'run', target: pos(0) } };
       case 'preview': {

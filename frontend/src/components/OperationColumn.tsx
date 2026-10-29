@@ -34,6 +34,12 @@ interface OperationColumnProps {
   onActivate: (id: string) => void;
   onUpdate?: (id: string, updates: Partial<Step>) => void;
   onRun: (id: string) => void;
+  /** Run every step (the pipeline): the run controls' "Run all steps". */
+  onRunAll?: () => void;
+  /** Move this step to a position, 0 the first. */
+  onMove?: (to: number) => void;
+  /** How many steps the workflow has. */
+  stepCount?: number;
   /** Declare the workflow, running nothing (Enter in the formula bar). */
   onDeclare?: () => void;
   onPause: (id: string) => void;
@@ -71,6 +77,9 @@ export default function OperationColumn({
   onActivate,
   onUpdate,
   onRun,
+  onRunAll,
+  onMove,
+  stepCount,
   onDeclare,
   onDelete,
   onMinimize,
@@ -396,6 +405,9 @@ export default function OperationColumn({
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
               onDeclare={onDeclare}
+              onRunAll={onRunAll}
+              onMove={onMove}
+              stepCount={stepCount}
               onDelete={() => onDelete(step.id)}
               openPanels={openPanels}
               onTogglePanel={togglePanel}
