@@ -219,7 +219,7 @@ showed the last one that did, still editable; D4's freeze closed that.
 | | Question | Decided | What it means for the work |
 |---|---|---|---|
 | D1 | What a pick of columns, rows or cells writes | **Core's notation, inline**: `wf["r"][0:2][cols["n"]]` where the pick is used, no select step | F6: `utils/selection.ts` writes the notation, and `selectionFormula` / the select-step insertion (`onInsertStepBefore`) go. F7: the parser accepts it. Unblocks F8–F10, R3, R7 |
-| D3 | What Enter does | **Enter declares the step** (instantiates it, so core checks and plans it) **without running the operation. ⌘/Ctrl+Enter declares and runs** | Built 2026-10-28 (Progress). What a declared step shows (staged, its plan, invalid with core's reason) comes with R6: the sync already returns each step's state and problems, but a `Step` has no field for them yet |
+| D3 | What Enter does | **Enter stages the step**: declaring it to core (it checks and plans it) stages it, which is not a run (owner, 2026-10-28: say "stages"). **⌘/Ctrl+Enter stages and runs** | Built 2026-10-28 (Progress). What a declared step shows (staged, its plan, invalid with core's reason) comes with R6: the sync already returns each step's state and problems, but a `Step` has no field for them yet |
 | D4 | The panel while the formula doesn't parse | **Freeze it**, with core's reason. **Its tool picker still works: choosing a tool rewrites the formula for that tool. Any state change in the panel re-enters the whole formula** (owner, 2026-10-28) | Built 2026-10-28 (Progress). A tool chosen in the autocomplete does the same, through F1's writer |
 | D5 | What opens the selection window | **Only the corner control.** A click never opens it | No change to today's behaviour. R4 is closed: a click draws the outline only |
 | D6 | How references and selections are drawn | **Dashed = a reference** (the cells a formula's reference covers, in the source step's colour). **Bold = the selection** | Two separate marks, and they can overlap. R3: the formula's reference box and the source grid's box are dashed in the same colour. The selection is bold (today's solid outline) |
@@ -273,7 +273,7 @@ each would land today.
 
 | # | Item | Today |
 |---|---|---|
-| L1 | **Step controller at the top** | a step's controls are spread over its toolbar (`StepToolbar`: run, the panel toggles, lock, delete), its header (minimize / maximize on hover) and the steps bar |
+| L1 | **Step controller at the top** | **Interim, built 2026-10-28** (owner): the toolbar's top row is three divided widgets by use case, step running controls \| step controller widgets \| step management widgets (Run/Stop · the Analytics, Data and Settings panels · lock, delete); the second row is the f(x) button and the formula bar to the end. To consolidate later: a step's controls are also in its header (minimize / maximize on hover) and the steps bar |
 | L2 | **Function UI cleanup** | the Formula panel (`ToolEditor`: Tool, Inputs, Modifiers) and the formula bar's autocomplete; ties to F2 (one tool list, one look) and to how the verb core chose is shown (open: show it with core's reason, or always write it) |
 | L3 | **Output selection and examination** | the grid's selection (bold box) and the inspector opened from its corner (`SelectionInspector`, `CellViewer`); ties to F15 (inputs / outputs toggles), R8 (deep exploration) and D8 (the `#<step>` lineage expanders) |
 

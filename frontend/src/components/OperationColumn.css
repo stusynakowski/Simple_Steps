@@ -1236,3 +1236,15 @@
   border-radius: 2px;
   pointer-events: none;
 }
+
+/* The step's control bar (StepToolbar): three widgets by use case — running,
+   the step's views, managing it — each a divided segment (owner, 2026-10-28;
+   to consolidate later, dev_plan/126 L1). */
+.step-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 4px;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+}
