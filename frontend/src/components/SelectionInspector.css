@@ -104,16 +104,18 @@
   min-height: 0;
 }
 
+/* The box is a frame in the step's colour round the selection: whatever
+   size it is dragged to, the colour fills it, so it stays square. */
 .si-box {
   width: max-content;
   min-width: 132px;            /* room for the header's controls, no more */
   max-width: min(760px, calc(100vw - 16px));
   max-height: min(70vh, calc(100vh - 60px));
   box-sizing: border-box;
-  background: #fff;
-  border: 1px solid var(--si-color, #888);
-  border-top: none;
-  overflow: auto;              /* a big selection scrolls inside its border */
+  padding: 4px;
+  background: var(--si-color, #888);
+  border-radius: 0 0 3px 3px;
+  overflow: auto;              /* a big selection scrolls inside its frame */
 }
 
 /* Resize from the box's right edge, bottom edge or corner. */
@@ -134,43 +136,31 @@
 .si-display .cv-embedded .cv-body { flex: 1; min-height: 0; }
 .si-display .cv-embedded .cv-plotly { height: 100%; min-height: 0; }
 
-/* The widgets, outside the border: inputs left, outputs right. */
-.si-side {
-  position: absolute;
-  top: 2px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: #fff;
-  border: 1px solid var(--si-color, #888);
-  border-radius: 3px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-.si-side-left { right: 100%; margin-right: 2px; }
-.si-side-right { left: 100%; margin-left: 2px; }
-
-.si-side-btn {
+/* The header's second row: tools that work on the selection inside this
+   frame (the wiring now; a quick plot, image analysis later). */
+.si-tools { display: flex; align-items: center; gap: 2px; padding: 1px 0 1px 18px; }
+.si-tool {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 22px;
-  padding: 0 2px;
+  gap: 1px;
+  height: 18px;
+  padding: 0 4px;
   border: none;
   border-radius: 3px;
-  background: transparent;
-  color: #666;
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
   cursor: pointer;
 }
-
-.si-side-btn:hover:not(:disabled) { background: #ececec; color: #111; }
-.si-side-btn:disabled { color: #bbb; cursor: default; }
-.si-side-btn:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 1px; }
+.si-tool:hover:not(:disabled) { background: rgba(255, 255, 255, 0.32); }
+.si-tool:disabled { opacity: 0.55; cursor: default; }
+.si-tool:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
 .si-arrow { font-size: 11px; line-height: 1; }
 
-/* One cell: its value alone, enlarged, whole (long text wraps, scrolls). */
+/* One cell: its value alone, enlarged, whole (long text wraps, scrolls);
+   white, boxed, inside the step's frame. */
 .si-value {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.28);
   padding: 4px 8px;
   font-size: 15px;
   line-height: 1.45;
@@ -181,7 +171,8 @@
 
 .si-value.si-error { background: #fdeceb; color: #b42318; }
 
-.si-table { border-collapse: collapse; font-size: 14px; }
+/* The selected cells: white, with a box round their edges, in the frame. */
+.si-table { border-collapse: collapse; font-size: 14px; background: #fff; border: 1px solid rgba(0, 0, 0, 0.28); }
 
 .si-table td {
   padding: 3px 8px;
@@ -190,11 +181,6 @@
   white-space: nowrap;
 }
 
-/* The table's outer edges are the box's border. */
-.si-table tr:first-child td { border-top: none; }
-.si-table tr:last-child td { border-bottom: none; }
-.si-table td:first-child { border-left: none; }
-.si-table td:last-child { border-right: none; }
 .si-table .si-unselected { background: #fafafa; }
 .si-table .si-error { background: #fdeceb; color: #b42318; }
 

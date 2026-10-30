@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
+import StepMinimap from './StepMinimap';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
@@ -52,7 +53,8 @@ const DEFAULT_LOG_HEIGHT = 220;
 // a maximized step viewer pushed the title bar 1px past the bottom.
 const LOG_HEADER_HEIGHT = 37;
 // The step viewer's footer (.steps-footer): the bottom bar of the steps, and
-// the handle between them and the console. VS Code style: it sits under the
+// the handle between them and the console. At the bottom of the page while no
+// console is docked; with one docked, VS Code style: it sits under the
 // tallest step (auto-fit) until dragged, then stays where it was put;
 // double-click returns it to auto-fit. On release either side snaps shut below
 // its threshold, like the sidebars. The steps and the console collapse
@@ -62,6 +64,8 @@ const STEPS_SNAP_THRESHOLD = 80;
 const LOG_SNAP_THRESHOLD = 80; // of console body, below its title bar
 // Room under the tallest step, so its border doesn't touch the footer.
 const STEPS_FIT_PADDING = 4;
+// The steps' map under them (StepMinimap, .step-minimap): auto-fit leaves it room.
+const STEPS_MAP_HEIGHT = 16;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -577,8 +581,12 @@ export default function MainLayout() {
   const maxAutoSteps = Math.max(0, bodyHeight - STEPS_FOOTER_HEIGHT
     - (consoleDocked ? (logCollapsed ? LOG_HEADER_HEIGHT : DEFAULT_LOG_HEIGHT) : 0));
   const maxManualSteps = Math.max(0, bodyHeight - STEPS_FOOTER_HEIGHT - (consoleDocked ? LOG_HEADER_HEIGHT : 0));
+  // With no console docked (closed, or popped out) the steps fill the body and
+  // their bar sits at the bottom of the page; with one docked — open or
+  // minimized to its title bar — the bar fits the steps or stays where it was
+  // dragged (owner, 2026-10-30).
   const stepsHeight = stepsCollapsed ? 0
-    : stepsMaximized ? maxManualSteps
+    : stepsMaximized || !consoleDocked ? maxManualSteps
     : autoFit ? Math.min(fitStepsHeight, maxAutoSteps)
     : Math.min(manualStepsHeight, maxManualSteps);
 
@@ -598,7 +606,7 @@ export default function MainLayout() {
         bottom = Math.max(bottom, el.getBoundingClientRect().bottom - top);
       });
       const scrollbar = main.offsetHeight - main.clientHeight;
-      setFitStepsHeight(Math.ceil(bottom + scrollbar + STEPS_FIT_PADDING));
+      setFitStepsHeight(Math.ceil(bottom + scrollbar + STEPS_FIT_PADDING + STEPS_MAP_HEIGHT));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -962,6 +970,11 @@ export default function MainLayout() {
                       style={bodyHeight > 0 ? { height: stepsHeight } : { flex: '1 1 0' }}
                     >
                       {canvasBlock}
+                      {/* The steps' map: jump to a step, see where you are. */}
+                      <StepMinimap
+                        scroller={canvasRef}
+                        steps={workflow.steps.map((s, i) => ({ id: s.id, label: s.label, color: s.step_color ?? getStepColor(i) }))}
+                      />
                     </div>
 
                     {/* The steps' bottom bar; the console's title bar sits

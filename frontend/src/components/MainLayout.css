@@ -516,9 +516,60 @@
   overflow-x: auto;
   overflow-y: hidden;
   background-color: #121212;
-  scrollbar-width: thin;
-  scrollbar-color: #444 #121212;
+  /* The steps' map below replaces the scrollbar (StepMinimap); the area
+     still scrolls by trackpad, Shift+wheel or the map. */
+  scrollbar-width: none;
   white-space: nowrap;
+}
+.horizontal-scroll-area::-webkit-scrollbar { display: none; }
+
+/* The steps' map (StepMinimap; owner, 2026-10-30): each step a thin copy of
+   its header, same arrow and colour; an outline, no fill, round the view. */
+.step-minimap {
+  position: relative;
+  flex: none;
+  height: 16px;
+  background: #121212;
+  border-top: 1px solid #1f1f1f;
+  cursor: pointer;
+  overflow: hidden;
+}
+.step-minimap-step {
+  position: absolute;
+  top: 4px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  opacity: 0.75;
+  cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%, 4px 50%);
+}
+.step-minimap-step.first { clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%); }
+.step-minimap-step:hover { opacity: 1; }
+.step-minimap-view {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+  border-radius: 3px;
+  background: transparent;
+  cursor: grab;
+  box-sizing: border-box;
+}
+.step-minimap-view:active { cursor: grabbing; }
+/* A step's label on hover, above its arrow on the map. */
+.step-minimap-label {
+  position: fixed;
+  z-index: 10000;
+  transform: translate(-50%, calc(-100% - 6px));
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: #2b2d31;
+  color: #e6e6e6;
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .columns-container {
