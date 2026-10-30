@@ -75,16 +75,15 @@ function HeaderButton({ icon, label, onClick, disabled }: {
   );
 }
 
-/** A widget on one side of the box, outside its border: the wiring toggle, →ƒ(x) or ƒ(x)→. */
-function Side({ side, label }: { side: 'left' | 'right'; label: string }) {
+/** A tool in the header's second row: the wiring, →ƒ(x) inputs or ƒ(x)→ outputs.
+ *  Tools that open inside the frame (a quick plot, image analysis) join it later. */
+function Tool({ side, label }: { side: 'inputs' | 'outputs'; label: string }) {
   return (
-    <div className={`si-side si-side-${side}`}>
-      <button type="button" className="si-side-btn" aria-label={label} title={label} disabled>
-        {side === 'left' && <span className="si-arrow" aria-hidden="true">→</span>}
-        <SymbolIcon name="function" size={14} />
-        {side === 'right' && <span className="si-arrow" aria-hidden="true">→</span>}
-      </button>
-    </div>
+    <button type="button" className="si-tool" aria-label={label} title={label} disabled>
+      {side === 'inputs' && <span className="si-arrow" aria-hidden="true">→</span>}
+      <SymbolIcon name="function" size={13} />
+      {side === 'outputs' && <span className="si-arrow" aria-hidden="true">→</span>}
+    </button>
   );
 }
 
@@ -297,6 +296,11 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
             <HeaderButton icon="close" label="Close" onClick={() => ctx.close(id)} />
           </span>
         </div>
+        {/* The tools row: widgets that work on the selection inside this frame. */}
+        <div className="si-tools" role="toolbar" aria-label="Inspector tools">
+          <Tool side="inputs" label="Inputs: what made this (coming with the wiring)" />
+          <Tool side="outputs" label="Outputs: what this feeds (coming with the wiring)" />
+        </div>
         {expanded && (
           <div className="si-detail">
             {expression && <code className="si-expression">{expression}</code>}
@@ -304,10 +308,9 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
           </div>
         )}
       </div>
-      {/* The selected cells in a tight border; the widgets sit outside it,
-          on its sides (more will join them). */}
+      {/* The selected cells, framed in the step's colour: the frame fills
+          whatever size the box is given, so it stays square round them. */}
       <div className="si-body">
-        <Side side="left" label="Inputs: what made this (coming with the wiring)" />
         <div
           ref={box}
           className="si-box"
@@ -347,7 +350,6 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
             </table>
           )}
         </div>
-        <Side side="right" label="Outputs: what this feeds (coming with the wiring)" />
         {!maximized && (
           <>
             <span className="si-resize si-resize-x" aria-hidden="true" onPointerDown={(e) => startResize(e, 'x')} />

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
+import StepMinimap from './StepMinimap';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
@@ -63,6 +64,8 @@ const STEPS_SNAP_THRESHOLD = 80;
 const LOG_SNAP_THRESHOLD = 80; // of console body, below its title bar
 // Room under the tallest step, so its border doesn't touch the footer.
 const STEPS_FIT_PADDING = 4;
+// The steps' map under them (StepMinimap, .step-minimap): auto-fit leaves it room.
+const STEPS_MAP_HEIGHT = 16;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -603,7 +606,7 @@ export default function MainLayout() {
         bottom = Math.max(bottom, el.getBoundingClientRect().bottom - top);
       });
       const scrollbar = main.offsetHeight - main.clientHeight;
-      setFitStepsHeight(Math.ceil(bottom + scrollbar + STEPS_FIT_PADDING));
+      setFitStepsHeight(Math.ceil(bottom + scrollbar + STEPS_FIT_PADDING + STEPS_MAP_HEIGHT));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -967,6 +970,11 @@ export default function MainLayout() {
                       style={bodyHeight > 0 ? { height: stepsHeight } : { flex: '1 1 0' }}
                     >
                       {canvasBlock}
+                      {/* The steps' map: jump to a step, see where you are. */}
+                      <StepMinimap
+                        scroller={canvasRef}
+                        steps={workflow.steps.map((s, i) => ({ id: s.id, label: s.label, color: s.step_color ?? getStepColor(i) }))}
+                      />
                     </div>
 
                     {/* The steps' bottom bar; the console's title bar sits
