@@ -21,6 +21,9 @@ Every shim below is tagged with what removes it::
     SHIM(core §C32)  a kernel can't be saved with its outputs (the output
                      store); a put-away kernel keeps them through the
                      workflow's internal session export
+    SHIM(core §C37)  k.view / k.cell crash on a cell holding an array (an
+                     image): core's _plain calls .item() on anything with a
+                     dtype; unwrap numpy scalars only
 
 When core lands one of those, delete the tagged block. Nothing else should
 need to change — that is the point of keeping them in one file.
@@ -66,6 +69,39 @@ __all__ = [
     "restore_with_outputs",
     "simple_step_resource",
 ]
+
+
+# --------------------------------------------------------------------------- #
+# Cell values                                                                 #
+# --------------------------------------------------------------------------- #
+
+def _patch_plain() -> None:
+    """SHIM(core §C37): ``simple_steps_core.values._plain`` unwraps any value
+    with ``item`` and ``dtype``, meant for numpy scalars (``np.int64(3)``).
+    An image is a numpy array too, and ``.item()`` on it raises, so
+    ``k.view(step)`` and ``k.cell(…)`` crash on a step that holds images and
+    the grid shows nothing. Unwrap numpy scalars only; everything else as core
+    does. ``workflow`` imports ``_plain`` by name, so both bindings are set.
+    """
+    import numpy as np
+    from simple_steps_core import values as _values
+    from simple_steps_core import workflow as _workflow
+
+    core_plain = _values._plain
+    if getattr(core_plain, "_shimmed", False):
+        return
+
+    def _plain(value: Any) -> Any:
+        if isinstance(value, np.ndarray):
+            return value
+        return core_plain(value)
+
+    _plain._shimmed = True  # type: ignore[attr-defined]
+    _values._plain = _plain
+    _workflow._plain = _plain
+
+
+_patch_plain()
 
 
 # --------------------------------------------------------------------------- #

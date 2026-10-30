@@ -28,22 +28,23 @@ const ACTIVE_HEADER_BG = '#e2e5ea';
 /** Where an inspected selection is marked in the grid, against the grid. */
 interface Mark { id: number; left: number; top: number; width: number; height: number }
 
-/** A typed cell's icon when it has no thumbnail (Material Symbols, never emoji). */
-const TYPE_ICONS: Record<string, SymbolName> = { plotly: 'show_chart', table: 'table_chart', json: 'data_object' };
+/** A typed cell's icon (Material Symbols, never emoji); anything else is data. */
+const TYPE_ICONS: Record<string, SymbolName> = {
+  image: 'image', plotly: 'bar_chart', table: 'table_chart', json: 'data_object',
+};
 
 /**
  * What a cell shows. Text and numbers as they are; a typed value (an image, a
- * figure, a table, a dict — backend cell_types.py) as its preview or an icon,
- * plus its summary. The full value opens in the selection popover.
+ * figure, a table, a dict — backend cell_types.py) as its icon and summary,
+ * never rendered here: an image or a plot is drawn only when it's inspected
+ * (owner, 2026-10-30).
  */
 function CellContent({ cell }: { cell: Cell }) {
   if (!cell.cell_type) return <>{cell.display_value}</>;
   const summary = cell.summary ?? cell.display_value;
   return (
     <span className="typed-cell" data-cell-type={cell.cell_type}>
-      {cell.preview
-        ? <img className="typed-cell-thumb" src={cell.preview} alt="" />
-        : TYPE_ICONS[cell.cell_type] && <span className="typed-cell-icon"><SymbolIcon name={TYPE_ICONS[cell.cell_type]} size={14} /></span>}
+      <span className="typed-cell-icon"><SymbolIcon name={TYPE_ICONS[cell.cell_type] ?? 'data_object'} size={14} /></span>
       <span className="typed-cell-text">{summary}</span>
     </span>
   );
@@ -413,6 +414,27 @@ function Grid({
   // last while the grid is open; saving them with the workflow comes later.
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [rowHeights, setRowHeights] = useState<Record<number, number>>({});
+  // Double-click, as in a spreadsheet: a cell expands to its whole content
+  // (its row grows; again to fold it); a column edge fits the column to its
+  // widest content; a row edge gives the row back its own height.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (r: number, c: string) => {
+    const key = `${r}:${c}`;
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+    setRowHeights((p) => { if (!(r in p)) return p; const next = { ...p }; delete next[r]; return next; });
+  };
+  const fitColumn = (col: string) => {
+    const widest = Array.from(gridRef.current?.querySelectorAll<HTMLElement>('[data-sel-key]') ?? [])
+      .filter((el) => el.dataset.selKey?.endsWith(`:${col}`))
+      .reduce((w, el) => Math.max(w, el.scrollWidth), 0);
+    if (widest) setColWidths((p) => ({ ...p, [col]: widest + 2 }));
+  };
+  const fitRow = (r: number) =>
+    setRowHeights((p) => { const next = { ...p }; delete next[r]; return next; });
   const startResize = (e: React.MouseEvent, axis: 'x' | 'y', apply: (size: number) => void) => {
     e.preventDefault();
     e.stopPropagation();                      // a resize never starts a selection
@@ -616,6 +638,7 @@ function Grid({
               aria-hidden="true"
               onMouseDown={(e) => startResize(e, 'x', (w) => setColWidths((p) => ({ ...p, [col]: w })))}
               onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => { e.stopPropagation(); fitColumn(col); }}
             />
           </div>
         ))}
@@ -697,6 +720,7 @@ function Grid({
                 aria-hidden="true"
                 onMouseDown={(e) => startResize(e, 'y', (h) => setRowHeights((p) => ({ ...p, [r]: h })))}
                 onClick={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => { e.stopPropagation(); fitRow(r); }}
               />
             </div>
 
@@ -708,7 +732,8 @@ function Grid({
               return (
                 <div
                   key={cellKey}
-                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}${isEmptyFrameCell(cell) ? ' empty-frame-cell' : ''}${cell?.state ? ` cell-${cell.state}` : ''}`}
+                  className={`grid-cell ${cell ? 'has-value' : 'empty'}${isErrorCell(cell) ? ' error-cell' : ''}${isEmptyFrameCell(cell) ? ' empty-frame-cell' : ''}${cell?.state ? ` cell-${cell.state}` : ''}${expanded.has(cellKey) ? ' cell-expanded' : ''}`}
+                  onDoubleClick={() => toggleExpanded(r, c)}
                   data-state={cell?.state}
                   role="gridcell"
                   data-sel-key={cellKey}

@@ -246,21 +246,11 @@ export default function StepToolbar({
           ]}
         />
         <div style={{ flex: 1 }} />
-        <button
-          className={`btn-icon step-menu-toggle step-menu-big${isOpen('details') ? ' active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTogglePanel('details'); }}
-          title="Step tools: tool, parameters and modifiers"
-          aria-label="Step tools"
-          aria-pressed={isOpen('details')}
-          data-testid="step-tools"
-        >
-          <SymbolIcon name="build" size={18} />
-        </button>
         <StepMenu
-          icon="menu"
+          icon="splitscreen_add"
           iconSize={18}
-          label="Toggle panels"
-          text="Toggle"
+          label="Step panels"
+          text="Step Panels"
           testId="panels"
           className="step-bar-named"
           items={(['overview', 'data'] as const).map((panel) => ({

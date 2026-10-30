@@ -1866,6 +1866,20 @@ settings a verb takes. **Shim:** `SHIM(core §C36)`,
 `core_bridge.described_modifiers`, which drops a setting core's own check
 calls unknown.
 
+### C37. `k.view` and `k.cell` crash on a cell holding an array
+
+**Run (2026-10-30, core `58bc115`):** a step whose tool returns an image
+(`np.zeros((n, n, 3), dtype=np.uint8)`) runs, and `k.step("img").data` holds
+the arrays; but `k.view("img")` and `k.cell("img", 0, "value")` both raise
+`ValueError: can only convert an array of size 1 to a Python scalar`, from
+`values._plain` (via `workflow._preview_rows`). `_plain` calls `.item()` on
+anything with `item` and `dtype`, meant for numpy scalars. In the app every
+grid reads `k.view`, so an image step showed nothing (`image_processing`'s
+`images`, `thumbs`, …). **Ask:** `_plain` unwraps `np.generic` only and
+leaves arrays (and other objects) as they are. **Shim:** `SHIM(core §C37)`,
+`core_bridge._patch_plain`, which does exactly that, for both `values` and
+`workflow` (which imports `_plain` by name).
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |

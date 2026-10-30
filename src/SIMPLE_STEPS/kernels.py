@@ -428,7 +428,7 @@ def view(session_id: str, key: str, name: str, start: int = 0, stop: int = 50) -
         for row in v["rows"]:
             for column in columns:
                 found = row["cells"].get(column["name"], {})
-                out = cell(int(row["position"]), str(column["name"]), found.get("value"))
+                out = cell(int(row["position"]), str(column["name"]), found.get("value"), preview=False)
                 out.update(state=found.get("state"), type=found.get("type"), id=_plain(row["id"]))
                 if found.get("error"):
                     out["error"] = str(found["error"])

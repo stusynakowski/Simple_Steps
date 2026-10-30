@@ -43,12 +43,13 @@ const cells: Cell[] = [
 describe('typed cells in the grid', () => {
   beforeEach(() => fetchCellView.mockClear());
 
-  it('shows a thumbnail and the summary, and plain cells as before', () => {
+  it('shows an image as its icon and summary, never the image, and plain cells as before', () => {
+    // An image is drawn only when it's inspected (owner, 2026-10-30), even
+    // when the cell carries a thumbnail.
     const { container } = render(<DataOutputGrid cells={cells} refId="ref1" />);
     expect(screen.getByText('SF')).toBeInTheDocument();
-    const thumbs = container.querySelectorAll('img.typed-cell-thumb');
-    expect(thumbs).toHaveLength(2);
-    expect(thumbs[0].getAttribute('src')).toBe('data:image/png;base64,THUMB');
+    expect(container.querySelectorAll('img')).toHaveLength(0);
+    expect(container.querySelectorAll('[data-cell-type="image"] .typed-cell-icon')).toHaveLength(2);
     expect(screen.getAllByText('16×16 RGB image')).toHaveLength(2);
   });
 
