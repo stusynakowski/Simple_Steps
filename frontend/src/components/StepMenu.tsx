@@ -105,6 +105,8 @@ export default function StepMenu({ icon, label, items, align = 'left', testId, t
           onClick={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
         >
+          {/* What this menu is (owner, 2026-10-30): its name, else its label. */}
+          <div className="step-menu-header" aria-hidden="true">{text ?? label}</div>
           {items.map((item, i) => (item.divider
             ? <div key={`d${i}`} className="step-menu-divider" role="separator" />
             : (
