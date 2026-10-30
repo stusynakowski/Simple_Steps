@@ -52,7 +52,8 @@ const DEFAULT_LOG_HEIGHT = 220;
 // a maximized step viewer pushed the title bar 1px past the bottom.
 const LOG_HEADER_HEIGHT = 37;
 // The step viewer's footer (.steps-footer): the bottom bar of the steps, and
-// the handle between them and the console. VS Code style: it sits under the
+// the handle between them and the console. At the bottom of the page while no
+// console is docked; with one docked, VS Code style: it sits under the
 // tallest step (auto-fit) until dragged, then stays where it was put;
 // double-click returns it to auto-fit. On release either side snaps shut below
 // its threshold, like the sidebars. The steps and the console collapse
@@ -577,8 +578,12 @@ export default function MainLayout() {
   const maxAutoSteps = Math.max(0, bodyHeight - STEPS_FOOTER_HEIGHT
     - (consoleDocked ? (logCollapsed ? LOG_HEADER_HEIGHT : DEFAULT_LOG_HEIGHT) : 0));
   const maxManualSteps = Math.max(0, bodyHeight - STEPS_FOOTER_HEIGHT - (consoleDocked ? LOG_HEADER_HEIGHT : 0));
+  // With no console docked (closed, or popped out) the steps fill the body and
+  // their bar sits at the bottom of the page; with one docked — open or
+  // minimized to its title bar — the bar fits the steps or stays where it was
+  // dragged (owner, 2026-10-30).
   const stepsHeight = stepsCollapsed ? 0
-    : stepsMaximized ? maxManualSteps
+    : stepsMaximized || !consoleDocked ? maxManualSteps
     : autoFit ? Math.min(fitStepsHeight, maxAutoSteps)
     : Math.min(manualStepsHeight, maxManualSteps);
 

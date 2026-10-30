@@ -513,9 +513,9 @@ export default function OperationColumn({
               </StepWidget>
               )}
 
-              {/* Details (Function) Tab Content - Edit Functionality */}
+              {/* The Formula panel: no name bar, f(x) opens and closes it (owner, 2026-10-30). */}
               {isOpen('details') && isEditMode && (
-                <StepWidget id="details" collapsed={collapsedPanels.has('details')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
+                <StepWidget id="details" bare collapsed={false} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
                   <div className="tab-content details-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
                       {/* The formula as a form: Tool, then Inputs and Modifiers. */}
