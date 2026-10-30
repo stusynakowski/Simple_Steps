@@ -217,12 +217,15 @@ export default function StepToolbar({
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
 
-      <div className="toolbar" data-testid="step-toolbar" style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+      {/* Two groups, side by side and centred, always on one line; a narrow
+          step shows their icons without words (CSS container query). */}
+      <div className="toolbar step-bar" data-testid="step-toolbar">
 
         {/* The step's control bar (owner, 2026-10-29; dev_plan/126 L1): Run and
             its controls at the left; at the right, step tools (the Formula
             panel), the panels menu (☰), settings, then managing the step.
             Each menu pops up over the page (StepMenu). */}
+        <div className="step-bar-side">
         <button
           className="step-run-big"
           onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }}
@@ -231,12 +234,12 @@ export default function StepToolbar({
           data-testid="btn-run"
         >
           <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={18} />
-          <span>{step.status === 'running' ? 'Stop' : 'Run step'}</span>
+          <span>{step.status === 'running' ? 'Stop' : 'Run Step'}</span>
         </button>
         <StepMenu
-          icon="more_vert"
+          icon="playlist_play"
           iconSize={20}
-          label="Run controls"
+          label="Run options"
           testId="run-controls"
           className="step-menu-big"
           items={[
@@ -245,7 +248,8 @@ export default function StepToolbar({
             { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
           ]}
         />
-        <div style={{ flex: 1 }} />
+        </div>
+        <div className="step-bar-side">
         <StepMenu
           icon="splitscreen_add"
           iconSize={18}
@@ -291,6 +295,7 @@ export default function StepToolbar({
               disabled: isLocked, danger: true, testId: 'btn-delete' },
           ]}
         />
+        </div>
       </div>
 
       {/* The f(x) button and the formula bar, on their own row */}
@@ -299,32 +304,23 @@ export default function StepToolbar({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: '6px',
           position: 'relative',
-          background: '#1e1e1e',
-          border: '1px solid #2d2d2d',
-          borderRadius: 4,
-          padding: '4px 6px',
         }}
       >
         
         {/* Function Button (Fx Icon) - Activated Details */}
         <button
-          className={`btn-icon tab-icon ${isOpen('details') ? 'active' : ''}`}
+          className={`btn-icon step-fx${isOpen('details') ? ' active' : ''}`}
           onClick={(e) => { e.stopPropagation(); onTogglePanel('details'); }}
           title="Formula: tool, parameters and modifiers"
-          style={{
-            color: isOpen('details') ? '#4ea1ff' : '#aaa',
-            background: isOpen('details') ? '#1f3a5f' : 'transparent',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontWeight: 'bold', fontFamily: 'serif', fontStyle: 'italic', fontSize: '12px',
-          }}
         >
           fx
         </button>
 
-        {/* Formula Input + Autocomplete Dropdown */}
-        <div style={{ flex: 1, position: 'relative' }}>
+        {/* The formula field: outlined, so it reads as an input, not text
+            (owner, 2026-10-30); blue while being edited. */}
+        <div className="step-formula-field" style={{ flex: 1, position: 'relative' }}>
           <Suspense
             fallback={
               <textarea

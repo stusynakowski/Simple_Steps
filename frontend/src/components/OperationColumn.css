@@ -1225,12 +1225,49 @@
 .col-resizer:hover,
 .row-resizer:hover { background: rgba(0, 0, 0, 0.15); }
 
-/* The step's control bar (StepToolbar; owner, 2026-10-29, dev_plan/126 L1):
-   Run and its controls left, the panels in the middle, managing the step
-   right — each an expander that pops up over the page (StepMenu). */
-/* Run: big and plain — the step runs at once; the ⋮ beside it opens the run controls. */
-/* Quiet by default (owner, 2026-10-29): no fills, no borders; muted until
-   hovered. Colour only where it informs: Run's play icon, a lock. */
+/* The step's control bar (StepToolbar; owner, 2026-10-29/30, dev_plan/126 L1):
+   Run and its controls, then Step Panels, Settings and Manage Step; each
+   menu pops up over the page (StepMenu). The two groups sit together,
+   centred, with even padding, on one line: a narrow step drops the words
+   and keeps the icons. Quiet: no fills, a thin outline on
+   each button (an inset shadow, so no size changes), muted until hovered.
+   Colour only where it informs: Run's play icon, a lock. */
+.toolbar-wrapper { container-type: inline-size; }
+.step-bar {
+  display: flex;
+  flex-wrap: nowrap;           /* always one line (owner, 2026-10-30) */
+  justify-content: center;     /* together, centred: no hole between the groups */
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+/* The bar fills its row (owner, 2026-10-30): the named buttons share the
+   width, their content centred; ⋮ and the lock mark keep their own size. */
+.step-bar-side { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 4px; }
+.step-bar-side > .step-run-big,
+.step-bar-side > .step-bar-named,
+.step-bar-side > .step-menu:has(> .step-bar-named) { flex: 1 1 0; min-width: 0; }
+.step-bar-side > .step-menu:has(> .step-bar-named) > .step-bar-named { width: 100%; }
+.step-run-big,
+.step-bar-named { justify-content: center; }
+/* A narrow step keeps one line by dropping words, not controls: the named
+   buttons show their icons only (each keeps its tooltip and label), and in a
+   very narrow one, Run too. */
+@container (max-width: 460px) {
+  .step-bar-named .step-menu-text { display: none; }
+  .step-bar-named { padding: 0 6px; }
+}
+@container (max-width: 230px) {
+  .step-run-big > span { display: none; }
+  .step-run-big { padding: 0 4px; }
+}
+.step-run-big,
+.step-menu-toggle,
+.step-fx { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13); }
+.step-run-big:hover,
+.step-menu-toggle:hover,
+.step-fx:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
 .step-run-big {
   display: inline-flex;
   align-items: center;
@@ -1267,10 +1304,41 @@
 .step-menu-toggle:hover,
 .step-menu-toggle.active { color: #e6e6e6; background: rgba(255, 255, 255, 0.07); }
 .step-menu-big { width: 26px; height: 26px; }
-/* A named control on the right: its name, then its icon ("Toggle ☰"). */
+/* A named control on the right: its name, then its icon ("Panels ⊞"). */
 .step-bar-named { height: 26px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; }
 .step-menu-text { line-height: 1; }
 .step-menu-badges { display: inline-flex; gap: 2px; opacity: 0.75; }
+
+/* The formula field: its own outline, so it stands apart from the text
+   around it; no box round the row (owner, 2026-10-30). */
+.step-formula-field {
+  border: 1px solid #3f4246;
+  border-radius: 4px;
+  background: #1a1a1a;
+  min-width: 0;
+}
+.step-formula-field:focus-within { border-color: #4ea1ff; }
+
+/* f(x), at the start of the formula row: big enough to find at a glance. */
+.step-fx {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #aaa;
+  font-family: serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 17px;
+  cursor: pointer;
+}
+.step-fx:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
+.step-fx.active { color: #4ea1ff; background: #1f3a5f; }
 
 /* The pop-up: over the whole page (a portal, fixed under its button). */
 .step-menu-pop {
@@ -1285,6 +1353,17 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 .step-menu-divider { height: 1px; margin: 4px 2px; background: #e6e6e6; }
+/* The pop-up's header: what this menu is (owner, 2026-10-30). */
+.step-menu-header {
+  padding: 4px 8px 6px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #eee;
+  color: #8a8f98;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
 .step-menu-check { width: 14px; display: inline-flex; color: #2563eb; }
 .step-menu-item.checked { font-weight: 600; }
 .step-menu-item {
