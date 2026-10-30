@@ -302,13 +302,16 @@ def cell_type_of(value: Any) -> Optional[CellType]:
     return None
 
 
-def cell(row_id: int, column_id: str, value: Any) -> Dict[str, Any]:
-    """One grid cell for ``/api/data``.
+def cell(row_id: int, column_id: str, value: Any, preview: bool = True) -> Dict[str, Any]:
+    """One grid cell for ``/api/data`` and ``/api/view``.
 
     Plain values keep the shape they always had (``value`` + ``display_value``).
-    Typed values add ``cell_type``, ``summary`` and maybe ``preview``; their
-    ``display_value`` is the summary, so every older code path still shows
-    something readable.
+    Typed values add ``cell_type``, ``summary`` and, with *preview*, a small
+    ``preview`` (an image's thumbnail); their ``display_value`` is the
+    summary, so every older code path still shows something readable. The
+    grid shows a typed cell as its icon and summary, and renders an image
+    only when it is inspected (owner, 2026-10-30), so ``/api/view`` asks for
+    no previews: no thumbnail is made for every image on a page.
     """
     if is_plain(value):
         missing = _is_missing(value)
@@ -330,7 +333,7 @@ def cell(row_id: int, column_id: str, value: Any) -> Dict[str, Any]:
         "cell_type": cell_type.name,
         "summary": summary,
     }
-    if cell_type.preview is not None:
+    if preview and cell_type.preview is not None:
         try:
             preview = cell_type.preview(value)
         except Exception:

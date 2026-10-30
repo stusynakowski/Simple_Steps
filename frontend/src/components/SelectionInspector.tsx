@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { Cell } from '../types/models';
 import { useInspectors } from '../context/InspectorContext';
 import type { Inspector } from '../context/InspectorContext';
-import { fetchDataMeta, fetchDataView } from '../services/api';
+import { fetchCellView, fetchDataMeta, fetchDataView } from '../services/api';
 import { textOn } from '../utils/contrast';
 import { isErrorCell } from '../utils/errorCells';
 import { inGridSel } from '../utils/gridSelection';
@@ -43,6 +43,24 @@ const WHOLE_CAP = 5000;
 const DRAG_SLOP = 4;
 /** Where an interactive display opens: big enough to use, resizable. */
 const DISPLAY_SIZE = { width: 640, height: 460 };
+/** The most images one inspector draws: a selection of more shows the rest
+ *  as their icon and summary (owner, 2026-10-30). */
+const MAX_IMAGES = 12;
+
+/** One image of a selection, fetched and drawn only now that it's inspected. */
+function InspectImage({ refId, row, column, summary }: { refId: string; row: number; column: string; summary: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchCellView(refId, row, column)
+      .then((v) => { if (live && v.view.kind === 'image') setSrc(v.view.src); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [refId, row, column]);
+  return src
+    ? <img className="si-image" src={src} alt={summary} title={summary} />
+    : <span className="si-image-pending"><SymbolIcon name="image" size={14} /> {summary}</span>;
+}
 
 interface WholeRows { rows: number[]; cells: Record<string, Cell>; total: number }
 
@@ -208,6 +226,28 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
   const shownRows = rows.filter((r) => cols.some((c) => isSelected(r, c)));
   const shownCols = cols.filter((c) => rows.some((r) => isSelected(r, c)));
   const single = shownRows.length === 1 && shownCols.length === 1 ? cells[`${shownRows[0]}:${shownCols[0]}`] : undefined;
+  const imageKeys = shownRows.flatMap((r) => shownCols
+    .filter((c) => isSelected(r, c) && cells[`${r}:${c}`]?.cell_type === 'image')
+    .map((c) => `${r}:${c}`));
+  const drawn = new Set(refId ? imageKeys.slice(0, MAX_IMAGES) : []);
+
+  // ── Size: drag the box's right edge, bottom edge or corner ───────────────
+  const box = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ width?: number; height?: number } | null>(null);
+  const startResize = (e: React.PointerEvent, axes: 'x' | 'y' | 'xy') => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = box.current;
+    if (!el) return;
+    const from = { x: e.clientX, y: e.clientY, w: el.offsetWidth, h: el.offsetHeight };
+    const move = (m: PointerEvent) => setSize((prev) => ({
+      width: axes !== 'y' ? Math.max(80, from.w + m.clientX - from.x) : prev?.width,
+      height: axes !== 'x' ? Math.max(28, from.h + m.clientY - from.y) : prev?.height,
+    }));
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
   const display = !!(single?.cell_type && refId);
   const expression = (formula ?? '').replace(/^=/, '');
   const ink = textOn(color);
@@ -268,9 +308,13 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
           on its sides (more will join them). */}
       <div className="si-body">
         <Side side="left" label="Inputs: what made this (coming with the wiring)" />
-        <div className="si-box" style={display && !maximized ? DISPLAY_SIZE : undefined}>
+        <div
+          ref={box}
+          className="si-box"
+          style={maximized ? undefined : size ? { ...size, maxWidth: 'none', maxHeight: 'none' } : display ? DISPLAY_SIZE : undefined}
+        >
           {display ? (
-            <CellViewer refId={refId!} row={rows[0]} column={cols[0]} mode="embedded" onClose={() => ctx.close(id)} />
+            <CellViewer refId={refId!} row={shownRows[0]} column={shownCols[0]} mode="embedded" onClose={() => ctx.close(id)} />
           ) : shownRows.length <= 1 && shownCols.length <= 1 ? (
             // One cell: its value alone. (No data column: a # cell.)
             <div className={`si-value${isErrorCell(single) ? ' si-error' : ''}`}>
@@ -278,6 +322,9 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
             </div>
           ) : (
             <table className="si-table">
+              {imageKeys.length > drawn.size && (
+                <caption className="si-note">first {drawn.size} of {imageKeys.length} images shown</caption>
+              )}
               <tbody>
                 {shownRows.map((r) => (
                   <tr key={r}>
@@ -286,7 +333,11 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
                       const inSel = isSelected(r, c);
                       return (
                         <td key={c} className={`${inSel ? '' : 'si-unselected'}${isErrorCell(cell) ? ' si-error' : ''}`}>
-                          {inSel && cell ? (cell.cell_type ? (cell.summary ?? cell.display_value) : cell.display_value) : ''}
+                          {inSel && cell
+                            ? drawn.has(`${r}:${c}`)
+                              ? <InspectImage refId={refId!} row={r} column={c} summary={cell.summary ?? cell.display_value} />
+                              : cell.cell_type ? (cell.summary ?? cell.display_value) : cell.display_value
+                            : ''}
                         </td>
                       );
                     })}
@@ -297,6 +348,13 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
           )}
         </div>
         <Side side="right" label="Outputs: what this feeds (coming with the wiring)" />
+        {!maximized && (
+          <>
+            <span className="si-resize si-resize-x" aria-hidden="true" onPointerDown={(e) => startResize(e, 'x')} />
+            <span className="si-resize si-resize-y" aria-hidden="true" onPointerDown={(e) => startResize(e, 'y')} />
+            <span className="si-resize si-resize-xy" aria-hidden="true" onPointerDown={(e) => startResize(e, 'xy')} />
+          </>
+        )}
       </div>
     </div>,
     document.body,

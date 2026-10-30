@@ -87,7 +87,7 @@ export default function UnifiedToolbar({
               title={pipelineStatus === 'paused' ? 'Resume Pipeline' : 'Run Pipeline'}
             >
               <Icon name="play" size={14} />
-              <span className="ut-label">{pipelineStatus === 'paused' ? 'Resume' : 'Run'}</span>
+              <span className="ut-label">{pipelineStatus === 'paused' ? 'Resume' : 'Run Workflow'}</span>
             </button>
           )}
 

@@ -720,16 +720,16 @@
 
 /* zebra striping logic requires specificity or JS, 
    but simplistic hover effects help readability */
-.grid-cell:hover {
-    background-color: #e6f7ff;
-    overflow: visible;
-    z-index: 10;
-    position: relative;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    white-space: normal;
-    word-break: break-word; /* Allows long words to break */
-    min-width: max-content; /* Expand to fit content on hover */
-    max-width: 300px;
+/* Hover only shades: a cell never changes size under the pointer (that was a
+   flicker). Double-click expands one to its whole content, wrapped, and its
+   row grows with it; double-click again to fold it (owner, 2026-10-30). */
+.grid-cell:hover { background-color: #e6f7ff; }
+.grid-cell.cell-expanded {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: visible;
+  text-overflow: clip;
+  background-color: #f5faff;
 }
 
 /* Special Case: Single Value "Hero" Cell */

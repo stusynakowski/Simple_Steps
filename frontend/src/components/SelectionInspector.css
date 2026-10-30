@@ -30,6 +30,11 @@
 /* Header bar: the step's colour; drag to pull off, click to expand. */
 .si-header {
   flex: none;
+  /* The box sets the width, not the header: tight round the cells
+     (owner, 2026-10-30). The title gives way (ellipsis) instead. */
+  width: 0;
+  min-width: 100%;
+  box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   padding: 2px 4px 2px 8px;
   font-size: 11px;
@@ -101,15 +106,26 @@
 
 .si-box {
   width: max-content;
-  min-width: 100%;             /* never narrower than its header bar */
+  min-width: 132px;            /* room for the header's controls, no more */
   max-width: min(760px, calc(100vw - 16px));
   max-height: min(70vh, calc(100vh - 60px));
+  box-sizing: border-box;
   background: #fff;
   border: 1px solid var(--si-color, #888);
   border-top: none;
   overflow: auto;              /* a big selection scrolls inside its border */
-  resize: both;
 }
+
+/* Resize from the box's right edge, bottom edge or corner. */
+.si-resize { position: absolute; z-index: 2; }
+.si-resize-x { top: 0; right: -3px; width: 6px; height: 100%; cursor: ew-resize; }
+.si-resize-y { left: 0; bottom: -3px; width: 100%; height: 6px; cursor: ns-resize; }
+.si-resize-xy { right: -4px; bottom: -4px; width: 10px; height: 10px; cursor: nwse-resize; }
+
+/* Images, drawn only in the inspector, a few at a time. */
+.si-image { display: block; max-width: 220px; max-height: 160px; image-rendering: auto; }
+.si-image-pending { display: inline-flex; align-items: center; gap: 4px; color: #888; }
+.si-note { caption-side: top; padding: 2px 8px; color: #888; font-size: 11px; text-align: left; }
 
 /* An interactive display (chart, image, table) fills the box, at whatever
    size it is resized to. */
