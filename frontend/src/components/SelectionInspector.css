@@ -1,8 +1,9 @@
 /* The selection inspector (spec 014 §8): a header bar in the step's colour
    (the pull-off bar, its window controls at the right end) above the
-   selected cells, in a border wrapped tightly round them; its widgets sit
-   outside that border, on its sides (owner, 2026-10-29: no dead space; more
-   widgets will join them). The box resizes from its corner. */
+   selected cells, in a border wrapped tightly round them. Header, tools row
+   and content all sit inside the frame; the content fills what the border
+   encloses (owner, 2026-10-30), and more tools will draw there (plots,
+   exploring a cell, its references). The box resizes from its corner. */
 
 .si-frame {
   position: fixed;
@@ -30,10 +31,9 @@
 /* Header bar: the step's colour; drag to pull off, click to expand. */
 .si-header {
   flex: none;
-  /* The box sets the width, not the header: tight round the cells
-     (owner, 2026-10-30). The title gives way (ellipsis) instead. */
-  width: 0;
-  min-width: 100%;
+  /* The whole header always shows (owner, 2026-10-30): it is as wide as its
+     title and controls, and the box below widens to match. Only a window
+     too narrow for it shortens the title (ellipsis). */
   box-sizing: border-box;
   border-radius: 3px 3px 0 0;
   padding: 2px 4px 2px 8px;
@@ -56,8 +56,10 @@
 }
 
 .si-title > .symbol-icon { flex: none; opacity: 0.9; }
-.si-step { font-weight: 700; }
-.si-what { min-width: 0; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; }
+/* In a window too narrow for the whole header, the title gives way, never
+   the controls: what is selected shortens first, then the step's name. */
+.si-step { min-width: 0; flex: 0 1 auto; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.si-what { min-width: 0; flex: 0 100 auto; opacity: 0.9; overflow: hidden; text-overflow: ellipsis; }
 
 /* Window controls, at the header's right end. */
 .si-controls { margin-left: auto; display: inline-flex; align-items: center; gap: 1px; flex: none; }
@@ -85,7 +87,8 @@
 .si-expanded .si-title { white-space: normal; flex-wrap: wrap; }
 .si-expanded .si-what { overflow: visible; }
 
-.si-detail { padding: 3px 0 2px 20px; }
+/* The expression wraps to the header's width rather than widening it. */
+.si-detail { width: 0; min-width: 100%; box-sizing: border-box; padding: 3px 0 2px 20px; }
 
 .si-expression {
   display: block;
@@ -108,14 +111,30 @@
    size it is dragged to, the colour fills it, so it stays square. */
 .si-box {
   width: max-content;
-  min-width: 132px;            /* room for the header's controls, no more */
+  /* At least as wide as the header, so the header is whole and the frame
+     square under it (owner, 2026-10-30). The !important beats a width set
+     by resizing, which may be narrower. */
+  min-width: 100% !important;
+  display: flex;
+  flex-direction: column;
   max-width: min(760px, calc(100vw - 16px));
   max-height: min(70vh, calc(100vh - 60px));
   box-sizing: border-box;
   padding: 4px;
   background: var(--si-color, #888);
   border-radius: 0 0 3px 3px;
-  overflow: auto;              /* a big selection scrolls inside its frame */
+  overflow: hidden;            /* the content scrolls, inside the frame */
+}
+
+/* Everything inside the border: white, filling the box at whatever size it
+   is given; a big selection scrolls here. */
+.si-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.28);
 }
 
 /* Resize from the box's right edge, bottom edge or corner. */
@@ -131,8 +150,9 @@
 
 /* An interactive display (chart, image, table) fills the box, at whatever
    size it is resized to. */
-.si-display .si-box { display: flex; overflow: hidden; max-width: calc(100vw - 16px); max-height: calc(100vh - 60px); }
-.si-display .si-box > .cv-embedded { flex: 1; min-width: 0; min-height: 0; }
+.si-display .si-box { max-width: calc(100vw - 16px); max-height: calc(100vh - 60px); }
+.si-display .si-content { display: flex; overflow: hidden; }
+.si-display .si-content > .cv-embedded { flex: 1; min-width: 0; min-height: 0; }
 .si-display .cv-embedded .cv-body { flex: 1; min-height: 0; }
 .si-display .cv-embedded .cv-plotly { height: 100%; min-height: 0; }
 
@@ -159,8 +179,8 @@
 /* One cell: its value alone, enlarged, whole (long text wraps, scrolls);
    white, boxed, inside the step's frame. */
 .si-value {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.28);
+  min-height: 100%;
+  box-sizing: border-box;
   padding: 4px 8px;
   font-size: 15px;
   line-height: 1.45;
@@ -172,7 +192,7 @@
 .si-value.si-error { background: #fdeceb; color: #b42318; }
 
 /* The selected cells: white, with a box round their edges, in the frame. */
-.si-table { border-collapse: collapse; font-size: 14px; background: #fff; border: 1px solid rgba(0, 0, 0, 0.28); }
+.si-table { border-collapse: collapse; font-size: 14px; min-width: 100%; }
 
 .si-table td {
   padding: 3px 8px;

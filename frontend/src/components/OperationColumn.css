@@ -1096,7 +1096,7 @@
   to { transform: rotate(360deg); }
 }
 
-/* Minimized: only the header, tight around the step's name. */
+/* Minimized: only the header, tight around the step's number. */
 .operation-column.minimized {
   min-width: 0;
 }
@@ -1226,7 +1226,9 @@
 .row-resizer:hover { background: rgba(0, 0, 0, 0.15); }
 
 /* The step's control bar (StepToolbar; owner, 2026-10-29/30, dev_plan/126 L1):
-   Run and its controls, then Step Panels, Settings and Manage Step; each
+   Run (its own size), Run to the end and the run options (Clear output
+   among them), then Step Panels,
+   Step Settings, Notes and Manage Step; each
    menu pops up over the page (StepMenu). The two groups sit together,
    centred, with even padding, on one line: a narrow step drops the words
    and keeps the icons. Quiet: no fills, a thin outline on
@@ -1245,7 +1247,6 @@
 /* The bar fills its row (owner, 2026-10-30): the named buttons share the
    width, their content centred; ⋮ and the lock mark keep their own size. */
 .step-bar-side { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 4px; }
-.step-bar-side > .step-run-big,
 .step-bar-side > .step-bar-named,
 .step-bar-side > .step-menu:has(> .step-bar-named) { flex: 1 1 0; min-width: 0; }
 .step-bar-side > .step-menu:has(> .step-bar-named) > .step-bar-named { width: 100%; }
@@ -1303,7 +1304,7 @@
 }
 .step-menu-toggle:hover,
 .step-menu-toggle.active { color: #e6e6e6; background: rgba(255, 255, 255, 0.07); }
-.step-menu-big { width: 26px; height: 26px; }
+.step-menu-big { width: 32px; height: 26px; }
 /* A named control on the right: its name, then its icon ("Panels ⊞"). */
 .step-bar-named { height: 26px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; }
 .step-menu-text { line-height: 1; }
@@ -1352,6 +1353,11 @@
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
+/* A popover (Step settings, Notes): content rather than a list of actions. */
+.step-menu-pop--panel { width: min(340px, calc(100vw - 32px)); }
+.step-menu-body { padding: 6px 8px 4px; }
+.step-menu-body .config-item:last-child { margin-bottom: 0; }
+.step-menu-body .step-notes-input { width: 100%; box-sizing: border-box; resize: vertical; }
 .step-menu-divider { height: 1px; margin: 4px 2px; background: #e6e6e6; }
 /* The pop-up's header: what this menu is (owner, 2026-10-30). */
 .step-menu-header {

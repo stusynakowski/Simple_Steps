@@ -36,6 +36,8 @@ interface OperationColumnProps {
   onRun: (id: string) => void;
   /** Run every step (the pipeline): the run controls' "Run all steps". */
   onRunAll?: () => void;
+  /** Run this step and every step after it (the toolbar's "Run to the end"). */
+  onRunToEnd?: () => void;
   /** Move this step to a position, 0 the first. */
   onMove?: (to: number) => void;
   /** How many steps the workflow has. */
@@ -78,6 +80,7 @@ export default function OperationColumn({
   onUpdate,
   onRun,
   onRunAll,
+  onRunToEnd,
   onMove,
   stepCount,
   onDeclare,
@@ -170,8 +173,9 @@ export default function OperationColumn({
 
   // ── References in the formula (R3) ──────────────────────────────────────
   // Where each wf["…"] is in the formula and what it covers, from the parser
-  // (F8): drawn dashed in the formula bar in its step's colour, and, while this
-  // formula bar has focus, boxed in the source step's grid.
+  // (F8): boxed dotted in the formula bar in the colour of the step it reads,
+  // and, while this formula bar has focus, outlined in the source step's grid
+  // in this step's colour (owner, 2026-10-30).
   const [refsOf, setRefsOf] = useState<{ formula: string; refs: FormulaReference[] }>({ formula: '', refs: [] });
   useEffect(() => {
     if (refsOf.formula === savedFormula) return;
@@ -193,8 +197,8 @@ export default function OperationColumn({
     if (!isReceiving) lastPick.current = null;
   }, [isReceiving]);
   useEffect(() => {
-    if (isReceiving) setReferences(refsOf.refs);
-  }, [isReceiving, refsOf.refs, setReferences]);
+    if (isReceiving) setReferences(refsOf.refs, color);
+  }, [isReceiving, refsOf.refs, color, setReferences]);
 
   const isScheduledInPipeline =
     pipelineStatus === 'running' &&
@@ -335,7 +339,10 @@ export default function OperationColumn({
       <div className={`op-header${isDragHinting ? ' drag-detach-hint' : ''}`} onClick={handleColumnClick} onMouseDown={handleHeaderMouseDown} style={{ cursor: 'pointer', position: 'relative' }}>
         <div className="arrow-background" />
         <div className="arrow-content">
-            {isSqueezed ? (
+            {isMinimized ? (
+                 // As small as it gets: just the step's number (owner, 2026-10-30).
+                 <span className="vertical-label" title={`Step ${stepIndex + 1} · ${step.label}`}>{statusSpinner}{stepIndex + 1}</span>
+            ) : isSqueezed ? (
                  <span className="vertical-label">{statusSpinner}{step.label}</span>
             ) : (
                 <>
@@ -406,6 +413,83 @@ export default function OperationColumn({
               onRun={() => onRun(step.id)}
               onDeclare={onDeclare}
               onRunAll={onRunAll}
+              onRunToEnd={onRunToEnd}
+              settings={
+                <div className="settings-content">
+                   <div className="config-item">
+                      <label>Step Name</label>
+                      <input
+                        type="text"
+                        value={step.label}
+                        onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
+                        placeholder="Enter step name..."
+                      />
+                   </div>
+                   {/* Colour: the swatch is a native colour input, so a
+                       click opens the system picker (a colour wheel on
+                       macOS). Saved as the step's meta.step_color. */}
+                   <div className="config-item">
+                      <label htmlFor={`step-color-${step.id}`}>Color</label>
+                      <div className="step-color-row">
+                        <label className="step-color-button" title="Choose the step's colour">
+                          <input
+                            id={`step-color-${step.id}`}
+                            type="color"
+                            className="step-color-input"
+                            value={/^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#888888'}
+                            onChange={(e) => onUpdate?.(step.id, { step_color: e.target.value })}
+                          />
+                          <span>Change color…</span>
+                        </label>
+                        {step.step_color && (
+                          <button
+                            type="button"
+                            className="step-color-reset"
+                            onClick={() => onUpdate?.(step.id, { step_color: undefined })}
+                            title="Back to the default colour for this position"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                   </div>
+                   <div className="summary-item">
+                      <span className="label">Step ID:</span>
+                      <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
+                   </div>
+                   <div className="summary-item">
+                      <span className="label">Status:</span>
+                      <span className={`status-badge status-${step.status}`}>{step.status}</span>
+                   </div>
+                   {/* Core's warnings from the last run (spec 009 REQ-RUN-002). */}
+                   {!!step.warnings?.length && (
+                     <div className="summary-item step-warnings" data-testid="step-warnings">
+                       <span className="label">Warnings:</span>
+                       <ul className="value">
+                         {step.warnings.map((w) => <li key={w}>{w}</li>)}
+                       </ul>
+                     </div>
+                   )}
+                </div>
+              }
+              notes={
+                // Markdown, shown rendered in Analytics; saved as the step's
+                // meta.notes. To become the step's Markdown file's expander header.
+                <div className="config-item config-item--stacked">
+                   <label htmlFor={`step-notes-${step.id}`}>
+                     <span className="config-hint">Markdown · shown in Analytics</span>
+                   </label>
+                   <textarea
+                     id={`step-notes-${step.id}`}
+                     className="step-notes-input"
+                     rows={8}
+                     autoFocus
+                     value={step.notes ?? ''}
+                     onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
+                     placeholder="What is this step for? e.g. **Keeps** only rows with a score over 5."
+                   />
+                </div>
+              }
               onMove={onMove}
               stepCount={stepCount}
               onDelete={() => onDelete(step.id)}
@@ -430,87 +514,6 @@ export default function OperationColumn({
                 <StepWidget id="overview" collapsed={collapsedPanels.has('overview')} onToggleCollapse={toggleCollapsed} background="transparent" maxHeight={widgetMaxHeight}>
                   <StepOverview step={step} availableOperations={availableOperations} />
                 </StepWidget>
-              )}
-
-              {/* Settings Tab Content - Miscellaneous Editing */}
-              {isOpen('settings') && isEditMode && (
-                <StepWidget id="settings" collapsed={collapsedPanels.has('settings')} onToggleCollapse={toggleCollapsed} background="#fff" maxHeight={widgetMaxHeight}>
-                  <div className="tab-content settings-content">
-                    <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
-                       <div className="config-item">
-                          <label>Step Name</label>
-                          <input 
-                            type="text" 
-                            value={step.label} 
-                            onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
-                            placeholder="Enter step name..."
-                            disabled={!isEditMode}
-                            style={{ opacity: isEditMode ? 1 : 0.8, cursor: isEditMode ? 'text' : 'default'  }}
-                          />
-                       </div>
-                       {/* Colour: the swatch is a native colour input, so a
-                           click opens the system picker (a colour wheel on
-                           macOS). Saved as the step's meta.step_color. */}
-                       <div className="config-item">
-                          <label htmlFor={`step-color-${step.id}`}>Color</label>
-                          <div className="step-color-row">
-                            <label className="step-color-button" title="Choose the step's colour">
-                              <input
-                                id={`step-color-${step.id}`}
-                                type="color"
-                                className="step-color-input"
-                                value={/^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#888888'}
-                                onChange={(e) => onUpdate?.(step.id, { step_color: e.target.value })}
-                              />
-                              <span>Change color…</span>
-                            </label>
-                            {step.step_color && (
-                              <button
-                                type="button"
-                                className="step-color-reset"
-                                onClick={() => onUpdate?.(step.id, { step_color: undefined })}
-                                title="Back to the default colour for this position"
-                              >
-                                Reset
-                              </button>
-                            )}
-                          </div>
-                       </div>
-                       {/* Notes: Markdown, shown rendered in Analytics.
-                           Saved as the step's meta.notes. */}
-                       <div className="config-item config-item--stacked">
-                          <label htmlFor={`step-notes-${step.id}`}>
-                            Notes <span className="config-hint">Markdown · shown in Analytics</span>
-                          </label>
-                          <textarea
-                            id={`step-notes-${step.id}`}
-                            className="step-notes-input"
-                            rows={4}
-                            value={step.notes ?? ''}
-                            onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
-                            placeholder="What is this step for? e.g. **Keeps** only rows with a score over 5."
-                          />
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Step ID:</span>
-                          <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
-                       </div>
-                       <div className="summary-item">
-                          <span className="label">Status:</span>
-                          <span className={`status-badge status-${step.status}`}>{step.status}</span>
-                       </div>
-                       {/* Core's warnings from the last run (spec 009 REQ-RUN-002). */}
-                       {!!step.warnings?.length && (
-                         <div className="summary-item step-warnings" data-testid="step-warnings">
-                           <span className="label">Warnings:</span>
-                           <ul className="value">
-                             {step.warnings.map((w) => <li key={w}>{w}</li>)}
-                           </ul>
-                         </div>
-                       )}
-                    </div>
-                  </div>
-              </StepWidget>
               )}
 
               {/* The Formula panel: no name bar, f(x) opens and closes it (owner, 2026-10-30). */}

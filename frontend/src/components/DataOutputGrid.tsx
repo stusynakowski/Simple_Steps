@@ -449,8 +449,9 @@ function Grid({
 
   // ── References from the formula being written (R3, D6) ──────────────────
   // While a formula bar has focus, each of its references to this step is
-  // boxed, dashed, in this step's colour, around the cells it covers: only
-  // when this step's output is shown, not while it's staged.
+  // boxed, dashed, in the colour of the step whose formula it is, around the
+  // cells it covers (owner, 2026-10-30): only when this step's output is
+  // shown, not while it's staged.
   const { wiringState } = useStepWiring();
   const myRefs = wiringState.references.filter((r) => r.step === stepName);
   const outputShown = (cells ?? []).some((c) => !c.state || ['known', 'failed', 'stale', 'absent'].includes(c.state));
@@ -659,7 +660,7 @@ function Grid({
         )}
         {refMarks.map((m, i) => (
           <div key={`ref-${i}`} className="reference-mark" aria-hidden="true"
-            style={{ left: m.left, top: m.top, width: m.width, height: m.height, borderColor: edge }} />
+            style={{ left: m.left, top: m.top, width: m.width, height: m.height, borderColor: wiringState.referenceColor ?? edge }} />
         ))}
         {marks.map((m) => (
           <div

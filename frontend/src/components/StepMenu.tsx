@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import SymbolIcon from './SymbolIcon';
 import type { SymbolName } from './SymbolIcon';
@@ -23,11 +24,15 @@ export type StepMenuItem = { divider: true } | {
  * list of actions or toggles. The pop-up is drawn over the whole page (a
  * portal, fixed where the button is), so no step column clips or covers it.
  * Closes on a click elsewhere, on Esc, on scroll, or after an action.
+ * With `children` instead of `items` it is a popover: the pop-up holds that
+ * content (a step's settings, its notes) and stays open while it is used.
  */
-export default function StepMenu({ icon, label, items, align = 'left', testId, text, badges, className = '', iconSize = 14 }: {
+export default function StepMenu({ icon, label, items = [], children, align = 'left', testId, text, badges, className = '', iconSize = 14 }: {
   icon: SymbolName;
   label: string;
-  items: StepMenuItem[];
+  items?: StepMenuItem[];
+  /** The popover's content, drawn in place of `items`. */
+  children?: ReactNode;
   /** Which edge of the button the pop-up lines up with. */
   align?: 'left' | 'right';
   testId?: string;
@@ -60,7 +65,9 @@ export default function StepMenu({ icon, label, items, align = 'left', testId, t
       if (!button.current?.contains(t) && !pop.current?.contains(t)) setOpen(false);
     };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    const close = () => setOpen(false);
+    // Scrolling the page moves the button away from the pop-up; scrolling
+    // inside the pop-up (a long note, say) does not.
+    const close = (e: Event) => { if (!pop.current?.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', away);
     document.addEventListener('keydown', esc);
     window.addEventListener('scroll', close, true);
@@ -80,7 +87,7 @@ export default function StepMenu({ icon, label, items, align = 'left', testId, t
         type="button"
         className={`btn-icon step-menu-toggle${open ? ' active' : ''}${className ? ` ${className}` : ''}`}
         aria-label={label}
-        aria-haspopup="menu"
+        aria-haspopup={children ? 'dialog' : 'menu'}
         aria-expanded={open}
         title={label}
         data-testid={testId}
@@ -98,8 +105,8 @@ export default function StepMenu({ icon, label, items, align = 'left', testId, t
       {open && createPortal(
         <div
           ref={pop}
-          className="step-menu-pop"
-          role="menu"
+          className={`step-menu-pop${children ? ' step-menu-pop--panel' : ''}`}
+          role={children ? 'dialog' : 'menu'}
           aria-label={label}
           style={{ top: at?.top ?? -9999, left: at?.left, right: at?.right }}
           onClick={(e) => e.stopPropagation()}
@@ -107,6 +114,7 @@ export default function StepMenu({ icon, label, items, align = 'left', testId, t
         >
           {/* What this menu is (owner, 2026-10-30): its name, else its label. */}
           <div className="step-menu-header" aria-hidden="true">{text ?? label}</div>
+          {children && <div className="step-menu-body">{children}</div>}
           {items.map((item, i) => (item.divider
             ? <div key={`d${i}`} className="step-menu-divider" role="separator" />
             : (

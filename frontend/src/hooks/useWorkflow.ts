@@ -659,14 +659,23 @@ export default function useWorkflow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [declareWorkflow]);
 
-  const runPipeline = useCallback(() => {
+  /**
+   * Run the pipeline to the end. With `fromId` (a step toolbar's "Run to the
+   * end"), that step and every later one run, after any earlier step that
+   * hasn't run yet; without it, from the first step not yet run.
+   */
+  const runPipeline = useCallback((fromId?: unknown) => {
     if (pipelineStatusRef.current === 'running') return;
     announce({ kind: 'run', target: null });
-    
+
     setPipelineStatus('running');
     const steps = workflowRef.current.steps;
     const firstIncomplete = steps.findIndex(s => s.status !== 'completed');
-    const startIndex = firstIncomplete >= 0 ? firstIncomplete : 0;
+    // A button wired straight to this passes its click event, so only a string is a step.
+    const from = typeof fromId === 'string' ? steps.findIndex(s => s.id === fromId) : -1;
+    const startIndex = from >= 0
+      ? (firstIncomplete >= 0 ? Math.min(firstIncomplete, from) : from)
+      : (firstIncomplete >= 0 ? firstIncomplete : 0);
 
     addLog('info', `▶ Pipeline started — running ${steps.length - startIndex} step(s) from index ${startIndex}`, {
       detail: `Steps: ${steps.slice(startIndex).map(s => s.label).join(' → ')}`,

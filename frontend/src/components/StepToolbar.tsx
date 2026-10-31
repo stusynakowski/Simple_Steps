@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import type { ReactNode } from 'react';
 import type { PanelId } from './stepPanels';
 import { PANEL_META } from './stepPanels';
 import type { SymbolName } from './SymbolIcon';
 
 /** Each panel's icon in the Panels menu. */
-const PANEL_ICON: Record<'overview' | 'data' | 'settings', SymbolName> = {
+const PANEL_ICON: Record<'overview' | 'data', SymbolName> = {
   overview: 'analytics',
   data: 'database',
-  settings: 'settings',
 };
 import type { GridPick } from '../utils/selection';
 import type { Step } from '../types/models';
@@ -43,6 +43,14 @@ interface StepToolbarProps {
   onRun?: (id: string) => void;
   /** Run every step (the pipeline). */
   onRunAll?: () => void;
+  /** Run this step and every step after it. */
+  onRunToEnd?: () => void;
+  /** Drop this step's output. */
+  onClearOutput?: () => void;
+  /** The Step settings popover's content (name, colour, id, status). */
+  settings?: ReactNode;
+  /** The Notes popover's content (the step's Markdown notes). */
+  notes?: ReactNode;
   /** Move this step to a position, 0 the first (core's `k.move`). */
   onMove?: (to: number) => void;
   /** How many steps the workflow has, so a move knows its ends. */
@@ -77,6 +85,10 @@ export default function StepToolbar({
   onRun, 
   onDeclare,
   onRunAll,
+  onRunToEnd,
+  onClearOutput,
+  settings,
+  notes,
   onMove,
   stepCount = 1,
   onDelete, 
@@ -221,10 +233,11 @@ export default function StepToolbar({
           step shows their icons without words (CSS container query). */}
       <div className="toolbar step-bar" data-testid="step-toolbar">
 
-        {/* The step's control bar (owner, 2026-10-29; dev_plan/126 L1): Run and
-            its controls at the left; at the right, step tools (the Formula
-            panel), the panels menu (☰), settings, then managing the step.
-            Each menu pops up over the page (StepMenu). */}
+        {/* The step's control bar (owner, 2026-10-29/30; dev_plan/126 L1): at
+            the left Run, Run to the end and the run options (Clear output is
+            one of them); at
+            the right the panels menu, the Step settings and Notes popovers,
+            then managing the step. Each pops up over the page (StepMenu). */}
         <div className="step-bar-side">
         <button
           className="step-run-big"
@@ -234,11 +247,21 @@ export default function StepToolbar({
           data-testid="btn-run"
         >
           <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={18} />
-          <span>{step.status === 'running' ? 'Stop' : 'Run Step'}</span>
+          <span>{step.status === 'running' ? 'Stop' : 'Run'}</span>
+        </button>
+        <button
+          className="btn-icon step-menu-toggle step-menu-big"
+          onClick={(e) => { e.stopPropagation(); onRunToEnd?.(); }}
+          disabled={!onRunToEnd}
+          title="Run to the end: this step and every step after it"
+          aria-label="Run to the end"
+          data-testid="btn-run-to-end"
+        >
+          <SymbolIcon name="fast_forward" size={22} />
         </button>
         <StepMenu
           icon="playlist_play"
-          iconSize={20}
+          iconSize={22}
           label="Run options"
           testId="run-controls"
           className="step-menu-big"
@@ -246,6 +269,9 @@ export default function StepToolbar({
             { icon: step.status === 'running' ? 'stop' : 'play_arrow', label: step.status === 'running' ? 'Stop' : 'Run this step', hint: '⌘↵', onClick: () => onRun?.(step.id) },
             { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
             { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
+            { divider: true },
+            { icon: 'cleaning_services', label: 'Clear output', hint: onClearOutput ? undefined : 'not yet',
+              onClick: () => onClearOutput?.(), disabled: !onClearOutput, testId: 'btn-clear-output' },
           ]}
         />
         </div>
@@ -265,17 +291,14 @@ export default function StepToolbar({
             testId: `panel-${panel}`,
           }))}
         />
-        <button
-          className={`btn-icon step-menu-toggle step-bar-named${isOpen('settings') ? ' active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTogglePanel('settings'); }}
-          title="Settings"
-          aria-label="Settings"
-          aria-pressed={isOpen('settings')}
-          data-testid="panel-settings"
-        >
-          <span className="step-menu-text">Settings</span>
-          <SymbolIcon name="settings" size={18} />
-        </button>
+        <StepMenu icon="tune" iconSize={18} label="Step settings" text="Step Settings" align="right"
+          testId="step-settings" className="step-bar-named">
+          {settings}
+        </StepMenu>
+        <StepMenu icon="sticky_note_2" iconSize={18} label="Notes" text="Notes" align="right"
+          testId="step-notes" className="step-bar-named">
+          {notes}
+        </StepMenu>
         {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
         <StepMenu
           icon="swap_horiz"
