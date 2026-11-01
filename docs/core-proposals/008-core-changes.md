@@ -1880,6 +1880,54 @@ leaves arrays (and other objects) as they are. **Shim:** `SHIM(core §C37)`,
 `core_bridge._patch_plain`, which does exactly that, for both `values` and
 `workflow` (which imports `_plain` by name).
 
+### C38. A selection as a tool's input, on its row ids
+
+**Principle (owner, 2026-10-31):** cells flow linearly, step to step, and
+every step is a tidy table. A selection is a smaller tidy table, so it may be
+any tool's input, provided its rows keep their mapping to the step they came
+from. Wherever row `#` in one step is not row `#` in the next, that mapping is
+recorded.
+
+**Run (2026-10-31, core `58bc115`), table `a` = 4 rows, ids 0–3:**
+
+| Step | Output row ids | Mapping recorded |
+|---|---|---|
+| `wf["a"][1:3]` (a selection step) | `[1, 2]` | ids kept; `k.cell` → `a`, id 1 |
+| `double[mod.map()](wf["sel"])` | `[1, 2]` | ids kept |
+| `big[mod.filter()](wf["a"])` | `[2, 3]` | ids kept |
+| `mod.sort(by=["x"], ascending=False)` | `[3, 2, 1, 0]` | ids kept, reordered |
+| `split[mod.expand()](wf["a"])` | `'0.0', '1.0', '1.1', …` | parent id in the id, and a `#a` column |
+| `add[mod.collapse(by="y", initial=0)]` | `'a', 'b', 'c'` (the key) | `#a` = `[0, 2]`, `[1]`, `[3]` |
+| `piv[mod.table()]` (a groupby inside) | `[0, 1, 2]`, new | **none**: `k.cell` inputs `('a', id None)` |
+| `piv_multi[mod.table()]` (returns a MultiIndex) | `[0, 1, 2, 3]`, new | **none**; the index levels became columns `y, x` |
+
+So the mapping is already the row id for one-to-one verbs, and a `#<step>`
+column where it isn't (expand, collapse); C16's `expand` ask is met. The
+MultiIndex is flattened to columns, so the tidy table holds there too.
+
+But **`double[mod.map()](wf["a"][1:3])`** raises `TypeError: a selection can't
+be a tool's input: make it its own step (wf["part"] = wf["p"][…]) and pass
+wf["part"]`, though the selection step it asks for keeps ids `[1, 2]` and maps
+back to `a` exactly. The detour adds a step to the flow and changes nothing
+about the mapping.
+
+**Ask:**
+
+1. A selection may be a tool's input. Its rows carry their ids from the step
+   they were selected from, as `wf["a"][1:3]` on its own already does, so
+   `k.cell` traces to `a`, id 1, with no step between. This also settles C20,
+   where the JSON form runs on every row instead.
+2. `table` records the mapping when it can't be the identity: a `#<input>`
+   column (the input ids each output row came from, as `collapse` gives), or a
+   recorded "unmapped" when the tool's output can't be traced, so the app can
+   say so instead of showing no inputs.
+
+**Done when:** `double[mod.map()](wf["a"][1:3])` runs with ids `[1, 2]` and
+`k.cell(step, 1, "value")["inputs"]` names `a`, id 1; and a `table` step's
+cells either name their input ids or say the mapping is unknown.
+
+**Shim:** none. The app keeps writing selection steps until core allows this.
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |

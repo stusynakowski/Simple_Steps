@@ -223,6 +223,24 @@ report("R9  the grid's index is core's #, not the position",
        f"the grid's row ids = {shown}; core's # = {ids}",
        f"the grid's row ids = {shown} = core's #")
 
+# ── Plan 130: mappings and references (06; each step's notes say EXPECT / TODAY) ──
+
+cat = example.catalog()
+mappings = Kernel(cat)
+for s in example.workflow("ui_status", "06-mappings-and-references")["steps"]:
+    try:
+        mappings[s["name"]] = operation_for("=" + s["expression"], {}, cat)
+    except Exception as e:
+        report(f"130 {s['name']}", True, "", f"refused as typed: {str(e)[:90]}", kind="CORE")
+        continue
+    try:
+        mappings.run(s["name"])
+        v = mappings.view(s["name"])
+        got = [(r["#"], [c.get("value") for c in r["cells"].values()]) for r in v["rows"]][:4]
+        report(f"130 {s['name']}", True, "", f"# and cells: {got}", kind="CORE")
+    except Exception as e:
+        report(f"130 {s['name']}", True, "", f"refused at run: {str(e).split(': ', 1)[-1][:90]}", kind="CORE")
+
 # ── Report ────────────────────────────────────────────────────────────────
 
 width = max(len(r[0]) for r in results)

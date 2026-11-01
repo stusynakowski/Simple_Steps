@@ -50,3 +50,25 @@ def add_up(n: list) -> int:
         n: the group's numbers.
     """
     return sum(n)
+
+
+@simple_step_tool(category="UI status")
+def add_k(n: int, k: int) -> int:
+    """The number plus one other number.
+
+    Args:
+        n: the number.
+        k: the number to add.
+    """
+    return n + k
+
+
+@simple_step_tool(category="UI status")
+def add_all(n: int, k: list) -> int:
+    """The number plus the sum of a list.
+
+    Args:
+        n: the number.
+        k: the numbers to add.
+    """
+    return n + sum(k)
