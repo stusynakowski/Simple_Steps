@@ -10,6 +10,14 @@
 > `docs/dev_plan/117` and `200`, and adds sixteen new asks, C1–C16. Old IDs
 > are kept, so core's replies still match. The last section maps the old IDs
 > and each `SHIM(core §X)` tag in the app to an entry here.
+>
+> **References, selection and lineage (2026-11-02):** the asks L1–L43 are
+> planned as milestones, with tests, in
+> [`docs/core-asks/`](../core-asks/README.md): the model, the plan and a probe,
+> in one folder to hand to core.
+> They supersede K19 (decision D1, 2026-11-02: the verb decides what a column
+> argument passes, not the parameter's type) and continue C7, C20, K9, K28
+> and K29; see `docs/core-asks/plan.md` §13.
 
 ## How to check progress
 

@@ -14,6 +14,7 @@ then come here.
 | What must it do? (REQ-* IDs) | [`spec/`](spec/) 009–014, tests in [`testplan/`](testplan/) | yes |
 | What are we changing next? (**dev plan**) | [`dev_plan/`](dev_plan/) | active plans only; see its README |
 | What do we need from core? | [`core-proposals/`](core-proposals/) (008 is the live list) | yes |
+| What should references, selection and lineage be, and what must core build for them? | [`core-asks/`](core-asks/README.md): model, plan with tests, and a probe, in one folder to hand to core | yes |
 | What was removed, and what is staged for removal? | [`cleanup-map.md`](cleanup-map.md) | yes |
 | Why was an early decision made? | [`adr/`](adr/), [`archive/`](archive/) | no: historical |
 

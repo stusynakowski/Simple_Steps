@@ -72,3 +72,13 @@ def add_all(n: int, k: list) -> int:
         k: the numbers to add.
     """
     return n + sum(k)
+
+
+@simple_step_tool(category="UI status")
+def size_band(n: int) -> str:
+    """A group key: "small" under 25, "big" otherwise.
+
+    Args:
+        n: the number to label.
+    """
+    return "small" if n < 25 else "big"
