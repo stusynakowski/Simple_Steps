@@ -1811,7 +1811,7 @@ Every ask's **Done when** is written as a check that can be run against core.
 ## At the kernel API (core `58bc115`, 0.2.0)
 
 Found while moving the app onto `Catalog` and `Kernel`
-([core_migration.md](../dev_plan/core_migration.md)), each run, not read.
+([core_migration 01](../archive/dev_plan/core_migration/01-core-0.2.0.md)), each run, not read.
 `SHIM(core §C17)` and `SHIM(core §G)` are gone with the paths that needed them
 (the `dataframe` orchestrator, the engine registry). `SHIM(core §C18)` stays:
 `cat.describe()` still takes the docstring's first line.

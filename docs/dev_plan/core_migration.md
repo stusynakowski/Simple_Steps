@@ -1,320 +1,162 @@
-# Moving Simple Steps onto the new core
+# Moving Simple Steps onto core v1.0.1
 
-> Step G of [phase4-plan.md](../../external/simple-steps-core/docs/design/phase4-plan.md), brought forward: what the app
-> repo (`Simple_Steps`) changes to run on this core, in what order, and what
-> it adopts later. Derived 2026-10-27 at core `fdd3b62`, from the app at
-> `1139779` (pin `86170a3`, 69 core commits behind). The app's own maps of
-> the same work are its `docs/cleanup-map.md` (round 4, stages A–D) and
-> `docs/system_design/12-core-and-app.md`; this page says which of their
-> rows core now makes possible.
+> Written 2026-11-09, from the app at `9ae73fd` (pin `58bc115`, core 0.2.0)
+> to core `fed4d1a` (tag `v1.0.1`, 108 commits later). Everything under §1
+> was **run**, not read: the app installed in a clean venv against core
+> `fed4d1a`, its tests and examples run, and each shim probed.
 >
-> **Written in core and copied here; §8–9 are the app's.** It absorbs the
-> app's [124](../archive/dev_plan/124-core-009-integration.md) and
-> [125](../archive/dev_plan/125-migrate-to-core-kernel.md) (§9). Their UI
-> work (the grid, selection, the parser's reference spans) is in
-> [126](126-formula-ui.md).
+> Core's own guide to this move is
+> [app-migration.md](../../external/simple-steps-core/docs/design/app-migration.md)
+> (§3.4 formulas, §3.8 what the expression cleanup changes). Earlier notes on
+> moving onto core (0.2.0, 124, 125) are in
+> [`../archive/dev_plan/core_migration/`](../archive/dev_plan/core_migration/).
 
-## 1. Can the app move now?
+**Goal.** The same functionality on core v1.0.1, with less code and one
+implementation per concept. Where core now does something the app does, the
+app's copy goes.
 
-**Yes.** Nothing left in phase 4 blocks it. Steps D, E and F add features
-the app either does without today or does for itself, and none of them
-renames or removes anything the app will use. So the move is one breaking
-pass now, then small additive passes as each core step lands (§5).
+## 1. Where the app stands on v1.0.1
 
-| Left in core | What the app does meanwhile | Blocks the move? |
-|---|---|---|
-| D: K22 outputs by data version | keeps `DATA_STORE` / `RAW_STORE` | no |
-| D: K23, K14 progress and `cancel()` | keeps `progress.py`; only the legacy orchestrators call it | no |
-| D: K15 re-run failed rows; R9 stages; autorun | not used yet | no |
-| E: C32, K16 output store; R7 media | saves the spec; a reloaded workflow re-runs, as today | no |
-| F: G18 the workflow as a table | its own UI | no |
-| C-D2 the seed recommendation | — | no |
-
-The one thing that would be worse later: every core commit from here on is
-written against an app that isn't on it. Moving now means the app's tests
-check core's changes as they land.
-
-## 2. Before the pin moves (on the old pin)
-
-Shrink what has to move. These are the app's own decided cleanups
-(cleanup-map.md round 4), none of which needs the new core, and each removes
-code the move would otherwise have to port:
-
-1. **Stage A:** eval mode (L1), the engine switch (L2), the unused routes.
-2. **Stage D, under "the best code is no code"**: `pack_loader.py` (L3),
-   the old-syntax formulas and orchestrators (L4), `safe_formula.py` and the
-   console (L7), `step_proxy.py` and `helpers.py` (L8), duplicate tools
-   (L9). About 3,200 lines; the old engine's last users go with them.
-3. **Stage B:** split `grid_runner.py` into what the kernel needs and the
-   legacy per-step path; `models.StepConfig` and `example_check.py` onto
-   `operation_formula`; `@simple_step_tool` stops wrapping in `StepProxy`.
-
-Checks after each, as the app has them: `pytest`, `scripts/preflight.py`,
-`examples/runme.py`.
-
-## 3. Moving the pin
-
-One branch in the app, in this order. Each item ends with the app's tests
-passing, except where it says otherwise.
-
-### 3.1 Pin and imports
-
-Move `pyproject.toml`'s pin and `external/simple-steps-core` together. Then
-**import from the package; `simple_steps_core.grid` is gone**:
-
-```python
-from simple_steps_core import (Catalog, Kernel, tool, resource, bound_tool, Secret,
-    mod, wf, res, rows, cols, join, stack, zip_, Operation, Step, Output, Problem)
-```
-
-Anything else comes from its module and may still change:
-
-| The app uses | Now |
+| Check | Result |
 |---|---|
-| `grid.Workflow` (61 uses) | `Kernel` for everything the app hosts; `simple_steps_core.workflow.Workflow` only inside core |
-| `grid.Operation`, `grid.op`, `grid.Output` | `Operation`, `simple_steps_core.operation.op`, `Output` |
-| `grid.mod`, `wf`, `res`, `cols`, `zip_`, `join`, `stack`, `tool`, `resource`, `bound_tool` | the same names, from the package |
-| `grid.ResourceNotLoaded` | `simple_steps_core.errors.ResourceNotLoaded` |
-| `grid.catalog`, `tool_entry`, `resource_entry`, `modifier_catalog`, `builtin_tools`, `shape_verbs`, `MODIFIERS`, `BUILTIN_TOOLS` | `cat.describe()` (`tools`, `modifiers`, `combines`, `resource_types`) |
-| `grid.TOOLS`, `grid.RESOURCE_TYPES`, `REGISTRY`, `register_tool` | gone: a `Catalog` |
-| `grid.ToolHandle` | `Tool` |
-| `grid.payload_column(output)` | `output.value_column` |
-| `grid.grid(value)` (`example_check.as_table`) | `k["x"] = value` then `k.step("x").data`; or `simple_steps_core.verbs.grid` |
-| `grid.infer_verb`, `check_modifier`, `predicted_columns`, `formula_names`, `check` | `simple_steps_core.checks` / `.catalog` (internal); prefer `k.check(name, op)` and `step.plan` |
+| `import SIMPLE_STEPS` | ok: nothing the app imports was removed |
+| `pytest` | **14 failed** (baseline 1, the known `test_select_cell`) |
+| `examples/runme.py` | collapse, sweep, expand, widen and every resource example fail; `KeyError: 'value'` |
+| core's `tutorial/handover.py` | 53 ✓ · 4 ✗ · 2 ? |
+| the six shims in `core_bridge.py` | all still needed |
 
-The pin-drift symptom in the app's `CLAUDE.md` and `docs/context.md`
-becomes *`cannot import name 'grid' from 'simple_steps_core'`*.
+### 1.1 Why the tests fail: three deliberate core changes
 
-### 3.2 One catalog
-
-`application.App` builds the catalog; nothing registers itself.
-
-- `@simple_step_tool` = core's `@tool` plus `extras={"simple_steps.ui": {name,
-  category, widgets}}`; its description goes in the docstring.
-- `core_bridge.register_with_core` and `main.py:139` stop using `REGISTRY`;
-  `OPERATION_REGISTRY` becomes `Catalog(tools=[…], resources=[…])` or
-  `Catalog.from_modules(app_tools)`. `agent/scope.py` reads the catalog.
-- The palette is `cat.describe()`; restricting is `cat.without(…)`.
-- `core_bridge.py`'s built-in tool groups (the old `ResourceSpec`) become
-  plain tools in the catalog, with a tag for the group.
-
-Dead afterwards: `OPERATION_REGISTRY` (56 references), `DEFINITIONS_LIST`,
-`core_bridge.py`'s shims (C17, C18, G).
-
-### 3.3 Host core's kernel
-
-`kernels.Kernel` keeps what hosting needs (key, lock, last-used) and holds a
-core `Kernel`. The rest it reads from core:
-
-| The app computes | Core gives |
-|---|---|
-| `Kernel.formulas`, `operations`, `reads`, `uses`, `problems`, `loaded`, `ids` | `k.steps`, `step.formula`, `step.operation.reads`, `step.problems` (each a `Problem` with `code`), `k.resources.loaded`, `step.id` |
-| `kernels.summary()` | `repr(k)`, `k.needs_run()` |
-| a step's status | `step.state` (`staged`, `completed`, `stale`, `failed`, `invalid`), `step.output.stale_reason` |
-| change notifications | `k.on_change(callback)` |
-| data for the grid view | `k.view(step, …)` (pages of 50, `window`), `k.cell(step, row id)`, `step.plan` (`size`, types, `inverse`) |
-| checking a proposal | `k.check(name, op)` |
-
-`agent/proposals.check_step` calls `k.check`.
-
-### 3.4 Formulas
-
-The parser stays in the app (`operation_formula.py`) and builds
-`Operation.from_spec(spec, catalog)`; core prints with `step.formula`.
-`formula_parser.py`'s canonical half goes; the UI's `/api/parse_formula`
-keeps its response shape.
-
-### 3.5 Saving and loading
-
-`file_manager.py` saves `k.to_json()` and loads `Kernel.from_json(text,
-catalog)`. Core reads format 4 only and refuses others with a message, so
-**re-save** the mock projects and examples. Under the app's own rule (no
-converters without a named user) older workspace files get that message;
-a converter is the owner's call (K17, §6).
-
-Secrets: a resource setting typed `Secret[str]` is never saved, so a loaded
-kernel asks for it (`k.define(…)` again, or `k.resources.attach`).
-
-### 3.6 What reads differently
-
-Renames from phase 3:
-
-| Was | Now |
-|---|---|
-| `ToolHandle`, `BoundToolHandle`, `ResourceDecl` | `Tool`, `BoundTool`, `Resource` |
-| `op.tool_id`, `step.step_id` | `op.tool`, `step.name` |
-| `modifier.params` | `modifier.settings` |
-| `step.status` (a string) | `step.state`; `step.status` is a `StepStatus` |
-| `PAYLOAD`, `payload_column()`, `meta["payload"]` | `VALUE_COLUMN`, `value_column()`, `output.value_column` |
-| preview `["status"]` | `["state"]` |
-| JSON `step_id`, `tool_id`, `params` | `name`, `tool`, `settings` (format 4) |
-| `name=` on a step | `mod.name(…)` |
-
-Behaviour from phase 4, which the UI and its tests will see:
-
-| Change | Rule ([rules.md](../../external/simple-steps-core/docs/design/rules.md)) |
-|---|---|
-| a step's `.data` has its row id `#` as the index, and starts with the `#` columns that say where each row came from (`#v`, …); tools never see them | 2, 3 |
-| `k.view` rows carry the row id under `#`, the screen position under `position`; `k.cell` takes a row id | 2 |
-| selections and column arguments go by row id, not position | 2, 6 |
-| `zip_` and column arguments between unrelated steps are refused; `zip_(…, match_ids=True)` | 6 |
-| `collapse`, `distinct`, `join`, `stack` add `#` columns; `gather[collapse()]` gives one list per column; a reducer gets lists | 3, 10 |
-| `expand` of a bare string or `None` fails the row; a dict expands to key/value rows | 9 |
-| a cell state `absent`; ints stay ints when rows fail | 9 |
-| `k["x"] = None` is the empty step | 9 |
-| a `-> Record` return spreads into one column per field; `mod.name` takes a list, mapping or pattern; `Kernel(cat, naming=…)` | — |
-| `timeout` is enforced; failures say `where`; defaults used warn; a stale read warns | — |
-| `plan` has `size` and observed types, or `unknown` with the reason | 7 |
-| `k.id`, `k.run_id`, `step.id`, `k.diff(other)`; tool hashes in the catalog spec; a resource's `data_version()` | — |
-| a resource passed by position binds as the tool's argument; a plain call with `res[…]` is refused | — |
-
-The `ref_id` the frontend uses (12 references) keeps its name; its value
-becomes the step's data version (`step.output.version`), as cleanup-map.md
-recommends.
-
-### 3.7 Probes and the handover folder
-
-Regenerate the app's `scripts/core_probes/` and `scripts/core_asks.py`
-against the package API (they import `grid`), then rebuild
-`core-handover/` with `scripts/core_handover.py`.
-
-## 4. Done means
-
-1. The app's tests pass, with the tests of removed code removed with it, and
-   no test of behaviour that stays edited to pass.
-2. `scripts/preflight.py` and `examples/runme.py` run.
-3. The acceptance session in the app's doc 12: every *update* line passes.
-4. `grep -r "simple_steps_core.grid\|REGISTRY\|OPERATION_REGISTRY"` finds nothing.
-5. The UI runs a workflow end to end: declare, run, edit (stale), save, load.
-
-## 5. Later, as each core step lands
-
-Additive, each a small pass in the app (cleanup-map.md stage C rows):
-
-| Core step | The app then | Removes |
+| Core change | Core commit | Fails here |
 |---|---|---|
-| D: K22 outputs by data version | `/api/data`, `/api/cell`, `/api/data-meta` read from the kernel | `DATA_STORE`, `RAW_STORE`, the leak |
-| D: K23, K14 progress, `cancel()` | `progress.py` and `/api/progress/{step_id}` relay core's callback | its own progress bookkeeping |
-| D: K15, R9, autorun | a "re-run failed rows" action; stages shown as one block | — |
-| E: the output store | `file_manager.py` passes a store; a reloaded workspace opens with its data | — |
-| E: R7 media handles | `cell_types.py` reads handles | — |
-| F: G18 | the table view from core's step blocks | its own row alignment |
+| **D9**: a step's one output column is named after the step, not `value`. The app's formula check runs under the step name `__formula__` ([grid_runner.py:23](../../src/SIMPLE_STEPS/grid_runner.py#L23)), so its column is `__formula__` | `eadc2f0` | `test_formula_switching::test_each_editor_switch_runs` (5 cases); the examples' expected results |
+| **S3**: a verb not written is decided when the step is, and saved (`mod.auto()`, `breaker`) | `2f40797` | `test_each_editor_switch_runs` (formula text); `test_tool_handle::test_a_step_input_infers_the_verb` (`'breaker' == 'auto'`) |
+| `copy` needs `columns=`; it has no default | — | `test_a_verb_that_applies_no_tool_refuses_another_tool[copy]`, `…takes_its_default_tool[copy]` |
 
-## 6. Decisions
+Eight test functions plus the five example runs. Each test asserts
+behaviour core removed on purpose, so under the CLEANUP rule it changes:
+**owner go-ahead 2026-11-09, each one listed before it's edited**.
 
-| | Decision | Recommended |
+### 1.2 Handover: what core hasn't built (the app keeps its own)
+
+| Ask | State | The app meanwhile |
 |---|---|---|
-| G-D1 | move the app now, before steps D–F | yes: §1 |
-| G-D2 | older saved workspaces (K17) | refuse with core's message, as the app's own rule says; a converter only if a named user has files to keep |
-| G-D3 | the app's stage A, B, D deletions before the move | yes: less to port, and none of them needs the new core |
+| K23 progress, `cancel()` | not built | `progress.py` |
+| K28b per-cell lineage stored | worked out on request by `k.cell` | nothing |
+| R7 media handles | not built | `cell_types.py` |
+| R9 stages | not built | nothing |
+| K19a, Pc4 | **?**: rows pair by identity between aligned steps (CA-11), never by position | refusals now write the join; show them |
 
-## 7. To do in core
+### 1.3 Shims: probed on `fed4d1a`
 
-What `simple-steps-core` does for this move, then after it. Each item is
-one piece, confirmed before it lands; ✓ when done.
-
-### Before the app moves
-
-| | To do | Why |
+| Shim | Still needed? | What ran |
 |---|---|---|
-| T1 | **Tag a release** (`0.2.0`, from `0.1.0`) at the commit the app pins, and bump `__version__` | the app pins a commit today; a tag says which core the migration was checked against |
-| T2 | **Export what the app needs publicly**: `ResourceNotLoaded` (and the other errors), `op`; or say which module each comes from in `docs/integrating.md` | §3.1 sends the app to internal modules for these; an internal name may change |
-| T3 | **A public way to infer a verb and list formula names**: the UI calls `/api/infer_verb` and the parser needs `formula_names` (today `checks.infer_verb`, `catalog.formula_names`, both internal) | the app shouldn't reach into `checks` |
-| T4 | `cat.describe()` gives each tool's **`hash`** beside its tags and extras | the palette and the workflow file show `k.id`; a changed tool should be visible there too |
-| T5 | **Update kernel-session.md and its example** (`examples/kernel_session.py`) with step C: ids, `diff`, `Secret`, `data_version()` | the working guide is what the app's developer reads first (phase-4 *done means*, 4) |
-| T6 | **Run the app's acceptance session against core alone** (its doc 12, and the regenerated probes), and fix what fails here, not in the app | "if the app works out a fact about a workflow, that fact belongs in core" |
+| C18 description = first docstring paragraph | yes | `describe()["tools"]["dbl"]["description"]` → `'Double it.'` (first line only) |
+| C33 `inspect.signature(tool)` | yes | `(*args, **kwargs) -> 'Any'` |
+| C34 `check_modifier`, `shape_verbs` internal | yes | not exported; the kernel offers only `check`, `infer_verb` |
+| C36 `describe()` lists `name=` | yes, **and now wrong**: `map`'s `name` defaults to `'value'`, which D9 contradicts | `describe()["modifiers"]["map"]["settings"]` |
+| C37 array cell crashes `k.view` / `k.cell` | yes | `ValueError: can only convert an array of size 1 to a Python scalar` |
+| C32 kernel saved with outputs | yes | after `Kernel.from_json`, a run step is `staged`; no store API |
 
-### Decisions waiting on the owner
+New ask for [008](../core-proposals/008-core-changes.md): C36's default
+`'value'` (above).
 
-| | Decision | Recommended |
-|---|---|---|
-| C-D2 | the seed recommendation | a tool with a `seed` parameter its step doesn't give warns |
-| R-D1 | a resource whose type has bound tools: also passable to a free tool as an argument, or only through its bound tools? | both allowed (today's behaviour), unless you mean to refuse |
-| G-D1–3 | §6 | as recommended there |
+## 2. The plan
 
-### Leftovers from step A
+One branch, `core-v1`. Each phase is a commit and ends with its exit
+check. Removals are listed for the owner first (what each piece does, what
+replaces it), then made one at a time.
 
-| | To do |
-|---|---|
-| T7 | `where: expect` on a failure note from an `expect` modifier, like `where: timeout` |
-| T8 | a source tool returning a list of records gives one row per record (`-> list[LoHi]` does under `expand`; a source doesn't yet) |
+### Phase 0: branch and pin
 
-### After the move: the rest of phase 4
+- Move `pyproject.toml`'s pin and `external/simple-steps-core` to `fed4d1a`
+  together; `python scripts/preflight.py`; `pip install -e
+  external/simple-steps-core`.
+- **Exit:** preflight passes; the 14 failures of §1, no others.
 
-In order, each as its step in [phase4-plan.md](../../external/simple-steps-core/docs/design/phase4-plan.md), and each
-followed by its small pass in the app (§5):
+### Phase 1: green on the new core, smallest change
 
-| | Step | Needs first |
-|---|---|---|
-| T9 | **D. Sessions**: K22 outputs by data version, K23/K14 progress and `cancel()`, K15 re-run failed rows, R9 stages, the autorun modifier | D-D1 (autorun design), D-D2 (progress callback) |
-| T10 | **E. Storage**: C32/K16 the output store, R7 media handles | E-D1 (the store's interface) |
-| T11 | **F. The workflow as a table** (G18) | nothing new |
-| T12 | `scripts/core_asks.py` at 39 of 39 (K14, K15, K16 close with D and E) | T9, T10 |
-| T13 | **Phase 5, the final docs** (cleanup-plan.md §6): README, writing-tools, resources (secrets, data versions), modifiers, integrating (for the app), problems | phase 4 done |
+- Read `output.value_column` everywhere the app assumes `"value"`
+  (`grid_runner`, `example_check`, the examples' expected results).
+- Show the verb core saved as core's decision; stop expecting it unwritten.
+- Update the eight tests of §1.1, each listed first.
+- **Exit:** `pytest` back to 1 failure; `examples/runme.py` passes.
 
-## 8. Progress (app branch `core-migration`)
+### Phase 2: core reads formulas; the app's parser goes
 
-| | Status | Commit |
-|---|---|---|
-| §2 Stage A: L1 eval mode, L2 engine switch, unused routes | done; owner go-ahead 2026-10-27 | `8050a08` |
-| §2 Stage D: L3, L4, L7 (console keeps its log streams), L8, L9 (+ `pandas_eval`) | done; owner go-ahead 2026-10-27 | `41100a0` |
-| §2 Stage B | absorbed by D: `grid_runner` is the formula path only; `StepConfig`/`example_check` on `operation_formula`; no `StepProxy` | — |
-| §3.1–3.4 pin `58bc115`, one catalog, core's kernel, the parser on `Operation.from_spec` | done | `7e00ad5`, `6b91494` |
-| §3.5 save/load as `k.to_json()` | **open**: see below | — |
-| §3.6 renames and behaviour | done for what the app touches; examples re-saved with `mod.name` | `7e00ad5` |
-| §3.7 probes, `core_asks.py`, handover folder | done (36/39 asks) | `b742509` |
+Core's `formula(text)` reads formula text into an operation, pick or
+literal, checked against the kernel's catalog, and never runs it (EX13,
+`febe4dc`). `formula(step.formula)` gives the step back. This supersedes
+the 2026-10-27 decision that the parser lives in the app (archive, 01 §9
+decision 3).
 
-Confirmed by the owner on 2026-10-27, one question each: `#` lineage columns
-are kept in stored outputs and hidden from the grid (`/api/data?index=true`
-returns them, for a planned index-grid expander); basic's `bucketed` zip is
-dropped (group keeps the rows' columns); bad_examples use core's wording and
-the corrected workflow expects the try_except-default warning; a formula
-that doesn't parse is core's empty step carrying the reason.
+- **Inventory first**, for the owner: each name used from
+  [operation_formula.py](../../src/SIMPLE_STEPS/operation_formula.py)
+  (923 lines; `compile_formula`, `FormulaError`, `describe`, `is_canonical`,
+  `format_parts`, `not_a_step`, `references`, `is_literal`), its 8 callers,
+  and what replaces it: `formula`, `FormulaError`, `step.formula`,
+  `step.spec`, `k.check`, `k.infer_verb`.
+- `/api/parse_formula` calls `formula` and keeps its response shape.
+- Anything core can't give becomes a tagged shim in `core_bridge.py` and an
+  ask in 008, never leftover parser code.
+- **Exit:** `operation_formula.py` deleted; tests and examples as phase 1.
 
-New core asks, with evidence, in [008](../core-proposals/008-core-changes.md):
-C32 (kernel saved with outputs), C33 (`inspect.signature(tool)`), C34
-(`check_modifier` internal), C35 (`tool(fn, id=…)` ignores `id`), C36
-(`describe()` lists retired `name=`).
+### Phase 3: the kernel reports itself
 
-Checks at `b742509`: pytest 1 failed / 252 passed (the known `test_select_cell`),
-vitest 149/149, every example's runme, preflight, smoke_install 20/20.
+App-migration §3.3: `kernels.py` computes formulas, reads, problems and a
+summary that core now gives (`k.steps`, `step.operation.reads`,
+`step.problems`, `repr(k)`, `k.needs_run()`, `k.on_change`). The app's
+kernel keeps hosting only: key, lock, last used.
 
-**§3.5, the open decision.** The app's files are its format 2 (`steps:
-[{name, expression, meta}]`, `resources: {name: {source, type, settings |
-as_loaded, overrides}}`). Core's `to_json()` is format 5 and refuses any
-other. Two things don't map one to one: a *ready-made* resource's
-declaration (`source: "loaded"`, `as_loaded`, `overrides`), and step `meta`
-(label, colour, notes). Both would ride in `extras["simple_steps.ui"]`. Once
-moved, every format-2 file (the examples are re-saved; a user's are not) gets
-core's "saved before the redesign" message (G-D2).
+- Inventory, then delete piece by piece.
+- **Exit:** as phase 1.
 
-## 9. Earlier steps on the app side (from 124 and 125)
+### Phase 4: frontend
 
-**124, core 009 (2026-10-21 to 10-23), done.** Phases 0–2, each piece
-confirmed by the owner:
-- Pins `b9f66d5` → `523ad1d` → `86170a3`. Results-only steps (traced through
-  row ids, spec 014 REQ-VIS-058); implicit steps save `mod.auto()` (and the
-  orchestration auto chose is to be shown, REQ-VIS-059); input values only in
-  the popover (REQ-VIS-060).
-- One core workflow per session, then **kernels**: one per (session,
-  workflow), `MAX_LIVE = 1`, the least recently used saved to disk and
-  restored without recomputing. Code: `kernels.py`, and the comments citing
-  "dev_plan/124 phase 2".
-- Phases 3–6 (the grid from core, selection, the popover, editing) moved to
-  [126](126-formula-ui.md); a first slice of selection and the popover was
-  built.
+- The view's `#` is the row number `0…n-1`; lineage stays hidden behind
+  the planned expander.
+- Show the new problem codes (`bad_pairing`, `id_argument`, `bad_combine`),
+  run warnings, and why a step is stale.
+- `python -m SIMPLE_STEPS.build_frontend`.
+- **Exit:** `cd frontend && npx vitest run`; preflight (bundle fresh).
 
-**125, the kernel move.** Its order of work became §3 and §8 here; its
-parser section is 126 F7–F8.
+### Phase 5: saved files and docs
 
-**Decisions (owner, 2026-10-27)**, from 125:
+- Re-save the examples and mock projects in core's current format.
+- `CLAUDE.md`, `docs/context.md`: the pin-drift symptom names something new
+  in this core.
+- 008: close what v1.0.1 closed; add C36's default. Regenerate
+  `scripts/core_probes/` and `scripts/core_asks.py`.
+- `dev_plan/README.md` and `126`: the parser is core's.
+
+### Phase 6: gates
+
+`pytest` (1 failure), `examples/runme.py`, `preflight.py --fix`,
+`smoke_install.py`, and the UI end to end: declare, run, edit (stale),
+save, load.
+
+### Not in this move
+
+Progress and `cancel()`, the output store (C32), media (R7), stages (R9):
+each is a small pass when core lands it (archive, 01 §5).
+
+## 3. Decisions (owner, 2026-11-09)
 
 | # | Question | Decided |
 |---|---|---|
-| 1 | Which core commit to pin | a core `main` commit once `core-handover` merges (done: `58bc115`, 0.2.0) |
-| 2 | Step identity | **the name is the identity**; references and hashes use names, and `insert`/`move` change a step's position. **Both `wf["name"]` and `wf[index]` work** in a formula; an index reference is saved by name. Not yet: `wf[0]` is refused ([008 K30](../core-proposals/008-core-changes.md#k30-wfindex-in-a-formula-saved-by-name), 126 F11) |
-| 3 | Where the parser lives | in the app: central and thin, syntax only; meaning is `k.check` |
-| 4 | Delete L4 and L10 before migrating | yes (done, `41100a0`) |
-| 5 | Old kernel snapshots | discard; the kernel re-runs |
-| 6 | Core's §7 choices | the kernel is what you hold; `step.state` replaces `step.status`. **Agent permissions live in the app's `App` object**, not in a step and not in core's catalog extras |
-| 7 | A kernel's catalog is fixed | yes: a new or changed tool means restarting the server. A resource's methods come with its *type*, which is in the catalog at boot |
+| 1 | Pin | `fed4d1a`, tag `v1.0.1` |
+| 2 | Tests asserting behaviour core removed (§1.1) | update them, each listed first |
+| 3 | The formula parser | core's `formula()` replaces the app's; supersedes the 2026-10-27 decision |
+| 4 | Where this plan lives | here; earlier notes in `archive/dev_plan/core_migration/` |
+
+## 4. Progress
+
+| Phase | Status | Commit |
+|---|---|---|
+| 0 pin | — | — |
+| 1 green | — | — |
+| 2 parser | — | — |
+| 3 kernel | — | — |
+| 4 frontend | — | — |
+| 5 files, docs | — | — |
+| 6 gates | — | — |

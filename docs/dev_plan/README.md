@@ -8,7 +8,7 @@ docs is [`../README.md`](../README.md). Code comments cite plans by number
 
 | File | Status | What it covers |
 |---|---|---|
-| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core 0.2.0 and its kernel: what's done (§8), what's open (§3.5 save/load), what follows as core lands; the earlier app-side steps and the owner's decisions (§9) |
+| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core v1.0.1 (`fed4d1a`): what fails today and why (§1, run), phases 0–6 with the app's formula parser replaced by core's `formula()` (§2), the owner's decisions (§3). Earlier moves: [`../archive/dev_plan/core_migration/`](../archive/dev_plan/core_migration/) |
 | [`120-literals-and-references.md`](./120-literals-and-references.md) | rule, partly built | Only `wf["step"]` is a reference; everything else is a literal. The canonical `tool[modifiers](input, arguments)` form. Cited by `operation_formula.py` |
 | [`122-skeleton-complete.md`](./122-skeleton-complete.md) | mostly built | Object model, resources, the agent, custom cell types. Cited by `application.py`, `resources.py`, `cell_types.py`, `agent/proposals.py` |
 | [`126-formula-ui.md`](./126-formula-ui.md) | **active** | The formula UI: what each path writes today (run), the open items F1–F16 (writing formulas, references and selection, showing cells), and decision D1. Replaces the open parts of 121, 123, 124 and 125 |
