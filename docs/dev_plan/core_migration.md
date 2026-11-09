@@ -153,7 +153,7 @@ each is a small pass when core lands it (archive, 01 §5).
 
 | Phase | Status | Commit |
 |---|---|---|
-| 0 pin | — | — |
+| 0 pin | done: preflight 3/3; pytest the 14 failures of §1, no others | this commit |
 | 1 green | — | — |
 | 2 parser | — | — |
 | 3 kernel | — | — |
