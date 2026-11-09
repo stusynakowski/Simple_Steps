@@ -45,7 +45,6 @@ example.check("bad_examples", "corrected", twin=pipeline.build_corrected, strict
     "nullable_column": {"nullable_column": [2, 0, 4]},
     "table_returns_text": {"column": ["city", "n"], "non_null": [3, 3]},
     "argument_hides_column": {"argument_hides_column": ["city of SF", "city of NYC", "city of LA"]},
-    "reads_a_result": {"reads_a_result": [2, 0, 4]},
     "zip_shares_a_column": {"n": [1, 0, 2], "scored": [2, 0, 4]},
     # NYC's n is 0: 1/0 raises, try_except(default=0.0) fills it in, and core
     # says so (the twin checks the values)

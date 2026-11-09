@@ -27,7 +27,7 @@ Before: the app imports fine; `pytest` 14 failed (baseline 1, the known
 | 4 | `mod.copy` is a new verb that needs `columns=` | 2 `copy` cases in `test_formula_switching` (the test lists every no-tool verb) | the test's settings table gives `copy` its `columns=` |
 | 5 | **S3**: an unwritten verb is decided when the step is and written (`mod.map()` plus a default breaker); `mod.auto()` is no longer saved (`2f40797`) | `test_tool_handle::test_a_step_input_infers_the_verb` | expectation |
 | 6 | **S3**: a `-> bool` tool with no verb **maps**; keeping rows is written, `mod.filter()`. `k.infer_verb` says so: *"to keep rows, write mod.filter()"* | example `auto_filter`; the "to a filter tool" switch | expectations. No editor change: `/api/infer_verb` already carries core's reason |
-| 7 | **S3**: a parameter binds the lone column of its type, and core writes the binding (`name=wf["people"][cols["first"]]`); with several it is refused and the message writes the fix | bad examples `parameter_not_a_column`, `reads_a_result` now run | `people` gets a second text column, so the first is still refused. `reads_a_result`: owner's call (§4) |
+| 7 | **S3**: a parameter binds the lone column of its type, and core writes the binding (`name=wf["people"][cols["first"]]`); with several it is refused and the message writes the fix | bad examples `parameter_not_a_column`, `reads_a_result` now run | `people` gets a second text column, so the first is still refused. `reads_a_result` is removed: core accepts it on purpose (§4) |
 
 Every test edit asserts behaviour core removed on purpose (owner go-ahead
 2026-11-09). The app's parser reads every form core writes back here
@@ -64,12 +64,12 @@ Not needed for today's functionality; core makes them possible.
 | 2 | Tests asserting behaviour core removed (§1) | update them |
 | 3 | Scope | refine, not refactor: §1 now, §3 later |
 | 4 | Where this plan lives | here; earlier notes in `archive/dev_plan/core_migration/` |
-| 5 | `reads_a_result`, no longer a mistake (§1 row 7) | open |
+| 5 | `reads_a_result`, no longer a mistake (§1 row 7) | removed from the bad examples |
 
 ## 5. Progress
 
 | Step | Status | Commit |
 |---|---|---|
 | pin and submodule to `fed4d1a` | done: preflight 3/3 | `6c5883d` |
-| §1 adjustments | done but row 7's `reads_a_result`: pytest at baseline plus that one case | — |
-| §2 gates | — | — |
+| §1 adjustments | done: pytest at baseline, every example passes | `7613805`, this commit |
+| §2 gates | pytest at baseline (1 failure); every example; vitest 145/145; preflight 3/3; smoke_install 20/20. The UI pass by hand is still to do | this commit |

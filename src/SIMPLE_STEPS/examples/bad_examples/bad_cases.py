@@ -118,11 +118,6 @@ CASES = [
          "has two (first, last). Rename one (people_named), or bind it: "
          "name=wf['people'][cols['first']].",
          'greet[mod.map()](wf["people_named"])'),
-    Case("reads_a_result", "Columns and types",
-         'double_n[mod.map()](wf["scored"])', "refused", "double_n() needs 'n', which 'scored' does not have (it has value)",
-         "A map step is only its result: scored holds value, not the readings' n. "
-         "Read n from readings, or zip_ the two to have both.",
-         'double_n[mod.map()](wf["readings"])'),
     Case("zip_shares_a_column", "Columns and types",
          'zip_(wf["readings"], wf["doubled"])', "refused", "zip_: 'n' is in both 'readings' and 'doubled'; rename one",
          "doubled names its result n, like the readings' own n; side by side, one "

@@ -53,7 +53,6 @@ def build_corrected() -> Kernel:
     # columns and types
     wf["missing_column"] = identity[mod.select(columns=["n"])](wf["readings"])
     wf["parameter_not_a_column"] = greet[mod.map()](wf["people_named"])
-    wf["reads_a_result"] = double_n[mod.map()](wf["readings"])
     wf["zip_shares_a_column"] = zip_(wf["readings"], wf["scored"])
     wf["nullable_column"] = add_one_or_zero[mod.map()](wf["gappy"])
     wf["table_returns_text"] = describe_rows[mod.table()](wf["readings"])

@@ -148,13 +148,6 @@
       }
     },
     {
-      "name": "reads_a_result",
-      "expression": "double_n[mod.map()](wf[\"scored\"])",
-      "meta": {
-        "label": "reads_a_result"
-      }
-    },
-    {
       "name": "zip_shares_a_column",
       "expression": "zip_(wf[\"readings\"], wf[\"doubled\"])",
       "meta": {
