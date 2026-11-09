@@ -29,7 +29,7 @@ def build_corrected() -> Kernel:
     wf["readings"] = to_rows[mod.source()](data='{"city": ["SF", "NYC", "LA"], "n": [1, 0, 2]}')
     wf["more"] = to_rows[mod.source()](data='{"city": ["BOS"], "n": [5]}')
     wf["gappy"] = to_rows[mod.source()](data='{"n": [1, null, 3]}')
-    wf["people"] = to_rows[mod.source()](data='{"first": ["Ada", "Bo"]}')
+    wf["people"] = to_rows[mod.source()](data='{"first": ["Ada", "Bo"], "last": ["Lovelace", "Bell"]}')
     wf["scored"] = double_n[mod.map()](wf["readings"])
     wf["doubled"] = double_n[mod.map(), mod.name("n")](wf["readings"])
     wf["people_named"] = identity[mod.rename(columns={"first": "name"})](wf["people"])

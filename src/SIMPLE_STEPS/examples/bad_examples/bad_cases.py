@@ -44,7 +44,7 @@ SOURCES = [
     ("readings", """to_rows[mod.source()](data='{"city": ["SF", "NYC", "LA"], "n": [1, 0, 2]}')"""),
     ("more", """to_rows[mod.source()](data='{"city": ["BOS"], "n": [5]}')"""),
     ("gappy", """to_rows[mod.source()](data='{"n": [1, null, 3]}')"""),
-    ("people", """to_rows[mod.source()](data='{"first": ["Ada", "Bo"]}')"""),
+    ("people", """to_rows[mod.source()](data='{"first": ["Ada", "Bo"], "last": ["Lovelace", "Bell"]}')"""),
     ("scored", 'double_n[mod.map()](wf["readings"])'),
     ("doubled", 'double_n[mod.map(), mod.name("n")](wf["readings"])'),
 ]
@@ -91,7 +91,7 @@ CASES = [
          "retry only wraps a verb; the brackets still need one.",
          'double_n[mod.map(), mod.retry(times=2)](wf["readings"])'),
     Case("misspelt_setting", "Tools and modifiers",
-         'double_n[mod.map(nme="doubled")](wf["readings"])', "refused", "map takes no parameter 'nme'; it accepts axis, name, replace, retries",
+         'double_n[mod.map(nme="doubled")](wf["readings"])', "refused", "map takes no parameter 'nme'; it accepts name",
          "map has no setting nme.",
          'double_n[mod.map(), mod.name("doubled")](wf["readings"])'),
     Case("missing_setting", "Tools and modifiers",
@@ -113,9 +113,10 @@ CASES = [
          "readings has no score column.",
          'identity[mod.select(columns=["n"])](wf["readings"])'),
     Case("parameter_not_a_column", "Columns and types",
-         'greet[mod.map()](wf["people"])', "refused", "greet() needs 'name', which 'people' does not have (it has first)",
-         "greet reads a name column by name; people calls it first. "
-         "Rename it first (people_named).",
+         'greet[mod.map()](wf["people"])', "refused", "greet() needs 'name', which 'people' does not have (it has first, last)",
+         "greet reads the column called name, or the one text column; people "
+         "has two (first, last). Rename one (people_named), or bind it: "
+         "name=wf['people'][cols['first']].",
          'greet[mod.map()](wf["people_named"])'),
     Case("reads_a_result", "Columns and types",
          'double_n[mod.map()](wf["scored"])', "refused", "double_n() needs 'n', which 'scored' does not have (it has value)",

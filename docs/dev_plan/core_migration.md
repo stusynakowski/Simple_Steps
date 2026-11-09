@@ -2,161 +2,74 @@
 
 > Written 2026-11-09, from the app at `9ae73fd` (pin `58bc115`, core 0.2.0)
 > to core `fed4d1a` (tag `v1.0.1`, 108 commits later). Everything under §1
-> was **run**, not read: the app installed in a clean venv against core
-> `fed4d1a`, its tests and examples run, and each shim probed.
+> was **run**, not read: the app's tests and examples on core `fed4d1a`, and
+> each finding probed on core alone.
 >
 > Core's own guide to this move is
-> [app-migration.md](../../external/simple-steps-core/docs/design/app-migration.md)
-> (§3.4 formulas, §3.8 what the expression cleanup changes). Earlier notes on
-> moving onto core (0.2.0, 124, 125) are in
+> [app-migration.md](../../external/simple-steps-core/docs/design/app-migration.md).
+> Earlier moves onto core (0.2.0, 124, 125) are in
 > [`../archive/dev_plan/core_migration/`](../archive/dev_plan/core_migration/).
 
-**Goal.** The same functionality on core v1.0.1, with less code and one
-implementation per concept. Where core now does something the app does, the
-app's copy goes.
+**Goal.** Core's update refines its rules. The app follows the refinements
+with the smallest change that keeps today's functionality. It is **not** a
+refactor: what core newly makes possible (§3) is a separate decision.
 
-## 1. Where the app stands on v1.0.1
+## 1. What changed in core, and what the app adjusts
 
-| Check | Result |
-|---|---|
-| `import SIMPLE_STEPS` | ok: nothing the app imports was removed |
-| `pytest` | **14 failed** (baseline 1, the known `test_select_cell`) |
-| `examples/runme.py` | collapse, sweep, expand, widen and every resource example fail; `KeyError: 'value'` |
-| core's `tutorial/handover.py` | 53 ✓ · 4 ✗ · 2 ? |
-| the six shims in `core_bridge.py` | all still needed |
+Before: the app imports fine; `pytest` 14 failed (baseline 1, the known
+`test_select_cell`); the examples fail.
 
-### 1.1 Why the tests fail: three deliberate core changes
+| # | Core refinement | What failed in the app | Adjustment |
+|---|---|---|---|
+| 1 | **D9**: a step's one output column takes the step's name, not `value` (`eadc2f0`) | example expectations; 4 editor-switch tests. And a bug: `/api/run` for a formula outside a workflow ran under a throwaway step `__formula__`, so its column was called that | `grid_runner.run_formula` runs as the real step when its name is an identifier the formula doesn't read; expectations name the step |
+| 2 | **PK8**: a tuple widens to `var0, var1` (was `c0, c1`) | example `split` | expectation; two comments |
+| 3 | retired settings (`axis`, `replace`, `retries`) gone from `map`'s "it accepts" | bad example `misspelt_setting` | expected words |
+| 4 | `mod.copy` is a new verb that needs `columns=` | 2 `copy` cases in `test_formula_switching` (the test lists every no-tool verb) | the test's settings table gives `copy` its `columns=` |
+| 5 | **S3**: an unwritten verb is decided when the step is and written (`mod.map()` plus a default breaker); `mod.auto()` is no longer saved (`2f40797`) | `test_tool_handle::test_a_step_input_infers_the_verb` | expectation |
+| 6 | **S3**: a `-> bool` tool with no verb **maps**; keeping rows is written, `mod.filter()`. `k.infer_verb` says so: *"to keep rows, write mod.filter()"* | example `auto_filter`; the "to a filter tool" switch | expectations. No editor change: `/api/infer_verb` already carries core's reason |
+| 7 | **S3**: a parameter binds the lone column of its type, and core writes the binding (`name=wf["people"][cols["first"]]`); with several it is refused and the message writes the fix | bad examples `parameter_not_a_column`, `reads_a_result` now run | `people` gets a second text column, so the first is still refused. `reads_a_result`: owner's call (§4) |
 
-| Core change | Core commit | Fails here |
+Every test edit asserts behaviour core removed on purpose (owner go-ahead
+2026-11-09). The app's parser reads every form core writes back here
+(checked: the written bindings, the breaker).
+
+New for core, in [008](../core-proposals/008-core-changes.md) (§ At core
+v1.0.1): **C39**, a source's one column is still `value` while every other
+verb's takes the step's name; **C36**, `map`'s `name` still defaults to
+`'value'`. All six shims (C18, C32, C33, C34, C36, C37) still apply.
+
+## 2. Gates
+
+`pytest` at baseline (1 failure), `examples/runme.py`, `cd frontend && npx
+vitest run`, `python scripts/preflight.py --fix`, `python
+scripts/smoke_install.py`, and the UI end to end: declare, run, edit
+(stale), save, load.
+
+## 3. Later, each its own decision
+
+Not needed for today's functionality; core makes them possible.
+
+| | What | Why it waits |
 |---|---|---|
-| **D9**: a step's one output column is named after the step, not `value`. The app's formula check runs under the step name `__formula__` ([grid_runner.py:23](../../src/SIMPLE_STEPS/grid_runner.py#L23)), so its column is `__formula__` | `eadc2f0` | `test_formula_switching::test_each_editor_switch_runs` (5 cases); the examples' expected results |
-| **S3**: a verb not written is decided when the step is, and saved (`mod.auto()`, `breaker`) | `2f40797` | `test_each_editor_switch_runs` (formula text); `test_tool_handle::test_a_step_input_infers_the_verb` (`'breaker' == 'auto'`) |
-| `copy` needs `columns=`; it has no default | — | `test_a_verb_that_applies_no_tool_refuses_another_tool[copy]`, `…takes_its_default_tool[copy]` |
+| L1 | Core's `formula(text)` in place of the app's parser (`operation_formula.py`, 923 lines). The app's parser refuses core's new pick forms: conditions (`wf["r"][cols["n"] > 1]`), a string as a column (`wf["r"]["n"]`), a pick as a tool's input | the app writes none of them today. Supersedes the "replace the parser" answer of 2026-11-09's first plan |
+| L2 | `kernels.py` reads what core's kernel reports (`repr(k)`, `step.problems`, `k.needs_run()`) | a refactor; nothing fails without it |
+| L3 | The frontend shows core's new problem codes (`bad_pairing`, `id_argument`, `bad_combine`) and stale reasons | they arrive today as text |
+| L4 | Progress and `cancel()` (K23), the output store (C32), media (R7), stages (R9) | core hasn't built them; the app keeps its own (archive 01 §5) |
 
-Eight test functions plus the five example runs. Each test asserts
-behaviour core removed on purpose, so under the CLEANUP rule it changes:
-**owner go-ahead 2026-11-09, each one listed before it's edited**.
-
-### 1.2 Handover: what core hasn't built (the app keeps its own)
-
-| Ask | State | The app meanwhile |
-|---|---|---|
-| K23 progress, `cancel()` | not built | `progress.py` |
-| K28b per-cell lineage stored | worked out on request by `k.cell` | nothing |
-| R7 media handles | not built | `cell_types.py` |
-| R9 stages | not built | nothing |
-| K19a, Pc4 | **?**: rows pair by identity between aligned steps (CA-11), never by position | refusals now write the join; show them |
-
-### 1.3 Shims: probed on `fed4d1a`
-
-| Shim | Still needed? | What ran |
-|---|---|---|
-| C18 description = first docstring paragraph | yes | `describe()["tools"]["dbl"]["description"]` → `'Double it.'` (first line only) |
-| C33 `inspect.signature(tool)` | yes | `(*args, **kwargs) -> 'Any'` |
-| C34 `check_modifier`, `shape_verbs` internal | yes | not exported; the kernel offers only `check`, `infer_verb` |
-| C36 `describe()` lists `name=` | yes, **and now wrong**: `map`'s `name` defaults to `'value'`, which D9 contradicts | `describe()["modifiers"]["map"]["settings"]` |
-| C37 array cell crashes `k.view` / `k.cell` | yes | `ValueError: can only convert an array of size 1 to a Python scalar` |
-| C32 kernel saved with outputs | yes | after `Kernel.from_json`, a run step is `staged`; no store API |
-
-New ask for [008](../core-proposals/008-core-changes.md): C36's default
-`'value'` (above).
-
-## 2. The plan
-
-One branch, `core-v1`. Each phase is a commit and ends with its exit
-check. Removals are listed for the owner first (what each piece does, what
-replaces it), then made one at a time.
-
-### Phase 0: branch and pin
-
-- Move `pyproject.toml`'s pin and `external/simple-steps-core` to `fed4d1a`
-  together; `python scripts/preflight.py`; `pip install -e
-  external/simple-steps-core`.
-- **Exit:** preflight passes; the 14 failures of §1, no others.
-
-### Phase 1: green on the new core, smallest change
-
-- Read `output.value_column` everywhere the app assumes `"value"`
-  (`grid_runner`, `example_check`, the examples' expected results).
-- Show the verb core saved as core's decision; stop expecting it unwritten.
-- Update the eight tests of §1.1, each listed first.
-- **Exit:** `pytest` back to 1 failure; `examples/runme.py` passes.
-
-### Phase 2: core reads formulas; the app's parser goes
-
-Core's `formula(text)` reads formula text into an operation, pick or
-literal, checked against the kernel's catalog, and never runs it (EX13,
-`febe4dc`). `formula(step.formula)` gives the step back. This supersedes
-the 2026-10-27 decision that the parser lives in the app (archive, 01 §9
-decision 3).
-
-- **Inventory first**, for the owner: each name used from
-  [operation_formula.py](../../src/SIMPLE_STEPS/operation_formula.py)
-  (923 lines; `compile_formula`, `FormulaError`, `describe`, `is_canonical`,
-  `format_parts`, `not_a_step`, `references`, `is_literal`), its 8 callers,
-  and what replaces it: `formula`, `FormulaError`, `step.formula`,
-  `step.spec`, `k.check`, `k.infer_verb`.
-- `/api/parse_formula` calls `formula` and keeps its response shape.
-- Anything core can't give becomes a tagged shim in `core_bridge.py` and an
-  ask in 008, never leftover parser code.
-- **Exit:** `operation_formula.py` deleted; tests and examples as phase 1.
-
-### Phase 3: the kernel reports itself
-
-App-migration §3.3: `kernels.py` computes formulas, reads, problems and a
-summary that core now gives (`k.steps`, `step.operation.reads`,
-`step.problems`, `repr(k)`, `k.needs_run()`, `k.on_change`). The app's
-kernel keeps hosting only: key, lock, last used.
-
-- Inventory, then delete piece by piece.
-- **Exit:** as phase 1.
-
-### Phase 4: frontend
-
-- The view's `#` is the row number `0…n-1`; lineage stays hidden behind
-  the planned expander.
-- Show the new problem codes (`bad_pairing`, `id_argument`, `bad_combine`),
-  run warnings, and why a step is stale.
-- `python -m SIMPLE_STEPS.build_frontend`.
-- **Exit:** `cd frontend && npx vitest run`; preflight (bundle fresh).
-
-### Phase 5: saved files and docs
-
-- Re-save the examples and mock projects in core's current format.
-- `CLAUDE.md`, `docs/context.md`: the pin-drift symptom names something new
-  in this core.
-- 008: close what v1.0.1 closed; add C36's default. Regenerate
-  `scripts/core_probes/` and `scripts/core_asks.py`.
-- `dev_plan/README.md` and `126`: the parser is core's.
-
-### Phase 6: gates
-
-`pytest` (1 failure), `examples/runme.py`, `preflight.py --fix`,
-`smoke_install.py`, and the UI end to end: declare, run, edit (stale),
-save, load.
-
-### Not in this move
-
-Progress and `cancel()`, the output store (C32), media (R7), stages (R9):
-each is a small pass when core lands it (archive, 01 §5).
-
-## 3. Decisions (owner, 2026-11-09)
+## 4. Decisions (owner, 2026-11-09)
 
 | # | Question | Decided |
 |---|---|---|
 | 1 | Pin | `fed4d1a`, tag `v1.0.1` |
-| 2 | Tests asserting behaviour core removed (§1.1) | update them, each listed first |
-| 3 | The formula parser | core's `formula()` replaces the app's; supersedes the 2026-10-27 decision |
+| 2 | Tests asserting behaviour core removed (§1) | update them |
+| 3 | Scope | refine, not refactor: §1 now, §3 later |
 | 4 | Where this plan lives | here; earlier notes in `archive/dev_plan/core_migration/` |
+| 5 | `reads_a_result`, no longer a mistake (§1 row 7) | open |
 
-## 4. Progress
+## 5. Progress
 
-| Phase | Status | Commit |
+| Step | Status | Commit |
 |---|---|---|
-| 0 pin | done: preflight 3/3; pytest the 14 failures of §1, no others | this commit |
-| 1 green | — | — |
-| 2 parser | — | — |
-| 3 kernel | — | — |
-| 4 frontend | — | — |
-| 5 files, docs | — | — |
-| 6 gates | — | — |
+| pin and submodule to `fed4d1a` | done: preflight 3/3 | `6c5883d` |
+| §1 adjustments | done but row 7's `reads_a_result`: pytest at baseline plus that one case | — |
+| §2 gates | — | — |

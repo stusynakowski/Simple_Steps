@@ -121,7 +121,7 @@ def risky(n):
 
 @simple_step_tool(category="Basic: core verbs")
 def make_pair(n):
-    """tuple return — widen auto-names the positions c0, c1.
+    """tuple return — widen auto-names the positions var0, var1.
 
     Args:
         n: the reading.

@@ -181,7 +181,8 @@ def run_operation(
     if is_canonical(formula):
         from .grid_runner import run_canonical_step
         try:
-            return run_canonical_step(formula, step_map or {}, session_id, result_store, resources)
+            return run_canonical_step(formula, step_map or {}, session_id, result_store, resources,
+                                      step_id=step_id)
         except Exception as e:
             raise ValueError(f"Error executing step: {e}") from e
     if not formula.lstrip("=").strip():

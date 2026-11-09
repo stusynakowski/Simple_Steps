@@ -36,7 +36,7 @@ SHAPE_VERBS = sorted(k for k, v in MODIFIERS.items() if v["class"] == "shape")
 
 #: Settings that make each verb valid on the `numbers` step (n, city).
 SETTINGS = {"select": 'columns=["n"]', "drop": 'columns=["n"]', "rename": 'columns={"n": "m"}',
-            "sort": 'by="n"', "group": 'by=["city"]'}
+            "sort": 'by="n"', "group": 'by=["city"]', "copy": 'columns={"n": "m"}'}
 
 
 # ── Tools of every kind a step can be switched between ───────────────────────
@@ -161,14 +161,16 @@ def test_the_refusal_reaches_the_formula_bar(client):
 #
 # Each case is a step as the editor rewrites it after a switch: the step reads
 # `numbers`; the tool or the verb changed. Every one must run. A map step is
-# only its results (core 009 decision 1), so its columns are just `value`.
+# only its results (core 009 decision 1), in one column named after the step
+# (core D9), here `s`. A `-> bool` tool with no verb maps; keeping rows is
+# written, mod.filter() (core S3).
 
 SWITCHES = {
     # tool switched: the verb goes back to auto (partsForTool + autoForWiring)
-    "to a map tool":           (_parts("fs_double", [_mod("auto")]), ["value"]),
-    "to a filter tool":        (_parts("fs_is_big", [_mod("auto")]), ["n", "city"]),
+    "to a map tool":           (_parts("fs_double", [_mod("auto")]), ["s"]),
+    "to a filter tool":        (_parts("fs_is_big", [_mod("auto")]), ["s"]),
     "to a list tool":          (_parts("fs_fan", [_mod("auto")]), None),
-    "to a text tool":          (_parts("fs_shout", [_mod("auto")]), ["value"]),
+    "to a text tool":          (_parts("fs_shout", [_mod("auto")]), ["s"]),
     "to a source tool":        (_parts("fs_numbers", [_mod("source")], None), ["n", "city"]),
     # verb switched: the tool kept (withShapeVerb)
     "map to filter":           (_parts("fs_is_big", [_mod("filter")]), ["n", "city"]),
@@ -177,9 +179,9 @@ SWITCHES = {
     # a no-tool verb chosen: the tool becomes its default (REQ-FORM-004)
     "to select":               (_parts("identity", [_mod("select", columns=["city"])]), ["city"]),
     "to sort":                 (_parts("identity", [_mod("sort", by="n", ascending=False)]), ["n", "city"]),
-    "back from select to map": (_parts("fs_double", [_mod("map")]), ["value"]),
+    "back from select to map": (_parts("fs_double", [_mod("map")]), ["s"]),
     # an execution modifier kept across a verb switch
-    "retry kept":              (_parts("fs_double", [_mod("map"), _mod("retry", times=2)]), ["value"]),
+    "retry kept":              (_parts("fs_double", [_mod("map"), _mod("retry", times=2)]), ["s"]),
 }
 
 

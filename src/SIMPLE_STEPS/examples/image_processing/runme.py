@@ -45,7 +45,7 @@ example.check("image_processing", "images", twin=pipeline.build_images,
             or "a grey image has colour in it",
     "thumbs": images("thumb", (32, 32, 3)),
     # five 32×32 thumbnails side by side
-    "strip": images("value", (32, 160, 3)),
+    "strip": images("strip", (32, 160, 3)),
 })
 
 sys.exit(example.finish())

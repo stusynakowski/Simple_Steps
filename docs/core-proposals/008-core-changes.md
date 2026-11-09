@@ -1936,6 +1936,32 @@ cells either name their input ids or say the mapping is unknown.
 
 **Shim:** none. The app keeps writing selection steps until core allows this.
 
+## At core v1.0.1 (`fed4d1a`)
+
+Found moving the app onto v1.0.1 ([core_migration.md](../dev_plan/core_migration.md)),
+each run against core alone, 2026-11-09. The six shims of the 0.2.0 section
+(C18, C32, C33, C34, C36, C37) were probed again and all still apply.
+
+### C39. A source's one output column is still `value`
+
+**Run:** `k["h"] = hello[mod.source()]()` (`-> str`), `k["u"] = up[mod.map()](wf["h"])`, `run_all`.
+
+**Got:** `h` has column `['value']`; `u` has `['u']`.
+
+**Ask:** D9 says a step's one output column takes the step's name. Either a
+source follows it too (`h`), or the rule says sources are the exception and
+why. The app's examples expect `value` from sources and the step's name
+from everything else.
+
+### C36, again: `map`'s `name` defaults to `'value'`
+
+**Run:** `cat.describe()["modifiers"]["map"]["settings"]`.
+
+**Got:** `[{'name': 'name', 'type': 'str', 'required': False, 'default': 'value'}]`.
+
+**Ask:** as C36, and the default contradicts D9: a step that writes no
+name gets the step's name, not `value`.
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |

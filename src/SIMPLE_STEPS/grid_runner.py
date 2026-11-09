@@ -25,8 +25,13 @@ _FORMULA_STEP = "__formula__"
 
 def run_formula(formula: str, load: Callable[[str], Any],
                 resources: Optional[Dict[str, Any]] = None,
-                live: Optional[Callable[[str, Dict[str, Any]], Any]] = None):
+                live: Optional[Callable[[str, Dict[str, Any]], Any]] = None,
+                step: Optional[str] = None):
     """Compile *formula* (core's syntax) and run it in a throwaway kernel.
+
+    It runs as the step *step* when that is a name core accepts and the
+    formula doesn't read it, because core names a step's one output column
+    after the step; otherwise under a placeholder name.
 
     *load(name)* returns the data of the step called *name*, or ``None`` when
     there is no such step (or it hasn't run). *resources* is the workflow's
@@ -62,12 +67,12 @@ def run_formula(formula: str, load: Callable[[str], Any],
             k.resources.attach(name, live(name, declarations[name]))
     except (ResourceError, TypeError) as exc:
         raise GridStepError(str(exc)) from exc
-    k[_FORMULA_STEP] = operation
-    step = k.step(_FORMULA_STEP)
-    if step.problems:
-        raise GridStepError("; ".join(str(p) for p in step.problems))
-    k.run(_FORMULA_STEP)
-    return k.step(_FORMULA_STEP), operation.to_dict()
+    name = step if step and step.isidentifier() and step not in compiled.reads else _FORMULA_STEP
+    k[name] = operation
+    if k.step(name).problems:
+        raise GridStepError("; ".join(str(p) for p in k.step(name).problems))
+    k.run(name)
+    return k.step(name), operation.to_dict()
 
 
 def infer_verb_for(parts: dict, upstream: Any = None,
@@ -145,7 +150,8 @@ def _bind_positional_resources(compiled, fn, types: Dict[str, type]) -> None:
 def run_canonical_step(formula: str, step_map: Dict[str, str],
                        session_id: Optional[str],
                        result_store: Optional[str] = None,
-                       resources: Optional[Dict[str, Any]] = None) -> Tuple[str, dict]:
+                       resources: Optional[Dict[str, Any]] = None,
+                       step_id: Optional[str] = None) -> Tuple[str, dict]:
     """``/api/run`` for a formula outside a workflow: run it, store the grid.
 
     *resources* is the workflow's ``resources`` section; their live objects
@@ -161,6 +167,7 @@ def run_canonical_step(formula: str, step_map: Dict[str, str],
     step, operation = run_formula(
         formula, load, resources=resources,
         live=lambda name, decl: live_resource(session_id, name, decl),
+        step=step_id,
     )
     output = step.output
     if output.meta.get("verb") == "source" and len(output.failed):

@@ -95,7 +95,7 @@ def build_all_orchestrations() -> Kernel:
     wf["from_list"] = identity[mod.expand()](wf["a_list"])
     wf["from_dict"] = identity[mod.widen(columns=["x", "y"])](wf["a_dict"])
 
-    # tuples widen by position (c0, c1)
+    # tuples widen by position (var0, var1)
     wf["pairs"] = make_pair[mod.map()](wf["readings"])
     wf["split"] = identity[mod.widen()](wf["pairs"])
 

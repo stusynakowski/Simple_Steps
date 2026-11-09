@@ -68,7 +68,7 @@ example.check("plotly_charts", "rich-cells", twin=pipeline.build_rich_cells, exp
 
 example.check("plotly_charts", "table-filter-chart", twin=pipeline.build_table_filter_chart, expect={
     "big": {"city": ["NYC", "LA", "Austin", "Denver"], "n": [4, 2, 5, 3]},
-    "chart": bar_figure(["NYC", "LA", "Austin", "Denver"], [4, 2, 5, 3], "Readings above one"),
+    "chart": bar_figure(["NYC", "LA", "Austin", "Denver"], [4, 2, 5, 3], "Readings above one", column="chart"),
 })
 
 sys.exit(example.finish())

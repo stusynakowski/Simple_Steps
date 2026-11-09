@@ -33,19 +33,19 @@ def answered(column="value"):
 
 example.check("dummy_llm", "resources", twin=pipeline.build_resources, live=pipeline.live_resources,
               expect={
-    "regions": {"value": ["west", "east", "west", "west"]},
-    "summaries": {"value": ["[fake-1] A", "[fake-1] B"]},
-    "tiny_summaries": {"value": ["[tiny-1] A", "[tiny-1] B"]},
+    "regions": {"regions": ["west", "east", "west", "west"]},
+    "summaries": {"summaries": ["[fake-1] A", "[fake-1] B"]},
+    "tiny_summaries": {"tiny_summaries": ["[tiny-1] A", "[tiny-1] B"]},
     # a map step is only its results: the keys stay in wf["keys"], linked by row id
-    "regions_bound": {"value": ["west", "east", "west", "west"]},
+    "regions_bound": {"regions_bound": ["west", "east", "west", "west"]},
     "hello": {"value": ["[fake-1] HI"]},
     "inferred": lambda data, metrics: metrics.get("verb") == "map" or f"ran as {metrics.get('verb')}, not map",
     # the ready-made house_llm is "house-1"; the workflow's saved override wins
-    "house_summaries": {"value": ["[house-2] A", "[house-2] B"]},
+    "house_summaries": {"house_summaries": ["[house-2] A", "[house-2] B"]},
 })
 
 example.check("dummy_llm", "local-llm", skip=local_llm_missing, expect={
-    "summaries": answered(),
+    "summaries": answered("summaries"),
     "hello": answered(),
 })
 

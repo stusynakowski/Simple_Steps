@@ -30,7 +30,7 @@
     },
     {
       "name": "people",
-      "expression": "to_rows[mod.source()](data='{\"first\": [\"Ada\", \"Bo\"]}')",
+      "expression": "to_rows[mod.source()](data='{\"first\": [\"Ada\", \"Bo\"], \"last\": [\"Lovelace\", \"Bell\"]}')",
       "meta": {
         "label": "people"
       }

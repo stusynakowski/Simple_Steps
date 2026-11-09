@@ -42,8 +42,8 @@ def check_main() -> bool:
         "big": {"city": ["NYC", "LA", "SF"], "n": [4, 2, 3]},
         "regions": {"region": ["east", "west", "west"]},
         "summaries": {"summary": ["[main-1] NYC", "[main-1] LA", "[main-1] SF"]},
-        "total_n": {"value": [9]},
-        "chart": lambda data, metrics: (list(data["value"].iloc[0].data[0].y) == [4, 2, 3])
+        "total_n": {"total_n": [9]},
+        "chart": lambda data, metrics: (list(data["chart"].iloc[0].data[0].y) == [4, 2, 3])
                  or "the chart's bars should be 4, 2, 3",
     })
     return example.finish() == 0
