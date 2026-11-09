@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import SymbolIcon from './SymbolIcon';
 import type { SymbolName } from './SymbolIcon';
+import { useHoverTip } from './useHoverTip';
 
 /** One action in a step menu, or a divider between groups of them. */
 export type StepMenuItem = { divider: true } | {
@@ -28,7 +29,8 @@ export type StepMenuItem = { divider: true } | {
  * content (a step's settings, its notes) and stays open while it is used.
  */
 export default function StepMenu({ icon, label, items = [], children, align = 'left', testId, text, badges, className = '', iconSize = 14 }: {
-  icon: SymbolName;
+  /** One icon, or several side by side (a popover holding more than one thing). */
+  icon: SymbolName | SymbolName[];
   label: string;
   items?: StepMenuItem[];
   /** The popover's content, drawn in place of `items`. */
@@ -47,6 +49,7 @@ export default function StepMenu({ icon, label, items = [], children, align = 'l
   const button = useRef<HTMLButtonElement>(null);
   const pop = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const { tipProps, tip } = useHoverTip(label, open);
 
   /** Open under the button (where it is now on screen), or close. */
   const toggle = () => {
@@ -89,19 +92,20 @@ export default function StepMenu({ icon, label, items = [], children, align = 'l
         aria-label={label}
         aria-haspopup={children ? 'dialog' : 'menu'}
         aria-expanded={open}
-        title={label}
         data-testid={testId}
         onClick={toggle}
+        {...tipProps}
       >
         {/* Its name, then its icon: "Toggle ☰", "Manage Step ⇄" (owner, 2026-10-29). */}
         {text && <span className="step-menu-text">{text}</span>}
-        <SymbolIcon name={icon} size={iconSize} />
+        {(Array.isArray(icon) ? icon : [icon]).map((name) => <SymbolIcon key={name} name={name} size={iconSize} />)}
         {!!badges?.length && (
           <span className="step-menu-badges" aria-hidden="true">
             {badges.map((b) => <SymbolIcon key={b} name={b} size={12} />)}
           </span>
         )}
       </button>
+      {tip}
       {open && createPortal(
         <div
           ref={pop}

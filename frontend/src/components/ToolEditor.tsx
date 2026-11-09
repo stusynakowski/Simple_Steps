@@ -18,11 +18,17 @@ import './ToolEditor.css';
 import SymbolIcon from './SymbolIcon';
 
 /**
- * The step's formula as a form, inside the Formula widget:
+ * The step's formula as a form, inside the Formula widget, in two columns.
+ * Every part is always open — headings, not expanders:
  *
- *   TOOL: [scale ▾]                       one thin bar
- *   ▾ INPUTS                              what the tool is given
- *   ▾ MODIFIERS  map · auto               how it is applied, in formula order
+ *   TOOL                           │ INPUT     the data it reads
+ *   [scale ▾]                      │   input   wf["a"]
+ *   MODIFIERS  map                 │ ARGUMENTS
+ *   ┌ 1. map           ↑ ↓ × ┐     │   factor  2
+ *
+ * A narrow step stacks them (left column first). Each part carries
+ * `data-formula-part` (tool / modifiers / input / arguments) so it can later
+ * be matched to the piece of the expression it edits.
  *
  * The formula is the only state. The editor shows *formula* (the last one
  * committed — Enter in the formula bar, or the editor's own write) and every
@@ -163,28 +169,16 @@ export default function ToolEditor({
     void write(partsForTool(id, chosen?.type, frozen ? previous : parts?.input ?? previous), frozen);
   };
 
+  // Frozen, everything but the tool picker waits for the formula bar.
+  const frozenProps = {
+    className: 'te-fieldset',
+    disabled: frozen,
+    'aria-disabled': frozen,
+    style: frozen ? { opacity: 0.5, pointerEvents: 'none' as const } : undefined,
+  };
+
   return (
     <div className="tool-editor" onClick={(e) => e.stopPropagation()}>
-      <div className="te-bar te-tool-bar">
-        <span className="te-bar-label">Tool:</span>
-        <select
-          className="te-tool-select"
-          value={frozen ? '' : parts?.tool ?? ''}
-          onChange={(e) => chooseTool(e.target.value)}
-          disabled={isCombine && !frozen}
-          title={op?.description}
-        >
-          <option value="">Choose a tool…</option>
-          {parts && !op && <option value={parts.tool}>{parts.tool}</option>}
-          {groupByCategory(tools).map(([category, ops]) => (
-            <optgroup key={category} label={category}>
-              {ops.map((o) => <option key={o.id} value={o.id}>{o.label || o.id}</option>)}
-            </optgroup>
-          ))}
-        </select>
-        {parts?.bound_to && <span className="te-bar-note">on res["{parts.bound_to}"]</span>}
-      </div>
-
       {warning && (
         <div className="te-warning" role="status" title={warning}>
           <SymbolIcon name="warning" size={13} /> {warning}
@@ -192,30 +186,62 @@ export default function ToolEditor({
         </div>
       )}
 
-      {notATool && !frozen && (
-        <div className="te-panel te-note">This step is a value or a reference, not a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
-      )}
+      <div className="te-columns">
+        {/* Left: what is called, and how it is applied. */}
+        <div className="te-col te-col-call">
+          <Section title="Tool" part="tool" note={parts?.bound_to ? `on res["${parts.bound_to}"]` : undefined}>
+            <select
+              className="te-tool-select"
+              value={frozen ? '' : parts?.tool ?? ''}
+              onChange={(e) => chooseTool(e.target.value)}
+              disabled={isCombine && !frozen}
+              title={op?.description}
+            >
+              <option value="">Choose a tool…</option>
+              {parts && !op && <option value={parts.tool}>{parts.tool}</option>}
+              {groupByCategory(tools).map(([category, ops]) => (
+                <optgroup key={category} label={category}>
+                  {ops.map((o) => <option key={o.id} value={o.id}>{o.label || o.id}</option>)}
+                </optgroup>
+              ))}
+            </select>
+            {op?.description && <div className="te-note te-tool-desc">{op.description}</div>}
+          </Section>
 
-      {parts && isCombine && !frozen && (
-        <div className="te-panel te-note">
-          A <code>{parts.tool}</code> of {parts.inputs.map((n) => `wf["${n}"]`).join(', ')}. Edit it in the formula bar.
+          {parts && !isCombine && (
+            <fieldset {...frozenProps}>
+              <Section title="Modifiers" part="modifiers" summary={modifiersSummary(parts, resolved)}>
+                <ModifierList parts={parts} catalog={catalog} resolved={resolved}
+                  onWrite={write} />
+              </Section>
+            </fieldset>
+          )}
         </div>
-      )}
 
-      {parts && !isCombine && (
-        <fieldset className="te-fieldset" disabled={frozen} aria-disabled={frozen}
-          style={frozen ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
-          <Bar title="Inputs" defaultOpen>
-            <InputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
-              onWrite={write} onDefineResource={onDefineResource} />
-          </Bar>
+        {/* Right: what the tool is given — the data it reads and its arguments. */}
+        <div className="te-col te-col-args">
+          {notATool && !frozen && (
+            <div className="te-note te-col-note">This step is a value or a reference, not a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
+          )}
 
-          <Bar title="Modifiers" summary={modifiersSummary(parts, resolved)} defaultOpen>
-            <ModifierList parts={parts} catalog={catalog} resolved={resolved}
-              onWrite={write} />
-          </Bar>
-        </fieldset>
-      )}
+          {parts && isCombine && !frozen && (
+            <div className="te-note te-col-note">
+              A <code>{parts.tool}</code> of {parts.inputs.map((n) => `wf["${n}"]`).join(', ')}. Edit it in the formula bar.
+            </div>
+          )}
+
+          {parts && !isCombine && (
+            <fieldset {...frozenProps}>
+              <InputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
+                onWrite={write} onDefineResource={onDefineResource} />
+            </fieldset>
+          )}
+
+          {!parts && !notATool && !frozen && (
+            <div className="te-note te-col-note">Choose a tool to see what it takes.</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -247,7 +273,7 @@ function DefaultInputUi({ parts, op, previousSteps, resources, onWrite, onDefine
   };
 
   return (
-    <div className="te-rows">
+    <>
       <datalist id={`${listId}-steps`}>
         {stepOptions.map((o) => <option key={o.value} value={o.value} label={o.label} />)}
       </datalist>
@@ -255,69 +281,74 @@ function DefaultInputUi({ parts, op, previousSteps, resources, onWrite, onDefine
         {[...stepOptions, ...resourceOptions].map((o) => <option key={o.value} value={o.value} label={o.label} />)}
       </datalist>
 
-      <ArgRow
-        name="input"
-        hint="The step this one reads"
-        value={parts.input ? `wf["${parts.input}"]` : ''}
-        placeholder={previousSteps.length ? 'a previous step, e.g. ' + stepOptions[stepOptions.length - 1].value : 'none: a source'}
-        listId={`${listId}-steps`}
-        previousSteps={previousSteps}
-        onCommit={setInput}
-      />
-      {parts.resources.map((name, i) => (
+      <Section title="Input" part="input" note="the data it reads">
         <ArgRow
-          key={`res-${i}`}
-          name={`resource ${i + 1}`}
-          value={`res["${name}"]`}
-          listId={`${listId}-all`}
+          name="input"
+          hint="The step this one reads"
+          value={parts.input ? `wf["${parts.input}"]` : ''}
+          placeholder={previousSteps.length ? 'a previous step, e.g. ' + stepOptions[stepOptions.length - 1].value : 'none: a source'}
+          listId={`${listId}-steps`}
           previousSteps={previousSteps}
-          resources={resources}
-          onDefineResource={onDefineResource}
-          onCommit={(text) => {
-            const v = fromFieldText(text);
-            const next = [...parts.resources];
-            if (v && typeof v === 'object' && '$res' in v) next[i] = (v as { $res: string }).$res;
-            else next.splice(i, 1);
-            onWrite({ ...parts, resources: next });
-          }}
+          onCommit={setInput}
         />
-      ))}
+        {parts.resources.map((name, i) => (
+          <ArgRow
+            key={`res-${i}`}
+            name={`resource ${i + 1}`}
+            value={`res["${name}"]`}
+            listId={`${listId}-all`}
+            previousSteps={previousSteps}
+            resources={resources}
+            onDefineResource={onDefineResource}
+            onCommit={(text) => {
+              const v = fromFieldText(text);
+              const next = [...parts.resources];
+              if (v && typeof v === 'object' && '$res' in v) next[i] = (v as { $res: string }).$res;
+              else next.splice(i, 1);
+              onWrite({ ...parts, resources: next });
+            }}
+          />
+        ))}
+      </Section>
 
-      {declared.map((p) => (
-        <ArgRow
-          key={p.name}
-          name={p.name}
-          required={p.required}
-          hint={p.description}
-          value={toFieldText(parts.arguments[p.name])}
-          placeholder={
-            p.default != null ? toFieldText(p.default)
-              : p.kind === 'resource' && parts.resources.length ? 'a resource given by position, above'
-                : p.required ? 'a column of the input, or a value' : ''
-          }
-          options={p.options ?? undefined}
-          listId={`${listId}-all`}
-          previousSteps={previousSteps}
-          resources={resources}
-          onDefineResource={onDefineResource}
-          onCommit={(text) => setArg(p.name, text, typeOf(p))}
-        />
-      ))}
-      {extra.map((name) => (
-        <ArgRow key={name} name={name} value={toFieldText(parts.arguments[name])}
-          hint="Passed by the formula; the tool doesn't declare it."
-          listId={`${listId}-all`} previousSteps={previousSteps} resources={resources}
-          onDefineResource={onDefineResource}
-          onCommit={(text) => setArg(name, text)} />
-      ))}
-    </div>
+      <Section title="Arguments" part="arguments">
+        {!declared.length && !extra.length && <div className="te-note">This tool takes no arguments.</div>}
+        {declared.map((p) => (
+          <ArgRow
+            key={p.name}
+            name={p.name}
+            required={p.required}
+            hint={p.description}
+            value={toFieldText(parts.arguments[p.name])}
+            placeholder={
+              p.default != null ? toFieldText(p.default)
+                : p.kind === 'resource' && parts.resources.length ? 'a resource given by position, above'
+                  : p.required ? 'a column of the input, or a value' : ''
+            }
+            options={p.options ?? undefined}
+            listId={`${listId}-all`}
+            previousSteps={previousSteps}
+            resources={resources}
+            onDefineResource={onDefineResource}
+            onCommit={(text) => setArg(p.name, text, typeOf(p))}
+          />
+        ))}
+        {extra.map((name) => (
+          <ArgRow key={name} name={name} value={toFieldText(parts.arguments[name])}
+            hint="Passed by the formula; the tool doesn't declare it."
+            listId={`${listId}-all`} previousSteps={previousSteps} resources={resources}
+            onDefineResource={onDefineResource}
+            onCommit={(text) => setArg(name, text)} />
+        ))}
+      </Section>
+    </>
   );
 }
 
 /**
  * One argument: a text box that suggests previous steps (and resources), and
- * takes any literal. A step reference shows what it reads; a resource opens
- * to its settings — the same literals as the Resources menu.
+ * takes any literal. A step reference shows what it reads; a resource shows
+ * its settings beneath it — the same literals as the Resources menu.
  */
 function ArgRow({
   name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit,
@@ -408,8 +439,11 @@ function ResourceArg({ name, decl, onDefine }: {
   };
 
   return (
-    <Bar title={`res["${name}"]`} summary={`${decl.type}${decl.source === 'loaded' ? ' · ready-made' : ''}`} nested>
-      <div className="te-note">Shared by every step that uses it.</div>
+    <div className="te-res">
+      <div className="te-res-head">
+        <code>res["{name}"]</code>
+        <span>{decl.type}{decl.source === 'loaded' ? ' · ready-made' : ''} · shared by every step that uses it</span>
+      </div>
       {settings.map((s) => (
         <Field
           key={s.name}
@@ -423,7 +457,7 @@ function ResourceArg({ name, decl, onDefine }: {
         />
       ))}
       {error && <div className="te-bad">{error}</div>}
-    </Bar>
+    </div>
   );
 }
 
@@ -466,13 +500,11 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
         const settings = (info?.settings ?? []).filter((s) => !HIDDEN_SETTINGS.has(s.name));
         const isAuto = m.kind === AUTO;
         return (
-          <Bar
+          <ModCard
             key={`${i}-${m.kind}`}
             title={`${i + 1}. ${m.kind}`}
             summary={isAuto ? (resolved ? `→ ${resolved.kind}` : 'from the data') : info?.class}
             badge={isAuto ? resolved?.why : undefined}
-            nested
-            defaultOpen
             actions={
               <>
                 <button className="te-icon-btn" title="Move up (earlier in the formula)" disabled={i === 0}
@@ -508,7 +540,7 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
                   ? { ...x, params: withEntry(x.params, s.name, fromFieldText(text, s.type)) } : x)))}
               />
             ))}
-          </Bar>
+          </ModCard>
         );
       })}
       <select className="te-add" value="" onChange={(e) => add(e.target.value)} title="Add a modifier at the end of the brackets">
@@ -527,29 +559,46 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
 
 // ── Building blocks ──────────────────────────────────────────────────────────
 
-/** A thin expander bar, styled like the step's own widget bars. */
-function Bar({ title, summary, badge, defaultOpen = false, nested = false, actions, children }: {
+/**
+ * One part of the formula, always open: a small heading over its fields.
+ * `part` names the piece of the expression it edits (`data-formula-part`).
+ */
+function Section({ title, part, summary, note, children }: {
+  title: string;
+  part: string;
+  summary?: string;
+  note?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="te-section" data-formula-part={part}>
+      <div className="te-heading">
+        <span className="te-heading-label">{title}</span>
+        {summary && <span className={`te-summary ${/^(auto|→)/.test(summary) ? 'te-auto' : ''}`}>{summary}</span>}
+        {note && <span className="te-heading-note">{note}</span>}
+      </div>
+      <div className="te-section-body">{children}</div>
+    </section>
+  );
+}
+
+/** One modifier: a light card with its name, what it is, and its settings. */
+function ModCard({ title, summary, badge, actions, children }: {
   title: string;
   summary?: string;
   badge?: string;
-  defaultOpen?: boolean;
-  nested?: boolean;
-  actions?: React.ReactNode;
+  actions: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className={`te-section ${nested ? 'te-nested' : ''}`}>
-      <div className="te-bar">
-        <button className="te-toggle" onClick={() => setOpen((v) => !v)} aria-expanded={open} title={badge}>
-          <span className="te-chevron">{open ? '▾' : '▸'}</span>
-          <span className="te-bar-label">{title}</span>
-          {summary && <span className={`te-summary ${/^(auto|→)/.test(summary) ? 'te-auto' : ''}`}>{summary}</span>}
-        </button>
-        {actions && <span className="te-actions">{actions}</span>}
+    <div className="te-mod">
+      <div className="te-mod-head" title={badge}>
+        <span className="te-mod-title">{title}</span>
+        {summary && <span className={`te-summary ${/^(auto|→)/.test(summary) ? 'te-auto' : ''}`}>{summary}</span>}
+        <span className="te-actions">{actions}</span>
       </div>
-      {open && <div className="te-panel">{children}</div>}
-    </section>
+      {children}
+    </div>
   );
 }
 

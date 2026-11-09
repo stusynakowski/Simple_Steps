@@ -483,7 +483,6 @@ export default function OperationColumn({
                      id={`step-notes-${step.id}`}
                      className="step-notes-input"
                      rows={8}
-                     autoFocus
                      value={step.notes ?? ''}
                      onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
                      placeholder="What is this step for? e.g. **Keeps** only rows with a score over 5."

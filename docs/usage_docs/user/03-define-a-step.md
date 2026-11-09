@@ -115,7 +115,8 @@ The full list, with fixes:
 
 ## Name, colour and notes
 
-Open **Settings** (gear):
+Open **Settings & Notes** (the tune and note icons, one button, in the
+step's toolbar):
 
 - **Step Name** — what the step is called, and what other steps write in
   `wf["…"]` to read it.
