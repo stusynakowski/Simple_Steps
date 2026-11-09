@@ -848,6 +848,7 @@ export default function MainLayout() {
                   onRun={runStep}
                   onDeclare={declareWorkflow}
                   onRunAll={runPipeline}
+                  onRunToEnd={() => runPipeline(step.id)}
                   onMove={(to) => moveStep(step.id, to)}
                   stepCount={workflow.steps.length}
                   onPause={id => console.log('Pause', id)}

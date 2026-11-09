@@ -12,6 +12,7 @@ docs is [`../README.md`](../README.md). Code comments cite plans by number
 | [`120-literals-and-references.md`](./120-literals-and-references.md) | rule, partly built | Only `wf["step"]` is a reference; everything else is a literal. The canonical `tool[modifiers](input, arguments)` form. Cited by `operation_formula.py` |
 | [`122-skeleton-complete.md`](./122-skeleton-complete.md) | mostly built | Object model, resources, the agent, custom cell types. Cited by `application.py`, `resources.py`, `cell_types.py`, `agent/proposals.py` |
 | [`126-formula-ui.md`](./126-formula-ui.md) | **active** | The formula UI: what each path writes today (run), the open items F1–F16 (writing formulas, references and selection, showing cells), and decision D1. Replaces the open parts of 121, 123, 124 and 125 |
+| [`130-reference-selection.md`](./130-reference-selection.md) | **proposed** | Selecting data from earlier steps, to the owner's rules R1–R9: rows are positions and `#` is `0..n-1`; `#<step>` lineage columns behind an expander; `#` columns never data; `var<n>` column names; many spellings; selection as input; row alignment needs join/zip. Q1–Q4 open |
 | [`200-shell-infrastructure-plan.md`](./200-shell-infrastructure-plan.md) | active | The "Jupyter-on-VS-Code" shell: S0 done, phase A mostly done |
 
 ## Weekend developments

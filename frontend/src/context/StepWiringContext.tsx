@@ -42,6 +42,8 @@ export interface WiringState {
   activeSelection: string | null;
   /** The receiving formula's references: the source grids box what each covers (R3). */
   references: FormulaReference[];
+  /** The receiving step's colour: what its references are outlined in, in the source grids. */
+  referenceColor: string | null;
 }
 
 export interface StepWiringContextValue {
@@ -60,8 +62,8 @@ export interface StepWiringContextValue {
   pickFrom: (sourceStep: string, pick: GridPick) => void;
   /** The receiving step publishes its current selection here. */
   setActiveSelection: (selection: string | null) => void;
-  /** The receiving step publishes its formula's references here. */
-  setReferences: (references: FormulaReference[]) => void;
+  /** The receiving step publishes its formula's references, and its colour, here. */
+  setReferences: (references: FormulaReference[], color: string) => void;
   /**
    * Called on blur (with a small delay so grid clicks can fire first).
    */
@@ -77,7 +79,7 @@ export interface StepWiringContextValue {
 // ── Context ────────────────────────────────────────────────────────────────
 
 const EMPTY_WIRING: WiringState = {
-  receivingStepId: null, receivingStepIndex: null, inputRef: null, onPick: null, activeSelection: null, references: [],
+  receivingStepId: null, receivingStepIndex: null, inputRef: null, onPick: null, activeSelection: null, references: [], referenceColor: null,
 };
 
 const StepWiringContext = createContext<StepWiringContextValue>({
@@ -117,6 +119,7 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
         onPick: onPick ?? null,
         activeSelection: prev.receivingStepId === stepId ? prev.activeSelection : null,
         references: prev.receivingStepId === stepId ? prev.references : [],
+        referenceColor: prev.receivingStepId === stepId ? prev.referenceColor : null,
       }));
     },
     []
@@ -190,8 +193,9 @@ export function StepWiringProvider({ children }: { children: React.ReactNode }) 
     setWiringState((prev) => (prev.activeSelection === selection ? prev : { ...prev, activeSelection: selection }));
   }, []);
 
-  const setReferences = useCallback((references: FormulaReference[]) => {
-    setWiringState((prev) => (JSON.stringify(prev.references) === JSON.stringify(references) ? prev : { ...prev, references }));
+  const setReferences = useCallback((references: FormulaReference[], color: string) => {
+    setWiringState((prev) => (prev.referenceColor === color && JSON.stringify(prev.references) === JSON.stringify(references)
+      ? prev : { ...prev, references, referenceColor: color }));
   }, []);
 
   return (

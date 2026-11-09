@@ -58,23 +58,39 @@ export interface FormulaEditorProps {
   /** Forwarded to the hidden textarea so wiring works unchanged. */
   shadowRef?: (el: HTMLTextAreaElement | null) => void;
   testId?: string;
-  /** Each step reference's [start, end) in *value* and its step's colour: underlined dashed while editing (R3). */
+  /** Each step reference's [start, end) in *value* and its step's colour: boxed dotted while editing (R3). */
   references?: { start: number; end: number; color: string }[];
 }
 
-/** The class that draws a reference dashed in *color*; its rule is added once. */
-function referenceClass(color: string): string {
+/**
+ * The classes that box a reference dotted in *color* (owner, 2026-10-30: an
+ * underline reads as a syntax error); their rules are added once.
+ *
+ * Monaco splits a reference into one span per token (`wf`, `[`, `"r"`, `]`),
+ * so an outline would draw a box per token. Instead every span draws the top
+ * and bottom edges, and the space shown before and after the reference draws
+ * the left and right ones, mid-space, so the box is one and clear of the text.
+ * All of it is background on vertical padding, which takes no room: the box is
+ * taller than the text without moving it.
+ */
+function referenceClasses(color: string): { inside: string; open: string; close: string } {
   const name = `ss-ref-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
   if (typeof document !== 'undefined' && !document.getElementById(name)) {
+    const h = `repeating-linear-gradient(90deg, ${color} 0 2px, transparent 2px 4px)`;
+    const v = `repeating-linear-gradient(180deg, ${color} 0 2px, transparent 2px 4px)`;
+    const line = '1.5px';
+    const edges = (x: string, w: string) => `${h} ${x} 0 / ${w} ${line} no-repeat, ${h} ${x} 100% / ${w} ${line} no-repeat`;
     const style = document.createElement('style');
     style.id = name;
-    // A dashed underline in the step's colour, below the text, never over it
-    // (owner, 2026-10-29: no box).
-    style.textContent = `.${name} { text-decoration: underline dashed ${color}; text-decoration-thickness: 1.5px;`
-      + ` text-underline-offset: 3px; text-decoration-skip-ink: none; }`;
+    style.textContent = [
+      `.${name}, .${name}-open, .${name}-close { padding: 3px 0; }`,
+      `.${name} { background: ${edges('0', '100%')}; }`,
+      `.${name}-open { background: ${edges('100%', '50%')}, ${v} 50% 0 / ${line} 100% no-repeat; }`,
+      `.${name}-close { background: ${edges('0', '50%')}, ${v} 50% 0 / ${line} 100% no-repeat; }`,
+    ].join('\n');
     document.head.appendChild(style);
   }
-  return name;
+  return { inside: name, open: `${name}-open`, close: `${name}-close` };
 }
 
 /**
@@ -125,8 +141,8 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
     getValue: () => monacoRef.current?.getValue() ?? value,
   }), [value]);
 
-  // References, underlined dashed in their step's colour, only while the bar is
-  // being edited (owner, 2026-10-29). A span from the last parse may lag a
+  // References, boxed dotted in their step's colour, only while the bar is
+  // being edited (owner, 2026-10-29/30). A span from the last parse may lag a
   // keystroke behind; one that no longer starts at a `wf[` is skipped.
   useEffect(() => {
     const ed = monacoRef.current;
@@ -139,9 +155,16 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       .map((r) => {
         const a = model.getPositionAt(r.start);
         const b = model.getPositionAt(r.end);
+        const box = referenceClasses(r.color);
+        // The spaces before and after are shown, not typed: Monaco lays
+        // injected text out like text, so the caret and clicks stay right.
         return {
           range: new api.Range(a.lineNumber, a.column, b.lineNumber, b.column),
-          options: { inlineClassName: referenceClass(r.color) },
+          options: {
+            inlineClassName: box.inside,
+            before: { content: ' ', inlineClassName: box.open },
+            after: { content: ' ', inlineClassName: box.close },
+          },
         };
       });
     if (referenceMarks.current) referenceMarks.current.set(marks);

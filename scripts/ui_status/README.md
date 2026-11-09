@@ -42,6 +42,8 @@ what to try and what the decision expects.
 | `03-references` | D1, D5, D6, R3, R7, F11 | with the caret in `reader`, pick a column, rows, a cell, a block from `readings` |
 | `04-lineage` | D8, R9 | the index after filter, slice, sort, distinct, expand, collapse, stack, join, and a chain |
 | `05-staged` | R6 | **don't Run All.** Open it: every step is staged, with core's reason its rows aren't known. Run only `readings` (⌘/Ctrl+Enter): `doubled` and `by_n` show 4 pending rows, `big_only` and `top2` 4 `maybe` rows (dashed: a filter or slice may drop them), `split` and `per_ward` a typed header and core's reason |
+| `06-mappings-and-references` | [130](../../docs/dev_plan/130-reference-selection.md) R1–R11 | run all. Every mapping that isn't one-to-one (filter, sort, expand, collapse, distinct, join) and the references into them. Each step's notes give EXPECT (the rule), TODAY (what core did) and VERDICT (MATCHES or FIX). Three steps don't parse on purpose: they're forms the rules want |
+| `07-shape-changes` | [130](../../docs/dev_plan/130-reference-selection.md) R1–R3, R8 | run all. One step per way the rows can change: filter, slice, sort, distinct, expand (once and twice), collapse (all, by key), gather, group, stack, join (inner, left), zip (aligned, not aligned), sweep, and chains. The rule for each: `#` is `0` to `n-1`; where rows came from is in `#<parent>`. Notes give EXPECT / TODAY / VERDICT |
 
 ## Adding a check
 

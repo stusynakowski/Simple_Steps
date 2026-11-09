@@ -1096,7 +1096,7 @@
   to { transform: rotate(360deg); }
 }
 
-/* Minimized: only the header, tight around the step's name. */
+/* Minimized: only the header, tight around the step's number. */
 .operation-column.minimized {
   min-width: 0;
 }
@@ -1225,40 +1225,47 @@
 .col-resizer:hover,
 .row-resizer:hover { background: rgba(0, 0, 0, 0.15); }
 
-/* The step's control bar (StepToolbar; owner, 2026-10-29/30, dev_plan/126 L1):
-   Run and its controls, then Step Panels, Settings and Manage Step; each
-   menu pops up over the page (StepMenu). The two groups sit together,
-   centred, with even padding, on one line: a narrow step drops the words
-   and keeps the icons. Quiet: no fills, a thin outline on
-   each button (an inset shadow, so no size changes), muted until hovered.
-   Colour only where it informs: Run's play icon, a lock. */
+/* The step's control bar (StepToolbar; owner, 2026-10-29/30, 2026-11-09,
+   dev_plan/126 L1): four groups split by thin dividers — running (Run, Run
+   to the end, run options), Step Panels, Settings & Notes, Manage Step —
+   every button sharing the bar's full width. Each menu pops up over the page
+   (StepMenu) and each button has a hover label (useHoverTip). One line: a
+   narrow step drops the words and keeps the icons. Quiet: no fills, a thin
+   outline on each button (an inset shadow, so no size changes), muted until
+   hovered. Colour only where it informs: Run's play icon, a lock. */
 .toolbar-wrapper { container-type: inline-size; }
 .step-bar {
   display: flex;
   flex-wrap: nowrap;           /* always one line (owner, 2026-10-30) */
-  justify-content: center;     /* together, centred: no hole between the groups */
   align-items: center;
   gap: 6px;
   min-width: 0;
   overflow: hidden;
 }
-/* The bar fills its row (owner, 2026-10-30): the named buttons share the
-   width, their content centred; ⋮ and the lock mark keep their own size. */
-.step-bar-side { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; gap: 4px; }
-.step-bar-side > .step-run-big,
-.step-bar-side > .step-bar-named,
-.step-bar-side > .step-menu:has(> .step-bar-named) { flex: 1 1 0; min-width: 0; }
-.step-bar-side > .step-menu:has(> .step-bar-named) > .step-bar-named { width: 100%; }
-.step-run-big,
-.step-bar-named { justify-content: center; }
-/* A narrow step keeps one line by dropping words, not controls: the named
-   buttons show their icons only (each keeps its tooltip and label), and in a
-   very narrow one, Run too. */
-@container (max-width: 460px) {
-  .step-bar-named .step-menu-text { display: none; }
-  .step-bar-named { padding: 0 6px; }
+/* Groups grow by how many buttons they hold, so every button is as wide. */
+.step-bar-group { display: flex; flex: 1 1 0; min-width: 0; align-items: center; gap: 4px; }
+.step-bar-group.step-bar-run { flex-grow: 3; }
+.step-bar-group > button,
+.step-bar-group > .step-menu { flex: 1 1 0; min-width: 0; }
+.step-bar-group > .step-menu > .step-menu-toggle { width: 100%; }
+.step-bar-divider {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  margin: 3px 0;
+  background: rgba(255, 255, 255, 0.16);
 }
-@container (max-width: 230px) {
+.step-run-big,
+.step-bar-btn { justify-content: center; }
+.step-bar .step-bar-btn { height: 30px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; overflow: hidden; }
+/* A narrow step keeps one line by dropping words, not controls: the named
+   buttons show their icons only (each keeps its hover label), and in a
+   very narrow one, Run too. */
+@container (max-width: 560px) {
+  .step-bar .step-bar-btn .step-menu-text { display: none; }
+  .step-bar .step-bar-btn { padding: 0 4px; }
+}
+@container (max-width: 260px) {
   .step-run-big > span { display: none; }
   .step-run-big { padding: 0 4px; }
 }
@@ -1272,7 +1279,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 26px;
+  height: 30px;
   padding: 0 8px 0 4px;
   border: none;
   border-radius: 4px;
@@ -1285,7 +1292,7 @@
 }
 .step-run-big .symbol-icon { color: #5fbf8a; }
 .step-run-big:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
-.step-locked-mark { color: #c9a24a; opacity: 0.85; }
+.step-locked-mark { flex: none; color: #c9a24a; opacity: 0.85; }
 
 /* A step toolbar expander (StepMenu): a button that pops up its actions. */
 .step-menu { display: flex; }
@@ -1303,11 +1310,26 @@
 }
 .step-menu-toggle:hover,
 .step-menu-toggle.active { color: #e6e6e6; background: rgba(255, 255, 255, 0.07); }
-.step-menu-big { width: 26px; height: 26px; }
-/* A named control on the right: its name, then its icon ("Panels ⊞"). */
-.step-bar-named { height: 26px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; }
-.step-menu-text { line-height: 1; }
+.step-menu-text { line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .step-menu-badges { display: inline-flex; gap: 2px; opacity: 0.75; }
+
+/* A toolbar button's hover label (useHoverTip): over the page, under it. */
+.hover-tip {
+  position: fixed;
+  z-index: 10001;
+  transform: translateX(-50%);
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #2b2d31;
+  color: #eceef1;
+  font-size: 11.5px;
+  line-height: 1.35;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  white-space: normal;
+  text-align: center;
+}
 
 /* The formula field: its own outline, so it stands apart from the text
    around it; no box round the row (owner, 2026-10-30). */
@@ -1352,7 +1374,23 @@
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
+/* A popover (Step settings, Notes): content rather than a list of actions. */
+.step-menu-pop--panel { width: min(340px, calc(100vw - 32px)); }
+.step-menu-body { padding: 6px 8px 4px; }
+.step-menu-body .config-item:last-child { margin-bottom: 0; }
+.step-menu-body .step-notes-input { width: 100%; box-sizing: border-box; resize: vertical; }
 .step-menu-divider { height: 1px; margin: 4px 2px; background: #e6e6e6; }
+/* A second part of one popover (Notes, under Step settings). */
+.step-menu-subheader {
+  margin: 10px -8px 6px;
+  padding: 6px 8px 0;
+  border-top: 1px solid #eee;
+  color: #8a8f98;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
 /* The pop-up's header: what this menu is (owner, 2026-10-30). */
 .step-menu-header {
   padding: 4px 8px 6px;

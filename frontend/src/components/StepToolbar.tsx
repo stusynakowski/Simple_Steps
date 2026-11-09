@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import type { ReactNode } from 'react';
 import type { PanelId } from './stepPanels';
 import { PANEL_META } from './stepPanels';
 import type { SymbolName } from './SymbolIcon';
 
 /** Each panel's icon in the Panels menu. */
-const PANEL_ICON: Record<'overview' | 'data' | 'settings', SymbolName> = {
+const PANEL_ICON: Record<'overview' | 'data', SymbolName> = {
   overview: 'analytics',
   data: 'database',
-  settings: 'settings',
 };
 import type { GridPick } from '../utils/selection';
 import type { Step } from '../types/models';
@@ -18,6 +18,7 @@ import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 import SymbolIcon from './SymbolIcon';
 import StepMenu from './StepMenu';
+import { useHoverTip } from './useHoverTip';
 
 // Lazy-load the Monaco-backed formula editor so the ~2 MB editor bundle
 // stays out of the initial JS payload.  While it's loading we render a
@@ -43,6 +44,14 @@ interface StepToolbarProps {
   onRun?: (id: string) => void;
   /** Run every step (the pipeline). */
   onRunAll?: () => void;
+  /** Run this step and every step after it. */
+  onRunToEnd?: () => void;
+  /** Drop this step's output. */
+  onClearOutput?: () => void;
+  /** The step's settings (name, colour, id, status), the top of the Settings & Notes popover. */
+  settings?: ReactNode;
+  /** The step's Markdown notes, under the settings in the same popover. */
+  notes?: ReactNode;
   /** Move this step to a position, 0 the first (core's `k.move`). */
   onMove?: (to: number) => void;
   /** How many steps the workflow has, so a move knows its ends. */
@@ -77,6 +86,10 @@ export default function StepToolbar({
   onRun, 
   onDeclare,
   onRunAll,
+  onRunToEnd,
+  onClearOutput,
+  settings,
+  notes,
   onMove,
   stepCount = 1,
   onDelete, 
@@ -213,88 +226,117 @@ export default function StepToolbar({
   };
 
   const isOpen = (panel: PanelId) => openPanels.includes(panel);
+  const runLabel = step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)';
+  const runTip = useHoverTip(runLabel);
+  const runToEndTip = useHoverTip('Run to the end: this step and every step after it');
 
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
 
-      {/* Two groups, side by side and centred, always on one line; a narrow
-          step shows their icons without words (CSS container query). */}
+      {/* The step's control bar (owner, 2026-10-29/30, 2026-11-09; dev_plan/126
+          L1): four groups split by dividers, every button sharing the full
+          width — running (Run, Run to the end, run options), the panels menu,
+          the step's settings and notes (one popover), then managing the step.
+          Each pops up over the page (StepMenu); each has a hover label. A
+          narrow step shows icons without words (CSS container query). */}
       <div className="toolbar step-bar" data-testid="step-toolbar">
-
-        {/* The step's control bar (owner, 2026-10-29; dev_plan/126 L1): Run and
-            its controls at the left; at the right, step tools (the Formula
-            panel), the panels menu (☰), settings, then managing the step.
-            Each menu pops up over the page (StepMenu). */}
-        <div className="step-bar-side">
-        <button
-          className="step-run-big"
-          onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }}
-          title={step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)'}
-          aria-label={step.status === 'running' ? 'Stop' : 'Run this step'}
-          data-testid="btn-run"
-        >
-          <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={18} />
-          <span>{step.status === 'running' ? 'Stop' : 'Run Step'}</span>
-        </button>
-        <StepMenu
-          icon="playlist_play"
-          iconSize={20}
-          label="Run options"
-          testId="run-controls"
-          className="step-menu-big"
-          items={[
-            { icon: step.status === 'running' ? 'stop' : 'play_arrow', label: step.status === 'running' ? 'Stop' : 'Run this step', hint: '⌘↵', onClick: () => onRun?.(step.id) },
-            { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
-            { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
-          ]}
-        />
+        <div className="step-bar-group step-bar-run">
+          <button
+            className="step-run-big"
+            onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }}
+            aria-label={step.status === 'running' ? 'Stop' : 'Run this step'}
+            data-testid="btn-run"
+            {...runTip.tipProps}
+          >
+            <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={20} />
+            <span>{step.status === 'running' ? 'Stop' : 'Run'}</span>
+          </button>
+          {runTip.tip}
+          <button
+            className="btn-icon step-menu-toggle step-bar-btn"
+            onClick={(e) => { e.stopPropagation(); onRunToEnd?.(); }}
+            disabled={!onRunToEnd}
+            aria-label="Run to the end"
+            data-testid="btn-run-to-end"
+            {...runToEndTip.tipProps}
+          >
+            <SymbolIcon name="fast_forward" size={22} />
+          </button>
+          {runToEndTip.tip}
+          <StepMenu
+            icon="playlist_play"
+            iconSize={22}
+            label="Run options"
+            testId="run-controls"
+            className="step-bar-btn"
+            items={[
+              { icon: step.status === 'running' ? 'stop' : 'play_arrow', label: step.status === 'running' ? 'Stop' : 'Run this step', hint: '⌘↵', onClick: () => onRun?.(step.id) },
+              { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
+              { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
+              { divider: true },
+              { icon: 'cleaning_services', label: 'Clear output', hint: onClearOutput ? undefined : 'not yet',
+                onClick: () => onClearOutput?.(), disabled: !onClearOutput, testId: 'btn-clear-output' },
+            ]}
+          />
         </div>
-        <div className="step-bar-side">
-        <StepMenu
-          icon="splitscreen_add"
-          iconSize={18}
-          label="Step panels"
-          text="Step Panels"
-          testId="panels"
-          className="step-bar-named"
-          items={(['overview', 'data'] as const).map((panel) => ({
-            icon: PANEL_ICON[panel],
-            label: PANEL_META[panel].name,
-            checked: isOpen(panel),
-            onClick: () => onTogglePanel(panel),
-            testId: `panel-${panel}`,
-          }))}
-        />
-        <button
-          className={`btn-icon step-menu-toggle step-bar-named${isOpen('settings') ? ' active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onTogglePanel('settings'); }}
-          title="Settings"
-          aria-label="Settings"
-          aria-pressed={isOpen('settings')}
-          data-testid="panel-settings"
-        >
-          <span className="step-menu-text">Settings</span>
-          <SymbolIcon name="settings" size={18} />
-        </button>
-        {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
-        <StepMenu
-          icon="swap_horiz"
-          iconSize={18}
-          label="Manage step"
-          text="Manage Step"
-          align="right"
-          testId="step-management"
-          className="step-bar-named"
-          items={[
-            { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
-            { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1), disabled: !onMove || stepIndex >= stepCount - 1 },
-            { divider: true },
-            { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => onLock?.(step.id) },
-            { divider: true },
-            { icon: 'delete', label: isLocked ? 'Delete (unlock first)' : 'Delete step', onClick: () => onDelete?.(step.id),
-              disabled: isLocked, danger: true, testId: 'btn-delete' },
-          ]}
-        />
+
+        <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
+
+        <div className="step-bar-group">
+          <StepMenu
+            icon="splitscreen_add"
+            iconSize={20}
+            label="Step panels"
+            text="Step Panels"
+            testId="panels"
+            className="step-bar-btn"
+            items={(['overview', 'data'] as const).map((panel) => ({
+              icon: PANEL_ICON[panel],
+              label: PANEL_META[panel].name,
+              checked: isOpen(panel),
+              onClick: () => onTogglePanel(panel),
+              testId: `panel-${panel}`,
+            }))}
+          />
+        </div>
+
+        <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
+
+        <div className="step-bar-group">
+          <StepMenu icon={['tune', 'sticky_note_2']} iconSize={20} label="Step settings & notes" align="right"
+            testId="step-settings" className="step-bar-btn">
+            {settings}
+            {notes && (
+              <>
+                <div className="step-menu-subheader">Notes</div>
+                {notes}
+              </>
+            )}
+          </StepMenu>
+        </div>
+
+        <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
+
+        <div className="step-bar-group">
+          <StepMenu
+            icon="swap_horiz"
+            iconSize={20}
+            label="Manage step"
+            text="Manage Step"
+            align="right"
+            testId="step-management"
+            className="step-bar-btn"
+            items={[
+              { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
+              { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1), disabled: !onMove || stepIndex >= stepCount - 1 },
+              { divider: true },
+              { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => onLock?.(step.id) },
+              { divider: true },
+              { icon: 'delete', label: isLocked ? 'Delete (unlock first)' : 'Delete step', onClick: () => onDelete?.(step.id),
+                disabled: isLocked, danger: true, testId: 'btn-delete' },
+            ]}
+          />
+          {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
         </div>
       </div>
 

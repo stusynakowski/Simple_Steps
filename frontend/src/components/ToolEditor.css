@@ -1,81 +1,119 @@
 /* Step editor (ToolEditor.tsx), inside the Formula widget.
-   Thin dark bars — a shade lighter than the widget's own bar — over white
-   panels with black text. Little space between: it reads as one formula. */
+   One white sheet in two columns — what is called and how (left), what it
+   is given (right) — split by a hairline. Every part is always open: small
+   headings, not expanders, so the form reads like the formula above it. */
 
 .tool-editor {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 2px 0;
+  background: #fff;
+  color: #111;
   font-size: 0.78rem;
+  container-type: inline-size;
 }
 
-/* ── Bars ─────────────────────────────────────────────────────────────── */
+/* ── Columns: tool + modifiers | input + arguments ────────────────────── */
 
-.te-bar {
+.te-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+.te-col {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 20px;
-  padding: 0 4px 0 6px;
-  background: #383838;
-  color: #d4d4d4;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px 10px 8px;
+  gap: 10px;
 }
 
-.te-nested > .te-bar {
-  background: #e9edf1;
-  color: #222;
-  border-left: 2px solid #4ea1ff;
+.te-col + .te-col { border-left: 1px solid #e3e7eb; }
+
+/* Too narrow for two useful columns: stack them, left first. */
+@container (max-width: 420px) {
+  .te-columns { grid-template-columns: minmax(0, 1fr); }
+  .te-col + .te-col { border-left: 0; border-top: 1px solid #e3e7eb; }
 }
 
-.te-bar-label {
-  font-size: 0.68rem;
-  font-weight: 600;
+/* ── Sections: a heading over its fields ──────────────────────────────── */
+
+.te-section { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.te-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 3px;
+  border-bottom: 1px solid #eef1f4;
+}
+
+.te-heading-label {
+  font-size: 0.66rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.5px;
+  color: #6b7785;
   white-space: nowrap;
 }
 
-.te-bar-note {
-  color: #9a9a9a;
-  font-size: 0.7rem;
-  font-family: ui-monospace, Menlo, monospace;
+.te-heading-note {
+  margin-left: auto;
+  color: #9aa4ae;
+  font-size: 0.68rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.te-tool-bar .te-tool-select {
-  flex: 1;
-  min-width: 0;
-  height: 18px;
-  font-size: 0.75rem;
+.te-section-body { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+
+.te-tool-select {
+  width: 100%;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
   background: #fff;
   color: #111;
-  border: 1px solid #555;
-  border-radius: 2px;
+  border: 1px solid #c5ccd3;
+  border-radius: 3px;
+}
+.te-tool-select:focus { outline: none; border-color: #4ea1ff; box-shadow: 0 0 0 1px #4ea1ff33; }
+
+.te-tool-desc { font-size: 0.7rem; line-height: 1.35; }
+
+/* ── Modifiers: one light card each, in formula order ─────────────────── */
+
+.te-mod {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 6px 8px;
+  border: 1px solid #e1e6eb;
+  border-left: 2px solid #4ea1ff;
+  border-radius: 3px;
+  background: #fafbfc;
 }
 
-.te-toggle {
-  flex: 1;
+.te-mod-head {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  padding: 2px 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  color: inherit;
 }
 
-/* index.css darkens every hovered button and rings every focused one;
-   on these bars that hid the label. */
-.te-toggle:hover { background: rgba(255, 255, 255, 0.06); }
-.te-nested > .te-bar .te-toggle:hover { background: rgba(78, 161, 255, 0.08); }
-.te-toggle:focus:not(:focus-visible),
-.te-icon-btn:focus:not(:focus-visible) { outline: none; }
+.te-mod-title {
+  font-family: ui-monospace, Menlo, monospace;
+  font-weight: 600;
+  font-size: 0.74rem;
+  white-space: nowrap;
+}
 
-.te-chevron { width: 9px; font-size: 11px; }
+.te-mod-head .te-actions { margin-left: auto; }
+
+/* index.css rings every focused button; on these small ones it hid the label. */
+.te-icon-btn:focus:not(:focus-visible) { outline: none; }
 
 .te-summary {
   overflow: hidden;
@@ -110,20 +148,7 @@
 .te-icon-btn:disabled { opacity: 0.3; cursor: default; }
 .te-remove:hover:not(:disabled) { color: #c0392b; }
 
-/* ── Panels ───────────────────────────────────────────────────────────── */
-
-.te-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px;
-  background: #fff;
-  color: #111;
-}
-
-.te-nested .te-panel { padding: 4px 6px 6px 10px; }
-
-.te-section.te-nested { border: 1px solid #e1e6eb; }
+/* ── Notes and warnings ───────────────────────────────────────────────── */
 
 .te-warning {
   display: flex;
@@ -144,12 +169,11 @@
 /* The step column sets nowrap; notes carry core's reasons and must wrap. */
 .te-note, .te-arg-detail, .te-warning, .te-bad { white-space: normal; overflow-wrap: anywhere; }
 .te-note { color: #5f6b76; font-size: 0.74rem; }
-.te-note code, .te-panel code { font-size: 0.72rem; }
+.te-note code { font-size: 0.72rem; }
+.te-col-note { padding-top: 2px; }
 .te-bad { color: #c0392b; font-size: 0.74rem; }
 
 /* ── Argument rows ────────────────────────────────────────────────────── */
-
-.te-rows { display: flex; flex-direction: column; gap: 4px; }
 
 .te-arg { display: flex; flex-direction: column; gap: 2px; }
 
@@ -201,9 +225,28 @@
   font-size: 0.7rem;
 }
 
-.te-arg .te-section { margin-left: 80px; }
+/* A resource argument's settings, beneath it, tinted like the reference. */
+.te-res {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 2px 80px;
+  padding: 4px 6px 6px 8px;
+  border-left: 2px solid #c3b2ec;
+  background: #faf8fe;
+}
 
-.te-modifiers { display: flex; flex-direction: column; gap: 3px; }
+.te-res-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: #5f6b76;
+  font-size: 0.7rem;
+}
+.te-res-head code { color: #4b2a91; font-weight: 600; }
+
+.te-modifiers { display: flex; flex-direction: column; gap: 5px; }
 
 .te-add {
   align-self: flex-start;

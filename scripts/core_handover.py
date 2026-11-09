@@ -85,6 +85,8 @@ def main() -> int:
         shutil.copy(ROOT / path, OUT / "code-to-port" / Path(path).name)
     shutil.copytree(ROOT / "scripts/core_probes", OUT / "probes",
                     ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(ROOT / "docs/core-asks", OUT / "core-asks",
+                    ignore=shutil.ignore_patterns("__pycache__"))
     (OUT / "CLAUDE.md").write_text(CORE_RULES)
 
     for f in sorted(OUT.rglob("*")):

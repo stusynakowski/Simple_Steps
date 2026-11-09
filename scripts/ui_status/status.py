@@ -223,6 +223,33 @@ report("R9  the grid's index is core's #, not the position",
        f"the grid's row ids = {shown}; core's # = {ids}",
        f"the grid's row ids = {shown} = core's #")
 
+# ── Plan 130: mappings, references, shape changes (06, 07; notes say EXPECT / TODAY) ──
+
+cat = example.catalog()
+
+
+def report_steps(wf_name):
+    """One CORE line per step: its # and first cells, or why it was refused."""
+    k = Kernel(cat)
+    tag = "130 " + wf_name[:2]
+    for s in example.workflow("ui_status", wf_name)["steps"]:
+        try:
+            k[s["name"]] = operation_for("=" + s["expression"], {}, cat)
+        except Exception as e:
+            report(f"{tag} {s['name']}", True, "", f"refused as typed: {str(e)[:90]}", kind="CORE")
+            continue
+        try:
+            k.run(s["name"])
+            v = k.view(s["name"])
+            got = [(r["#"], [c.get("value") for c in r["cells"].values()]) for r in v["rows"]][:4]
+            report(f"{tag} {s['name']}", True, "", f"# and cells: {got}", kind="CORE")
+        except Exception as e:
+            report(f"{tag} {s['name']}", True, "", f"refused at run: {str(e).split(': ', 1)[-1][:90]}", kind="CORE")
+
+
+report_steps("06-mappings-and-references")
+report_steps("07-shape-changes")
+
 # ── Report ────────────────────────────────────────────────────────────────
 
 width = max(len(r[0]) for r in results)

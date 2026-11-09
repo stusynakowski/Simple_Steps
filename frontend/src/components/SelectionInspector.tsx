@@ -316,6 +316,10 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
           className="si-box"
           style={maximized ? undefined : size ? { ...size, maxWidth: 'none', maxHeight: 'none' } : display ? DISPLAY_SIZE : undefined}
         >
+          {/* The content: fills everything inside the step's border, below the
+              header and its tools (owner, 2026-10-30). Plots, exploring a
+              cell and its references will be drawn here too. */}
+          <div className="si-content">
           {display ? (
             <CellViewer refId={refId!} row={shownRows[0]} column={shownCols[0]} mode="embedded" onClose={() => ctx.close(id)} />
           ) : shownRows.length <= 1 && shownCols.length <= 1 ? (
@@ -349,6 +353,7 @@ export default function SelectionInspector({ inspector }: { inspector: Inspector
               </tbody>
             </table>
           )}
+          </div>
         </div>
         {!maximized && (
           <>

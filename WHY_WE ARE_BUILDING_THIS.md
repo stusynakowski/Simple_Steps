@@ -1,6 +1,9 @@
-# what is the purpose of this tool
-# in short we want to build a platform to help people compose python operations in a way that is as easy as composing functions in tabular tools like excel.
-# in this wrok we are building a frontend that resembles tabular workflows but is developed in a way that is super easy for python developers to expose tools and resources that users can invoke to perform whatever task they need. additionally users can leverage Agents that merely review the task at hand, review the resource we have acsess to and propose a linear chain of dectorated tools to perform the task. AGENTS are ideally not executing tasks but are merely proposing updates to the chain of operations operations
+# what is the purpose of this tool? 
+# in short we want to build a platform to help partnering teams democratize and orchestrate python tools and resources within a particular scope of problems. the teams consist of the following people. (users, developers, maintainers, and agents)
+# developers can create and deploy a server that exposes a set of python functions and classes that are super easy to deploy to others. 
+# users see a familiar reactive imparative programming experience that resembles tabular data processing tools like excel. they linear workflows consisting of steps. 
+
+# in this work we are building a frontend that resembles tabular workflows but is developed in a way that is super easy for python developers to expose tools and resources that users can acheive their goals within a particular scope of problems.example problems.read a gadditionally users can leverage Agents that merely review the task at hand, review the resource we have acsess to and propose a linear chain of dectorated tools to perform the task. AGENTS are ideally not executing tasks but are merely proposing updates to the chain of operations operations
 
 # CONTEXT 
 # IN short we want an easy bridge between two people
