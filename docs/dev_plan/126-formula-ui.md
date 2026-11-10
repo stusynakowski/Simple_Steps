@@ -191,6 +191,20 @@ source step is far away.
 - a small label after each reference, as in the grid (`totals · n`);
 - both, with the label only while the formula bar has focus.
 
+### R11 — Check that the formula bar and the Formula panel stay in sync
+
+**To do (owner, 2026-11-10; later):** check, in the browser, that the
+formula bar and the Formula panel (fx) always show the same formula, in
+both directions: an edit in the bar updates the panel's fields and its map,
+and an edit in a field rewrites the bar. Include the cases that have gone
+wrong before (R1, D4): typing fast, a formula that doesn't parse yet,
+choosing a tool from either picker, a grid pick while the panel is open,
+and the new map (its parts and lines must follow the formula as shown).
+
+**Today:** the panel shows the committed formula (`savedFormula`) and
+writes back through the backend; the map's parts come with each parse. Not
+yet checked end to end since the map landed (2026-11-10).
+
 ## Progress
 
 | Date | Item | Done | Confirmed |
