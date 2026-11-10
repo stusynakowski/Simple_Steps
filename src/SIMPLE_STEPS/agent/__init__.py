@@ -1,18 +1,5 @@
 """
-Simple Steps Agent — LangGraph-powered assistant for defining and refining
-step functions within workflows.
-
-The agent reviews available operations in scope, helps users select the right
-function for each step, and iteratively refines the arguments/configuration.
+Simple Steps Copilot — the agent that proposes changes to a workflow
+(docs/dev_plan/weekend_developments/128). It acts only through checked
+proposals; see ``proposals.py`` for one turn and ``model.py`` for the model.
 """
-
-from .config import AgentConfig, get_agent_config, update_agent_config
-from .graph import build_agent_graph, invoke_agent
-
-__all__ = [
-    "AgentConfig",
-    "get_agent_config",
-    "update_agent_config",
-    "build_agent_graph",
-    "invoke_agent",
-]

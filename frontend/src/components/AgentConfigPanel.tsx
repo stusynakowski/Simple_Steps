@@ -4,8 +4,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { AgentConfig, AgentHealthStatus } from '../services/agentApi';
-import { getAgentConfig, updateAgentConfig, getAgentHealth } from '../services/agentApi';
+import type { AgentConfig } from '../services/agentApi';
+import { getAgentConfig, updateAgentConfig } from '../services/agentApi';
 import { mdiClose, mdiCogOutline } from '@mdi/js';
 import MaterialIcon from './MaterialIcon';
 import './AgentConfigPanel.css';
@@ -31,7 +31,6 @@ const MODEL_SUGGESTIONS: Record<string, string[]> = {
 
 const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) => {
   const [config, setConfig] = useState<AgentConfig | null>(null);
-  const [health, setHealth] = useState<AgentHealthStatus | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
@@ -39,7 +38,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) 
   useEffect(() => {
     if (isOpen) {
       loadConfig();
-      loadHealth();
     }
   }, [isOpen]);
 
@@ -50,15 +48,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) 
       setDirty(false);
     } catch {
       setError('Failed to load agent config');
-    }
-  };
-
-  const loadHealth = async () => {
-    try {
-      const h = await getAgentHealth();
-      setHealth(h);
-    } catch {
-      setHealth(null);
     }
   };
 
@@ -76,7 +65,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) 
       const updated = await updateAgentConfig(config);
       setConfig(updated);
       setDirty(false);
-      await loadHealth();
     } catch {
       setError('Failed to save config');
     } finally {
@@ -95,17 +83,6 @@ const AgentConfigPanel: React.FC<AgentConfigPanelProps> = ({ isOpen, onClose }) 
             <MaterialIcon path={mdiClose} />
           </button>
         </div>
-
-        {/* Health status */}
-        {health && (
-          <div className={`agent-health-banner ${health.ready ? 'ready' : 'not-ready'}`}>
-            <span className="health-dot" />
-            {health.ready ? 'Agent ready' : 'Agent not configured'}
-            {!health.provider_package && health.install_hint && (
-              <span className="health-hint"> — {health.install_hint}</span>
-            )}
-          </div>
-        )}
 
         {error && <div className="agent-config-error">{error}</div>}
 

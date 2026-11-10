@@ -44,19 +44,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-agent = [
-    "langgraph>=0.2.0",
-    "langchain-core>=0.3.0",
-    "langchain-openai>=0.2.0",
-]
-agent-anthropic = [
-    "simple-steps[agent]",
-    "langchain-anthropic>=0.2.0",
-]
-agent-ollama = [
-    "simple-steps[agent]",
-    "langchain-ollama>=0.2.0",
-]
 desktop = [
     "pywebview>=5.0",
 ]

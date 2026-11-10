@@ -511,7 +511,7 @@ Simple_Steps/
 │       ├── operations.py          # The standard tools (sources, JSON, cleaning)
 │       ├── models.py              # Pydantic models
 │       ├── file_manager.py        # Workflow JSON persistence
-│       ├── agent/                 # LangGraph chat agent (optional extra)
+│       ├── agent/                 # the copilot: checked proposals, any LLM (plan 128)
 │       └── frontend_dist/         # Bundled production frontend (generated)
 ├── frontend/                      # React + TypeScript app (source)
 │   └── src/

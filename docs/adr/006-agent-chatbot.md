@@ -1,7 +1,12 @@
 # ADR 006 — Agent / Chatbot Extension (LangGraph)
 
+> **Superseded 2026-11-09** by plan 128 (`docs/dev_plan/weekend_developments/128-agent-workflow-builder.md`).
+> The LangGraph path this describes (`agent/graph.py`, `/api/agent/chat`, its
+> WebSocket, `/api/agent/health`, the `agent*` extras) was removed (A0); the
+> copilot is the checked-proposal path, with any LLM behind one setting.
+
 ## Status
-Accepted
+Superseded (2026-11-09, plan 128)
 
 ## Context
 Users need guidance when defining workflow steps — choosing which function to use from the operation catalogue and configuring the right arguments. The existing ChatSidebar was a static placeholder.
