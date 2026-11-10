@@ -63,6 +63,32 @@ them, or not at all.
 every core pin move with a fixed model. If a change in core or the app makes
 the agent worse, the suite says so before a user does.
 
+## Copilot functionality (owner, 2026-11-09)
+
+Owner's ask: familiar copilot functionality, for creating and modifying
+workflows, documented and drawn clearly. The illustrated version of this plan
+is the artifact *Simple Steps Copilot* (https://claude.ai/artifact/WNw6KzyQ5u6RM1F2YvNZBW).
+
+**Modes, named as code copilots name them** (proposed; they rename this
+plan's Off / Propose / Develop):
+
+| Mode | It | You |
+|---|---|---|
+| **Ask** | answers questions about the workflow, its steps and data; changes nothing | read |
+| **Edit** (was Propose) | proposes changes as a review list, each step's formula before → after | Keep or Undo each, or all |
+| **Agent** (was Develop) | applies, runs, observes and repeats toward the goal, within its budget | watch the feed; Pause, Stop, Undo turn |
+
+| In a code copilot | In Simple Steps | When |
+|---|---|---|
+| Chat panel | the chat pane | today |
+| Review a diff | the review list, Keep / Undo per step and for all | A3 |
+| #-mentions | `@step` attaches a step; the grid selection and a failing step attach themselves | A1 |
+| Slash commands | `/new`, `/fix`, `/explain`, `/add` | A3 |
+| Quick fix | Fix on an invalid or failed step's popover (the popover rule: no new grid buttons) | A3 |
+| Agent tool calls | each action as a chat line written as the console writes it | A4 |
+| Checkpoints | before each agent turn; Undo turn | A4 |
+| Inline completion | ghost text in the formula bar, Tab accepts | later |
+
 ## The model: any text LLM, one setting (contract 5)
 
 Owner's goal (2026-11-09): **configure one LLM, and any model that generates
