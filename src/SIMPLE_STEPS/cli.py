@@ -61,7 +61,7 @@ def print_versions() -> None:
     """
     Report what is actually installed, including each package's git commit.
 
-    The version string rarely changes (simple-steps 0.0.0, core 0.1.0), so pip
+    The version string changes only at a release, so between releases pip
     treats any installed copy as satisfying a fresh `pip install git+...` and
     silently leaves the old code in place. The commit is the only way to tell
     what you really have — which is what this prints.
@@ -280,7 +280,8 @@ def main():
     # ── Print startup banner ─────────────────────────────────────────────
     print()
     print("  ┌─────────────────────────────────────────────┐")
-    print("  │          ⚡ Simple Steps v0.0.0 ⚡            │")
+    from . import __version__
+    print(f"  │          ⚡ Simple Steps v{__version__} ⚡            │")
     print("  ├─────────────────────────────────────────────┤")
     print(f"  │  Backend API: http://{args.host}:{port}/api    │")
     print(f"  │  Frontend UI: http://{args.host}:{port}        │")

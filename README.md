@@ -34,7 +34,7 @@ simple-steps
 
 ### Updating an existing install — read this
 
-`simple-steps` (`0.0.0`) and `simple-steps-core` (`0.1.0`) rarely change version, so
+Between releases the version numbers don't change, so
 **a plain `pip install git+...` on a machine that already has them does
 nothing** — pip sees the installed copy as satisfying the requirement and keeps
 your old code. `pip install --upgrade` does not help either, for the same
@@ -51,13 +51,14 @@ Check what you really have — the commit, not the version:
 
 ```bash
 simple-steps --version
-#   simple-steps       0.0.0 (git 5597c025ae78)
-#   simple-steps-core  0.1.0 (git 1c30e03c9a10)
+#   simple-steps       0.1.0 (git …)
+#   simple-steps-core  1.0.1 (git fed4d1ab1739)
 ```
 
-If `simple-steps-core` is older than `1c30e03`, you will see
-`ImportError: cannot import name 'ResourceSpec'` — that is the symptom of a
-stale install, and the force-reinstall above is the fix.
+If `simple-steps-core` is older than the one this release pins (`fed4d1a`,
+core 1.0.1), importing fails with *"This version of simple-steps needs a newer
+simple-steps-core"*: a stale install, and the force-reinstall above is the
+fix. To install exactly one release, pin its tag: `…/Simple_Steps.git@v0.1.0`.
 
 ### Running the examples
 
@@ -110,7 +111,7 @@ python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git"
 Optional: pin to a specific tag/release:
 
 ```bash
-python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.0.0"
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.0"
 ```
 
 This installs the package into your environment (`site-packages`) and gives you the `simple-steps` CLI without creating a repo folder in your current workspace.
@@ -165,7 +166,7 @@ pip install -e ".[desktop,dev]"
 # 1) Use environment (no repo checkout in your project folders)
 conda create -n simple_steps_use python=3.11 -y
 conda activate simple_steps_use
-python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.0.0"
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.0"
 
 # 2) Dev environment (full repo, editable install)
 conda create -n simple_steps_dev python=3.11 -y
@@ -191,7 +192,7 @@ This starts the backend API **and** serves the frontend UI on a single port. You
 
 ```
   ┌─────────────────────────────────────────┐
-  │         ⚡ Simple Steps v0.0.0 ⚡        │
+  │         ⚡ Simple Steps v0.1.0 ⚡        │
   ├─────────────────────────────────────────┤
   │  Backend API: http://127.0.0.1:8000/api  │
   │  Frontend UI: http://127.0.0.1:8000      │
@@ -279,7 +280,7 @@ That's it — a native window opens with the full Simple Steps UI. The directory
 
 ```
   ┌─────────────────────────────────────────────┐
-  │       ⚡ Simple Steps v0.0.0 (Desktop) ⚡     │
+  │       ⚡ Simple Steps v0.1.0 (Desktop) ⚡     │
   ├─────────────────────────────────────────────┤
   │  Mode:        Native window (pywebview)      │
   │  Backend API: http://127.0.0.1:8000/api      │

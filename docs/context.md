@@ -125,8 +125,8 @@ description of the system). In short:
   `>=3.10`, but nothing below 3.13 is tested). Environment:
   `uv venv --python 3.13 && source .venv/bin/activate`
 - Install (dev): `python -m pip install -e ".[dev]"`
-- **Update a pip install elsewhere**: the version numbers rarely change
-  (`simple-steps` 0.0.0, `simple-steps-core` 0.1.0), so
+- **Update a pip install elsewhere**: between releases the version numbers
+  don't change (`simple-steps` 0.1.0, `simple-steps-core` 1.0.1), so
   a plain `pip install git+...` is a NO-OP on a machine that already has them —
   pip reports the old copy as satisfying the requirement. Use
   `pip install --upgrade --force-reinstall --no-cache-dir "git+https://github.com/stusynakowski/Simple_Steps.git"`,
