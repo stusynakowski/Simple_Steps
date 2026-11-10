@@ -78,13 +78,6 @@
       }
     },
     {
-      "name": "row_selection",
-      "expression": "double_n[mod.map()](wf[\"readings\"][0:2])",
-      "meta": {
-        "label": "row_selection"
-      }
-    },
-    {
       "name": "unknown_tool",
       "expression": "dubble_n[mod.map()](wf[\"readings\"])",
       "meta": {
@@ -96,13 +89,6 @@
       "expression": "double_n[mod.mapp()](wf[\"readings\"])",
       "meta": {
         "label": "unknown_modifier"
-      }
-    },
-    {
-      "name": "no_verb",
-      "expression": "double_n[mod.retry(times=2)](wf[\"readings\"])",
-      "meta": {
-        "label": "no_verb"
       }
     },
     {

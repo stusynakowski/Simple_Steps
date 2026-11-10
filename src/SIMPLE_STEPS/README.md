@@ -10,7 +10,7 @@ and where things are kept.
 | `application.py` | `App(tools=[…], resources=[…], loaded={…})`: what an application offers |
 | `decorators.py` | `@simple_step_tool`: core's `@tool`, with the UI's label and category in `extras["simple_steps.ui"]` |
 | `catalog.py` | the one `Catalog` (every declared tool and resource type), and the palette from `describe()` |
-| `operation_formula.py` | the formula parser: core's syntax → core's operation spec, and back for the step editor |
+| `operation_formula.py` | the app's thin side of formulas: core reads the text (`simple_steps_core.formula`); this keeps the syntax checks the UI needs, the references' positions, `/api/parse_formula`'s answer and the step editor's parts round trip |
 | `kernels.py` | each open workflow as a core `Kernel`: declare, run, states; put away and restored |
 | `engine.py` | `/api/run`'s entry, and the store `/api/data` pages outputs from |
 | `grid_runner.py` | a formula run outside a workflow, and the metrics every run reports |

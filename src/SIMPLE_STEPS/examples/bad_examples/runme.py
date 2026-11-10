@@ -40,7 +40,6 @@ example.check("bad_examples", "mistakes", strict=True,
 
 example.check("bad_examples", "corrected", twin=pipeline.build_corrected, strict=True, expect={
     "two_inputs": {"city": ["SF", "NYC", "LA", "BOS"]},
-    "row_selection": {"city": ["SF", "NYC"]},
     "parameter_not_a_column": {"parameter_not_a_column": ["hi Ada", "hi Bo"]},
     "nullable_column": {"nullable_column": [2, 0, 4]},
     "table_returns_text": {"column": ["city", "n"], "non_null": [3, 3]},

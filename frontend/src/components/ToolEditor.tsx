@@ -72,10 +72,12 @@ interface Props {
   onDefineResource?: (name: string, definition: string) => Promise<void>;
   /** The editor wrote a new formula. */
   onChange: (formula: string, parsed: ParsedFormula) => void;
+  /** Core's problems with the step, from the workflow's check when it was entered. */
+  problems?: string[];
 }
 
 export default function ToolEditor({
-  formula, availableOperations, previousSteps, resources = {}, onDefineResource, onChange,
+  formula, availableOperations, previousSteps, resources = {}, onDefineResource, onChange, problems,
 }: Props) {
   const [parts, setParts] = useState<FormulaParts | null>(null);
   /** The committed formula is valid but isn't a tool call (a literal, a legacy formula). */
@@ -179,9 +181,11 @@ export default function ToolEditor({
 
   return (
     <div className="tool-editor" onClick={(e) => e.stopPropagation()}>
-      {warning && (
-        <div className="te-warning" role="status" title={warning}>
-          <SymbolIcon name="warning" size={13} /> {warning}
+      {/* A formula core can't read (as you type), else what the workflow's check
+          found when the step was entered (core_migration §6 D2). */}
+      {(warning || !!problems?.length) && (
+        <div className="te-warning" role="status" title={warning ?? problems!.join('\n')}>
+          <SymbolIcon name="warning" size={13} /> {warning ?? problems!.join('; ')}
           {frozen && <div className="te-frozen-note">Fix it in the formula bar, or choose a tool to start the formula over.</div>}
         </div>
       )}

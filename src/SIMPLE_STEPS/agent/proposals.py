@@ -121,7 +121,7 @@ def check_step(step: Dict[str, str], earlier: List[str],
     *existing*: it changes a step that's already there, whose name (a UI label
     such as "Step 1") is kept as it is."""
     from ..catalog import catalog
-    from ..operation_formula import FormulaError, compile_formula, is_canonical
+    from ..operation_formula import FormulaError, Operation, is_canonical, read, resources_of
     from ..resources import ResourceError, resource_type
 
     name, formula = step.get("name", ""), step.get("formula", "")
@@ -132,31 +132,36 @@ def check_step(step: Dict[str, str], earlier: List[str],
     if not is_canonical(formula):
         return 'the formula must use the syntax tool[mod.verb()](wf["step"], …); it names no step or verb'
     try:
-        compiled = compile_formula(formula)
+        value = read(formula)
     except FormulaError as exc:
         return str(exc)
-    for ref in compiled.reads:
+    if not isinstance(value, Operation):
+        return None                                      # a pick: reads checked by the kernel
+    for ref in value.reads:
         if ref not in earlier:
             shown = ", ".join(earlier) or "none"
             return f'reads wf["{ref}"], which isn\'t an earlier step (earlier steps: {shown})'
-    for res in compiled.resources:
+    for res in resources_of(formula):
         if res not in resources:
             shown = ", ".join(f'res["{r}"]' for r in resources) or "none"
             return f'uses res["{res}"], which this workflow doesn\'t have (it has: {shown})'
-    if compiled.is_combine:
+    spec = value.to_dict()
+    if spec.get("inputs"):                               # a combine applies no tool
         return None
-    if compiled.bound_to:
+    tool = spec["tool"].split(".")[-1]
+    if spec.get("bound_to"):
+        bound = spec["bound_to"]["$res"]
         try:
-            cls = resource_type(resources[compiled.bound_to], compiled.bound_to)
+            cls = resource_type(resources[bound], bound)
         except ResourceError as exc:
             return str(exc)
         tools = catalog().describe()["resource_types"].get(cls.__name__, {}).get("tools", {})
-        if f"{cls.__name__}.{compiled.tool_id}" not in tools:
+        if f"{cls.__name__}.{tool}" not in tools:
             shown = ", ".join(t.split(".", 1)[1] for t in tools) or "none"
-            return f"{compiled.tool_id} is not a tool of {cls.__name__}; its tools are: {shown}"
+            return f"{tool} is not a tool of {cls.__name__}; its tools are: {shown}"
         return None
-    if compiled.tool_id not in catalog().functions:
-        return f"there's no tool named {compiled.tool_id}"
+    if tool not in catalog().functions:
+        return f"there's no tool named {tool}"
     return None
 
 
@@ -202,17 +207,14 @@ def _ready_made_to_use(proposed: List[Dict[str, str]], workflow_resources: Mappi
     declares, so the proposal adds the declaration first — the same
     ``res["x"] = Type(…)`` the Resources menu and the console send.
     """
-    from ..operation_formula import FormulaError, compile_formula
+    from ..operation_formula import resources_of
     from ..resources import LOADED
 
     wanted: List[str] = []
     for step in proposed:
         if step["name"] in problems:
             continue
-        try:
-            names = compile_formula(step["formula"]).resources
-        except FormulaError:
-            continue
+        names = resources_of(step["formula"])
         wanted += [n for n in names if n in LOADED and n not in (workflow_resources or {})]
     out = []
     for name in dict.fromkeys(wanted):

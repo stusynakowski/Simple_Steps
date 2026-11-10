@@ -33,7 +33,7 @@ example = Example(HERE / "app.py")
 from simple_steps_core import Kernel  # noqa: E402
 from SIMPLE_STEPS.engine import run_operation  # noqa: E402
 from SIMPLE_STEPS.kernels import operation_for  # noqa: E402
-from SIMPLE_STEPS.operation_formula import FormulaError, compile_formula  # noqa: E402
+from SIMPLE_STEPS.operation_formula import FormulaError, read  # noqa: E402
 
 results = []
 
@@ -50,7 +50,7 @@ def source(rel):
 
 def parses(formula):
     try:
-        compile_formula(formula)
+        read(formula)
         return True, ""
     except FormulaError as e:
         return False, str(e).split(". ")[0]

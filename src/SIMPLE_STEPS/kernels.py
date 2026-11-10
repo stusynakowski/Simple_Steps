@@ -31,7 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from simple_steps_core import Kernel as CoreKernel
 from simple_steps_core import Operation
 
-from .grid_runner import GridStepError, _bind_positional_resources, _engine_metrics, _formula_tool
+from .grid_runner import GridStepError, _engine_metrics
 
 
 @dataclass
@@ -244,32 +244,20 @@ def _literal_value(formula: str) -> Any:
 
 
 def operation_for(formula: str, declarations: Dict[str, Any], cat) -> Operation:
-    """A formula in core's syntax → core's operation, for *cat*'s tools.
-    Raises :class:`GridStepError` (or the parser's ``FormulaError``) with the reason."""
-    from .operation_formula import compile_formula
-    from .resources import resource_type
+    """A formula in core's syntax → the operation the kernel stores, read by
+    core (core_migration.md §6, D1). What it means is core's check when it's
+    assigned. Raises core's ``FormulaError``, or :class:`GridStepError` for a
+    resource the workflow doesn't declare (the declarations are the app's)."""
+    from .operation_formula import operation_of, read, resources_of
 
-    compiled = compile_formula(formula)
-    types: Dict[str, type] = {}
-    for name in compiled.resources:
+    for name in resources_of(formula):
         if name not in declarations:
             known = ", ".join(f'res["{n}"]' for n in declarations) or "none yet"
             raise GridStepError(
                 f'no resource named "{name}" in this workflow (its resources: {known}). '
                 "Add it to the workflow's resources first"
             )
-        types[name] = resource_type(declarations[name], name)
-    fn = _formula_tool(compiled, cat.functions, types)
-    _bind_positional_resources(compiled, fn, types)
-    inferred = None
-    if compiled.needs_inference:
-        # tool(wf["x"], …) is core's implicit auto: it saves `mod.auto()`, and
-        # core picks the verb from the data at each run. With no input, a source.
-        if fn is None:
-            raise GridStepError(f"no tool named '{compiled.tool_id}'")
-        inferred = "source" if compiled.input is None else "auto"
-    bound_type = types[compiled.bound_to].__name__ if compiled.bound_to in types else None
-    return Operation.from_spec(compiled.operation(inferred, bound_type), cat)
+    return operation_of(read(formula), cat)
 
 
 def _declared(s: Kernel, name: str) -> Optional[Any]:
@@ -326,7 +314,14 @@ def sync(s: Kernel, steps: List[Dict[str, Any]]) -> None:
                     operation = operation_for(formula, s.declarations, s.k.catalog)
                 except (FormulaError, GridStepError) as exc:
                     s.problems[name] = str(exc)
-        _declare(s, position, name, operation)
+        try:
+            _declare(s, position, name, operation)
+        except (TypeError, ValueError) as exc:
+            # Core refuses some formulas when the step is assigned, not when
+            # it's read (a second step given by position, say): that step
+            # carries the reason and is the empty step; the others go on.
+            s.problems[name] = str(exc)
+            _declare(s, position, name, None)
 
 
 def _declare(s: Kernel, position: int, name: str, operation: Any) -> None:

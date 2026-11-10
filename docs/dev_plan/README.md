@@ -28,9 +28,10 @@ Larger plans for the next stretch of work, in [`weekend_developments/`](./weeken
 ## One-paragraph summary
 
 A **step** holds one formula in core's syntax,
-`tool[mod.verb(…)](wf["step"], arg=…)`, which is valid Python. The app's
-parser (`operation_formula.py`) maps that text to a core operation spec and
-nothing more; whether the step makes sense is core's check. A **workflow** is
+`tool[mod.verb(…)](wf["step"], arg=…)`, which is valid Python. **Core reads
+the text** (`simple_steps_core.formula`); the app's `operation_formula.py`
+only adds what the UI needs (reference positions, the step editor's parts).
+Whether the step makes sense is core's check, on Enter. A **workflow** is
 the ordered, named steps; core's **kernel** holds the workflow, the catalog
 and the outputs, one per session. The **UI's job** is to help the user write
 a valid formula; the formula is the single source of truth. Details:

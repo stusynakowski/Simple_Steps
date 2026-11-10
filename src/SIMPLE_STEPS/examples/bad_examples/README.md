@@ -32,20 +32,18 @@ add an entry there and run that.
 | `bare_name` | `double_n[mod.map()](readings)` | **refused**: readings is not defined. To use the step "readings", write wf["readings"] | A step is only ever wf["name"]; a bare name means nothing. | `double_n[mod.map()](wf["readings"])` |
 | `quoted_name` | `double_n[mod.map()]("readings")` | **refused**: "readings" is a string. Did you mean wf["readings"]? | A quoted string is text, never a step. | `double_n[mod.map()](wf["readings"])` |
 | `missing_step` | `double_n[mod.map()](wf["reading"])` | **refused**: input 'reading', which is not an earlier step | There's no step called that (a typo), or it hasn't run yet. | `double_n[mod.map()](wf["readings"])` |
-| `two_inputs` | `double_n[mod.map()](wf["readings"], wf["more"])` | **refused**: a step reads one input; to combine steps use join | A step reads one input. Reading several is a combine. | `stack(wf["readings"], wf["more"])` |
-| `row_selection` | `double_n[mod.map()](wf["readings"][0:2])` | **refused**: a selection can't be a tool's input | A tool's input is a whole step; make the part its own step (or pass it as an argument, n=wf["readings"][cols["n"]]). | `wf["readings"][0:2]` |
+| `two_inputs` | `double_n[mod.map()](wf["readings"], wf["more"])` | **refused**: a step reads one input: to combine steps use join | A step reads one input. Reading several is a combine. | `stack(wf["readings"], wf["more"])` |
 
 ## Tools and modifiers
 
 | step | written wrong | what happens | why | written right |
 |---|---|---|---|---|
 | `unknown_tool` | `dubble_n[mod.map()](wf["readings"])` | **refused**: 'dubble_n' is not in this workflow's catalog | The tool name is misspelt. | `double_n[mod.map()](wf["readings"])` |
-| `unknown_modifier` | `double_n[mod.mapp()](wf["readings"])` | **refused**: unknown modifier mod.mapp | The modifier name is misspelt. | `double_n[mod.map()](wf["readings"])` |
-| `no_verb` | `double_n[mod.retry(times=2)](wf["readings"])` | **refused**: the brackets need a shape verb | retry only wraps a verb; the brackets still need one. | `double_n[mod.map(), mod.retry(times=2)](wf["readings"])` |
+| `unknown_modifier` | `double_n[mod.mapp()](wf["readings"])` | **refused**: no modifier 'mapp' | The modifier name is misspelt. | `double_n[mod.map()](wf["readings"])` |
 | `misspelt_setting` | `double_n[mod.map(nme="doubled")](wf["readings"])` | **refused**: map takes no parameter 'nme'; it accepts name | map has no setting nme. | `double_n[mod.map(), mod.name("doubled")](wf["readings"])` |
 | `missing_setting` | `double_n[mod.map(), mod.retry()](wf["readings"])` | **refused**: retry needs times= — it has no default | retry has no default number of tries. | `double_n[mod.map(), mod.retry(times=2)](wf["readings"])` |
-| `setting_is_a_step` | `identity[mod.sort(by=wf["readings"])](wf["readings"])` | **refused**: mod.sort(by=…) is a setting, and settings are literals | A modifier's settings are literals: sort by a column name. | `identity[mod.sort(by="n")](wf["readings"])` |
-| `not_a_literal` | `greet[mod.map()](wf["readings"], name=str.upper("ada"))` | **refused**: name: an operation can't be an argument | An argument is a literal or a step — the formula bar runs no code. | `greet[mod.map()](wf["readings"], name="ADA")` |
+| `setting_is_a_step` | `identity[mod.sort(by=wf["readings"])](wf["readings"])` | **refused**: sort's by= reads 'readings', which holds DataFrame; it must be str | A modifier's settings are literals: sort by a column name. | `identity[mod.sort(by="n")](wf["readings"])` |
+| `not_a_literal` | `greet[mod.map()](wf["readings"], name=str.upper("ada"))` | **refused**: str.upper is not a tool | An argument is a literal or a step — the formula bar runs no code. | `greet[mod.map()](wf["readings"], name="ADA")` |
 
 ## Columns and types
 

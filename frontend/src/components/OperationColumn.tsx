@@ -547,6 +547,7 @@ export default function OperationColumn({
                         previousSteps={previousSteps}
                         resources={resources as Record<string, ResourceDeclaration> | undefined}
                         onDefineResource={onDefineResource}
+                        problems={step.problems}
                         onChange={(formula, parsed) => {
                           handleFormulaUpdate(step.id, formula, parsed);
                         }}

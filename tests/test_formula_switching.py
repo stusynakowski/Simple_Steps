@@ -11,6 +11,7 @@ REQ-FORM-006 (every tool, switched to and run), and TEST-FORM-07 REQ-FORM-007
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,10 +20,14 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from simple_steps_core import Kernel
+
+from SIMPLE_STEPS import simple_step_resource
+from SIMPLE_STEPS.core_bridge import bound
 from SIMPLE_STEPS.decorators import simple_step_tool
 from SIMPLE_STEPS.main import app
 from SIMPLE_STEPS.operation_formula import (
-    FormulaError, compile_formula, format_parts, is_canonical, to_parts,
+    FormulaError, describe, format_parts, is_canonical, operation_of, read, to_parts,
 )
 from SIMPLE_STEPS.catalog import catalog
 
@@ -66,6 +71,34 @@ def fs_shout(city: str) -> str:
     return city.upper()
 
 
+@simple_step_resource
+class FsDB:
+    """A resource with one bound tool, for the res["db"] cases."""
+
+    @bound
+    def lookup(self, city: str) -> str:
+        return city
+
+
+def _problems(formula):
+    """What core says when *formula* is assigned as a step after `numbers`
+    (n, city), with a resource `db`: the check made on Enter (core_migration
+    §6 D2). Empty when the step is fine."""
+    k = Kernel(catalog())
+    k["numbers"] = fs_numbers.__wrapped__() if hasattr(fs_numbers, "__wrapped__") else fs_numbers()
+    k.define("db", FsDB)
+    try:
+        k["x"] = operation_of(read(formula), k.catalog)
+    except (FormulaError, TypeError, ValueError) as exc:
+        return str(exc)
+    return "; ".join(str(p) for p in k.step("x").problems)
+
+
+def _parts_of(formula):
+    """The step editor's parts for *formula*, read by core."""
+    return to_parts(formula, read(formula))
+
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -100,61 +133,61 @@ def _mod(kind, **params):
 @pytest.mark.parametrize("formula", [
     '=fs_double[mod.map(), mod.filter()](wf["numbers"])',
     '=fs_double[mod.auto(), mod.map()](wf["numbers"])',
-    '=identity[mod.select(columns=["n"]), mod.sort(by="n")](wf["numbers"])',
+    # (select, slice and sort may now stand before a verb in one step: core S3)
     '=res["db"].lookup[mod.map(), mod.filter()](wf["numbers"])',
 ])
 def test_two_shape_verbs_are_refused_when_written(formula):
-    """REQ-FORM-001: refused by the compiler, naming the verbs and the fix."""
-    with pytest.raises(FormulaError, match=r"shape verbs.*separate steps"):
-        compile_formula(formula)
+    """REQ-FORM-001: refused when the step is entered, naming the verbs and the fix."""
+    assert re.search(r"shape verbs.*separate steps", _problems(formula)), _problems(formula)
 
 
 def test_two_shape_verbs_are_refused_by_the_editor_write():
-    """REQ-FORM-001: the editor's write path (format_parts) refuses them too."""
-    with pytest.raises(FormulaError, match="shape verbs"):
-        format_parts(_parts("fs_double", [_mod("map"), _mod("filter")]))
+    """REQ-FORM-001: what the editor writes with two shape verbs is refused when entered."""
+    formula = "=" + format_parts(_parts("fs_double", [_mod("map"), _mod("filter")]))
+    assert "shape verbs" in _problems(formula)
 
 
 @pytest.mark.parametrize("execution", ['mod.retry(times=2)', 'mod.timeout(seconds=5)'])
 def test_execution_modifiers_go_with_any_shape_verb(execution):
     """REQ-FORM-001: retry / timeout are not shape verbs; either side of one is fine."""
-    compile_formula(f'=fs_double[mod.map(), {execution}](wf["numbers"])')
-    compile_formula(f'=fs_double[{execution}, mod.map()](wf["numbers"])')
+    assert _problems(f'=fs_double[mod.map(), {execution}](wf["numbers"])') == ""
+    assert _problems(f'=fs_double[{execution}, mod.map()](wf["numbers"])') == ""
 
 
 # ── TEST-FORM-02 · REQ-FORM-002 ──────────────────────────────────────────────
 
 @pytest.mark.parametrize("verb", NO_TOOL_VERBS)
 def test_a_verb_that_applies_no_tool_refuses_another_tool(verb):
-    """REQ-FORM-002: refused when written, with both fixes in the message."""
-    default = MODIFIERS[verb]["default_tool"]
-    with pytest.raises(FormulaError) as err:
-        compile_formula(f'=fs_double[mod.{verb}({SETTINGS.get(verb, "")})](wf["numbers"])')
-    message = str(err.value)
-    assert f"{verb} applies no tool" in message
-    assert f"{default}[mod.{verb}(" in message            # the verb, with its tool
-    assert "fs_double[mod.map()]" in message               # or the tool, with map
+    """REQ-FORM-002: refused when entered, saying the verb applies no tool and
+    pointing to map (core's wording, core_migration §6 D3)."""
+    message = _problems(f'=fs_double[mod.{verb}({SETTINGS.get(verb, "")})](wf["numbers"])')
+    assert f"{verb} applies no tool" in message, message
+    assert "map" in message
 
 
 @pytest.mark.parametrize("verb", NO_TOOL_VERBS)
 def test_a_verb_that_applies_no_tool_takes_its_default_tool(verb):
-    """REQ-FORM-002: the default tool is still accepted."""
+    """REQ-FORM-002: the default tool is still accepted (a setting the data
+    can't satisfy, such as widen with no dict column, is another matter)."""
     default = MODIFIERS[verb]["default_tool"]
-    compile_formula(f'={default}[mod.{verb}({SETTINGS.get(verb, "")})](wf["numbers"])')
+    problems = _problems(f'={default}[mod.{verb}({SETTINGS.get(verb, "")})](wf["numbers"])')
+    assert "applies no tool" not in problems, problems
 
 
 def test_bound_tools_follow_the_same_rule():
     """REQ-FORM-002: a resource's method is a tool, so select refuses it."""
-    with pytest.raises(FormulaError, match="select applies no tool"):
-        compile_formula('=res["db"].lookup[mod.select(columns=["n"])](wf["numbers"])')
+    assert "select applies no tool" in _problems(
+        '=res["db"].lookup[mod.select(columns=["n"])](wf["numbers"])')
 
 
-def test_the_refusal_reaches_the_formula_bar(client):
-    """REQ-FORM-002: /api/parse_formula reports it as you type, not at Run."""
-    parsed = client.post("/api/parse_formula",
-                         json={"formula": '=fs_double[mod.sort(by="n")](wf["numbers"])'}).json()
-    assert parsed["isValid"] is False
-    assert "sort applies no tool" in parsed["error"]
+def test_the_refusal_reaches_the_step_when_entered(client):
+    """REQ-FORM-002: the refusal reaches the step when it's entered: the
+    workflow's sync carries it as the step's problem, which the UI shows
+    (core_migration §6 D2; it is no longer checked on every keystroke)."""
+    steps = [{"id": "a", "name": "numbers", "formula": "=fs_numbers[mod.source()]()"},
+             {"id": "b", "name": "sorted", "formula": '=fs_double[mod.sort(by="n")](wf["numbers"])'}]
+    synced = client.post("/api/workflow/sync", json={"workflow_key": "form02", "workflow_steps": steps}).json()
+    assert any("sort applies no tool" in p for p in synced["steps"]["sorted"]["problems"]), synced
 
 
 # ── TEST-FORM-03 · the editor's switches, run end to end ─────────────────────
@@ -222,8 +255,7 @@ def test_every_verb_on_a_tool_runs_or_is_refused_when_written(client, numbers, v
     no_input = verb in ("source", "sweep")
     head = f'fs_double[mod.{verb}({SETTINGS.get(verb, "")})]'
     try:
-        formula = "=" + format_parts(to_parts(compile_formula(
-            head if no_input else f'{head}(wf["numbers"])')))
+        formula = "=" + format_parts(_parts_of(head if no_input else f'{head}(wf["numbers"])'))
     except FormulaError:
         return                                      # refused when written: fine
     r = _run(client, formula, numbers)
@@ -262,8 +294,7 @@ def _example_formulas():
 
 @pytest.mark.parametrize("formula", list(_example_formulas()))
 def test_example_formulas_round_trip_through_the_editor(formula):
-    """REQ-FORM-007: compile → to_parts → format_parts → compile is the identity."""
-    compiled = compile_formula(formula)
-    again = compile_formula(format_parts(to_parts(compiled)))
-    assert again.operation() == compiled.operation()
-    assert to_parts(again) == to_parts(compiled)
+    """REQ-FORM-007: read → parts → format_parts → read is the identity."""
+    written = format_parts(_parts_of(formula))
+    assert describe(written)["operation"] == describe(formula)["operation"]
+    assert _parts_of(written) == _parts_of(formula)

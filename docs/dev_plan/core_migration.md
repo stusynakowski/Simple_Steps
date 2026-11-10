@@ -53,7 +53,7 @@ Not needed for today's functionality; core makes them possible.
 
 | | What | Why it waits |
 |---|---|---|
-| L1 | Core's `formula(text)` in place of the app's parser (`operation_formula.py`, 923 lines). The app's parser refuses core's new pick forms: conditions (`wf["r"][cols["n"] > 1]`), a string as a column (`wf["r"]["n"]`), a pick as a tool's input | **Decided, §6**: its own branch, after `core-v1` merges |
+| L1 | **Done 2026-11-09** (branch `core-formula`): core's `formula(text)` reads every formula; `operation_formula.py` 933 → 456 lines, the change 527 lines smaller in all. Core's new pick forms (conditions, a string as a column, a pick as a tool's input) work in the formula bar | §6 |
 | L2 | `kernels.py` reads what core's kernel reports (`repr(k)`, `step.problems`, `k.needs_run()`) | a refactor; nothing fails without it |
 | L3 | **Done 2026-11-09.** A step's problems are listed in its summary and on its status pill's hover (they were synced but never shown); a step reading a stale one shows *out of date*, with core's reason (`read stale 's'`, from `k.needs_run()`); the summary shows *Core runs:* the formula core holds when it differs from the one written (the verb it decided, the bindings it wrote) | — |
 | L4 | Progress and `cancel()` (K23), the output store (C32), media (R7), stages (R9) | core hasn't built them; the app keeps its own (archive 01 §5) |
@@ -75,6 +75,26 @@ Not needed for today's functionality; core makes them possible.
 | pin and submodule to `fed4d1a` | done: preflight 3/3 | `6c5883d` |
 | §1 adjustments | done: pytest at baseline, every example passes | `7613805`, this commit |
 | §2 gates | pytest at baseline (1 failure); every example; vitest 145/145; preflight 3/3; smoke_install 20/20. The UI pass by hand is still to do | this commit |
+| core 1.0.2, release 0.1.1 | done | `96c4026`, tag `v0.1.1` |
+| L1: core reads formulas | done, below | branch `core-formula` |
+
+**L1, as built.** `kernels.operation_for`, `grid_runner.run_formula` and the
+agent's `check_step` read formulas with core's `formula()`; a pick on its own
+becomes the identity-select step core stores. Core binds positional resources,
+so `grid_runner`'s binding helpers went. `/api/parse_formula` answers as you
+type from core's read alone (D2); what a step means is checked when the
+workflow syncs, and the sync now keeps a refusal core makes on assignment as
+that step's problem instead of failing the workflow. Those problems show in
+the step summary, on the status pill and in the step editor's warning line.
+The editor's parts are built from core's operation and the text (positional
+resources, `$expr` for anything else); a pick as a tool's input has no parts
+and is edited in the formula bar (D6). Test changes, each asserting behaviour
+core moved or reworded (D2, D3, D4): `test_formula_switching`'s refusals are
+checked by assigning the step, as Enter does; *the refusal reaches the
+formula bar* became *reaches the step when entered*; the two-verb case
+`select` + `sort` was dropped (core S3: pickers may stand before a verb).
+`bad_examples` takes core's wording for four cases and drops `row_selection`
+and `no_verb`, which core now accepts on purpose.
 
 ## 6. L1: core reads formulas (decisions, owner, 2026-11-09)
 
