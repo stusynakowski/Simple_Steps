@@ -18,7 +18,7 @@ From the top of a step's column down:
 
 | part | what it does |
 |---|---|
-| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*), on one line. Click it to open or close the step. Hover it for **settings** (tune icon) and **notes** (note icon) beside the name, and **minimize** and **maximize** at the right; drag it out to float the step in its own window. A step with notes shows them under the header, folded to their first line. |
+| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*), on one line. Click it to open or close the step. Hover it for **settings** (tune icon) and **notes** (note icon) beside the name, and **minimize** and **maximize** at the right; drag it out to float the step in its own window. A step with notes has a small arrow at the header's bottom left, on hover: it opens the notes under the header. |
 | **Toolbar** | three groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
 | **Formula row** | **fx** opens the Formula panel; then the **formula bar**. |
 | **Panels** | whichever you've opened, always in the order Analytics, Formula, Data. Click a panel's title to fold it to just the title. |
@@ -167,8 +167,9 @@ icon its notes.
   for its position.
 - **Notes** — anything worth remembering about the step: what it's for, why
   a setting is what it is. Write in Markdown (`**bold**`, `- lists`,
-  `` `code` ``). The notes appear, formatted, under the step's header
-  (folded to their first line: click to open) and in **Analytics**.
+  `` `code` ``). The notes appear, formatted, in **Analytics**, and under
+  the step's header when you open them with the arrow at the header's
+  bottom left (shown on hover).
 
 The name, colour and notes are saved with the workflow.
 

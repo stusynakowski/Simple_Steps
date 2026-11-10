@@ -1494,48 +1494,55 @@
 .op-header .step-header-inline:has(.has-notes) { opacity: 0.55; pointer-events: auto; }
 .op-header:hover .step-header-inline:has(.has-notes) { opacity: 1; }
 
-/* The notes, rendered, as an expander under the header. */
-.step-notes-header {
-  background: color-mix(in srgb, var(--step-color) 14%, #1b1b1b);
-  border-left: 3px solid var(--step-color);
-  color: #ddd;
-  font-size: 0.78rem;
-}
-.step-notes-toggle {
+/* The notes' expander (owner, 2026-11-10): a small button at the header's
+   bottom left, shown on hover. Folded, nothing else shows. */
+.step-notes-hover-btn {
+  position: absolute;
+  left: 6px;
+  bottom: 3px;
+  z-index: 3;
   display: flex;
   align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 4px 8px 4px 4px;
+  justify-content: center;
+  width: 18px;
+  height: 16px;
+  padding: 0;
   border: none;
-  background: transparent;
-  color: inherit;
-  text-align: left;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
-.step-notes-toggle:hover { background: rgba(255, 255, 255, 0.05); }
-.step-notes-chevron { flex: none; transform: rotate(-90deg); transition: transform 0.12s ease; }
-.step-notes-header.open .step-notes-chevron { transform: none; }
-.step-notes-preview {
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  opacity: 0.85;
+.op-header:hover .step-notes-hover-btn,
+.step-notes-hover-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
-.step-notes-header.open .step-notes-preview {
-  font-size: 0.66rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
+.step-notes-hover-btn:hover { background: rgba(0, 0, 0, 0.5); }
+.step-notes-chevron { transform: rotate(-90deg); transition: transform 0.12s ease; }
+.step-notes-hover-btn.open .step-notes-chevron { transform: none; }
+
+/* Open: the notes under the header, in its colour and type, as a
+   description of the step. */
+.step-notes-header {
+  background: var(--step-color);
+  background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18));
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  font-size: 0.8rem;
+  margin-right: 28px;   /* square with the header's body, not its arrow tip */
 }
 .step-notes-body {
-  padding: 0 12px 8px 24px;
+  padding: 8px 14px 10px;
   line-height: 1.45;
   max-height: 260px;
   overflow: auto;
 }
 .step-notes-body > :first-child { margin-top: 0; }
 .step-notes-body > :last-child { margin-bottom: 0; }
-.step-notes-body code { background: rgba(255, 255, 255, 0.08); padding: 0 3px; border-radius: 3px; }
+.step-notes-body h1, .step-notes-body h2, .step-notes-body h3 { font-size: 0.95rem; margin: 0 0 4px; }
+.step-notes-body a { color: #fff; text-decoration: underline; }
+.step-notes-body code { background: rgba(0, 0, 0, 0.25); padding: 0 3px; border-radius: 3px; text-shadow: none; }

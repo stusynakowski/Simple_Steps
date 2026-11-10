@@ -337,6 +337,7 @@ export default function OperationColumn({
   // The step's settings and its notes: opened from the header, on hover,
   // beside the name and status (owner, 2026-11-10).
   const [notesOpen, setNotesOpen] = useState(false);
+  const hasNotes = !!step.notes?.trim();
   const stepSettings = (
       <div className="settings-content">
          <div className="config-item">
@@ -501,24 +502,29 @@ export default function OperationColumn({
             </button>
           )}
         </div>
-      </div>
-
-      {/* The step's notes, rendered, as an expander under the header: one
-          line folded, the whole Markdown open (owner, 2026-11-10). Not on a
-          minimized or squeezed step, which keeps its header as it was. */}
-      {!isMinimized && !isSqueezed && !!step.notes?.trim() && (
-        <div className={`step-notes-header${notesOpen ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
+        {/* The notes' expander: bottom left of the header, on hover, only
+            for a step with notes (owner, 2026-11-10). Folded, nothing else
+            shows; open, the notes sit under the header. */}
+        {!isMinimized && !isSqueezed && hasNotes && (
           <button
             type="button"
-            className="step-notes-toggle"
+            className={`step-notes-hover-btn${notesOpen ? ' open' : ''}`}
             aria-expanded={notesOpen}
-            title={notesOpen ? 'Fold the notes' : 'Show the notes'}
-            onClick={() => setNotesOpen((o) => !o)}
+            aria-label={notesOpen ? `Fold ${step.label}'s notes` : `Show ${step.label}'s notes`}
+            title={notesOpen ? 'Fold the notes' : `Notes: ${firstLine(step.notes!)}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o); }}
           >
             <SymbolIcon name="arrow_drop_down" size={16} className="step-notes-chevron" />
-            <span className="step-notes-preview">{notesOpen ? 'Notes' : firstLine(step.notes)}</span>
           </button>
-          {notesOpen && <div className="step-notes-body"><Markdown>{step.notes}</Markdown></div>}
+        )}
+      </div>
+
+      {/* Open, the notes are a Markdown description under the header, in
+          its colour. Not on a minimized or squeezed step. */}
+      {!isMinimized && !isSqueezed && hasNotes && notesOpen && (
+        <div className="step-notes-header" onClick={(e) => e.stopPropagation()}>
+          <div className="step-notes-body"><Markdown>{step.notes}</Markdown></div>
         </div>
       )}
 
