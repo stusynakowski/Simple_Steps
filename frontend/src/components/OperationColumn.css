@@ -1434,33 +1434,14 @@
 .step-menu-hint { color: #999; font-size: 11px; }
 
 /* ── Step header (owner, 2026-11-10) ───────────────────────────────────── */
-/* The name in the middle, a little high; the run's word at the bottom
-   centre; the run's icon just ahead of the tail; the hover controls at the
-   bottom right. */
+/* The name in the middle; the run's icon just ahead of the tail (hover it
+   for the status); the hover controls at the bottom right. */
 .header-titles.header-one-line {
   flex-direction: row;
   justify-content: center;
   padding: 0 24px 0 44px;   /* clear of the run's icon */
 }
-.operation-column:not(.squeezed):not(.minimized) .arrow-content { padding-bottom: 12px; }
 .header-one-line .op-name { flex: 0 1 auto; min-width: 0; }
-
-.op-header > .op-status-indicator {
-  position: absolute;
-  left: 50%;
-  bottom: 4px;
-  transform: translateX(-50%);
-  z-index: 2;
-  padding: 0 6px;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.35);
-  font-size: 0.62rem;
-  line-height: 14px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  cursor: help;
-}
 
 .step-run-icon {
   position: absolute;
@@ -1475,7 +1456,6 @@
   cursor: help;
 }
 .column-wrapper:first-child > .operation-column .step-run-icon { left: 10px; }
-.operation-column:not(.squeezed):not(.minimized) .step-run-icon { margin-top: -6px; }   /* level with the name */
 .run-icon-running .symbol-icon { animation: material-icon-spin 0.9s linear infinite; }
 .operation-column.squeezed .arrow-content { padding: 0 30px 0 58px; }
 .column-wrapper:first-child > .operation-column.squeezed .arrow-content { padding-left: 34px; }
@@ -1552,3 +1532,59 @@
   resize: vertical;
 }
 .step-notes-inline-input::placeholder { color: rgba(255, 255, 255, 0.6); }
+
+/* ── Step width: drag an open step's sides (owner, 2026-11-10) ─────────── */
+/* A thin strip on each side of the body; on hover (and while dragging) it
+   shows as a line in the step's colour. */
+.step-width-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 20;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.step-width-handle--left { left: -4px; }
+.step-width-handle--right { right: -4px; }
+.step-width-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: var(--step-color, #888);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.step-width-handle:hover::after,
+.column-wrapper.resizing .step-width-handle::after { opacity: 0.9; }
+.column-wrapper.resizing { transition: none; }
+body.is-resizing-step { cursor: ew-resize; user-select: none; }
+body.is-resizing-step * { cursor: ew-resize !important; }
+
+/* ── The formula bar at rest (owner, 2026-11-10) ───────────────────────── */
+/* Over the one-line editor: tool*(data), in the editor's own colours (Monaco
+   colours it); the * says it has modifiers. A click edits the whole. */
+.formula-summary {
+  position: absolute;
+  inset: 0;
+  height: 28px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  box-sizing: border-box;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: "SF Mono", Menlo, Monaco, "Courier New", monospace;
+  font-size: 13px;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+.formula-summary-code { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.formula-summary-code br { display: none; }
+.formula-summary-star { color: #d4d4d4; font-weight: 700; }

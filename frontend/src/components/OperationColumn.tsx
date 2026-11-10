@@ -7,7 +7,7 @@ import StepToolbar from './StepToolbar';
 import { placePick, stepRef } from '../utils/selection';
 import type { GridPick, PlacedPick } from '../utils/selection';
 import { parseFormula } from '../utils/formulaParser';
-import type { FormulaReference, ParsedFormula } from '../utils/formulaParser';
+import type { FormulaReference, FormulaSpans, ParsedFormula } from '../utils/formulaParser';
 import { useStepColor } from '../context/StepPaletteContext';
 import ToolEditor from './ToolEditor';
 import StepWidget from './StepWidget';
@@ -69,6 +69,10 @@ interface OperationColumnProps {
   resources?: Record<string, unknown>;
   /** Change a resource's settings (the Resources menu's define). */
   onDefineResource?: (name: string, definition: string) => Promise<void>;
+  /** A drag starts at the open step's left or right side: resize its width. */
+  onResizeStart?: (edge: 'left' | 'right', e: React.PointerEvent) => void;
+  /** Double-click on a side: back to the default width. */
+  onResizeReset?: () => void;
 }
 
 export default function OperationColumn({
@@ -98,6 +102,8 @@ export default function OperationColumn({
   resources,
   onDefineResource,
   onDetach,
+  onResizeStart,
+  onResizeReset,
   progress,
   pipelineStatus = 'idle',
   pipelineCursorIndex = -1,
@@ -183,13 +189,13 @@ export default function OperationColumn({
   // (F8): boxed dotted in the formula bar in the colour of the step it reads,
   // and, while this formula bar has focus, outlined in the source step's grid
   // in this step's colour (owner, 2026-10-30).
-  const [refsOf, setRefsOf] = useState<{ formula: string; refs: FormulaReference[] }>({ formula: '', refs: [] });
+  const [refsOf, setRefsOf] = useState<{ formula: string; refs: FormulaReference[]; spans?: FormulaSpans }>({ formula: '', refs: [] });
   useEffect(() => {
     if (refsOf.formula === savedFormula) return;
     let cancelled = false;
     const timer = setTimeout(() => {
       parseFormula(savedFormula)
-        .then((p) => { if (!cancelled) setRefsOf({ formula: savedFormula, refs: p.references ?? [] }); })
+        .then((p) => { if (!cancelled) setRefsOf({ formula: savedFormula, refs: p.references ?? [], spans: p.spans }); })
         .catch(() => {});
     }, 150);
     return () => { cancelled = true; clearTimeout(timer); };
@@ -197,6 +203,9 @@ export default function OperationColumn({
   const stepColor = useStepColor();
   const colorOf = Object.fromEntries(previousSteps.map((s, i) =>
     [s.label, s.step_color ?? stepColor(i, stepCount ?? previousSteps.length + 1)]));
+  // The formula bar at rest (owner, 2026-11-10): the tool and its data, the
+  // modifiers shown as a `*` (tool*(data)); the whole expression while it's being edited.
+  const formulaSummary = summarize(savedFormula, refsOf.formula === savedFormula ? refsOf.spans : undefined);
   const barReferences = refsOf.refs.map((r) => ({ start: r.span[0], end: r.span[1], color: colorOf[r.step] ?? '#888' }));
 
   // A new round of picking starts fresh: the last pick is only replaced while
@@ -217,11 +226,12 @@ export default function OperationColumn({
 
   // Where the step's run stands (utils/runState.ts), the same as on the
   // steps' map: the colour of the header's sides, an icon at its tail, a
-  // word at its bottom centre (owner, 2026-11-10).
+  // word at its bottom centre (owner, 2026-11-10). A staged step has no icon.
   const run = runState(step, isScheduledInPipeline);
-  const runIcon = (
+  const runIconName = RUN_ICON[run.kind];
+  const runIcon = runIconName && (
     <span className={`step-run-icon run-icon-${run.kind}`} title={run.text}>
-      <SymbolIcon name={RUN_ICON[run.kind]} size={15} />
+      <SymbolIcon name={runIconName} size={15} />
     </span>
   );
   // What core runs, when it differs from what was written: the verb it
@@ -251,7 +261,7 @@ export default function OperationColumn({
   // Handler for Formula-based updates (Toolbar Input)
   // The formula bar is the canonical write path. Everything else is derived from it.
   const handleFormulaUpdate = (_id: string, formula: string, parsed: ParsedFormula) => {
-    setRefsOf({ formula, refs: parsed.references ?? [] });
+    setRefsOf({ formula, refs: parsed.references ?? [], spans: parsed.spans });
     if (parsed.isValid && parsed.operationId) {
       // Preserve internal keys (e.g. _orchestrator) that aren't in the formula.
       // The orchestration modifier in the formula takes precedence; store it as
@@ -451,12 +461,9 @@ export default function OperationColumn({
                 </div>
             )}
         </div>
-        {/* The run's icon, just ahead of the tail; its word at the bottom
-            centre (owner, 2026-11-10; stages will change this later). */}
+        {/* The run's icon, just ahead of the tail; hover it for the status
+            (owner, 2026-11-10: no status word under the name). */}
         {!isMinimized && runIcon}
-        {!isMinimized && !isSqueezed && (
-          <span className={`op-status-indicator run-icon-${run.kind}`} title={run.text}>{run.label}</span>
-        )}
         {/* Hover controls — bottom right of the header: the notes' notepad,
             settings, minimize, maximize. They stop mousedown so a click never
             starts the header's drag-to-detach. */}
@@ -566,6 +573,21 @@ export default function OperationColumn({
       )}
 
       <div className={`op-body ${isSqueezed ? 'squeezed' : ''}`}>
+        {/* Drag either side of an open step to make it wider or narrower;
+            double-click to go back to the default (owner, 2026-11-10). */}
+        {onResizeStart && isActive && !isSqueezed && !isMaximized && !isMinimized && (['left', 'right'] as const).map((edge) => (
+          <div
+            key={edge}
+            className={`step-width-handle step-width-handle--${edge}`}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={`Resize ${step.label} (${edge} side)`}
+            title="Drag to resize · double-click for the default width"
+            onPointerDown={(e) => onResizeStart(edge, e)}
+            onDoubleClick={(e) => { e.stopPropagation(); onResizeReset?.(); }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ))}
         <div className="op-body-inner">
           {!isSqueezed && (
             <StepToolbar
@@ -590,6 +612,7 @@ export default function OperationColumn({
               onFormulaBarRef={(el) => { formulaBarRef.current = el; }}
               onReferencePick={handleReferencePick}
               references={barReferences}
+              formulaSummary={formulaSummary}
             />
           )}
 
@@ -660,6 +683,21 @@ export default function OperationColumn({
       </div>
     </div>
   );
+}
+
+/**
+ * The formula at rest (owner, 2026-11-10): `tool*(data)` — the tool, a `*`
+ * when it has modifiers (details not shown), then its data and settings,
+ * without the `=`. Where the tool and modifiers are is core's (the parse's
+ * spans); a formula without modifiers, or not parsed yet, shows as written.
+ */
+function summarize(formula: string, spans?: FormulaSpans): string {
+  const mods = spans?.modifiers;
+  const tool = spans?.tool;
+  if (!mods?.length || !tool) return formula.trim().replace(/^=/, '');
+  // After the last modifier: the `]` closing them, then the call.
+  const call = formula.slice(mods[mods.length - 1][1]).replace(/^\s*\]/, '');
+  return `${formula.slice(tool[0], tool[1])}*${call}`.trim();
 }
 
 /** A note's first line, as plain text: its title when it's folded (Markdown marks dropped). */

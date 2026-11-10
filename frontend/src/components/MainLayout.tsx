@@ -67,6 +67,9 @@ const LOG_SNAP_THRESHOLD = 80; // of console body, below its title bar
 const STEPS_FIT_PADDING = 4;
 // The steps' map under them (StepMinimap, .step-minimap): auto-fit leaves it room.
 const STEPS_MAP_HEIGHT = 22;
+// How narrow and how wide a step can be dragged (its sides; step_width).
+const STEP_MIN_WIDTH = 280;
+const STEP_MAX_WIDTH = 2400;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -151,6 +154,8 @@ export default function MainLayout() {
   } = useWorkflow();
   // A step without its own colour takes the palette's (System Settings).
   const stepColor = useStepColor();
+  // The step a failed run stopped at, for the workflow's "Rerun from …".
+  const failedStep = workflow.steps.find((s) => ['failed', 'partial'].includes(runState(s, false).kind));
 
   // ── Tab state ────────────────────────────────────────────────────────────
   // Start with the initial workflow as the first tab
@@ -498,6 +503,41 @@ export default function MainLayout() {
 
   const toggleChat = useCallback(() => setRightPaneVisible(v => !v), []);
 
+  // ── Step widths (owner, 2026-11-10) ────────────────────────────────────
+  // Drag an open step's left or right side to make it wider or narrower.
+  // While dragging only the live width changes; on release it's the step's
+  // `step_width`, saved with the workflow. Dragging the left side scrolls the
+  // steps with it, so that side follows the pointer.
+  const [liveWidth, setLiveWidth] = useState<{ id: string; width: number } | null>(null);
+  const startResize = useCallback((stepId: string, edge: 'left' | 'right', e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const wrapper = (e.currentTarget as HTMLElement).closest<HTMLElement>('.column-wrapper');
+    if (!wrapper) return;
+    const startWidth = wrapper.offsetWidth;
+    const startX = e.clientX;
+    const scroller = canvasRef.current;
+    const startScroll = scroller?.scrollLeft ?? 0;
+    let width = startWidth;
+    const move = (m: PointerEvent) => {
+      const dx = m.clientX - startX;
+      width = Math.round(Math.min(STEP_MAX_WIDTH, Math.max(STEP_MIN_WIDTH, edge === 'right' ? startWidth + dx : startWidth - dx)));
+      if (edge === 'left' && scroller) scroller.scrollLeft = startScroll + (width - startWidth);
+      setLiveWidth({ id: stepId, width });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.classList.remove('is-resizing-step');
+      setLiveWidth(null);
+      if (width !== startWidth) updateStep(stepId, { step_width: width });
+    };
+    document.body.classList.add('is-resizing-step');
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }, [updateStep]);
+
   // ── Detached step windows ──────────────────────────────────────────────
   const [detachedWindows, setDetachedWindows] = useState<DetachedWindow[]>([]);
 
@@ -788,6 +828,20 @@ export default function MainLayout() {
         pipelineMeta={pipelineMeta}
         connection={connection}
         latestLog={latestLog}
+        runOptions={[
+          // The failed step a run stopped at: the first one (a run skips,
+          // and marks failed, the steps after it). From there to the end.
+          { icon: 'error', label: failedStep ? `Rerun from "${failedStep.label}"` : 'Rerun from the failed step',
+            hint: failedStep ? 'the failed step' : 'none failed',
+            onClick: () => failedStep && runPipeline(failedStep.id),
+            disabled: !failedStep || pipelineStatus === 'running', testId: 'btn-rerun-failed' },
+          { icon: 'fast_forward', label: 'Rerun every step', hint: 'from the first',
+            onClick: () => runPipeline(workflow.steps[0]?.id),
+            disabled: !workflow.steps.length || pipelineStatus === 'running', testId: 'btn-rerun-all' },
+          { divider: true },
+          { icon: 'cleaning_services', label: 'Clear all outputs', hint: 'not yet',
+            onClick: () => {}, disabled: true, testId: 'btn-clear-all-outputs' },
+        ]}
         overviewMenu={
           <WorkflowOverview
             name={workflow.name || 'Untitled'}
@@ -831,9 +885,19 @@ export default function MainLayout() {
             const isMinimized = !isExpanded && minimizedStepIds.has(step.id);
             const previousSteps = workflow.steps.slice(0, index);
             const size = isMaximized ? 'maximized' : isExpanded ? 'expanded' : isMinimized ? 'minimized' : 'collapsed';
+            // An open step's own width, dragged at its sides (live while dragging).
+            const width = isExpanded && !isMaximized
+              ? (liveWidth?.id === step.id ? liveWidth.width : step.step_width)
+              : undefined;
             return (
-              <div key={step.id} className={`column-wrapper ${size}`}>
+              <div
+                key={step.id}
+                className={`column-wrapper ${size}${liveWidth?.id === step.id ? ' resizing' : ''}`}
+                style={width ? { width, flex: `0 0 ${width}px` } : undefined}
+              >
                 <OperationColumn
+                  onResizeStart={(edge, e) => startResize(step.id, edge, e)}
+                  onResizeReset={() => updateStep(step.id, { step_width: undefined })}
                   step={step}
                   stepIndex={index}
                   previousSteps={previousSteps}

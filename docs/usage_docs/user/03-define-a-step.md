@@ -18,10 +18,11 @@ From the top of a step's column down:
 
 | part | what it does |
 |---|---|
-| **Header** | the step's name, with where its run stands: the colour of the arrow's sides, an icon just ahead of its tail, and a word at the bottom centre (see [the run's colours](#run-it)). Click it to open or close the step. Hover it for its controls at the bottom right: **notes** (notepad), **settings** (tune icon), **minimize** and **maximize**; drag it out to float the step in its own window. |
-| **Toolbar** | three groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
-| **Formula row** | **fx** opens the Formula panel; then the **formula bar**. |
+| **Header** | the step's name, with where its run stands: the colour of the arrow's sides, and an icon just ahead of its tail (none while staged; hover it for the status) — see [the run's colours](#run-it). Click it to open or close the step. Hover it for its controls at the bottom right: **notes** (notepad), **settings** (tune icon), **minimize** and **maximize**; drag it out to float the step in its own window. |
+| **Toolbar** | three groups. **Run Step** runs this step (⌘↵); **Run options** beside it has *Run to the end* (this step and every step after it), *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
+| **Formula row** | **fx** opens the Formula panel; then the **formula bar**. At rest it shows the tool and its data, with a **\*** after the tool when it has modifiers not shown (`double_n*(wf["readings"], n=2)`); click it to see and edit the whole expression. |
 | **Panels** | whichever you've opened, always in the order Analytics, Formula, Data. Click a panel's title to fold it to just the title. |
+| **Sides** | drag either side of an open step to make it wider or narrower (a line in the step's colour shows on hover); double-click a side for the default width. The width is saved with the workflow. |
 
 ## Write the formula
 
@@ -112,10 +113,19 @@ A step has **one** input. To line up the rows of two steps, use a
 
 ## Run it
 
-- **Run** in the step's toolbar runs that step. It uses the outputs of the
+- **Run Step** in the step's toolbar runs that step. It uses the outputs of the
   steps it reads, so run those first — or
-- **Run to the end**, beside it, runs that step and every one after it — or
-- **Run** in the workflow toolbar runs every step, in order.
+- **Run to the end**, in the **Run options** beside it, runs that step and
+  every one after it — or
+- **Run Workflow** in the workflow toolbar runs every step, in order, from
+  the first one not yet run; the square beside it stops the run.
+
+The **workflow run options** (the list icon right of Run Workflow and Stop):
+
+- **Rerun from "*step*"** — a run stops at the first step that fails; this
+  runs again from that step to the end, once you've fixed it.
+- **Rerun every step** — from the first step, whatever has run already.
+- **Clear all outputs** — *not yet available*.
 
 Then look at the output:
 
@@ -130,11 +140,11 @@ The **console** (terminal icon in the workflow toolbar) logs every run, with
 the details.
 
 Each step's header shows where its run stands in the colour of its sides,
-with an icon at its tail and a word at the bottom: **grey** staged (not run,
-or out of date), **blue stripes** queued, moving toward the next step while
-it runs, **green** ran, **amber** ran with some rows failed, **red** failed.
-A step that **can't run** is grey with its tail outlined red; hover the icon
-or the word for why.
+with an icon at its tail: **grey** staged (not run, no icon; or out of
+date), **blue stripes** queued, moving toward the next step while it runs,
+**green** ran, **amber** ran with some rows failed, **red** failed. A step
+that **can't run** is grey with its tail outlined red; hover the icon for
+why.
 
 The **map** along the bottom of the steps is a thin copy of the headers,
 outlined the same way. Hover it for a step's status; click a step to jump to

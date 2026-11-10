@@ -216,6 +216,55 @@ argument is given to each call). 0.1.3 eases it in the panel (*runs over*
 as the first argument, a note on what each argument receives); a fix in
 core's syntax is a separate decision.
 
+### R13 — One formula, one structure: the panel's rules (owner, 2026-11-10)
+
+**Decided:**
+1. **The parser never says "doesn't parse."** Every piece of text maps to a
+   fixed set of slots: tool (0–1), modifiers, runs over, resources, named
+   arguments. Each slot is *valid*, *incomplete* or *invalid*, with its
+   span and possible fixes; text that fits no slot is junk, shaded red. The
+   formula bar and the panel are two views of this one structure. A panel
+   edit rewrites only its slot's text; the rest stays exactly as typed,
+   invalid parts included.
+2. **Corrections are proposed, never applied.** Clicking a red part offers
+   the closest valid fix, or removing it; the click applies it. Infer and the
+   agent work the same way: they propose an edit to this step's formula.
+3. **One tool per step.** A second call is red, offered as remove or swap.
+   What one tool can't do is done with modifiers.
+4. **Knock-on rules:**
+   - Changing the tool keeps arguments whose names still fit. The rest
+     become amber "unused" slots with a remove button; they are never
+     deleted silently.
+   - Changing the verb re-labels what each argument receives.
+   - Changing what it runs over re-infers which parameters its columns fill.
+   - An undo stack per step.
+   - Colours: grey unfinished (at the cursor), amber an easy fix (e.g. a
+     modifier), red incompatible.
+5. **The client parses; core decides.** Port the parser to the client, used
+   once a session loads, so the browser does as much as it can without
+   risking the program's integrity. One grammar spec, and a shared set of
+   example formulas with the slot structure each should produce, run against
+   both parsers. **A disagreement between the client parser and core is a
+   system error:** shown as a black/red message, and logged so it gets fixed.
+   *(Plan to write.)*
+6. **Arguments that survive data changes.** Columns by name are preferred.
+   Row picks by position are accepted, with an amber "changes if the step
+   changes" warning and a proposed condition or modifier that keeps the
+   meaning.
+7. **Auto and columns.** With just `wf["step"]` as what it runs over, core
+   fills each parameter from a column: first by name, else from the one
+   column of a fitting type. If more than one fits, core proposes one. The
+   runs-over line branches into each parameter it fills, headed with that
+   column's name. **Blocked on core C47:** core says which column fills
+   which parameter only after a run (per cell); before a run its warning is
+   wrong. Until then the panel says only what is certain: same-name fills.
+
+**Done (2026-11-10):** the panel's layout: tabs, helper placeholders,
+`f(x) = …` centred with each part labelled, Tool / Modifiers / Arguments
+stacked, problems at the bottom, tool `None` (faded) for a value, a copy or
+a pick, "modifier as tool". The formula bar opens the whole formula on a
+click.
+
 ## Progress
 
 | Date | Item | Done | Confirmed |

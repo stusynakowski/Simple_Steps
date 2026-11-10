@@ -19,17 +19,20 @@ import './ToolEditor.css';
 import SymbolIcon from './SymbolIcon';
 
 /**
- * The step's formula as a form, inside the Formula widget, in two columns.
- * Every part is always open — headings, not expanders:
+ * The step's formula as a form, inside the Formula widget (owner, 2026-11-10):
  *
- *   TOOL                           │ INPUT     the data it reads
- *   [scale ▾]                      │   input   wf["a"]
- *   MODIFIERS  map                 │ ARGUMENTS
- *   ┌ 1. map           ↑ ↓ × ┐     │   factor  2
+ *   [Formula] [a tool's card…]                     tabs
+ *   Infer · Ask · Clean up · Scale · Undo          helpers (placeholders)
+ *          f(x) = scale [mod.map()] (wf["a"], factor=2)
+ *                 tool   modifier    runs over factor
+ *   Tool       [scale ▾]                           ← lines from each label
+ *   Modifiers  ┌ 1. map ┐
+ *   Arguments  runs over wf["a"] · factor 2
+ *   ⚠ problems, at the bottom
  *
- * A narrow step stacks them (left column first). Each part carries
- * `data-formula-part` (tool / modifiers / input / arguments) so it can later
- * be matched to the piece of the expression it edits.
+ * The parts' labels under the formula take the place of headings; a heading
+ * shows only when there is no formula to map. Each part carries
+ * `data-formula-part` (tool / modifiers / arguments).
  *
  * The formula is the only state. The editor shows *formula* (the last one
  * committed — Enter in the formula bar, or the editor's own write) and every
@@ -68,8 +71,27 @@ export interface InputUiProps {
   hotProps?: HotProps;
 }
 
-/** Tools that registered their own input UI, by tool id. Empty until tools can provide one. */
-const INPUT_UIS: Record<string, ComponentType<InputUiProps>> = {};
+/**
+ * Prefab cards a tool (by tool id) or a resource (by resource type) brings
+ * to the Formula panel: each is a tab beside "Formula", for when a form made
+ * for it serves better than the general one. A card writes through the same
+ * `onWrite`, so the formula stays the one state. Empty until tools can
+ * declare one.
+ */
+const TOOL_CARDS: Record<string, { label: string; Card: ComponentType<InputUiProps> }> = {};
+
+/**
+ * The formula toolbar: helpers for building the formula. Placeholders
+ * (owner, 2026-11-10): each will propose an edit to this step's formula,
+ * never apply one unasked.
+ */
+const FORMULA_HELPERS = [
+  { icon: 'auto_awesome', label: 'Infer', what: 'Fill the arguments from the step it runs over' },
+  { icon: 'smart_toy', label: 'Ask', what: 'Say what you want; an agent proposes a formula for this step' },
+  { icon: 'cleaning_services', label: 'Clean up', what: 'Make the formula robust to changes in its data' },
+  { icon: 'speed', label: 'Scale', what: 'Run it faster or on more data' },
+  { icon: 'undo', label: 'Undo', what: 'Back to the formula before the last change' },
+] as const;
 
 interface Props {
   formula: string;
@@ -104,8 +126,9 @@ export default function ToolEditor({
   const [literal, setLiteral] = useState<string | null>(null);
   /** The part under the pointer, in the formula or its field. */
   const [hot, setHot] = useState<string | null>(null);
+  /** The tab shown: the Formula, or a card the tool or a resource brings. */
+  const [tab, setTab] = useState('formula');
   const root = useRef<HTMLDivElement | null>(null);
-  const split = useSplit();
 
   useEffect(() => { getModifiers().then(setCatalog).catch(() => setCatalog({})); }, []);
   const isShape = (kind: string) => isShapeVerb(kind, catalog);
@@ -183,7 +206,13 @@ export default function ToolEditor({
   const op = parts ? tools.find((o) => o.id === parts.tool) : undefined;
   const previous = previousSteps.length ? previousSteps[previousSteps.length - 1].label : null;
   const isCombine = !!parts && parts.inputs.length > 0;
-  const InputUi = (parts && INPUT_UIS[parts.tool]) || DefaultInputUi;
+  // The cards on offer: the tool's, then each resource type's it uses.
+  const cardKeys = parts
+    ? [parts.tool, ...parts.resources.map((r) => resources[r]?.type)].filter((k): k is string => !!k && k in TOOL_CARDS)
+    : [];
+  const card = tab !== 'formula' && cardKeys.includes(tab) ? TOOL_CARDS[tab] : null;
+  // A verb in the tool's place (a modifier that brings its own tool).
+  const modifierAsTool = !!parts && availableOperations.some((o) => o.id === parts.tool && o.type === 'verb');
 
   const chooseTool = (id: string) => {
     if (!id) return;
@@ -204,11 +233,13 @@ export default function ToolEditor({
   // with a selection is `identity` with its select, shown as such.
   const isCopy = !!parts && parts.tool === 'identity' && parts.modifiers?.length === 1
     && parts.modifiers[0].kind === 'select' && !Object.keys(parts.modifiers[0].params).length;
-  const noTool = literal !== null ? 'value' : isCopy ? 'copy' : null;
+  // A pick (`wf["r"][0:2]`) is written without a tool too: its selection is the modifier.
+  const isPick = !isCopy && !!shown.spans?.step;
+  const noTool = literal !== null ? 'value' : isCopy ? 'copy' : isPick ? 'pick' : null;
   // The verb the arguments are read under: written, or what auto resolves to.
   const written = parts?.modifiers?.find((m) => isShape(m.kind) && m.kind !== AUTO)?.kind;
   const verb = written ?? resolved?.kind ?? null;
-  const parts_ = mapParts(shown.spans);
+  const parts_ = mapParts(shown.spans, modifierAsTool ? 'modifier as tool' : 'tool');
   // A value step: its one field writes the formula, checked by the backend first.
   const writeLiteral = async (text: string) => {
     const next = `=${text.trim()}`;
@@ -224,142 +255,130 @@ export default function ToolEditor({
     onMouseLeave: () => setHot(null),
   });
 
+  const mapped = !frozen && parts_.length > 0;
+  // Red: the formula can't be read. Amber: what core found, or an edit not in the formula yet.
+  const problemList = warning ? [warning] : problems ?? [];
+
   return (
-    <div className={`tool-editor${!frozen && parts_.length ? ' te-mapped' : ''}`} ref={root} onClick={(e) => e.stopPropagation()}>
-      {/* A formula core can't read (as you type), else what the workflow's check
-          found when the step was entered (core_migration §6 D2). */}
-      {(warning || !!problems?.length) && (
-        <div className="te-warning" role="status" title={warning ?? problems!.join('\n')}>
-          <SymbolIcon name="warning" size={13} /> {warning ?? problems!.join('; ')}
+    <div className={`tool-editor${mapped ? ' te-mapped' : ''}`} ref={root} onClick={(e) => e.stopPropagation()}>
+      {/* The panel's tabs: the Formula, and any card the tool or a resource brings. */}
+      <div className="te-tabs" role="tablist">
+        <button role="tab" aria-selected={!card} className={`te-tab${!card ? ' active' : ''}`} onClick={() => setTab('formula')}>Formula</button>
+        {cardKeys.map((k) => (
+          <button key={k} role="tab" aria-selected={card === TOOL_CARDS[k]} className={`te-tab${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>
+            {TOOL_CARDS[k].label}
+          </button>
+        ))}
+      </div>
+
+      {/* Helpers for building the formula: placeholders for now. */}
+      <div className="te-helpers" role="toolbar" aria-label="Formula helpers">
+        {FORMULA_HELPERS.map((h) => (
+          <button key={h.label} className="te-helper" disabled title={`${h.label}: ${h.what} (coming later)`}>
+            <SymbolIcon name={h.icon} size={14} /><span>{h.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {card && parts ? (
+        <div className="te-card">
+          <card.Card parts={parts} op={op} previousSteps={previousSteps} resources={resources}
+            onWrite={write} onDefineResource={onDefineResource} refs={shown.refs} verb={verb} copy={noTool === 'copy' || noTool === 'pick'} />
+        </div>
+      ) : (
+        <>
+          {/* f(x) = the formula, each part labelled; a dotted line from each label to its field. */}
+          {mapped && <ExplodedFormula formula={shown.formula} parts={parts_} hot={hot} onHot={setHot} />}
+
+          <div className="te-stack" style={{ paddingTop: mapped ? laneBand(parts_.length) : undefined }}>
+            {/* What is called. None (faded) for a value or a copy. */}
+            <div className={noTool ? 'te-faded' : undefined}>
+              <Section title="Tool" part="tool" note={parts?.bound_to ? `on res["${parts.bound_to}"]` : undefined}>
+                <div {...hotProps('tool')}>
+                  <select
+                    className="te-tool-select"
+                    value={frozen || noTool ? '' : parts?.tool ?? ''}
+                    onChange={(e) => chooseTool(e.target.value)}
+                    disabled={isCombine && !frozen}
+                    title={op?.description}
+                  >
+                    <option value="">{noTool ? 'None' : 'Choose a tool…'}</option>
+                    {parts && !op && !noTool && <option value={parts.tool}>{parts.tool}</option>}
+                    {groupByCategory(tools).map(([category, ops]) => (
+                      <optgroup key={category} label={category}>
+                        {ops.map((o) => <option key={o.id} value={o.id}>{o.label || o.id}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {noTool === 'value' && <div className="te-note te-tool-desc">A value is its own source: no tool runs. Choose a tool to compute it instead.</div>}
+                {noTool === 'copy' && <div className="te-note te-tool-desc">No tool runs: the step is a copy of the step it reads. Select rows or columns in that step's grid to take part of it, or choose a tool.</div>}
+                {noTool === 'pick' && <div className="te-note te-tool-desc">No tool runs: the step is the part of the step it reads that the selection picks. Choose a tool to compute from it instead.</div>}
+                {!noTool && op?.description && <div className="te-note te-tool-desc">{op.description}</div>}
+              </Section>
+            </div>
+
+            {/* How it is applied. */}
+            {parts && !isCombine && (!noTool || noTool === 'pick') && (
+              <fieldset {...frozenProps}>
+                <Section title="Modifiers" part="modifiers" summary={modifiersSummary(parts, resolved)}>
+                  <ModifierList parts={parts} catalog={catalog} resolved={resolved}
+                    onWrite={write} hotProps={hotProps} />
+                </Section>
+              </fieldset>
+            )}
+
+            {/* What it is given: the data it runs over and its arguments. */}
+            {noTool === 'value' && !frozen && (
+              <Section title="Arguments" part="arguments">
+                <div {...hotProps('value')}>
+                  <Field name="value" value={literal ?? ''} description="A number, text in quotes, a list or a dict"
+                    onCommit={(text) => { void writeLiteral(text); }} />
+                </div>
+              </Section>
+            )}
+
+            {notATool && literal === null && !frozen && (
+              <div className="te-note">This step isn't a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
+            )}
+
+            {parts && isCombine && !frozen && (
+              <div className="te-note">
+                A <code>{parts.tool}</code> of {parts.inputs.map((n) => `wf["${n}"]`).join(', ')}. Edit it in the formula bar.
+              </div>
+            )}
+
+            {parts && !isCombine && (
+              <fieldset {...frozenProps}>
+                <DefaultInputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
+                  onWrite={write} onDefineResource={onDefineResource}
+                  refs={shown.refs} verb={verb} copy={noTool === 'copy' || noTool === 'pick'} hotProps={hotProps} />
+              </fieldset>
+            )}
+
+            {!parts && !notATool && !frozen && (
+              <div className="te-note">Choose a tool to see what it takes.</div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Errors and warnings, at the bottom: a formula core can't read (as
+          you type), else what the workflow's check found (core_migration §6 D2). */}
+      {problemList.length > 0 && (
+        <div className={`te-problems${frozen ? ' te-error' : ''}`} role="status">
+          {problemList.map((p, i) => (
+            <div key={i} className="te-problem">
+              <SymbolIcon name={frozen ? 'error' : 'warning'} size={13} /> <span>{p}</span>
+            </div>
+          ))}
           {frozen && <div className="te-frozen-note">Fix it in the formula bar, or choose a tool to start the formula over.</div>}
         </div>
       )}
 
-      {/* The formula, part by part; a dotted line from each part to its field. */}
-      {!frozen && parts_.length > 0 && (
-        <ExplodedFormula formula={shown.formula} parts={parts_} hot={hot} onHot={setHot} />
-      )}
-
-      <div className="te-columns" style={{
-        gridTemplateColumns: `minmax(140px, ${split.fraction}fr) 7px minmax(160px, ${1 - split.fraction}fr)`,
-        // Room for the lines' lanes between the formula and the fields.
-        paddingTop: !frozen && parts_.length ? laneBand(parts_.length) : undefined,
-      }}>
-        {/* Left: what is called, and how it is applied. */}
-        <div className="te-col te-col-call">
-          <Section title="Tool" part="tool" note={parts?.bound_to ? `on res["${parts.bound_to}"]` : undefined}>
-            <div {...hotProps('tool')}>
-              <select
-                className="te-tool-select"
-                value={frozen || noTool ? '' : parts?.tool ?? ''}
-                onChange={(e) => chooseTool(e.target.value)}
-                disabled={isCombine && !frozen}
-                title={op?.description}
-              >
-                <option value="">{noTool === 'value' ? 'No tool: a value' : noTool === 'copy' ? 'No tool: a copy of a step' : 'Choose a tool…'}</option>
-                {parts && !op && !noTool && <option value={parts.tool}>{parts.tool}</option>}
-                {groupByCategory(tools).map(([category, ops]) => (
-                  <optgroup key={category} label={category}>
-                    {ops.map((o) => <option key={o.id} value={o.id}>{o.label || o.id}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-            {noTool === 'value' && <div className="te-note te-tool-desc">A value is its own source: no tool runs, and the step is this one value. Choose a tool to compute it instead.</div>}
-            {noTool === 'copy' && <div className="te-note te-tool-desc">No tool runs: the step is a copy of the step it reads. Select rows or columns in that step's grid to take part of it, or choose a tool.</div>}
-            {!noTool && op?.description && <div className="te-note te-tool-desc">{op.description}</div>}
-          </Section>
-
-          {parts && !isCombine && !noTool && (
-            <fieldset {...frozenProps}>
-              <Section title="Modifiers" part="modifiers" summary={modifiersSummary(parts, resolved)}>
-                <ModifierList parts={parts} catalog={catalog} resolved={resolved}
-                  onWrite={write} hotProps={hotProps} />
-              </Section>
-            </fieldset>
-          )}
-        </div>
-
-        <div
-          className="te-divider"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Drag to give the tool or the arguments more room"
-          title="Drag to resize; double-click to reset"
-          onPointerDown={(e) => split.start(e, root.current?.querySelector('.te-columns') ?? null)}
-          onDoubleClick={split.reset}
-        />
-
-        {/* Right: what the tool is given — the data it runs over and its arguments. */}
-        <div className="te-col te-col-args">
-          {noTool === 'value' && !frozen && (
-            <Section title="Arguments" part="arguments">
-              <div {...hotProps('value')}>
-                <Field name="value" value={literal ?? ''} description="A number, text in quotes, a list or a dict"
-                  onCommit={(text) => { void writeLiteral(text); }} />
-              </div>
-            </Section>
-          )}
-
-          {notATool && literal === null && !frozen && (
-            <div className="te-note te-col-note">This step isn't a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
-          )}
-
-          {parts && isCombine && !frozen && (
-            <div className="te-note te-col-note">
-              A <code>{parts.tool}</code> of {parts.inputs.map((n) => `wf["${n}"]`).join(', ')}. Edit it in the formula bar.
-            </div>
-          )}
-
-          {parts && !isCombine && (
-            <fieldset {...frozenProps}>
-              <InputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
-                onWrite={write} onDefineResource={onDefineResource}
-                refs={shown.refs} verb={verb} copy={noTool === 'copy'} hotProps={hotProps} />
-            </fieldset>
-          )}
-
-          {!parts && !notATool && !frozen && (
-            <div className="te-note te-col-note">Choose a tool to see what it takes.</div>
-          )}
-        </div>
-      </div>
-
-      {!frozen && parts_.length > 0 && <MapLines root={root} hot={hot} deps={[shown, split.fraction, parts, literal, resolved]} />}
+      {mapped && !card && <MapLines root={root} hot={hot} deps={[shown, parts, literal, resolved, problemList.length]} />}
     </div>
   );
-}
-
-/** The split between the tool and the arguments: a fraction of the width, dragged, remembered per browser. */
-function useSplit() {
-  const KEY = 'simple-steps.formula-panel.split';
-  const DEFAULT = 0.4;
-  const [fraction, setFraction] = useState<number>(() => {
-    try {
-      const v = Number(localStorage.getItem(KEY));
-      return v > 0.15 && v < 0.85 ? v : DEFAULT;
-    } catch { return DEFAULT; }
-  });
-  const save = (v: number) => { try { localStorage.setItem(KEY, String(v)); } catch { /* not kept: fine */ } };
-  const start = (e: React.PointerEvent, columns: Element | null) => {
-    if (!columns) return;
-    e.preventDefault();
-    const box = columns.getBoundingClientRect();
-    let last = fraction;
-    const move = (ev: PointerEvent) => {
-      last = Math.min(0.8, Math.max(0.2, (ev.clientX - box.left) / box.width));
-      setFraction(last);
-    };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      save(last);
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-  };
-  const reset = () => { setFraction(DEFAULT); save(DEFAULT); };
-  return { fraction, start, reset };
 }
 
 /** What a field gets to say which part of the formula it edits, and to light up with it. */
@@ -393,8 +412,10 @@ function DefaultInputUi({
     if (!perRow) return undefined;
     if (inputCols.includes(name)) return `↳ from column ${name} of ${parts.input}, each row (same name)`;
     if (hasDefault) return undefined;
+    // Core fills it from the one column of a fitting type, or proposes one
+    // if several fit; which, it says only after a run (core C47).
     return inputCols.length
-      ? `↳ ${parts.input} has no column ${name}: give a value, or any column, e.g. ${name}=wf["${parts.input}"]["${inputCols[0]}"]`
+      ? `↳ no column named ${name} in ${parts.input}: core fills it from a column of a fitting type, or asks you to pick one. Or set it, e.g. ${name}=wf["${parts.input}"][cols["${inputCols[0]}"]]`
       : undefined;
   };
   const stepOptions = previousSteps.map((s) => ({ value: `wf["${s.label}"]`, label: `step · ${s.label}` }));

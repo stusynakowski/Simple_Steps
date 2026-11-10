@@ -2019,6 +2019,33 @@ owner decides whether to wait for core.
 **Ask:** as C36, and the default contradicts D9: a step that writes no
 name gets the step's name, not `value`.
 
+### C47. Which column fills each parameter, before the step runs
+
+**Run** (2026-11-10, core `dbaf4c7`): `r` has columns `n`, `value` (both
+int); `k["s"] = add_k[mod.map()](wf["r"])` with `add_k(n: int, k: int)`.
+
+**Got:**
+- Run: `s` = `[13, 21]`. `n` was filled from column `n` by name, and `k`
+  from `value`, the one int column left. `k.cell("s", 0, "s")["inputs"]`
+  says so: `{argument: 'n', columns: ['n']}`, `{argument: 'k', columns: ['value']}`.
+- Before the run: `step.warnings` says `expects 'n', 'k' from 'r', which is
+  predicted to produce (value) — likely missing once it runs`. Both
+  parameters do get filled, so the warning is wrong. Nothing on the step
+  says which column fills which parameter.
+- Two int columns, one parameter `x` (`double`): a `missing_column` problem
+  that proposes `x=wf['r'][cols['n']]`. Good: a proposal, not applied.
+
+**Ask:** the step's plan states each parameter's binding before any run:
+`{param: {from: "column" | "argument" | "default", step, column, how:
+"name" | "type", certainty}}`, and is `ambiguous` with its candidates when
+more than one column fits. The Formula panel draws the runs-over line
+branching into each filled parameter, headed with the column's name
+(owner, 2026-11-10). Without this, the browser would have to copy core's
+name-then-type rule, and a copy that drifts is exactly the client/core
+mismatch dev_plan/126 R13 treats as a system error. Also: the
+`likely_missing_column` warning shouldn't fire for parameters that type
+matching will fill. No shim.
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |

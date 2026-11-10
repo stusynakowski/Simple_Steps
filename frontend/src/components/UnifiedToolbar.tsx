@@ -1,5 +1,7 @@
 import Icon from './Icon';
 import SessionStatus from './SessionStatus';
+import StepMenu from './StepMenu';
+import type { StepMenuItem } from './StepMenu';
 import type { Connection } from '../hooks/useConnection';
 import type { LogEntry } from './ExecutionLog';
 import './UnifiedToolbar.css';
@@ -33,6 +35,8 @@ interface UnifiedToolbarProps {
   connection: Connection;
   /** The most recent log line, shown in the activity pill while running. */
   latestLog?: LogEntry;
+  /** The workflow's run options, a menu right of Run and Stop. */
+  runOptions?: StepMenuItem[];
 }
 
 export default function UnifiedToolbar({
@@ -51,6 +55,7 @@ export default function UnifiedToolbar({
   infoSlot,
   connection,
   latestLog,
+  runOptions,
 }: UnifiedToolbarProps) {
   const running = pipelineMeta?.counts.running ?? 0;
   const errors = pipelineMeta?.counts.errors ?? 0;
@@ -99,6 +104,17 @@ export default function UnifiedToolbar({
           >
             <Icon name="debug-stop" size={14} />
           </button>
+          {/* More ways to run the workflow (owner, 2026-11-10). */}
+          {!!runOptions?.length && (
+            <StepMenu
+              icon="playlist_play"
+              iconSize={18}
+              label="Workflow run options"
+              testId="workflow-run-options"
+              className="ut-btn ut-btn-run-options"
+              items={runOptions}
+            />
+          )}
         </div>
 
         <div className="ut-divider" />

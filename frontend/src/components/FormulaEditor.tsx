@@ -60,6 +60,12 @@ export interface FormulaEditorProps {
   testId?: string;
   /** Each step reference's [start, end) in *value* and its step's colour: boxed dotted while editing (R3). */
   references?: { start: number; end: number; color: string }[];
+  /**
+   * What the bar shows when it isn't being edited (owner, 2026-11-10):
+   * `tool*(data)`, the `*` when it has modifiers. A click shows the whole
+   * expression, to edit. Undefined: the expression always.
+   */
+  summary?: string;
 }
 
 /**
@@ -109,7 +115,7 @@ const COLLAPSED_HEIGHT = 28;
 const MAX_EXPANDED_HEIGHT = 200;
 
 const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function FormulaEditor(
-  { value, onChange, onEnter, onModEnter, onFocus, onBlur, placeholder, shadowRef, testId, references },
+  { value, onChange, onEnter, onModEnter, onFocus, onBlur, placeholder, shadowRef, testId, references, summary },
   ref,
 ) {
   const monacoRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -133,6 +139,8 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
   // directly would run the FIRST render's handlers forever — and with them the
   // step as it was then. Route them through a ref that tracks every render.
   const handlers = useRef({ onChange, onEnter, onModEnter, onFocus, onBlur });
+  /** Fits the height to the content while editing (set at mount). */
+  const fitRef = useRef<() => void>(() => {});
   useLayoutEffect(() => { handlers.current = { onChange, onEnter, onModEnter, onFocus, onBlur }; });
 
   // Expose imperative API.
@@ -255,11 +263,14 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       setHeight((prev) => (prev === next ? prev : next));
     };
     editor.onDidContentSizeChange(fit);
+    fitRef.current = fit;
 
     // Focus / blur bubble up for autocomplete + wiring activation.
     editor.onDidFocusEditorText(() => {
       focusedRef.current = true;
       setFocused(true);            // wraps; the content-size event then fits the height
+      // And once wrapping has applied, in case the size event came first or not at all.
+      requestAnimationFrame(() => requestAnimationFrame(() => fitRef.current()));
       handlers.current.onFocus?.();
     });
     editor.onDidBlurEditorText(() => {
@@ -271,6 +282,26 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
       handlers.current.onBlur?.();
     });
   };
+
+  // The bar at rest, coloured exactly as the editor colours it: Monaco
+  // colours `tool(data)`, then the `*` (modifiers not shown) goes right
+  // after the tool's token — `tool*(` alone wouldn't read as a tool.
+  const [summaryHtml, setSummaryHtml] = useState<{ for: string; html: string } | null>(null);
+  useEffect(() => {
+    const monaco = monacoApi.current;
+    if (!summary || !monaco || !mounted) return;
+    const star = /^([A-Za-z_][\w.]*)\*/.exec(summary);
+    const plain = star ? star[1] + summary.slice(star[0].length) : summary;
+    let cancelled = false;
+    void monaco.editor.colorize(plain, SIMPLE_STEPS_LANGUAGE_ID, { tabSize: 2 }).then((html) => {
+      if (cancelled) return;
+      const marked = star
+        ? html.replace(`>${star[1]}</span>`, `>${star[1]}</span><span class="formula-summary-star" title="Has modifiers: click to see the whole formula">*</span>`)
+        : html;
+      setSummaryHtml({ for: summary, html: marked });
+    });
+    return () => { cancelled = true; };
+  }, [summary, mounted]);
 
   // Parent prop changed → push into Monaco model (only if different).
   useEffect(() => {
@@ -376,6 +407,28 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
           }}
         >
           {placeholder}
+        </div>
+      )}
+      {/* At rest: tool*(data), in the editor's colours. Over the
+          editor (which stays mounted for picks); a click edits the whole. */}
+      {summary && value && !focused && (
+        <div
+          className="formula-summary"
+          data-testid="formula-summary"
+          title={value}
+          onMouseDown={(e) => {
+            // The whole expression, to edit: the caret at its end.
+            e.preventDefault();
+            const ed = monacoRef.current;
+            const model = ed?.getModel();
+            if (ed && model) ed.setPosition(model.getPositionAt(model.getValueLength()));
+            ed?.focus();
+          }}
+        >
+          {summaryHtml?.for === summary
+            // Monaco's own colouring (escaped by Monaco), so it matches the editor.
+            ? <span className="formula-summary-code" dangerouslySetInnerHTML={{ __html: summaryHtml.html }} />
+            : <span className="formula-summary-code">{summary}</span>}
         </div>
       )}
       {/* Hidden textarea — the wiring system's injection target. */}

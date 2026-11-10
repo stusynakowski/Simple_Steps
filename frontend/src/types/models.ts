@@ -91,6 +91,8 @@ export interface Step {
   step_color?: string;
   /** Markdown notes on what the step is for; shown in Analytics. Saved in `meta`. */
   notes?: string;
+  /** The step's width when open, in px, dragged at its sides. Unset = the default. Saved in `meta`. */
+  step_width?: number;
 }
 
 export interface Workflow {

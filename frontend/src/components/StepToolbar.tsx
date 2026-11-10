@@ -72,9 +72,11 @@ interface StepToolbarProps {
   onReferencePick?: (sourceStep: string, pick: GridPick) => void;
   /** The formula's step references and their steps' colours, drawn dashed in the bar (R3). */
   references?: { start: number; end: number; color: string }[];
+  /** The formula at rest: the tool, `[…]` for its modifiers, its data (owner, 2026-11-10). */
+  formulaSummary?: string;
 }
 
-export default function StepToolbar({ 
+export default function StepToolbar({
   step,
   stepIndex = 0,
   availableOperations = [], 
@@ -96,6 +98,7 @@ export default function StepToolbar({
   onFormulaBarRef,
   onReferencePick,
   references,
+  formulaSummary,
 }: StepToolbarProps) {
   // Local state for immediate UI feedback
   const initFormula = step.formula || step.operation || '';
@@ -107,7 +110,9 @@ export default function StepToolbar({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Wiring context — lets prior-step grids inject references into this formula bar
-  const { activateWiring, deactivateWiring } = useStepWiring();
+  const { activateWiring, deactivateWiring, wiringState } = useStepWiring();
+  // While picking from other steps' grids the bar keeps the whole expression.
+  const isPicking = wiringState.receivingStepId === step.id;
 
   // Sync from external formula updates (UI config → formula bar)
   // Use functional setState to compare against the *current* state, not a
@@ -222,14 +227,14 @@ export default function StepToolbar({
   const isOpen = (panel: PanelId) => openPanels.includes(panel);
   const runLabel = step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)';
   const runTip = useHoverTip(runLabel);
-  const runToEndTip = useHoverTip('Run to the end: this step and every step after it');
 
   return (
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
 
       {/* The step's control bar (owner, 2026-10-29/30, 2026-11-09; dev_plan/126
           L1): three groups split by dividers, every button sharing the full
-          width — running (Run, Run to the end, run options), the panels menu,
+          width — running (Run Step, and the run options: run to the end, stage,
+          run all, clear; owner, 2026-11-10), the panels menu,
           then managing the step. The step's settings and notes are in its
           header (owner, 2026-11-10).
           Each pops up over the page (StepMenu); each has a hover label. A
@@ -244,20 +249,9 @@ export default function StepToolbar({
             {...runTip.tipProps}
           >
             <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={20} />
-            <span>{step.status === 'running' ? 'Stop' : 'Run'}</span>
+            <span>{step.status === 'running' ? 'Stop' : 'Run Step'}</span>
           </button>
           {runTip.tip}
-          <button
-            className="btn-icon step-menu-toggle step-bar-btn"
-            onClick={(e) => { e.stopPropagation(); onRunToEnd?.(); }}
-            disabled={!onRunToEnd}
-            aria-label="Run to the end"
-            data-testid="btn-run-to-end"
-            {...runToEndTip.tipProps}
-          >
-            <SymbolIcon name="fast_forward" size={22} />
-          </button>
-          {runToEndTip.tip}
           <StepMenu
             icon="playlist_play"
             iconSize={22}
@@ -266,6 +260,8 @@ export default function StepToolbar({
             className="step-bar-btn"
             items={[
               { icon: step.status === 'running' ? 'stop' : 'play_arrow', label: step.status === 'running' ? 'Stop' : 'Run this step', hint: '⌘↵', onClick: () => onRun?.(step.id) },
+              { icon: 'fast_forward', label: 'Run to the end', hint: 'this step and after', onClick: () => onRunToEnd?.(),
+                disabled: !onRunToEnd, testId: 'btn-run-to-end' },
               { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
               { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
               { divider: true },
@@ -375,6 +371,7 @@ export default function StepToolbar({
             <FormulaEditor
             value={formula}
             references={references}
+            summary={isPicking ? undefined : formulaSummary}
             onChange={(next) => {
               // Build a synthetic event so we reuse handleInputChange's logic
               // without duplicating its body.

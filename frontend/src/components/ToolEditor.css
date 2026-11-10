@@ -1,7 +1,6 @@
 /* Step editor (ToolEditor.tsx), inside the Formula widget.
-   One white sheet in two columns — what is called and how (left), what it
-   is given (right) — split by a hairline. Every part is always open: small
-   headings, not expanders, so the form reads like the formula above it. */
+   One white sheet: tabs, the helpers, f(x) = the formula centred with each
+   part labelled, then Tool, Modifiers and Arguments stacked, problems last. */
 
 .tool-editor {
   display: flex;
@@ -12,28 +11,70 @@
   container-type: inline-size;
 }
 
-/* ── Columns: tool + modifiers | input + arguments ────────────────────── */
+/* ── Tabs and the helpers ─────────────────────────────────────────────── */
 
-.te-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+.te-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid #e3e7eb;
+  background: #f6f8fa;
 }
+.te-tab {
+  padding: 3px 10px 4px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  background: none;
+  color: #5f6b76;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.te-tab.active { background: #fff; color: #111; border-color: #e3e7eb; }
+.te-tab:focus:not(:focus-visible) { outline: none; }
 
-.te-col {
+.te-helpers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #eef1f4;
+}
+.te-helper {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: #5f6b76;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.te-helper:hover:not(:disabled) { border-color: #c5ccd3; background: #f3f6f9; }
+.te-helper:disabled { opacity: 0.45; cursor: default; }
+.te-helpers .te-helper:last-child { margin-left: auto; }
+
+/* ── The fields, stacked: Tool, Modifiers, Arguments ──────────────────── */
+
+.te-stack {
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  padding: 6px 10px 8px;
   gap: 10px;
+  min-width: 0;
+  padding: 6px 10px 10px;
 }
+/* Room either side for the lines' tracks: the tool's on the left, the rest on the right. */
+.te-mapped .te-stack { padding-left: 18px; padding-right: 24px; }
 
-.te-col + .te-col { border-left: 1px solid #e3e7eb; }
+/* No tool (a value, a copy): the tool's field is there, faded. */
+.te-faded { opacity: 0.55; }
+.te-faded:hover { opacity: 1; }
 
-/* Too narrow for two useful columns: stack them, left first. */
-@container (max-width: 420px) {
-  .te-columns { grid-template-columns: minmax(0, 1fr); }
-  .te-col + .te-col { border-left: 0; border-top: 1px solid #e3e7eb; }
-}
+.te-card { padding: 8px 10px; }
 
 /* ── Sections: a heading over its fields ──────────────────────────────── */
 
@@ -150,27 +191,29 @@
 
 /* ── Notes and warnings ───────────────────────────────────────────────── */
 
-.te-warning {
+/* Errors and warnings, at the bottom: amber, red when the formula can't be read. */
+.te-problems {
   display: flex;
-  gap: 6px;
-  align-items: baseline;
-  padding: 3px 8px;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+  padding: 5px 10px;
   background: #fff8e1;
   color: #8a5a00;
-  border-left: 2px solid #f0a500;
+  border-top: 1px solid #f0d58a;
   font-size: 0.74rem;
-  flex-wrap: wrap;
 }
+.te-problems.te-error { background: #fdecea; color: #a12b1f; border-top-color: #f3b3ab; }
+.te-problem { display: flex; gap: 6px; align-items: baseline; }
 
 /* The formula doesn't parse: the panel waits (dev_plan/126 D4). */
 .te-frozen-note { flex-basis: 100%; font-style: italic; }
 .te-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 
 /* The step column sets nowrap; notes carry core's reasons and must wrap. */
-.te-note, .te-arg-detail, .te-warning, .te-bad { white-space: normal; overflow-wrap: anywhere; }
+.te-note, .te-arg-detail, .te-problems, .te-bad { white-space: normal; overflow-wrap: anywhere; }
 .te-note { color: #5f6b76; font-size: 0.74rem; }
 .te-note code { font-size: 0.72rem; }
-.te-col-note { padding-top: 2px; }
 .te-bad { color: #c0392b; font-size: 0.74rem; }
 
 /* ── Argument rows ────────────────────────────────────────────────────── */
@@ -258,27 +301,52 @@
   border-radius: 3px;
 }
 
-/* ── The map: the formula, part by part, and a line to each part's field ─── */
-/* (FormulaMap.tsx, owner 2026-11-10). The tool and the argument columns are
-   split by a divider you drag; the lines follow it. */
+/* ── The map: f(x) = the formula, each part labelled, a line to its field ─ */
+/* (FormulaMap.tsx, owner 2026-11-10). */
 
 .tool-editor { position: relative; }
 
 .fm-formula {
   font-family: Menlo, Monaco, 'Courier New', monospace;
   font-size: 0.8rem;
-  line-height: 1.9;
-  padding: 8px 10px 12px;
-  border-bottom: 1px solid #eef1f4;
-  word-break: break-all;
+  line-height: 1.5;
+  padding: 12px 12px 2px;
+  text-align: center;
+  overflow-wrap: anywhere;
   color: #6b7785;
+}
+/* f(x), as on the step's fx button. */
+.fm-fx {
+  font-family: serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: #1f6fd1;
+}
+.fm-eq { white-space: pre; }
+/* A part: its text, and its label right under it. */
+.fm-part {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: top;
+  cursor: default;
 }
 .fm-chip {
   padding: 1px 3px;
   border-radius: 3px;
   border-bottom: 2px dotted currentColor;
-  cursor: default;
   transition: background 0.1s;
+}
+.fm-label {
+  margin-top: 1px;
+  font-family: system-ui, sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.85;
 }
 .fm-tool      { color: #1f6fd1; }
 .fm-modifier  { color: #8a45c4; }
@@ -286,14 +354,13 @@
 .fm-resource  { color: #c2453b; }
 .fm-argument  { color: #b4690e; }
 .fm-value     { color: #1e8a4c; }
-.fm-chip.fm-hot { background: currentColor; }
-.fm-chip.fm-hot { color: #fff; }
-.fm-chip.fm-tool.fm-hot     { background: #1f6fd1; }
-.fm-chip.fm-modifier.fm-hot { background: #8a45c4; }
-.fm-chip.fm-input.fm-hot,
-.fm-chip.fm-value.fm-hot    { background: #1e8a4c; }
-.fm-chip.fm-resource.fm-hot { background: #c2453b; }
-.fm-chip.fm-argument.fm-hot { background: #b4690e; }
+.fm-part.fm-hot .fm-chip { color: #fff; background: currentColor; }
+.fm-tool.fm-hot .fm-chip     { background: #1f6fd1; }
+.fm-modifier.fm-hot .fm-chip { background: #8a45c4; }
+.fm-input.fm-hot .fm-chip,
+.fm-value.fm-hot .fm-chip    { background: #1e8a4c; }
+.fm-resource.fm-hot .fm-chip { background: #c2453b; }
+.fm-argument.fm-hot .fm-chip { background: #b4690e; }
 
 .fm-lines {
   position: absolute;
@@ -320,23 +387,10 @@
 [data-map-target] { border-radius: 4px; transition: box-shadow 0.1s; }
 [data-map-target].te-hot { box-shadow: 0 0 0 2px #cfe0f7; background: #f5f9ff; }
 
-/* The divider between the tool and the arguments. */
-.te-divider {
-  cursor: col-resize;
-  background: linear-gradient(to right, transparent 3px, #e3e7eb 3px, #e3e7eb 4px, transparent 4px);
-  touch-action: none;
-}
-.te-divider:hover { background: linear-gradient(to right, transparent 2px, #9ab8e0 2px, #9ab8e0 5px, transparent 5px); }
-
 /* What an argument passes the tool, in words. */
 .te-arg-receives { color: #4b5a6a; font-style: normal; }
 
-@container (max-width: 420px) {
-  .te-columns { grid-template-columns: minmax(0, 1fr) !important; }
-  .te-divider { display: none; }
-}
-
-/* With the map shown, each column keeps a gutter at its left for the lines'
-   tracks, so a line never runs over a heading or a field. */
-.te-mapped .te-col { padding-left: 18px; }
-.te-mapped .fm-formula { border-bottom: 0; }
+/* With the map shown, the labels under the formula name each part: the
+   sections' titles go, and a heading stays only for what it summarises. */
+.te-mapped .te-heading-label { display: none; }
+.te-mapped .te-heading:not(:has(.te-summary, .te-heading-note)) { display: none; }

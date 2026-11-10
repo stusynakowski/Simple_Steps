@@ -69,6 +69,7 @@ async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise
     operation: formula,
     ...(typeof s.meta?.step_color === 'string' ? { step_color: s.meta.step_color } : {}),
     ...(typeof s.meta?.notes === 'string' ? { notes: s.meta.notes } : {}),
+    ...(typeof s.meta?.step_width === 'number' ? { step_width: s.meta.step_width } : {}),
   };
 }
 
@@ -986,11 +987,12 @@ export default function useWorkflow() {
         config: s.configuration,
         // formula is the canonical field — always persisted
         formula: s.formula ?? s.operation ?? '',
-        // What the formula can't carry: the step's colour and notes.
-        ...((s.step_color || s.notes) ? {
+        // What the formula can't carry: the step's colour, notes and width.
+        ...((s.step_color || s.notes || s.step_width) ? {
           meta: {
             ...(s.step_color ? { step_color: s.step_color } : {}),
             ...(s.notes ? { notes: s.notes } : {}),
+            ...(s.step_width ? { step_width: s.step_width } : {}),
           },
         } : {}),
       })),
