@@ -89,6 +89,15 @@ plan's Off / Propose / Develop):
 | Checkpoints | before each agent turn; Undo turn | A4 |
 | Inline completion | ghost text in the formula bar, Tab accepts | later |
 
+### Decided (owner, 2026-11-09)
+
+| # | Question | Decided |
+|---|---|---|
+| C1 | Mode names | **Ask / Edit / Agent**, replacing Off / Propose / Develop |
+| C2 | The model's APIs | **OpenAI-compatible, Anthropic, a Python function** |
+| C3 | Keys | **The user can define keys** (the settings panel or the App). **The agent never sees them**, and as a rule **the agent sees nothing the user can't**: its context is built only from what the UI shows (contract 4), never from settings, keys, secret resource settings or server internals. A key is never sent back to the browser either: the panel shows only whether one is set |
+| C4 | A0 | **go**: the LangGraph path removed as inventoried; the old settings replaced by the one setting |
+
 ## The model: any text LLM, one setting (contract 5)
 
 Owner's goal (2026-11-09): **configure one LLM, and any model that generates
