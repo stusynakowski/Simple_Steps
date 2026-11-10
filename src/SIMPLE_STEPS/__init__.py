@@ -19,7 +19,7 @@ In Python, a workflow is core's (``simple_steps_core``):
 #   from simple_steps import simple_step
 import sys as _sys
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from .decorators import simple_step, simple_step_tool  # noqa: F401
 from .core_bridge import simple_step_resource  # noqa: F401
