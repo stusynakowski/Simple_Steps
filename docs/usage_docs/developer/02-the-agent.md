@@ -11,26 +11,43 @@ The worked example, with requests to try and a test harness, is
 
 ## Turn it on
 
-The agent uses a local model served by [Ollama](https://ollama.com):
+The agent works with any model that writes text. Out of the box it looks for
+a local model served by [Ollama](https://ollama.com):
 
 ```bash
 ollama pull llama3.2:3b                      # the default model, about 2 GB
 simple-steps run examples/agent_demo/app.py
 ```
 
-An app turns it on, picks the model, or turns it off with `agent=`:
+An app picks the model, or turns the agent off, with `agent=`:
 
 ```python
 from SIMPLE_STEPS import App
 from SIMPLE_STEPS.agent.model import Agent
 
-app = App(tools=[my_tools], agent=Agent(model="qwen2.5:7b"))  # this model
-app = App(tools=[my_tools])                                   # a local Ollama, if one is running
-app = App(tools=[my_tools], agent=False)                      # off
+app = App(tools=[my_tools], agent=Agent(model="qwen2.5:7b"))      # a local Ollama model
+app = App(tools=[my_tools], agent=Agent(                          # any OpenAI-compatible server
+    model="gpt-4o-mini", api_key_env="OPENAI_API_KEY"))
+app = App(tools=[my_tools], agent=Agent(                          # Anthropic
+    api="anthropic", model="claude-haiku-5-5", api_key_env="ANTHROPIC_API_KEY"))
+app = App(tools=[my_tools], agent=Agent(generate=my_fn))          # any function: messages -> text
+app = App(tools=[my_tools])                                       # the settings panel, else a local Ollama
+app = App(tools=[my_tools], agent=False)                          # off
 ```
 
-`OLLAMA_MODEL` and `OLLAMA_HOST` set the default model and host. Without a
-model the app runs as usual; the chat pane says the agent is off, and why.
+`api="openai"` (the default) covers OpenAI, Ollama, LM Studio, vLLM,
+llama.cpp's server, Groq, OpenRouter and others; set `base_url` for anything
+but OpenAI itself.
+
+Without an `agent=` in code, each user picks the model in the agent's
+**settings panel** (API, model, base URL, key, temperature), with **Test
+connection** to check it. The setting is saved per user in
+`~/.simple_steps/agent.json`; a key is write-only and never sent back to the
+browser. A model the app sets in code is shown there read-only. From a
+terminal, `simple-steps agent test` runs the same check.
+
+`OLLAMA_MODEL` and `OLLAMA_HOST` set the local default. Without a model the
+app runs as usual; the chat pane says the agent is off, and why.
 
 ## Make your tools easy for it
 
@@ -40,7 +57,8 @@ its code. So:
 - name tools for what they do: `line_total`, not `calc`;
 - name parameters after the columns they read: `price`, `quantity`;
 - make the first docstring line a sentence a user might say;
-- use return types: `-> bool` says filter, `(acc, x)` says reducer.
+- use return types and parameter names: `-> list` says expand, `(acc, x)`
+  says reducer, `-> bool` says it's a test the agent can filter with.
 
 ## Test it against your model
 
@@ -57,5 +75,5 @@ and saves what it built as a workflow you can open.
 **Expect to stay:** proposals are checked before the user sees them; the
 agent reads your tools' names, signatures and docstrings.
 
-**Expect to change:** Ollama being the only provider (the settings panel
-lists others, but only Ollama is used today); the default model.
+**Expect to change:** the default model; how much context the agent is given
+(plan 128 A1).

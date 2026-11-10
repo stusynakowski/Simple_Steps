@@ -25,12 +25,12 @@ What a step does, written on one line in the step's formula bar, starting
 with `=`:
 
 ```
-=with_tax[mod.map(name="total")](wf["items"], rate=0.1)
+=with_tax[mod.map(), mod.name("total")](wf["items"], rate=0.1)
 ```
 
 Read it as: *apply the tool `with_tax`, once per row (`map`), to the output of
-the step `items`, with `rate` set to 0.1, and put the answer in a column
-called `total`.* The formula is the whole truth about a step — the forms and
+the step `items`, with `rate` set to 0.1, and call the answer column
+`total`.* The formula is the whole truth about a step — the forms and
 dropdowns in the app only edit it. [04 — Expressions](04-expressions.md)
 has every part.
 
@@ -46,9 +46,9 @@ start from. Tools come from the app's developer (see the
 
 A step reads an earlier step by name: `wf["items"]` means *the output of the
 step called `items`*. It's the only way to refer to a step — `items` on its
-own, or `"items"` in quotes, is not a reference. A step reads at most one
-earlier step (to combine two, see *Combining steps* in
-[Expressions](04-expressions.md#combining-steps)). A step with no input — the
+own, or `"items"` in quotes, is not a reference. `wf["items"][0:2]` reads
+just part of it. A step has one input; to line up the rows of two steps,
+see *Combining steps* in [Expressions](04-expressions.md#combining-steps). A step with no input — the
 first one, usually — is a **source**: it makes a table from nothing.
 
 ## Shape: the verb in square brackets
@@ -60,16 +60,21 @@ values.
 | verb | rows in → rows out | the tool is… |
 |---|---|---|
 | `mod.source()` | nothing → a table | something that builds a table |
-| `mod.map()` | n → n, one new column | called once per row |
+| `mod.map()` | n → n: one column of answers | called once per row |
 | `mod.filter()` | n → fewer | a yes/no test per row |
 | `mod.expand()` | n → more | given a row, returns a list |
 | `mod.collapse()` | n → 1 (or 1 per group) | something that combines rows |
 | `mod.group()` | n → n, plus a key column | gives each row a group key |
 | `mod.table()` | table → table | given the whole table |
 
+`mod.name("total")` after the verb names the answer column; without it, the
+column takes the step's name. A `map` step holds only its answers; `zip_`
+puts them beside the table they came from.
+
 Some verbs need no tool at all — `select`, `drop`, `rename`, `sort`,
 `slice`, `distinct` — and use the built-in `identity`. Leave the brackets
-off and Simple Steps picks the verb from the tool.
+off and Simple Steps picks the verb from the tool. A yes/no tool still
+gets `map` (a column of True and False): write `mod.filter()` to keep rows.
 
 A step has **one** shape verb. To filter and then map, make two steps, the
 second reading the first. A few other modifiers — `retry`, `timeout`,

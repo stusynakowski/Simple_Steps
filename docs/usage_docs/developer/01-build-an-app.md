@@ -69,8 +69,10 @@ The rules that matter:
   Steps calls it per row.
 - **Name parameters after the columns they read.** `price` reads the
   `price` column.
-- **The signature suggests the verb.** `-> bool` suits a filter, `(acc, x)`
-  suits a collapse, `-> list` suits an expand, anything else a map.
+- **The signature suggests the verb.** With no verb written, `(acc, x)`
+  collapses, `-> list` expands, a `DataFrame` first input gets the whole
+  table, anything else maps. A `-> bool` tool suits a filter, but users
+  write `mod.filter()`: inferred, it maps to a True/False column.
 - **Write the `Args:` section, and type hints.** The **Environment** panel
   shows each input's type, default and `Args:` text, and the return type —
   an input without a hint shows as *untyped*.
@@ -137,14 +139,15 @@ The UI opens in your browser. Add these steps (see
 | step | formula |
 |---|---|
 | `items` | `to_rows[mod.source()](data='{"item": ["tea", "cake", "jam"], "price": [3.0, 12.0, 6.5]}')` |
-| `taxed` | `with_tax[mod.map(name="total")](wf["items"], rate=0.1)` |
+| `taxed` | `with_tax[mod.map(), mod.name("total")](wf["items"], rate=0.1)` |
 | `pricey` | `is_pricey[mod.filter()](wf["items"])` |
 | `spend` | `add_price[mod.collapse(initial=0)](wf["pricey"])` |
 | `ranked` | `identity[mod.sort(by="price", ascending=False)](wf["items"])` |
 | `cheap` | `cheapest[mod.table()](wf["items"], n=2)` |
 
-Expected: `taxed.total` is `3.3, 13.2, 7.15`; `pricey` keeps cake and jam;
-`spend` is `18.5`; `cheap` is tea, jam.
+Expected: `taxed` is one column, `total`: `3.3, 13.2, 7.15`; `pricey` keeps
+cake and jam; `spend` is `18.5`, in a column named `spend`; `cheap` is tea,
+jam.
 
 Save it as `first` in project `shop`; it lands in
 `projects/shop/first.simple-steps-workflow`.
@@ -155,18 +158,30 @@ Each formula is valid Python — the right-hand side of a line in
 simple-steps-core:
 
 ```python
-from simple_steps_core import grid
-from simple_steps_core.grid import mod, op
+# twin.py
+from simple_steps_core import Kernel, mod, op
+from SIMPLE_STEPS.catalog import catalog
 from SIMPLE_STEPS.operations import to_rows
 from my_tools import add_price, cheapest, is_pricey, with_tax
 
 identity = op("identity")
 
-wf = grid.Workflow()
-wf["items"] = to_rows[mod.source()](data='{"item": ["tea", "cake", "jam"], "price": [3.0, 12.0, 6.5]}')
-wf["taxed"] = with_tax[mod.map(name="total")](wf["items"], rate=0.1)
-wf["pricey"] = is_pricey[mod.filter()](wf["items"])
-wf["spend"] = add_price[mod.collapse(initial=0)](wf["pricey"])
+
+def build() -> Kernel:
+    wf = Kernel(catalog())        # the app's tools, as the UI has them
+    wf["items"] = to_rows[mod.source()](data='{"item": ["tea", "cake", "jam"], "price": [3.0, 12.0, 6.5]}')
+    wf["taxed"] = with_tax[mod.map(), mod.name("total")](wf["items"], rate=0.1)
+    wf["pricey"] = is_pricey[mod.filter()](wf["items"])
+    wf["spend"] = add_price[mod.collapse(initial=0)](wf["pricey"])
+    wf["ranked"] = identity[mod.sort(by="price", ascending=False)](wf["items"])
+    wf["cheap"] = cheapest[mod.table()](wf["items"], n=2)
+    return wf
+
+
+if __name__ == "__main__":
+    wf = build()
+    wf.run("spend")               # runs it, and the steps it reads
+    print(wf.step("spend").data)
 ```
 
 This is useful for tests, and for moving a workflow out of the UI into a
@@ -183,10 +198,12 @@ import sys
 from pathlib import Path
 from SIMPLE_STEPS.example_check import Example
 
+import twin
+
 example = Example(Path(__file__).resolve().parent / "app.py")
-example.check("shop", "first", expect={
+example.check("shop", "first", twin=twin.build, expect={
     "taxed": {"total": [3.3, 13.2, 7.15]},
-    "spend": {"value": [18.5]},
+    "spend": {"spend": [18.5]},
 })
 sys.exit(example.finish())
 ```
@@ -194,12 +211,13 @@ sys.exit(example.finish())
 ```
 ── shop/first
 PASS  items   to_rows[mod.source()](data='…')
-PASS  taxed   with_tax[mod.map(name="total")](wf["items"], rate=0.1)
+PASS  taxed   with_tax[mod.map(), mod.name("total")](wf["items"], rate=0.1)
 …
 ```
 
-Pass `twin=` a function that builds the Python version (step 5) and every
-step is also compared cell for cell against it.
+`twin=` takes the function that builds the Python version (step 5); every
+step is then also compared cell for cell against it. Leave it out to check
+only `expect`.
 
 ## 7. Add a resource (when a tool needs a connection or a model)
 
@@ -238,8 +256,8 @@ Offer the type in the app — `App(tools=[my_tools], resources=[my_tools.PriceLi
 — create a resource named `sale` in the workflow, then use either form:
 
 ```
-discounted[mod.map(name="sale")](wf["items"], prices=res["sale"])
-res["sale"].sale_price[mod.map(name="sale")](wf["items"])
+discounted[mod.map(), mod.name("sale")](wf["items"], prices=res["sale"])
+res["sale"].sale_price[mod.map(), mod.name("sale")](wf["items"])
 ```
 
 Settings are plain literals and are saved with the workflow. Secrets are

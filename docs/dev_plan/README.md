@@ -8,7 +8,7 @@ docs is [`../README.md`](../README.md). Code comments cite plans by number
 
 | File | Status | What it covers |
 |---|---|---|
-| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core v1.0.1 (`fed4d1a`): refine, not refactor. Each core refinement and the app's small adjustment (§1, run), the gates (§2), what waits for its own decision, such as core's `formula()` in place of the app's parser (§3). Earlier moves: [`../archive/dev_plan/core_migration/`](../archive/dev_plan/core_migration/) |
+| [`core_migration.md`](./core_migration.md) | **active** | Moving the app onto core v1.0.1 (`fed4d1a`), now on v1.0.2 (`dbaf4c7`): refine, not refactor. Each core refinement and the app's small adjustment (§1, run), the gates (§2), what waits for its own decision, such as core's `formula()` in place of the app's parser (§3). Earlier moves: [`../archive/dev_plan/core_migration/`](../archive/dev_plan/core_migration/) |
 | [`120-literals-and-references.md`](./120-literals-and-references.md) | rule, partly built | Only `wf["step"]` is a reference; everything else is a literal. The canonical `tool[modifiers](input, arguments)` form. Cited by `operation_formula.py` |
 | [`122-skeleton-complete.md`](./122-skeleton-complete.md) | mostly built | Object model, resources, the agent, custom cell types. Cited by `application.py`, `resources.py`, `cell_types.py`, `agent/proposals.py` |
 | [`126-formula-ui.md`](./126-formula-ui.md) | **active** | The formula UI: what each path writes today (run), the open items F1–F16 (writing formulas, references and selection, showing cells), and decision D1. Replaces the open parts of 121, 123, 124 and 125 |
@@ -22,7 +22,7 @@ Larger plans for the next stretch of work, in [`weekend_developments/`](./weeken
 | File | Status | What it covers |
 |---|---|---|
 | [`127-file-io.md`](./weekend_developments/127-file-io.md) | **proposed** | Importing and exporting data in steps: a `Folder` resource (`files`, `read`, `write`), a ready-made `workspace`, exports that run only when run; and a security fix for the Explorer's path check |
-| [`128-agent-workflow-builder.md`](./weekend_developments/128-agent-workflow-builder.md) | **proposed** | An agent (local model) that builds workflows: a closed action space (propose, load, invoke only what the workflow has), a five-state loop, six context layers with budgets, a task budget, propose and develop modes with a live activity feed; removing the unused LangGraph path first |
+| [`128-agent-workflow-builder.md`](./weekend_developments/128-agent-workflow-builder.md) | **in progress**: A0, M1, M2 done | An agent (local model) that builds workflows: a closed action space (propose, load, invoke only what the workflow has), a five-state loop, six context layers with budgets, a task budget, propose and develop modes with a live activity feed; removing the unused LangGraph path first |
 | [`129-multi-user-hosting.md`](./weekend_developments/129-multi-user-hosting.md) | **proposed** | One on-prem server, many isolated users: sign-in (local accounts or a proxy header), a home per user, a kernel host per user (in-process, subprocess or container), limits and an audit log; plain Linux with Python or conda, Docker optional; security fixes first |
 
 ## One-paragraph summary

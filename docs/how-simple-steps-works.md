@@ -44,7 +44,6 @@ Two layers sit inside the server.
 - `engine.py`'s orchestrators and `OPERATION_REGISTRY`;
 - `eval_engine`, `step_proxy` and `helpers`;
 - packs;
-- the LangGraph chat;
 - the root `usage_docs/` and most of `README.md`.
 
 Every shipped example uses only the new layer. Most of the contradictions
@@ -207,8 +206,8 @@ The fixes for the storage problems are already designed in
 | **The checks before the user sees anything** | every formula compiles, reads only earlier steps, uses only real tools and the workflow's resources. Failures go back to the model a couple of times; whatever is still wrong is shown with its problem | `proposals.check_step` | built |
 | **What the user does** | reads the proposal, unticks changes, applies it, runs it | `ChatSidebar`, `AgentProposal` | built |
 | **Running steps** | never | — | built: it can't |
-| **The model** | a local Ollama model; set with `App(agent=Agent(model=…))` or `OLLAMA_MODEL` | `agent/model.py` | partly. The settings panel lists other providers, but only Ollama is used |
-| **The LangGraph chat** | `/api/agent/chat` and the WebSocket `/chat/stream`: a LangGraph graph with its own prompts and catalog. **It will be the agent users use** (owner, 2026-10-24), as a later layer. Today the chat pane uses `/propose` instead | `agent/graph.py`, `agent/prompts.py` | partly. Two agents for now. When LangGraph takes over, it has to keep the guarantees `/propose` gives: the same catalog (`App`'s, §7 item 11) and `proposals.check_step` on every formula |
+| **The model** | any LLM that writes text, behind one setting: an OpenAI-compatible server (OpenAI, Ollama, LM Studio, vLLM, …), Anthropic, or a Python function. Chosen by `App(agent=Agent(…))`, then the settings panel (saved per user in `~/.simple_steps/agent.json`, key write-only), then a local Ollama | `agent/model.py`, `agent/config.py` | built (spec 016; plan 128 M1, M2) |
+| ~~The LangGraph chat~~ | **Removed 2026-11-09** (plan 128 A0, owner's decision C4). `/propose` is the one agent | — | removed |
 | **Chat history** | where conversations are kept | — | missing. Where to store it is undecided. Chat is part of a session (the active construction of a workflow) |
 
 The design meets the goal: the agent's only output is a list of formulas,
@@ -234,7 +233,7 @@ section.
 | 6 | **Results stored twice and never freed** | airtight; robust | [11 — what's wrong](system_design/11-data-flow-and-storage.md#whats-wrong-with-it) | Keeping results in memory is fine for now; storage may change when the app scales (owner, 2026-10-24). The leak is separate: every run adds a copy that is never freed, so a long session grows without bound even at small scale. The fix is 11's target: the kernel holds outputs, and the browser reads by step and version |
 | 7 | **Global, per-process settings and agent config that any browser can change**, including the agent's system prompt | the maintainer controls the app | `/api/settings`, `/api/agent/config` | **Decided** for the agent: maintainer only, in `App(...)`. Settings: the same, with users getting read-only views |
 | 8 | **No users and no per-user tool sets** | the maintainer configures what each kind of user gets | — | Needs a design doc. It's the biggest *missing* piece, not a bug |
-| 9 | **Two agents** | one clear agent | `agent/graph.py` vs `agent/proposals.py` | LangGraph stays: it is the future agent. Make it one agent by having the graph produce its proposals through `proposals.py`'s scope and checks, so there's one catalog and one set of checks |
+| 9 | ~~**Two agents**~~ | one clear agent | `agent/proposals.py` | **Done 2026-11-09** (plan 128 A0): the LangGraph path removed; `proposals.py`'s scope and checks are the one agent |
 | 10 | **The old programming model is still public**: `step`, `map_each`, `@simple_step`, packs, `=ss_map` in the README | one way to do each thing | `__init__.py`, `README.md`, root `usage_docs/` | Stop exporting them, then delete them. Rewrite the README from the developer guide |
 
 Items 1 and 2 are security problems, not tidiness, and both are now decided.
@@ -325,7 +324,7 @@ your confirmation before it's removed.
 | L9 | **Standard tools that duplicate core**: `select_columns`, `drop_columns`, `rename_columns`, `sort_by`, `filter_rows`, `group_by`, `aggregate`, `pivot`, `merge_steps`, `select_rows`, `select_cell` | the same jobs as core's verbs | no shipped example (they use only `to_rows` and `literal`); the failing `test_select_cell` | decide, per tool. Several ways to write the same thing is fine, as in pandas (owner, 2026-10-24). The problem is several *implementations* that can disagree: `select_cell` is broken while `mod.select` works, and these tools take text (`columns="a,b"`) where the grammar has lists. Keep any spelling as a system tool, but **implement it on core's verb**, so there's one behaviour | core's verbs, with these as thin system tools on top where a second spelling helps |
 | L10 | **Per-step grid runs outside a kernel**: `grid_runner.run_canonical_step`, `run_grid_step` | runs one step in a throwaway workflow | `run_operation`, when the request lacks the workflow's steps | replace first: every caller sends the workflow, as the UI already does | the kernel |
 | L11 | **Endpoints the UI never calls**: `/api/debug/registry`, `/api/loader`, `/api/projects/{id}/load-ops`. *Corrected 2026-10-26:* `parse_formula`, `build_formula`, `format_formula` and `infer_verb` **are** called by the UI, which parses every formula through `parse_formula` ([cleanup-map.md](cleanup-map.md) Round 4) | registry debugging; runtime tool loading | tests only | none for the UI | — for the three; the formula routes stay, backed by core's parser once it has one |
-| L12 | ~~The second agent~~ **Not legacy** (owner, 2026-10-24): the LangGraph chat is the future agent. Not removed; merged with `proposals.py`'s scope and checks (§5 item 9) | — | — | — | — |
+| L12 | ~~The second agent~~ **Removed 2026-11-09** (plan 128 A0): the owner first kept the LangGraph chat as the future agent (2026-10-24), then decided to remove it (C4) | — | — | — | `agent/proposals.py` |
 
 ### Tangles to cut first
 

@@ -9,7 +9,7 @@ This document outlines the testing strategy for the Simple Steps UI. It ensures 
 3.  **End-to-End (E2E) Tests:** Focus on full user journeys (e.g., Create workflow -> Add Step -> Run -> View Output).
 
 ## 3. Requirement Mapping
-The following table maps requirements from `docs/spec/000-overview.md` to specific test cases.
+The following table maps requirements from `docs/archive/spec/000-overview.md` (archived) to specific test cases.
 
 | ID | Requirement | Test Case ID | Test Description | Priority |
 |:---|:---|:---|:---|:---|

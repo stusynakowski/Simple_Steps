@@ -3,7 +3,7 @@
 How a step's grid shows **what state its output is in** and **what maps to
 what** — which cells a selection was made from, which cells use it, and how
 rows line up across steps. Built on core's step output model
-([core 009](../../external/simple-steps-core/docs/core-proposals/009-step-output-model.md),
+(core 009, removed from core in `9fc60ac`,
 pin `b9f66d5` or later): results only, row ids shared between steps, a state
 per cell, data-hash versions.
 

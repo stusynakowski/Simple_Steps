@@ -11,18 +11,18 @@ Python — in a script it's the right-hand side of `wf["step"] = …`.)
 ## The shape
 
 ```
-=with_tax[mod.map(name="total"), mod.retry(times=2)](wf["items"], rate=0.1)
- ───┬───  ──────────────┬────────────────────────── ────┬─────  ───┬────
-   tool        modifiers: one verb, then             input     arguments
-               optional execution modifiers
+=with_tax[mod.map(), mod.name("total"), mod.retry(times=2)](wf["items"], rate=0.1)
+ ───┬───  ────────────────────┬───────────────────────── ────┬─────  ───┬────
+   tool    modifiers: one verb, its name, then            input     arguments
+           optional execution modifiers
 ```
 
 | part | what it is | rules |
 |---|---|---|
 | **tool** | a tool's name, or `identity` when no tool should run | must exist in the app |
-| **`[ … ]`** | modifiers | at most one *shape verb*, plus any execution modifiers; omit the brackets to let the verb be inferred |
-| **input** | `wf["step"]` | at most one; omitted for sources and sweeps |
-| **arguments** | `name=value` | literals (`1`, `"a"`, `[1, 2]`, `{"k": "v"}`, `True`), or `res["name"]` |
+| **`[ … ]`** | modifiers | at most one *shape verb*, `mod.name(…)`, plus any execution modifiers; omit the brackets to let the verb be inferred |
+| **input** | `wf["step"]`, or part of one (`wf["step"][0:2]`) | at most one; omitted for sources and sweeps |
+| **arguments** | `name=value` | literals (`1`, `"a"`, `[1, 2]`, `{"k": "v"}`, `True`), `res["name"]`, or `wf["step"]` (that step's whole table) |
 
 Modifier settings (inside `mod.verb(...)`) are always literals.
 
@@ -31,6 +31,8 @@ Modifier settings (inside `mod.verb(...)`) are always literals.
 | write | means |
 |---|---|
 | `wf["items"]` | the output of the step named `items` — the **only** way to refer to a step |
+| `wf["items"][0:2]` | its first two rows |
+| `wf["items"][cols["n"] > 1]` | its rows where `n` is over 1 |
 | `"items"` | just the text `items` |
 | `items` | an error |
 | `res["db"]` | the resource named `db` |
@@ -41,18 +43,20 @@ Modifier settings (inside `mod.verb(...)`) are always literals.
 | verb | example | effect |
 |---|---|---|
 | `source` | `=to_rows[mod.source()](data='{"n": [1, 2]}')` | builds a table from nothing |
-| `map` | `=scale[mod.map(name="score")](wf["readings"])` | one new column, one value per row |
+| `map` | `=scale[mod.map(), mod.name("score")](wf["readings"])` | one value per row; the step holds just that column |
 | `filter` | `=is_big[mod.filter()](wf["readings"])` | keeps rows where the tool returns true |
-| `expand` | `=fan_out[mod.expand(name="item")](wf["readings"])` | each row becomes several |
+| `expand` | `=fan_out[mod.expand(), mod.name("item")](wf["readings"])` | each row becomes several |
 | `collapse` | `=add_n[mod.collapse(initial=0)](wf["readings"])` | all rows reduce to one |
 | `collapse` per group | `=add_n[mod.collapse(by="bucket", initial=0)](wf["bucket"])` | one row per group |
-| `group` | `=label_city[mod.group(name="bucket")](wf["readings"])` | adds a group-key column |
+| `group` | `=label_city[mod.group(), mod.name("bucket")](wf["readings"])` | keeps the rows, adds a group-key column |
 | `table` | `=top_n[mod.table()](wf["people"], column="score", n=3)` | tool gets and returns the whole table |
 | `sweep` | `=grid_cell[mod.sweep(model=["a", "b"], window=[7, 30])]` | runs every combination; no input |
 | `widen` | `=identity[mod.widen(columns=["x", "y"])](wf["records"])` | spreads records/tuples into columns |
 
-`name=` names the new column (default `value`). It refuses to overwrite an
-existing column unless you pass `replace=True`.
+`mod.name("score")`, after the verb, names the output column; without it the
+column takes the step's name. (`mod.map(name=…)` is the retired spelling and
+is refused.) A `map` step holds only its answers: to see them beside the
+table they came from, add a step `=zip_(wf["readings"], wf["score"])`.
 
 ### Verbs that run no tool — use `identity`
 
@@ -65,29 +69,33 @@ existing column unless you pass `replace=True`.
 =identity[mod.distinct(columns=["city"])](wf["scored"])
 ```
 
+The tool can also be left off: `=mod.sort(by="score")(wf["scored"])` is the
+same step.
+
 ## Execution modifiers
 
 Added after the verb, inside the same brackets:
 
 ```
 =scale[mod.map(), mod.retry(times=2), mod.timeout(seconds=5)](wf["readings"])
-=risky[mod.map(name="out"), mod.try_except(default=-1)](wf["readings"])
+=risky[mod.map(), mod.name("out"), mod.try_except(default=-1)](wf["readings"])
 ```
 
 | modifier | effect |
 |---|---|
 | `mod.retry(times=N)` | retry a failing row up to N times (`times` is required) |
-| `mod.timeout(seconds=S)` | declares a time limit — accepted and saved, but as of this writing a slow row is **not** cut off, so don't rely on it yet |
+| `mod.timeout(seconds=S)` | a row that takes longer than S seconds fails (*TimedOut*); add `try_except` to give it a value instead |
 | `mod.try_except(default=X)` | a failing row gets X instead of stopping the run |
 
-They wrap a verb; they can't stand alone (`[mod.retry(times=2)]` is refused).
+With no shape verb beside them (`[mod.retry(times=2)]`), the verb is
+inferred, as with no brackets.
 
 ## Shortcuts
 
 | write | means |
 |---|---|
-| `=scale(wf["readings"])` | no brackets: the verb is inferred from the tool (`-> bool` filters, `(acc, x)` collapses, `-> list` expands, else map) |
-| `=scale[mod.auto()](wf["readings"])` | infer the verb again on every run |
+| `=scale(wf["readings"])` | no brackets: the verb is inferred from the tool (a `DataFrame` first input → `table`, `(acc, x)` → `collapse`, `-> list` → `expand`, else `map`). A `-> bool` tool maps to a True/False column; write `mod.filter()` to keep rows |
+| `=scale[mod.auto()](wf["readings"])` | the same: infer the verb |
 | `=[1, 2, 3]`, `={"x": 1}`, `=7` | a plain value is a one-cell source; reshape it with `expand` or `widen` |
 
 ## Built-in reducers
@@ -119,8 +127,8 @@ argument you write in the formula is used for **every** row — so writing
 an argument with a column's name hides that column (you'll get a warning):
 
 ```
-=with_tax[mod.map(name="total")](wf["items"], rate=0.1)   # rate: same for every row
-=with_tax[mod.map(name="total")](wf["items"], price=1.0)  # warns: overrides the price column
+=with_tax[mod.map(), mod.name("total")](wf["items"], rate=0.1)   # rate: same for every row
+=with_tax[mod.map(), mod.name("total")](wf["items"], price=1.0)  # warns: overrides the price column
 ```
 
 If a tool's parameter has no matching column, rename the column first:
@@ -133,11 +141,14 @@ If a tool's parameter has no matching column, rename the column first:
 
 The formula bar runs no code, so these are refused:
 
-- two inputs to one step: `scale[mod.map()](wf["a"], wf["b"])` — use a combine
-- part of a step: `wf["readings"][0:2]` — make the part its own step with `mod.slice`
-- computed arguments: `name=str.upper("ada")` — write the literal `"ADA"`
+- computed arguments: `name=str.upper("ada")` — write the literal `"ADA"`,
+  or compute it in its own step and pass `wf["…"]`
 - a step as a modifier setting: `mod.sort(by=wf["x"])` — settings are literals
 
+And one to avoid: a second step written without a name,
+`scale[mod.map()](wf["a"], wf["b"])`, is passed whole to the tool's next
+input. To line up two steps' rows, use a combine.
+
 More: [`examples/README.md`](../../../src/SIMPLE_STEPS/examples/README.md#the-formula-syntax-in-one-screen)
-and the 44-step tour in
+and the tour of every verb in
 [`examples/basic/basic_pipeline.py`](../../../src/SIMPLE_STEPS/examples/basic/basic_pipeline.py).

@@ -19,20 +19,20 @@ From the top of a step's column down:
 | part | what it does |
 |---|---|
 | **Header** | the step's name and status (*pending*, *running*, *completed*, *error*). Click it to open or close the step. Hover for **minimize** and **maximize**; drag it out to float the step in its own window. |
-| **Toolbar** | **Analytics** (chart icon), **Data** (table icon), **Settings** (gear) open panels below. On the right: **Lock** and **Delete**. |
-| **Formula row** | **▶** runs this step; **fx** opens the Formula panel; then the **formula bar**. |
-| **Panels** | whichever you've opened, always in the order Analytics, Settings, Formula, Data. Click a panel's title to fold it to just the title. |
+| **Toolbar** | four groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Settings & notes** (tune and note icons) holds the name, colour and notes. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
+| **Formula row** | **fx** opens the Formula panel; then the **formula bar**. |
+| **Panels** | whichever you've opened, always in the order Analytics, Formula, Data. Click a panel's title to fold it to just the title. |
 
 ## Write the formula
 
 Every step's formula starts with `=`. A typical one:
 
 ```
-=with_tax[mod.map(name="total")](wf["items"], rate=0.1)
+=with_tax[mod.map(), mod.name("total")](wf["items"], rate=0.1)
 ```
 
-*tool* `with_tax`, *how to apply it* `[mod.map(name="total")]` — once per row,
-answer in a column called `total` — *what to apply it to* `wf["items"]`, and
+*tool* `with_tax`, *how to apply it* `[mod.map(), mod.name("total")]` — once
+per row, answer in a column called `total` — *what to apply it to* `wf["items"]`, and
 *settings* `rate=0.1`. [04 — Expressions](04-expressions.md) explains each
 part.
 
@@ -58,6 +58,12 @@ Type the formula directly. After `=`, the bar suggests tools as you type a
 name. For now, prefer choosing the tool in the Formula panel: it writes the
 brackets and the input for you, in exactly the form below.
 
+While you type, the bar only checks that the text can be read. Press
+**Enter** to stage the step: it's then checked against the workflow (does
+the tool exist, one shape verb, the settings' types, which steps it may
+read). A step's problems show on its status pill, in its summary and in the
+Formula panel; the other steps still run.
+
 ## Point at an earlier step
 
 A step reads an earlier step with `wf["name"]` — the step's name in quotes,
@@ -72,13 +78,18 @@ the earlier steps' data light up; click in one to put a reference to it into
 the formula. *(Picking cells, rows and columns this way is being reworked, so
 the details will change.)*
 
-A step reads **one** earlier step. Two inputs at once need a *combine* — see
-[Combining steps](04-expressions.md#combining-steps).
+A reference can pick part of a step: `wf["readings"][0:2]` is its first two
+rows, `wf["readings"][cols["n"] > 1]` the rows where `n` is over 1. Either
+can be a step on its own or a tool's input.
+
+A step has **one** input. To line up the rows of two steps, use a
+*combine* — see [Combining steps](04-expressions.md#combining-steps).
 
 ## Run it
 
-- **▶** in the step's formula row runs that step. It uses the outputs of the
+- **Run** in the step's toolbar runs that step. It uses the outputs of the
   steps it reads, so run those first — or
+- **Run to the end**, beside it, runs that step and every one after it — or
 - **Run** in the workflow toolbar runs every step, in order.
 
 Then look at the output:
@@ -94,17 +105,18 @@ the details.
 
 ## When a step is refused
 
-Many mistakes are caught **before anything runs**, with a message saying
-what to write instead:
+Many mistakes are caught **when you press Enter**, before anything runs,
+with a message saying what to write instead:
 
 | you wrote | you're told |
 |---|---|
 | `scale[mod.map()](readings)` | readings is not defined. To use the step "readings", write wf["readings"] |
 | `scale[mod.map()]("readings")` | "readings" is a string. Did you mean wf["readings"]? |
-| `scale[mod.mapp()](wf["readings"])` | unknown modifier mod.mapp |
+| `scale[mod.mapp()](wf["readings"])` | no modifier 'mapp'. Known: auto, breaker, cast, collapse, … |
 | `identity[mod.select(columns=["score"])](wf["readings"])` | select names 'score', which the input does not have (it has city, n) |
-| `scale[mod.map(), mod.filter()](wf["readings"])` | 2 shape verbs in one step (map, filter); at most one is allowed. Split them into separate steps… |
-| `scale[mod.sort(by="n")](wf["readings"])` | sort applies no tool, so it runs on identity: `identity[mod.sort(by='n')](wf["…"])`. To compute with scale, use map… |
+| `scale[mod.map(), mod.filter()](wf["readings"])` | 2 shape verbs in one step (filter, map); at most one is allowed. Split them into separate steps… |
+| `scale[mod.sort(by="n")](wf["readings"])` | sort applies no tool: write mod.sort(…)(wf["…"]). To compute with scale, use map: scale[mod.map()](wf["…"]) |
+| `scale[mod.map(name="score")](wf["readings"])` | map's name= is retired: name the output with mod.name("score") after the verb |
 
 If some **rows fail** (the tool raised on them), the other rows still have
 results, and **Run** stops at that step. Add `mod.try_except()` —
@@ -129,10 +141,12 @@ step's toolbar):
 
 The name, colour and notes are saved with the workflow.
 
-## Lock and delete
+## Move, lock and delete
 
-**Delete** (bin icon) removes the step. **Lock** (padlock) guards a step
-against being deleted by accident; unlock it to delete it.
+All three are in **Manage Step**. **Move left** and **Move right** change the
+step's place in the row. **Delete step** removes it. **Lock** guards a step
+against being deleted by accident (a padlock shows on the toolbar); unlock
+it to delete it.
 
 ## A first workflow, by hand
 
@@ -142,12 +156,12 @@ with these names and formulas:
 ```
 nums      =[3, 1, 2]
 rows      =identity[mod.expand()](wf["nums"])
-sorted    =identity[mod.sort(by="value")](wf["rows"])
+sorted    =identity[mod.sort(by="rows")](wf["rows"])
 how_many  =count[mod.collapse()](wf["rows"])
 ```
 
-`nums` is one cell holding a list; `expand` turns it into three rows in a
-`value` column; `sort` orders them; `collapse` with `count` gives `3`.
+`nums` is one cell holding a list; `expand` turns it into three rows, in a
+column named after the step, `rows`; `sort` orders them; `collapse` with `count` gives `3`.
 
 ---
 

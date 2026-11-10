@@ -41,7 +41,7 @@ The icons down the left edge open the side panels:
 | **Explorer** | the workspace's files: projects and their workflows |
 | **Environment** | every tool and resource this app gives you — click one for its details |
 | **User Docs** | these pages |
-| **Settings** (bottom) | where results are kept, and eval mode |
+| **Settings** (bottom) | where results are kept (**Result Storage**) |
 
 The chat pane on the right is the [agent](05-the-agent.md). Any side panel
 can be dragged narrower, or closed with the small tab on its edge.

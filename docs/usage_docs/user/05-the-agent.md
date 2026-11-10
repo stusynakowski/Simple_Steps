@@ -12,9 +12,17 @@ dim when it's off — hover the dot to see why. The bar under the header shows
 what the agent can see: how many steps and resources the workflow has, and
 which model it's using.
 
-If it's off, the app wasn't given a model. Whoever set the app up can turn
-it on — see [Set up the agent](../developer/02-the-agent.md) in the
-Developer guide.
+If it's off, no model is set, or the one set isn't answering. Open
+**Agent settings** in the chat header and choose one: the API (any
+OpenAI-compatible server, such as OpenAI, Ollama or LM Studio, or
+Anthropic), the model, its address, and a key if it needs one. **Test
+connection** says whether it works, and what's wrong if not. The setting is
+saved for you, outside every workspace; a key is never shown again once
+saved.
+
+If the app sets the model itself, the settings show it read-only; whoever
+set the app up can change it — see
+[Set up the agent](../developer/02-the-agent.md) in the Developer guide.
 
 ## Use it
 
@@ -28,8 +36,8 @@ Developer guide.
    *"use a threshold of 50"* — and it proposes a change.
 
 You can also ask questions — *"which tool keeps the large orders?"* — and
-get an answer with no changes. The header's buttons open the agent's
-settings and clear the conversation.
+get an answer with no changes. The header's buttons open **Agent
+settings** and **Clear chat**.
 
 ## What it checks before you see a proposal
 

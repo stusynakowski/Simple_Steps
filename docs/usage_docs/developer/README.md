@@ -57,7 +57,5 @@ some details are still moving. As a rough estimate:
   `operation_type=` and `id=`), and how fully type hints such as `Literal`
   are turned into UI controls.
 - The built-in tool list, and the exact wording of error messages.
-- What `mod.timeout(...)` actually enforces (today it doesn't stop a slow
-  row).
 - Legacy CLI flags (`--ops`, `--packs`) and the deprecated `@simple_step`
   alias — don't start new work on them.

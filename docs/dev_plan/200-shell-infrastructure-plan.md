@@ -339,7 +339,7 @@ When all six are true, the infrastructure is done and feature work can return to
 
 ## 11. References
 
-- `docs/system_design/06-frontend-architecture.md` — current component tree
-- `docs/system_design/08-pipeline-persistence.md` — file format
+- `docs/archive/system_design/06-frontend-architecture.md` — current component tree
+- `docs/archive/system_design/08-pipeline-persistence.md` — file format
 - `docs/dev_plan/100-architecture.md` — canvas architecture (unchanged by this plan)
 - `docs/cleanup-map.md` — what was removed (including packs) and why

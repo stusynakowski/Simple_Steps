@@ -80,7 +80,7 @@ Read-only here; described as the app uses them. Checked by running core, per
 
 ### The grid
 
-In core's vocabulary ([core's `grid-model.md`](../../external/simple-steps-core/docs/grid-model.md)),
+In core's vocabulary ([core's `grid-model.md`](../../external/simple-steps-core/docs/design/history/grid-model.md)),
 **the grid is a step's results table: the DataFrame in `Output.data`.** It is
 not a class of its own — it's the data part of an Output, with one state per
 cell beside it:

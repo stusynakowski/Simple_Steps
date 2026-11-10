@@ -1,6 +1,6 @@
 # 128 — An agent that builds workflows
 
-> Status: **proposed**, 2026-10-30, app at `bb181ab`; the six contracts and
+> Status: **in progress** (A0, M1, M2 done 2026-11-09); proposed 2026-10-30, app at `bb181ab`; the six contracts and
 > the prerequisites (P1–P4) added 2026-11-09. Owner's goal: an agent,
 > ideally on a **local model**, that helps construct workflows. Its graph is
 > very simple; it can only **propose, load and invoke the tools and
