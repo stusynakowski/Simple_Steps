@@ -53,7 +53,7 @@ Not needed for today's functionality; core makes them possible.
 
 | | What | Why it waits |
 |---|---|---|
-| L1 | Core's `formula(text)` in place of the app's parser (`operation_formula.py`, 923 lines). The app's parser refuses core's new pick forms: conditions (`wf["r"][cols["n"] > 1]`), a string as a column (`wf["r"]["n"]`), a pick as a tool's input | the app writes none of them today. Supersedes the "replace the parser" answer of 2026-11-09's first plan |
+| L1 | Core's `formula(text)` in place of the app's parser (`operation_formula.py`, 923 lines). The app's parser refuses core's new pick forms: conditions (`wf["r"][cols["n"] > 1]`), a string as a column (`wf["r"]["n"]`), a pick as a tool's input | **Decided, §6**; D3 waits on the message review |
 | L2 | `kernels.py` reads what core's kernel reports (`repr(k)`, `step.problems`, `k.needs_run()`) | a refactor; nothing fails without it |
 | L3 | **Done 2026-11-09.** A step's problems are listed in its summary and on its status pill's hover (they were synced but never shown); a step reading a stale one shows *out of date*, with core's reason (`read stale 's'`, from `k.needs_run()`); the summary shows *Core runs:* the formula core holds when it differs from the one written (the verb it decided, the bindings it wrote) | — |
 | L4 | Progress and `cancel()` (K23), the output store (C32), media (R7), stages (R9) | core hasn't built them; the app keeps its own (archive 01 §5) |
@@ -75,3 +75,33 @@ Not needed for today's functionality; core makes them possible.
 | pin and submodule to `fed4d1a` | done: preflight 3/3 | `6c5883d` |
 | §1 adjustments | done: pytest at baseline, every example passes | `7613805`, this commit |
 | §2 gates | pytest at baseline (1 failure); every example; vitest 145/145; preflight 3/3; smoke_install 20/20. The UI pass by hand is still to do | this commit |
+
+## 6. L1: core reads formulas (decisions, owner, 2026-11-09)
+
+What core's `formula(text)` does, run on `fed4d1a`: reads every form,
+the new picks included; needs no kernel; takes a leading `=`; refuses code
+(`__import__` → refused). `Operation.to_source()` prints one back. It reads
+syntax only: an unknown tool, two shape verbs or a misspelt setting is
+refused when the step is assigned (`k.check`). It gives no reference
+positions.
+
+| # | Decision | Decided |
+|---|---|---|
+| D1 | What replaces `operation_formula.py` | core reads the text; a thin app adapter keeps `/api/parse_formula` and `/api/format_formula` answering in the same shape, so the frontend is unchanged |
+| D2 | When a formula is checked | **Serious parsing and validation happen when the formula is submitted (Enter) or the formula form changes**, against the workflow's live kernel (`k.check`), which knows the inputs and their columns. While typing, only what is cheap: core's `formula()` for syntax and the reference positions. Today the bar calls `/api/parse_formula` on every keystroke |
+| D3 | Whose wording | **Simple Steps' Python-development wording stays**: where a message tells you how to write Python, it uses Simple Steps' names (`@simple_step_tool` for core's `@tool`, `simple_step_resource` for `@resource`, `bound` for `@bound_tool`). Everything else is core's, **pending the owner's review of the specifics**: [core_migration_L1_messages.md](core_migration_L1_messages.md), 56 cases side by side |
+| D4 | The app's own rules | drop those core decides otherwise on purpose (a pick on its own is a step; a pick as a tool's input); keep the rest as `SHIM(core §X)` plus an ask. A table of every rule before anything is deleted |
+| D5 | Reference positions (126 F8) | the app finds them with `ast` on text core accepted (about 30 lines, a shim) and asks core for them |
+| D6 | The step editor and the new picks | conditions and picks as inputs work in the formula bar; the editor shows those parts as written text, through its `{$expr}` passthrough. Real editor controls belong to plan 130 |
+| D7 | Order | open; recommended: its own branch after `core-v1` merges |
+
+### What the message review found (D3)
+
+| Group | Cases | What it means |
+|---|---|---|
+| A. the same, or nearly | 12 | core's wording, no loss |
+| B. core is better | 5 | core catches an unknown tool, an unknown step, a plain function (`print`), and knows the data (`column 3 of 's', which has 2 columns`) |
+| C. core accepts, on purpose | 3 | a pick as a step, a pick as an input, a verb decided (S3) |
+| D. core accepts, probably shouldn't | 4 | a tool with a verb but no input (`dbl[mod.map()]`); a source given an input; an unquoted setting (`mod.sort(by=n)`) |
+| E. core's wording is worse | 25 | refuses rightly but says less (`dbl[mod.map()](s)`: app *"s is not defined. To use the step "s", write wf["s"]"*, core *"a tool's input in a formula is a step or a pick…"*); leaks internals (`binop`, `got Modifier`, `<Operation s>`); one names `@tool` |
+| F. core's error looks like a bug | 5 | `'ResRef' object is not iterable`; an empty message; `res["db"]` alone answered with `data_version has no instance` |
