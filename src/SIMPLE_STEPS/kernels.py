@@ -429,7 +429,7 @@ def view(session_id: str, key: str, name: str, start: int = 0, stop: int = 50) -
             for column in columns:
                 found = row["cells"].get(column["name"], {})
                 out = cell(int(row["position"]), str(column["name"]), found.get("value"), preview=False)
-                out.update(state=found.get("state"), type=found.get("type"), id=_plain(row["id"]))
+                out.update(state=found.get("state"), type=found.get("type"), id=_plain(row["#"]))
                 if found.get("error"):
                     out["error"] = str(found["error"])
                 cells.append(out)

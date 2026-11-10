@@ -27,6 +27,8 @@ Before: the app imports fine; `pytest` 14 failed (baseline 1, the known
 | 4 | `mod.copy` is a new verb that needs `columns=` | 2 `copy` cases in `test_formula_switching` (the test lists every no-tool verb) | the test's settings table gives `copy` its `columns=` |
 | 5 | **S3**: an unwritten verb is decided when the step is and written (`mod.map()` plus a default breaker); `mod.auto()` is no longer saved (`2f40797`) | `test_tool_handle::test_a_step_input_infers_the_verb` | expectation |
 | 6 | **S3**: a `-> bool` tool with no verb **maps**; keeping rows is written, `mod.filter()`. `k.infer_verb` says so: *"to keep rows, write mod.filter()"* | example `auto_filter`; the "to a filter tool" switch | expectations. No editor change: `/api/infer_verb` already carries core's reason |
+| 8 | **S5a**: a view row's number is `#`; its `id` field is gone | `/api/view` (the grid) raised `KeyError: 'id'`. No test covers it; found driving the UI's calls | `kernels.view` reads `row["#"]`: a pick's integer is that row number (S5d) |
+| 9 | **SM** (owner, 2026-11-04): only the edited step is stale; a reader turns stale once the step before it re-runs with new data | nothing fails; the grid marks fewer steps out of date after an edit than before | none: core's rule |
 | 7 | **S3**: a parameter binds the lone column of its type, and core writes the binding (`name=wf["people"][cols["first"]]`); with several it is refused and the message writes the fix | bad examples `parameter_not_a_column`, `reads_a_result` now run | `people` gets a second text column, so the first is still refused. `reads_a_result` is removed: core accepts it on purpose (§4) |
 
 Every test edit asserts behaviour core removed on purpose (owner go-ahead
@@ -34,8 +36,8 @@ Every test edit asserts behaviour core removed on purpose (owner go-ahead
 (checked: the written bindings, the breaker).
 
 New for core, in [008](../core-proposals/008-core-changes.md) (§ At core
-v1.0.1): **C39**, a source's one column is still `value` while every other
-verb's takes the step's name; **C36**, `map`'s `name` still defaults to
+v1.0.1): **C39**, a source's one column (and a literal's, and the empty step's) is
+still `value` while every other verb's takes the step's name; **C36**, `map`'s `name` still defaults to
 `'value'`. All six shims (C18, C32, C33, C34, C36, C37) still apply.
 
 ## 2. Gates

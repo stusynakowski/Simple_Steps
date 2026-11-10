@@ -1946,7 +1946,8 @@ each run against core alone, 2026-11-09. The six shims of the 0.2.0 section
 
 **Run:** `k["h"] = hello[mod.source()]()` (`-> str`), `k["u"] = up[mod.map()](wf["h"])`, `run_all`.
 
-**Got:** `h` has column `['value']`; `u` has `['u']`.
+**Got:** `h` has column `['value']`; `u` has `['u']`. A literal step
+(`k["v"] = 7`) and the empty step (`k["e"] = None`) are `value` too.
 
 **Ask:** D9 says a step's one output column takes the step's name. Either a
 source follows it too (`h`), or the rule says sources are the exception and
