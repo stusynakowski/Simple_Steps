@@ -1,6 +1,7 @@
 # 128 — An agent that builds workflows
 
-> Status: **proposed**, 2026-10-30, app at `bb181ab`. Owner's goal: an agent,
+> Status: **proposed**, 2026-10-30, app at `bb181ab`; the six contracts and
+> the prerequisites (P1–P4) added 2026-11-09. Owner's goal: an agent,
 > ideally on a **local model**, that helps construct workflows. Its graph is
 > very simple; it can only **propose, load and invoke the tools and
 > resources available** to a workflow, nothing else; its **context** (the
@@ -38,6 +39,40 @@ resource's tools, create resource types, touch another workflow, or act
 outside its budget. Every action is checked before it happens: formulas by
 `k.check` (one checker for the UI, the console and the agent), resources
 against the app's ready-made list, runs against the permissions.
+
+## Built to last: the agent touches six contracts, nothing else
+
+Added 2026-11-09 (owner: a design that weathers any later change). The old
+LangGraph path broke silently when the syntax changed: its prompt was
+hand-written and still teaches `=filter_rows(column=…)`. So the agent never
+reaches into core, the kernel, the parser or the UI's state. It uses six
+interfaces, each owned by one module and each used the same way by the UI
+and the console. A change anywhere else reaches the agent through one of
+them, or not at all.
+
+| # | Contract | What it is | Owned by | Why it lasts |
+|---|---|---|---|---|
+| 1 | **Commands**: what it can do | the workflow command protocol (`set`, `add`, `remove`, `rename`, `move`, `run`, `define_resource`, …), the one already in `types/commands.ts`, **moved to the backend** so any client can apply it to a session's workflow. The agent's output is a list of commands, never code or prose formulas | `commands.py` (new), the UI and console as clients | a new UI feature is a new command; the agent sees it in the schema |
+| 2 | **Check**: what's allowed | `check(commands) → problems`: the commands applied to a copy of the session's kernel, core's `k.check` on each step, plus the App's permissions. The same call the formula bar makes on Enter (L1 D2) | the L1 adapter | one checker: a rule that changes in core changes for the UI and the agent at once |
+| 3 | **Knowledge**: what it's told | generated at startup, never hand-written: tool cards from `catalog().describe()`; a syntax card of example formulas **built by core's constructors and printed by core** (`Operation.to_source()`), each one read back with `formula()` in a test; the App author's notes | `agent/context.py` | the card is regenerated when core's syntax changes, and its test fails if it ever teaches a form core refuses |
+| 4 | **Observation**: what it sees | the UI's own reads: the sync summary (state, why stale, problems, the formula core runs) and `/api/view` pages, trimmed by the context budget | `kernels.py`, as for the grid | no agent-only access to drift |
+| 5 | **Model**: who thinks | `Model.complete(messages, schema) → dict`, one small protocol; Ollama is one adapter, a hosted model another. The loop imports no provider SDK and no agent framework | `agent/model.py` | a new model or provider is a new adapter |
+| 6 | **Transcript**: what happened | every turn as data: context sizes, the model's output, the commands, the check results, what ran, the budget spent. The activity feed renders it; undo replays it backwards; the task suite scores it | `agent/loop.py` | debugging, undo and evaluation read one record |
+
+**The guard on all six:** the task suite (`agent_demo/ask.py`, A6) runs on
+every core pin move with a fixed model. If a change in core or the app makes
+the agent worse, the suite says so before a user does.
+
+## Before the agent
+
+Each item is small and checked by the existing gates:
+
+| # | What | Why first |
+|---|---|---|
+| P1 | Take the owner's core update (C40–C44 and anything else), move the pin, release 0.1.1 | the agent's checker and syntax card come from core |
+| P2 | **L1**: core reads formulas, one checker, check on Enter | contracts 2 and 3. An agent built on today's parser is rewritten when L1 lands |
+| P3 | **A0**: the unused LangGraph path removed (owner's go-ahead per piece) | one agent, not two |
+| P4 | **Commands on the backend** (contract 1) | propose mode can wait for it, since the UI applies proposals today; develop mode (A4) can't |
 
 ## The graph: five states, one loop
 
@@ -163,7 +198,7 @@ one agent.
 | A1 | Context layers with budgets; the syntax card generated from core; relevance ranking for tools; the context meter |
 | A2 | The workflow goal (D2) in the file and the chat pane |
 | A3 | The loop (D1) behind `/api/agent/propose`; the budget, propose mode only |
-| A4 | Develop mode: commands applied, stage, run, observe; the activity feed; marks on agent-changed steps; pause, stop, undo; permissions |
+| A4 | Develop mode, on P4's backend commands: commands applied, stage, run, observe; the activity feed; marks on agent-changed steps; pause, stop, undo; permissions |
 | A5 | Templates (D6) as few-shot context |
 | A6 | The task-suite harness: per-model results, compared |
 
