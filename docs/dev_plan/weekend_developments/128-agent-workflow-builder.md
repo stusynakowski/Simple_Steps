@@ -98,6 +98,22 @@ plan's Off / Propose / Develop):
 | C3 | Keys | **The user can define keys** (the settings panel or the App). **The agent never sees them**, and as a rule **the agent sees nothing the user can't**: its context is built only from what the UI shows (contract 4), never from settings, keys, secret resource settings or server internals. A key is never sent back to the browser either: the panel shows only whether one is set |
 | C4 | A0 | **go**: the LangGraph path removed as inventoried; the old settings replaced by the one setting |
 
+## Owner's first test (2026-11-10, Qwen 30B)
+
+The owner configured a Qwen 30B model through the settings panel (the
+OpenAI-compatible path, M1–M2) and asked the copilot to build and change
+workflows. **It works, but poorly.** What was seen, why (read in the code on
+2026-11-10), and what fixes it:
+
+| # | Seen | Why, in the code today | Fix, and where |
+|---|---|---|---|
+| T1 | **No chat sessions** | The conversation lives only in the chat pane's state (`ChatSidebar.tsx`): closing the pane or reloading loses it; there's no New chat and no list of earlier chats; the model sees only the last 6 turns | **New step A2b:** chat sessions saved with the workflow (beside its goal), New chat, earlier chats listed; each session is the transcript (contract 6), so it survives a reload |
+| T2 | **Can't make corrections** | A proposal shows each formula as read-only text with a checkbox (`ProposalCard`): apply or skip, nothing else. No way to edit a proposed formula, to say what's wrong, or to undo after applying | **A3, the review list:** edit a proposed formula in place (checked as you'd check the formula bar); *Revise* sends your comment back as feedback for another try; Undo after Keep |
+| T3 | **Unclear what changed, or what the model used** | The card shows the model's summary and the new formulas; nothing shows what the model was told, or why it chose each change | **A1:** "What the model saw", the context layers with their sizes, expandable in the chat. **A3:** each change carries a one-line *why* (the schema asks for it) and its formula before → after, the difference highlighted |
+| T4 | **Some changes can't be made** | Its action space is add, change and remove step formulas, and ready-made resources: no rename, move or run. Its syntax is a hand-written prompt that doesn't cover every form core reads | **P4:** rename, move and run as commands. **A1:** the syntax card generated from core. The owner to list the requests that failed, so each becomes a task in the suite (A6) |
+
+The order of work gains A2b; A1 and A3 take the T2–T4 items above.
+
 ## The model: any text LLM, one setting (contract 5)
 
 Owner's goal (2026-11-09): **configure one LLM, and any model that generates
@@ -280,6 +296,7 @@ one agent.
 | M2 | **Done 2026-11-09.** The settings panel on the one setting (API, model, base URL, key, temperature; Material Symbols); Test connection there, `POST /api/agent/test` and `simple-steps agent test`; the setting saved in `~/.simple_steps/agent.json` (mode 600), a key write-only and never returned; an App-given setting shown read-only. The LangGraph-era `AgentConfig` is gone (spec 016 REQ-AGENT-008, 009) |
 | A1 | Context layers with budgets; the syntax card generated from core; relevance ranking for tools; the context meter |
 | A2 | The workflow goal (D2) in the file and the chat pane |
+| A2b | **Chat sessions** (T1): saved with the workflow, New chat, earlier chats listed; a session is the transcript (contract 6) |
 | A3 | The loop (D1) behind `/api/agent/propose`; the budget, propose mode only |
 | A4 | Develop mode, on P4's backend commands: commands applied, stage, run, observe; the activity feed; marks on agent-changed steps; pause, stop, undo; permissions |
 | A5 | Templates (D6) as few-shot context |

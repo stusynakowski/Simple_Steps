@@ -174,6 +174,23 @@ exist, opened on demand. What a row pick refers to is D8.
   shape before you run*: the plan's `inverse` (`rebuild`, `trace`, `opaque`,
   `generated`).
 
+## Reported by the owner (2026-11-10)
+
+### R10 — References in the formula bar are unclear
+
+**Seen:** while writing a formula, it isn't clear what each reference is.
+
+**Today:** each `wf["…"]` in the formula bar has a dashed box in the colour of
+the step it reads (F8, R3). The colour is the only cue: the box doesn't say
+which step it reads or which argument it fills. That label exists only on the
+box in the *source* grid (`dbl · n`, 2026-11-09), which is off screen when the
+source step is far away.
+
+**To decide (owner):** how the formula bar should say it, for example:
+- a hover card on each reference: *reads `totals` → `n`, rows 0–2, column `n`*;
+- a small label after each reference, as in the grid (`totals · n`);
+- both, with the label only while the formula bar has focus.
+
 ## Progress
 
 | Date | Item | Done | Confirmed |
