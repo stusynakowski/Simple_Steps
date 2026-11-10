@@ -1221,6 +1221,21 @@
   pointer-events: none;
 }
 
+/* Who reads the boxed cells, and as what (`dbl · n`): a tab on the box's
+   top-left edge, in the reading step's colour. */
+.reference-mark-label {
+  position: absolute;
+  left: -1.5px;
+  top: 0;
+  transform: translateY(-100%);
+  padding: 0 4px;
+  border-radius: 2px 2px 0 0;
+  color: #fff;
+  font-size: 0.65rem;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 /* Resizing, as in a spreadsheet (dev_plan/126 L5): a column header's right
    edge and a # cell's bottom edge are handles. */
 .grid-header-cell { position: relative; }

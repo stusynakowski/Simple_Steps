@@ -255,7 +255,9 @@ def describe(formula: Optional[str]) -> Dict[str, Any]:
 def references(formula: str) -> List[Dict[str, Any]]:
     """Every step reference in *formula*, where it is and what it covers
     (dev_plan/126 F8): ``{"span": [start, end], "step": "r"}``, plus ``rows``
-    and ``columns`` (core's spec) for a selection, ``wf["r"][0:2][cols["n"]]``.
+    and ``columns`` (core's spec) for a selection, ``wf["r"][0:2][cols["n"]]``,
+    and ``argument``: what the reference is given as, ``"input"`` for a tool's
+    input or the keyword it's passed by (``n=wf["r"][cols["n"]]`` → ``"n"``).
 
     *span* is in characters of *formula* exactly as given, the leading ``=``
     included, so the formula bar can mark each reference and the source grid
@@ -283,7 +285,15 @@ def references(formula: str) -> List[Dict[str, Any]]:
 
     found: List[Dict[str, Any]] = []
 
-    def visit(node: ast.AST) -> None:
+    def visit(node: ast.AST, argument: Optional[str] = None) -> None:
+        if isinstance(node, ast.Call):
+            combine = isinstance(node.func, ast.Name) and node.func.id in COMBINES
+            visit(node.func)
+            for i, arg in enumerate(node.args):
+                visit(arg, "input" if i == 0 and not combine else None)
+            for kw in node.keywords:
+                visit(kw.value, kw.arg)
+            return
         if isinstance(node, ast.Subscript):
             ref = None
             try:
@@ -296,10 +306,10 @@ def references(formula: str) -> List[Dict[str, Any]]:
                 return                      # a selection core refuses covers nothing
             if ref is not None:
                 span = [offset(node.lineno, node.col_offset), offset(node.end_lineno, node.end_col_offset)]
-                found.append({"span": span, **ref})
+                found.append({"span": span, **ref, **({"argument": argument} if argument else {})})
                 return
         for child in ast.iter_child_nodes(node):
-            visit(child)
+            visit(child, argument)
 
     visit(tree.body)
     return found

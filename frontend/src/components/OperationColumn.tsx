@@ -197,8 +197,8 @@ export default function OperationColumn({
     if (!isReceiving) lastPick.current = null;
   }, [isReceiving]);
   useEffect(() => {
-    if (isReceiving) setReferences(refsOf.refs, color);
-  }, [isReceiving, refsOf.refs, color, setReferences]);
+    if (isReceiving) setReferences(refsOf.refs.map((r) => ({ ...r, reader: step.label })), color);
+  }, [isReceiving, refsOf.refs, color, setReferences, step.label]);
 
   const isScheduledInPipeline =
     pipelineStatus === 'running' &&

@@ -37,6 +37,10 @@ export interface FormulaReference {
   step: string;
   rows?: number | string | (number | string)[] | { start: number | null; stop: number | null };
   columns?: { names: string[] } | { from: string; to: string };
+  /** What it's given as: `input` for a tool's input, or the keyword (`n=…`). */
+  argument?: string;
+  /** The step whose formula holds it; set by that step when it publishes its references. */
+  reader?: string;
 }
 
 /** A tool argument: a literal, another step's value, or a resource. */

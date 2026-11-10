@@ -28,9 +28,11 @@ const ACTIVE_HEADER_BG = '#e2e5ea';
 /** Where an inspected selection is marked in the grid, against the grid. */
 interface Mark { id: number; left: number; top: number; width: number; height: number }
 
-/** A typed cell's icon (Material Symbols, never emoji); anything else is data. */
+/** A typed cell's icon (Material Symbols, never emoji), only where the summary
+ *  alone doesn't say what the cell holds: a dict's or a text's summary is its
+ *  own text, braces and all. */
 const TYPE_ICONS: Record<string, SymbolName> = {
-  image: 'image', plotly: 'bar_chart', table: 'table_chart', json: 'data_object',
+  image: 'image', plotly: 'bar_chart', table: 'table_chart',
 };
 
 /**
@@ -44,7 +46,9 @@ function CellContent({ cell }: { cell: Cell }) {
   const summary = cell.summary ?? cell.display_value;
   return (
     <span className="typed-cell" data-cell-type={cell.cell_type}>
-      <span className="typed-cell-icon"><SymbolIcon name={TYPE_ICONS[cell.cell_type] ?? 'data_object'} size={14} /></span>
+      {TYPE_ICONS[cell.cell_type] && (
+        <span className="typed-cell-icon"><SymbolIcon name={TYPE_ICONS[cell.cell_type]} size={14} /></span>
+      )}
       <span className="typed-cell-text">{summary}</span>
     </span>
   );
@@ -456,17 +460,19 @@ function Grid({
   const myRefs = wiringState.references.filter((r) => r.step === stepName);
   const outputShown = (cells ?? []).some((c) => !c.state || ['known', 'failed', 'stale', 'absent'].includes(c.state));
   const refsKey = outputShown ? JSON.stringify(myRefs) : '';
-  const [refMarks, setRefMarks] = useState<Omit<Mark, 'id'>[]>([]);
+  const [refMarks, setRefMarks] = useState<(Omit<Mark, 'id'> & { label: string })[]>([]);
   useLayoutEffect(() => {
     const place = () => {
-      const next: Omit<Mark, 'id'>[] = [];
+      const next: (Omit<Mark, 'id'> & { label: string })[] = [];
       if (outputShown) {
         for (const ref of myRefs) {
+          // Who reads it, and as what: `dbl · n`.
+          const label = [ref.reader, ref.argument].filter(Boolean).join(' · ');
           for (const box of referenceBoxes(ref, rows, cols, idOf)) {
             const a = elementAt(box.rows[0], box.cols[0]);
             const b = elementAt(box.rows[box.rows.length - 1], box.cols[box.cols.length - 1]);
             if (!a || !b) continue;
-            next.push({ left: a.offsetLeft, top: a.offsetTop,
+            next.push({ left: a.offsetLeft, top: a.offsetTop, label,
               width: b.offsetLeft + b.offsetWidth - a.offsetLeft, height: b.offsetTop + b.offsetHeight - a.offsetTop });
           }
         }
@@ -660,7 +666,11 @@ function Grid({
         )}
         {refMarks.map((m, i) => (
           <div key={`ref-${i}`} className="reference-mark" aria-hidden="true"
-            style={{ left: m.left, top: m.top, width: m.width, height: m.height, borderColor: wiringState.referenceColor ?? edge }} />
+            style={{ left: m.left, top: m.top, width: m.width, height: m.height, borderColor: wiringState.referenceColor ?? edge }}>
+            {m.label && (
+              <span className="reference-mark-label" style={{ background: wiringState.referenceColor ?? edge }}>{m.label}</span>
+            )}
+          </div>
         ))}
         {marks.map((m) => (
           <div
