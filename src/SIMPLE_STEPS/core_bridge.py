@@ -24,6 +24,9 @@ Every shim below is tagged with what removes it::
     SHIM(core §C37)  k.view / k.cell crash on a cell holding an array (an
                      image): core's _plain calls .item() on anything with a
                      dtype; unwrap numpy scalars only
+    SHIM(core §C45)  formula() raises SelectionError, not FormulaError, for a
+                     selection it won't read (wf["s"][1][2]); read it as the
+                     FormulaError it is
 
 When core lands one of those, delete the tagged block. Nothing else should
 need to change — that is the point of keeping them in one file.
@@ -68,6 +71,7 @@ __all__ = [
     "save_with_outputs",
     "restore_with_outputs",
     "simple_step_resource",
+    "formula",
 ]
 
 
@@ -102,6 +106,27 @@ def _patch_plain() -> None:
 
 
 _patch_plain()
+
+
+# --------------------------------------------------------------------------- #
+# Reading formulas                                                            #
+# --------------------------------------------------------------------------- #
+
+def formula(text: str) -> Any:
+    """Core's ``formula(text)``, raising only ``FormulaError`` for text core
+    won't read.
+
+    SHIM(core §C45): for a selection it refuses (``wf["s"][1][2]``,
+    ``[[0, "a"]]``, ``[::2]``) core raises ``SelectionError``, which callers
+    expecting ``FormulaError`` don't catch: ``/api/parse_formula`` answered
+    500, and one such step failed the whole workflow's sync.
+    """
+    from simple_steps_core import FormulaError, SelectionError
+    from simple_steps_core import formula as core_formula
+    try:
+        return core_formula(text)
+    except SelectionError as exc:
+        raise FormulaError(str(exc)) from None
 
 
 # --------------------------------------------------------------------------- #

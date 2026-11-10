@@ -153,6 +153,7 @@ export default function useWorkflow() {
             plan: view.plan ?? undefined,
             viewColumns: view.columns,
             output_preview: view.cells,
+            outputRows: view.window?.of ?? s.outputRows,
           })),
         };
         setWorkflow(workflowRef.current);

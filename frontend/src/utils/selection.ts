@@ -7,13 +7,14 @@
  *
  *   whole table      wf["readings"]
  *   columns          wf["readings"][cols["n"]]   wf["readings"][cols[["city", "n"]]]
- *   one row          wf["readings"][3]            (core's row id, #)
- *   scattered rows   wf["readings"][[0, 3]]       (row ids)
- *   text row ids     wf["split"][rows["0.1"]]     (after expand or collapse; a
- *                    plain ["…"] would read as a column, so core asks for rows[…])
- *   a run of rows    wf["readings"][1:4]          (positions on screen, as core's ranges are)
+ *   one row          wf["readings"][3]
+ *   scattered rows   wf["readings"][[0, 3]]
+ *   a run of rows    wf["readings"][1:4]
  *   a cell           wf["readings"][3][cols["n"]]
  *   a block          wf["readings"][1:4][cols[["city", "n"]]]
+ *
+ * Rows are positions, 0..n-1, as core reads them: a step's `#` is its
+ * position (core-asks M1), so the grid's row is what the formula says.
  *
  * Only the text is written here; the backend's parser reads it, and core
  * checks it. A selection that isn't one rectangle (scattered cells) has no
@@ -38,12 +39,10 @@ const lit = (v: string | number) => (typeof v === 'number' ? String(v) : JSON.st
 
 /**
  * *sel* on step *step* in core's notation. *rows* and *cols* are the grid's
- * row positions and data columns, in order; *idOf* gives each position's row
- * id (core's #), falling back to the position.
+ * row positions and data columns, in order.
  */
 export function selectionText(
   step: string, sel: GridSel | null, rows: number[], cols: string[],
-  idOf: Record<number, string | number> = {},
 ): string | null {
   if (!sel || sel.kind === 'index') return null;
   const ref = stepRef(step);
@@ -59,19 +58,13 @@ export function selectionText(
 
   const rowList = rows.filter((r) => rowSet.has(r));
   const colList = cols.filter((c) => colSet.has(c));
-  const id = (r: number) => idOf[r] ?? r;
 
   let rowPart = '';
   if (rowList.length !== rows.length) {
     const first = rows.indexOf(rowList[0]);
     const contiguous = rowList.every((r, i) => rows[first + i] === r);
-    const ids = rowList.map(id);
-    const texty = ids.some((v) => typeof v === 'string');
     if (contiguous && rowList.length > 1) rowPart = `[${rowList[0]}:${rowList[rowList.length - 1] + 1}]`;
-    else {
-      const one = ids.length === 1 ? lit(ids[0]) : `[${ids.map(lit).join(', ')}]`;
-      rowPart = texty ? `[rows[${one}]]` : `[${one}]`;
-    }
+    else rowPart = rowList.length === 1 ? `[${rowList[0]}]` : `[[${rowList.join(', ')}]]`;
   }
   let colPart = '';
   if (colList.length !== cols.length) {
@@ -125,24 +118,28 @@ export interface GridBox { rows: number[]; cols: string[] }
 /**
  * The cells of this grid a formula's reference covers (dev_plan/126 R3), as
  * rectangles to box: one per run of adjacent rows and adjacent columns.
- * Read as core reads it: single and listed rows by row id (*idOf*), a range
- * by position, no rows or no columns meaning all of them.
+ * Read as core reads it: rows are positions (a negative one counts back from
+ * the step's *total* rows), columns are data columns by name or position, and
+ * no rows or no columns means all of them. A condition (`cols["n"] > 5`)
+ * boxes nothing: which rows match is core's to say, and a box around every
+ * row would be wrong.
  */
 export function referenceBoxes(
   ref: Pick<FormulaReference, 'rows' | 'columns'>, rows: number[], cols: string[],
-  idOf: Record<number, string | number> = {},
+  total: number = rows.length,
 ): GridBox[] {
-  const id = (r: number) => String(idOf[r] ?? r);
+  const at = (i: number) => (i < 0 ? total + i : i);
   let rowList = rows;
   const want = ref.rows;
   if (want !== undefined && want !== null) {
     if (typeof want === 'object' && !Array.isArray(want)) {
-      const start = want.start ?? 0;
-      const stop = want.stop ?? Number.POSITIVE_INFINITY;
+      if ('where' in want) return [];
+      const start = want.start == null ? 0 : at(want.start);
+      const stop = want.stop == null ? total : at(want.stop);
       rowList = rows.filter((r) => r >= start && r < stop);
     } else {
-      const ids = new Set((Array.isArray(want) ? want : [want]).map(String));
-      rowList = rows.filter((r) => ids.has(id(r)));
+      const picked = new Set((Array.isArray(want) ? want : [want]).filter((v): v is number => typeof v === 'number').map(at));
+      rowList = rows.filter((r) => picked.has(r));
     }
   }
   let colList = cols;
@@ -152,6 +149,13 @@ export function referenceBoxes(
     const a = cols.indexOf(named.from);
     const b = cols.indexOf(named.to);
     colList = a < 0 || b < 0 ? [] : cols.slice(Math.min(a, b), Math.max(a, b) + 1);
+  } else if (named && 'positions' in named) {
+    const p = named.positions;
+    const n = cols.length;
+    const pos = (i: number) => (i < 0 ? n + i : i);
+    colList = Array.isArray(p)
+      ? p.map(pos).filter((i) => i >= 0 && i < n).map((i) => cols[i])
+      : cols.slice(p.start == null ? 0 : pos(p.start), p.stop == null ? n : pos(p.stop));
   }
   const rowRuns = runs(rows, rowList);
   const colRuns = runs(cols, colList);

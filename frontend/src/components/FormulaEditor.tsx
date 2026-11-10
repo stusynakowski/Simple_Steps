@@ -388,9 +388,27 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
         data-testid={testId}
         aria-hidden
         tabIndex={-1}
+        // Focus that lands here (after a tool is chosen, or a grid pick) goes
+        // on to Monaco, where typing happens. It sits inside the bar, not at
+        // -9999px: focusing an element off to the left scrolled the steps row
+        // there, so the step jumped under the pointer.
+        onFocus={() => {
+          const editor = monacoRef.current;
+          editor?.focus();
+          // Callers set the caret here right after focusing (end of a chosen
+          // tool's formula, after an inserted pick): carry it over to Monaco.
+          setTimeout(() => {
+            const ta = shadowTextareaRef.current;
+            const model = editor?.getModel();
+            if (!ta || !editor || !model) return;
+            const a = model.getPositionAt(ta.selectionStart);
+            const b = model.getPositionAt(ta.selectionEnd);
+            editor.setSelection({ startLineNumber: a.lineNumber, startColumn: a.column, endLineNumber: b.lineNumber, endColumn: b.column });
+          }, 0);
+        }}
         style={{
           position: 'absolute',
-          left: -9999,
+          left: 0,
           top: 0,
           width: 1,
           height: 1,

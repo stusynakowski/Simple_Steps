@@ -1963,9 +1963,52 @@ run, C44 wording. **All closed in core 1.0.2 (`dbaf4c7`)**, as were C39 and
 C36's `'value'` default; no shims needed.
 
 **C36 at 1.0.2, still open in the app:** `map`'s `name` now defaults to "the
-step's name", and core accepts `mod.map(name="d")`. The app's
-`SHIM(core §C36)` still hides `name=` from the palette as retired, so it may
-now hide a valid setting. Removing it is the owner's call.
+step's name". ~~Core accepts `mod.map(name="d")`.~~ *Corrected 2026-11-10,
+run against core alone:* core **refuses** it at declaration (`checks.py`:
+"map's name= is retired: name the output with mod.name("d") after the
+verb"), so `SHIM(core §C36)`, which hides `name=` from the palette, is right
+and stays.
+
+## At core 1.0.2 (`dbaf4c7`): references and selection
+
+Found checking every pick the grid writes and every form a user can type,
+2026-11-10. Each run against core alone (a `Kernel` on the app's catalog).
+
+### C45. `formula()` raises `SelectionError` for a selection it won't read
+
+**Run:** `formula('wf["s"][1][2]')`, `formula('wf["s"][[0, "a"]]')`,
+`formula('wf["s"][::2]')`, `formula('wf["s"][1.5]')`.
+
+**Got:** each raises `SelectionError` (a `ValueError`), not `FormulaError`.
+`FormulaError` is documented as "formula text core won't read", and that's
+what these are. In the app, `/api/parse_formula` answered HTTP 500 for each
+(the formula bar got no message), and one such step made the whole
+workflow's sync fail with 400.
+
+**Ask:** `formula()` raises `FormulaError` (with the same message) for any
+text it won't read, selections included. **Shim:** `SHIM(core §C45)`,
+`core_bridge.formula`, which does exactly that; `operation_formula` reads
+through it.
+
+### C46. A cell pick on a step collapsed by group fails
+
+**Run:** `k["g"] = add_n[mod.collapse(by="city", initial=0)](wf["r"])`, then
+`k["p"] = wf["g"][1][cols["g"]]`.
+
+**Got:** `step 'p' is invalid and cannot run: select: the condition reads
+cols['city'], which 'g' doesn't have`. The same for `wf["g"][cols["g"]][1]`,
+`wf["g"][rows[1], cols["g"]]` and `wf["g"][1]["g"]`. `wf["g"][1]` alone
+works, and so does `wf["g"][[0, 2]]["city"]` (it keeps the key). A sorted or
+plain step takes the same picks.
+
+**Why, it seems:** core turns the row part of a pick on a grouped step into
+a condition on the group key (`city == …`) and applies the column part
+first, which drops the key.
+
+**Ask:** a pick's rows and columns select the same cells whatever the step's
+verb: row 1, column `g` is that one cell. The grid writes exactly this pick
+when you click a cell of a grouped step, so today it fails. No shim: the
+owner decides whether to wait for core.
 
 ### C36, again: `map`'s `name` defaults to `'value'`
 

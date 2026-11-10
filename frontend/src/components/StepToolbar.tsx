@@ -427,8 +427,8 @@ export default function StepToolbar({
               onFormulaBarRef?.(el);
             }}
             placeholder={availableOperations?.length
-              ? `=operation.source(param="value") or =operation.map(col=step1.col)`
-              : '=OPERATION.mode(param="value")'}
+              ? `=tool[mod.map()](wf["step"], setting=1) — or press fx to build it`
+              : '=tool[mod.map()](wf["step"])'}
             testId="formula-input"
           />
           </Suspense>

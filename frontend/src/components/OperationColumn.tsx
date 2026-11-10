@@ -571,6 +571,7 @@ export default function OperationColumn({
                         onPick={(pick) => pickFrom(step.label, pick)}
                         columns={step.viewColumns}
                         planNote={planNote}
+                        rowCount={step.outputRows}
                         stagedCellMode={stagedCellMode}
                         onHoverChange={(spot) => setGridHover(spot && { ...spot, step: step.label })}
                         onNoteChange={setDataNote}

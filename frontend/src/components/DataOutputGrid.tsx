@@ -106,6 +106,9 @@ interface DataOutputGridProps {
   columns?: { name: string; type?: string }[];
   /** Why a staged step's rows aren't known yet, from its plan. */
   planNote?: string;
+  /** The step's total rows (the grid may show only the first page): where a
+   *  negative row in a reference, `[-1]`, lands. */
+  rowCount?: number;
 }
 
 /**
@@ -131,6 +134,7 @@ function Grid({
   formula,
   columns,
   planNote,
+  rowCount,
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   // Looking at data (spec 014 §6, §8): a click selects — a cell, a row, a
@@ -212,7 +216,7 @@ function Grid({
   const shownSel = selection.of === cells ? selection.sel : null;
   /** While a formula is being written, tell it what the selection reads (D1). */
   const sendPick = (sel: GridSel | null) => {
-    if (wiringMode) onPick?.({ text: selectionText(stepName, sel, rows, cols, idOf) });
+    if (wiringMode) onPick?.({ text: selectionText(stepName, sel, rows, cols) });
   };
   const select = (pick: GridSelPick, e: React.MouseEvent) => {
     // The click that ends a drag: the drag already made the selection.
@@ -467,7 +471,7 @@ function Grid({
         for (const ref of myRefs) {
           // Who reads it, and as what: `dbl · n`.
           const label = [ref.reader, ref.argument].filter(Boolean).join(' · ');
-          for (const box of referenceBoxes(ref, rows, cols, idOf)) {
+          for (const box of referenceBoxes(ref, rows, cols, rowCount ?? rows.length)) {
             const a = elementAt(box.rows[0], box.cols[0]);
             const b = elementAt(box.rows[box.rows.length - 1], box.cols[box.cols.length - 1]);
             if (!a || !b) continue;

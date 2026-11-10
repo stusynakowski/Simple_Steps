@@ -35,8 +35,9 @@ export interface ParsedFormula {
 export interface FormulaReference {
   span: [number, number];
   step: string;
-  rows?: number | string | (number | string)[] | { start: number | null; stop: number | null };
-  columns?: { names: string[] } | { from: string; to: string };
+  rows?: number | string | (number | string)[] | { start: number | null; stop: number | null } | { where: unknown };
+  columns?: { names: string[] } | { from: string; to: string }
+    | { positions: number[] | { start: number | null; stop: number | null } };
   /** What it's given as: `input` for a tool's input, or the keyword (`n=…`). */
   argument?: string;
   /** The step whose formula holds it; set by that step when it publishes its references. */

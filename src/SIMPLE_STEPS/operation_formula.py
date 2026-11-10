@@ -29,7 +29,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from simple_steps_core import FormulaError, Operation  # noqa: F401  (FormulaError is re-exported)
-from simple_steps_core import formula as _core_formula
+from .core_bridge import formula as _core_formula
 
 #: Shape verbs that read no step: a call with nothing in it can be left out.
 NO_INPUT_VERBS = ("source", "sweep")
@@ -345,8 +345,10 @@ def _spec(value: Any) -> dict:
     if isinstance(value, Operation):
         return value.to_dict()
     parts = to_parts("", value) or {}
+    # A plain reference copies the step: every column, as core declares it.
+    settings = parts["modifiers"][0]["params"] or {"columns": {"positions": {"start": None, "stop": None}}}
     return {"tool": "identity", "input": {"$ref": parts.get("input")}, "arguments": {},
-            "modifiers": [{"kind": "select", "settings": parts["modifiers"][0]["params"]}]}
+            "modifiers": [{"kind": "select", "settings": settings}]}
 
 
 def _is_name(node: ast.AST, name: str) -> bool:
