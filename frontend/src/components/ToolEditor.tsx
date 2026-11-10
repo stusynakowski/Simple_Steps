@@ -7,8 +7,9 @@ import {
 import type { Step } from '../types/models';
 import {
   formatFormula, inferVerb, parseFormula,
-  type FormulaParts, type ParsedFormula,
+  type FormulaParts, type FormulaReference, type FormulaSpans, type ParsedFormula,
 } from '../utils/formulaParser';
+import { ExplodedFormula, MapLines, mapParts } from './FormulaMap';
 import {
   AUTO, autoForWiring, explicitModifiers, fromFieldText, isShapeVerb, moveModifier, partsForTool,
   toFieldText, wiringChanged, withChosenVerb, withEntry,
@@ -57,6 +58,14 @@ export interface InputUiProps {
   resources: Record<string, ResourceDeclaration>;
   onWrite: (next: FormulaParts) => void;
   onDefineResource?: (name: string, definition: string) => Promise<void>;
+  /** The formula's references (what each picked argument covers), from the parser. */
+  refs?: FormulaReference[];
+  /** The verb the tool runs under (written, or what auto resolves to): how an argument is read. */
+  verb?: string | null;
+  /** The step is a plain copy: only what it runs over applies. */
+  copy?: boolean;
+  /** Marks a field as the editor of one part of the formula (the map's lines end there). */
+  hotProps?: HotProps;
 }
 
 /** Tools that registered their own input UI, by tool id. Empty until tools can provide one. */
@@ -89,6 +98,14 @@ export default function ToolEditor({
   const [catalog, setCatalog] = useState<Record<string, ModifierInfo>>({});
   /** What `auto` (or a bracket-less formula) resolved to, and for which tool and wiring. */
   const [answer, setAnswer] = useState<{ key: string; resolved: Resolved } | null>(null);
+  /** The formula the map shows, with its parts' places and its references: always one formula's. */
+  const [shown, setShown] = useState<{ formula: string; spans?: FormulaSpans; refs: FormulaReference[] }>({ formula: '', refs: [] });
+  /** A literal step's text (`7`, `[1, 2]`): a value, no tool. */
+  const [literal, setLiteral] = useState<string | null>(null);
+  /** The part under the pointer, in the formula or its field. */
+  const [hot, setHot] = useState<string | null>(null);
+  const root = useRef<HTMLDivElement | null>(null);
+  const split = useSplit();
 
   useEffect(() => { getModifiers().then(setCatalog).catch(() => setCatalog({})); }, []);
   const isShape = (kind: string) => isShapeVerb(kind, catalog);
@@ -101,12 +118,14 @@ export default function ToolEditor({
     const empty = !formula.trim();
     (empty ? Promise.resolve(null) : parseFormula(formula)).then((p) => {
       if (cancelled) return;
-      if (!p) { setParts(null); setNotATool(false); setWarning(null); setFrozen(false); return; }
+      if (!p) { setParts(null); setNotATool(false); setWarning(null); setFrozen(false); setLiteral(null); setShown({ formula: '', refs: [] }); return; }
       if (!p.isValid) { setWarning(p.error ?? 'This formula has a syntax error.'); setFrozen(true); return; }
       setWarning(null);
       setFrozen(false);
       setParts(p.parts ?? null);
       setNotATool(!p.parts);
+      setLiteral(p.operationId === 'literal' ? formula.trim().replace(/^=/, '').trim() : null);
+      setShown({ formula, spans: p.spans, refs: p.references ?? [] });
     }).catch(() => { if (!cancelled) setWarning('Could not reach the server to check this formula.'); });
     return () => { cancelled = true; };
   }, [formula]);
@@ -148,7 +167,9 @@ export default function ToolEditor({
       setParts(res.parsed.parts ?? next);
       setWarning(null);
       // The app writes formulas with a leading '=' (docs/dev_plan/104).
-      onChange(res.formula.startsWith('=') ? res.formula : `=${res.formula}`, res.parsed);
+      const written = res.formula.startsWith('=') ? res.formula : `=${res.formula}`;
+      setShown({ formula: written, spans: res.parsed.spans, refs: res.parsed.references ?? [] });
+      onChange(written, res.parsed);
     } catch (e) {
       if (seq !== writeSeq.current) return;
       setParts(next);
@@ -179,8 +200,32 @@ export default function ToolEditor({
     style: frozen ? { opacity: 0.5, pointerEvents: 'none' as const } : undefined,
   };
 
+  // No tool: a value (`=7`) or a plain copy of a step (`=wf["r"]`). A pick
+  // with a selection is `identity` with its select, shown as such.
+  const isCopy = !!parts && parts.tool === 'identity' && parts.modifiers?.length === 1
+    && parts.modifiers[0].kind === 'select' && !Object.keys(parts.modifiers[0].params).length;
+  const noTool = literal !== null ? 'value' : isCopy ? 'copy' : null;
+  // The verb the arguments are read under: written, or what auto resolves to.
+  const written = parts?.modifiers?.find((m) => isShape(m.kind) && m.kind !== AUTO)?.kind;
+  const verb = written ?? resolved?.kind ?? null;
+  const parts_ = mapParts(shown.spans);
+  // A value step: its one field writes the formula, checked by the backend first.
+  const writeLiteral = async (text: string) => {
+    const next = `=${text.trim()}`;
+    const p = await parseFormula(next);
+    if (!p.isValid) { setWarning(`${p.error ?? 'not a value'} — not in the formula yet.`); return; }
+    setWarning(null);
+    onChange(next, p);
+  };
+  const hotProps = (key: string) => ({
+    'data-map-target': key,
+    className: hot === key ? 'te-hot' : undefined,
+    onMouseEnter: () => setHot(key),
+    onMouseLeave: () => setHot(null),
+  });
+
   return (
-    <div className="tool-editor" onClick={(e) => e.stopPropagation()}>
+    <div className="tool-editor" ref={root} onClick={(e) => e.stopPropagation()}>
       {/* A formula core can't read (as you type), else what the workflow's check
           found when the step was entered (core_migration §6 D2). */}
       {(warning || !!problems?.length) && (
@@ -190,42 +235,70 @@ export default function ToolEditor({
         </div>
       )}
 
-      <div className="te-columns">
+      {/* The formula, part by part; a dotted line from each part to its field. */}
+      {!frozen && parts_.length > 0 && (
+        <ExplodedFormula formula={shown.formula} parts={parts_} hot={hot} onHot={setHot} />
+      )}
+
+      <div className="te-columns" style={{ gridTemplateColumns: `minmax(140px, ${split.fraction}fr) 7px minmax(160px, ${1 - split.fraction}fr)` }}>
         {/* Left: what is called, and how it is applied. */}
         <div className="te-col te-col-call">
           <Section title="Tool" part="tool" note={parts?.bound_to ? `on res["${parts.bound_to}"]` : undefined}>
-            <select
-              className="te-tool-select"
-              value={frozen ? '' : parts?.tool ?? ''}
-              onChange={(e) => chooseTool(e.target.value)}
-              disabled={isCombine && !frozen}
-              title={op?.description}
-            >
-              <option value="">Choose a tool…</option>
-              {parts && !op && <option value={parts.tool}>{parts.tool}</option>}
-              {groupByCategory(tools).map(([category, ops]) => (
-                <optgroup key={category} label={category}>
-                  {ops.map((o) => <option key={o.id} value={o.id}>{o.label || o.id}</option>)}
-                </optgroup>
-              ))}
-            </select>
-            {op?.description && <div className="te-note te-tool-desc">{op.description}</div>}
+            <div {...hotProps('tool')}>
+              <select
+                className="te-tool-select"
+                value={frozen || noTool ? '' : parts?.tool ?? ''}
+                onChange={(e) => chooseTool(e.target.value)}
+                disabled={isCombine && !frozen}
+                title={op?.description}
+              >
+                <option value="">{noTool === 'value' ? 'No tool: a value' : noTool === 'copy' ? 'No tool: a copy of a step' : 'Choose a tool…'}</option>
+                {parts && !op && !noTool && <option value={parts.tool}>{parts.tool}</option>}
+                {groupByCategory(tools).map(([category, ops]) => (
+                  <optgroup key={category} label={category}>
+                    {ops.map((o) => <option key={o.id} value={o.id}>{o.label || o.id}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            {noTool === 'value' && <div className="te-note te-tool-desc">A value is its own source: no tool runs, and the step is this one value. Choose a tool to compute it instead.</div>}
+            {noTool === 'copy' && <div className="te-note te-tool-desc">No tool runs: the step is a copy of the step it reads. Select rows or columns in that step's grid to take part of it, or choose a tool.</div>}
+            {!noTool && op?.description && <div className="te-note te-tool-desc">{op.description}</div>}
           </Section>
 
-          {parts && !isCombine && (
+          {parts && !isCombine && !noTool && (
             <fieldset {...frozenProps}>
               <Section title="Modifiers" part="modifiers" summary={modifiersSummary(parts, resolved)}>
                 <ModifierList parts={parts} catalog={catalog} resolved={resolved}
-                  onWrite={write} />
+                  onWrite={write} hotProps={hotProps} />
               </Section>
             </fieldset>
           )}
         </div>
 
-        {/* Right: what the tool is given — the data it reads and its arguments. */}
+        <div
+          className="te-divider"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Drag to give the tool or the arguments more room"
+          title="Drag to resize; double-click to reset"
+          onPointerDown={(e) => split.start(e, root.current?.querySelector('.te-columns') ?? null)}
+          onDoubleClick={split.reset}
+        />
+
+        {/* Right: what the tool is given — the data it runs over and its arguments. */}
         <div className="te-col te-col-args">
-          {notATool && !frozen && (
-            <div className="te-note te-col-note">This step is a value or a reference, not a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
+          {noTool === 'value' && !frozen && (
+            <Section title="Arguments" part="arguments">
+              <div {...hotProps('value')}>
+                <Field name="value" value={literal ?? ''} description="A number, text in quotes, a list or a dict"
+                  onCommit={(text) => { void writeLiteral(text); }} />
+              </div>
+            </Section>
+          )}
+
+          {notATool && literal === null && !frozen && (
+            <div className="te-note te-col-note">This step isn't a tool call. Edit it in the formula bar, or choose a tool to replace it.</div>
           )}
 
           {parts && isCombine && !frozen && (
@@ -237,7 +310,8 @@ export default function ToolEditor({
           {parts && !isCombine && (
             <fieldset {...frozenProps}>
               <InputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
-                onWrite={write} onDefineResource={onDefineResource} />
+                onWrite={write} onDefineResource={onDefineResource}
+                refs={shown.refs} verb={verb} copy={noTool === 'copy'} hotProps={hotProps} />
             </fieldset>
           )}
 
@@ -246,14 +320,79 @@ export default function ToolEditor({
           )}
         </div>
       </div>
+
+      {!frozen && parts_.length > 0 && <MapLines root={root} hot={hot} deps={[shown, split.fraction, parts, literal, resolved]} />}
     </div>
   );
 }
 
+/** The split between the tool and the arguments: a fraction of the width, dragged, remembered per browser. */
+function useSplit() {
+  const KEY = 'simple-steps.formula-panel.split';
+  const DEFAULT = 0.4;
+  const [fraction, setFraction] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem(KEY));
+      return v > 0.15 && v < 0.85 ? v : DEFAULT;
+    } catch { return DEFAULT; }
+  });
+  const save = (v: number) => { try { localStorage.setItem(KEY, String(v)); } catch { /* not kept: fine */ } };
+  const start = (e: React.PointerEvent, columns: Element | null) => {
+    if (!columns) return;
+    e.preventDefault();
+    const box = columns.getBoundingClientRect();
+    let last = fraction;
+    const move = (ev: PointerEvent) => {
+      last = Math.min(0.8, Math.max(0.2, (ev.clientX - box.left) / box.width));
+      setFraction(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      save(last);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  const reset = () => { setFraction(DEFAULT); save(DEFAULT); };
+  return { fraction, start, reset };
+}
+
+/** What a field gets to say which part of the formula it edits, and to light up with it. */
+type HotProps = (key: string) => {
+  'data-map-target': string;
+  className?: string;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+};
+
 // ── Inputs: the default input UI ─────────────────────────────────────────────
 
-function DefaultInputUi({ parts, op, previousSteps, resources, onWrite, onDefineResource }: InputUiProps) {
+function DefaultInputUi({
+  parts, op, previousSteps, resources, onWrite, onDefineResource, refs = [], verb, copy, hotProps,
+}: InputUiProps) {
   const listId = useId();
+  const mark = (key: string) => (hotProps ? hotProps(key) : {});
+  const inputStep = parts.input ? previousSteps.find((s) => s.label === parts.input) : undefined;
+  const inputCols = columnsOf(inputStep);
+  const perRow = !verb || PER_ROW.has(verb);
+  /**
+   * The note under an argument: what the tool receives when it reads a step,
+   * else, while it's empty, where its value comes from (a column of the same
+   * name, its default, or nowhere yet). An argument may name any column:
+   * `weight=wf["r"]["n"]` gives `weight` each row's `n`.
+   */
+  const argNote = (name: string, isResource: boolean, hasDefault: boolean): string | undefined => {
+    const ref = refs.find((r) => r.argument === name);
+    if (ref) return receives(ref, verb, columnsOf(previousSteps.find((s) => s.label === ref.step)));
+    if (isResource || parts.arguments[name] !== undefined || !parts.input) return undefined;
+    if (!perRow) return undefined;
+    if (inputCols.includes(name)) return `↳ from column ${name} of ${parts.input}, each row (same name)`;
+    if (hasDefault) return undefined;
+    return inputCols.length
+      ? `↳ ${parts.input} has no column ${name}: give a value, or any column, e.g. ${name}=wf["${parts.input}"]["${inputCols[0]}"]`
+      : undefined;
+  };
   const stepOptions = previousSteps.map((s) => ({ value: `wf["${s.label}"]`, label: `step · ${s.label}` }));
   const resourceOptions = Object.keys(resources).map((n) => ({ value: `res["${n}"]`, label: `resource · ${resources[n].type}` }));
 
@@ -285,68 +424,141 @@ function DefaultInputUi({ parts, op, previousSteps, resources, onWrite, onDefine
         {[...stepOptions, ...resourceOptions].map((o) => <option key={o.value} value={o.value} label={o.label} />)}
       </datalist>
 
-      <Section title="Input" part="input" note="the data it reads">
-        <ArgRow
-          name="input"
-          hint="The step this one reads"
-          value={parts.input ? `wf["${parts.input}"]` : ''}
-          placeholder={previousSteps.length ? 'a previous step, e.g. ' + stepOptions[stepOptions.length - 1].value : 'none: a source'}
-          listId={`${listId}-steps`}
-          previousSteps={previousSteps}
-          onCommit={setInput}
-        />
-        {parts.resources.map((name, i) => (
-          <ArgRow
-            key={`res-${i}`}
-            name={`resource ${i + 1}`}
-            value={`res["${name}"]`}
-            listId={`${listId}-all`}
-            previousSteps={previousSteps}
-            resources={resources}
-            onDefineResource={onDefineResource}
-            onCommit={(text) => {
-              const v = fromFieldText(text);
-              const next = [...parts.resources];
-              if (v && typeof v === 'object' && '$res' in v) next[i] = (v as { $res: string }).$res;
-              else next.splice(i, 1);
-              onWrite({ ...parts, resources: next });
-            }}
-          />
-        ))}
-      </Section>
-
       <Section title="Arguments" part="arguments">
-        {!declared.length && !extra.length && <div className="te-note">This tool takes no arguments.</div>}
-        {declared.map((p) => (
+        {/* What it runs over: the rows it's applied to. A tool's input is not
+            just another argument: it sets the rows, and its columns fill the
+            parameters you don't set, by name. */}
+        <div {...mark('input')}>
           <ArgRow
-            key={p.name}
-            name={p.name}
-            required={p.required}
-            hint={p.description}
-            value={toFieldText(parts.arguments[p.name])}
-            placeholder={
-              p.default != null ? toFieldText(p.default)
-                : p.kind === 'resource' && parts.resources.length ? 'a resource given by position, above'
-                  : p.required ? 'a column of the input, or a value' : ''
-            }
-            options={p.options ?? undefined}
-            listId={`${listId}-all`}
+            name="runs over"
+            hint="The step this one runs over: its rows, and its columns by name"
+            value={parts.input ? `wf["${parts.input}"]` : ''}
+            placeholder={previousSteps.length ? 'a previous step, e.g. ' + stepOptions[stepOptions.length - 1].value : 'nothing: a source'}
+            listId={`${listId}-steps`}
             previousSteps={previousSteps}
-            resources={resources}
-            onDefineResource={onDefineResource}
-            onCommit={(text) => setArg(p.name, text, typeOf(p))}
+            onCommit={setInput}
+            note={inputStep && !copy ? runsOver(parts.input!, verb, inputCols) : undefined}
           />
+        </div>
+        {!copy && parts.resources.map((name, i) => (
+          <div key={`res-${i}`} {...mark(`res:${i}`)}>
+            <ArgRow
+              name={`resource ${i + 1}`}
+              value={`res["${name}"]`}
+              listId={`${listId}-all`}
+              previousSteps={previousSteps}
+              resources={resources}
+              onDefineResource={onDefineResource}
+              onCommit={(text) => {
+                const v = fromFieldText(text);
+                const next = [...parts.resources];
+                if (v && typeof v === 'object' && '$res' in v) next[i] = (v as { $res: string }).$res;
+                else next.splice(i, 1);
+                onWrite({ ...parts, resources: next });
+              }}
+            />
+          </div>
         ))}
-        {extra.map((name) => (
-          <ArgRow key={name} name={name} value={toFieldText(parts.arguments[name])}
-            hint="Passed by the formula; the tool doesn't declare it."
-            listId={`${listId}-all`} previousSteps={previousSteps} resources={resources}
-            onDefineResource={onDefineResource}
-            onCommit={(text) => setArg(name, text)} />
+        {!copy && !declared.length && !extra.length && <div className="te-note">This tool takes no other arguments.</div>}
+        {!copy && declared.map((p) => (
+          <div key={p.name} {...mark(`arg:${p.name}`)}>
+            <ArgRow
+              name={p.name}
+              required={p.required}
+              hint={p.description}
+              value={toFieldText(parts.arguments[p.name])}
+              placeholder={
+                p.default != null ? toFieldText(p.default)
+                  : p.kind === 'resource' && parts.resources.length ? 'a resource given by position, above'
+                    : p.required ? 'a column of the input, or a value' : ''
+              }
+              options={p.options ?? undefined}
+              listId={`${listId}-all`}
+              previousSteps={previousSteps}
+              resources={resources}
+              onDefineResource={onDefineResource}
+              onCommit={(text) => setArg(p.name, text, typeOf(p))}
+              note={argNote(p.name, p.kind === 'resource', p.default != null)}
+            />
+          </div>
+        ))}
+        {!copy && extra.map((name) => (
+          <div key={name} {...mark(`arg:${name}`)}>
+            <ArgRow name={name} value={toFieldText(parts.arguments[name])}
+              hint="Passed by the formula; the tool doesn't declare it."
+              listId={`${listId}-all`} previousSteps={previousSteps} resources={resources}
+              onDefineResource={onDefineResource}
+              onCommit={(text) => setArg(name, text)}
+              note={argNote(name, false, false)} />
+          </div>
         ))}
       </Section>
     </>
   );
+}
+
+// ── What an argument passes (core-asks model.md, "What an argument passes") ──
+
+/** Verbs that call the tool once per row: an argument's column gives each call its own row's cell. */
+const PER_ROW = new Set(['map', 'filter', 'expand', 'group']);
+
+/** A step's data columns, as core's view or its last run reports them. */
+function columnsOf(step: Step | undefined): string[] {
+  return step?.viewColumns?.map((c) => c.name) ?? step?.outputColumns ?? [];
+}
+
+/** The runs-over row's note: what the input sets, and how the parameters read it. */
+function runsOver(step: string, verb: string | null | undefined, cols: string[]): string {
+  const how = verb && PER_ROW.has(verb) ? 'one call per row'
+    : verb === 'collapse' ? 'all its rows combined into one (or one per group)'
+      : verb === 'table' ? 'the whole table in one call'
+        : 'its rows';
+  const named = cols.length ? ` Its columns (${cols.slice(0, 6).join(', ')}${cols.length > 6 ? ', …' : ''}) fill parameters of the same name that you don't set.` : '';
+  return `↳ ${how} of ${step}.${named}`;
+}
+
+/** Rows in core's spec, in words. */
+function rowsInWords(rows: FormulaReference['rows']): string {
+  if (rows === undefined || rows === null) return 'every row';
+  if (typeof rows === 'number') return `row ${rows}`;
+  if (Array.isArray(rows)) return `rows ${rows.join(', ')}`;
+  if (typeof rows === 'object' && 'where' in rows) return 'the rows that match the condition';
+  if (typeof rows === 'object') {
+    const a = rows.start ?? 0;
+    return rows.stop == null ? `rows ${a} to the end` : `rows ${a}–${rows.stop - 1}`;
+  }
+  return `row ${String(rows)}`;
+}
+
+/**
+ * What a tool receives for an argument that reads a step: the data, never
+ * the `#` column or the column's name. As core passes it (run 2026-11-10):
+ * a column pick gives a per-row tool each row's own cell (the steps must
+ * line up row for row, or core refuses), and anything else the whole column
+ * as a list; one cell is one value; a whole step is the same for every call,
+ * its one column as a list or, with several columns, the table.
+ */
+function receives(ref: FormulaReference, verb: string | null | undefined, cols: string[]): string {
+  const step = ref.step;
+  const names = ref.columns && 'names' in ref.columns ? ref.columns.names : null;
+  const oneRow = typeof ref.rows === 'number';
+  if (!ref.columns && ref.rows === undefined) {
+    if (cols.length === 1) {
+      return `↳ all of column ${cols[0]} of ${step}, as one list, the same for every call. For each row's own value, pick the column: wf["${step}"]["${cols[0]}"]`;
+    }
+    return `↳ the whole table ${step}${cols.length ? ` (${cols.slice(0, 6).join(', ')}${cols.length > 6 ? ', …' : ''})` : ''}, the same for every call: its data only, never the # column`;
+  }
+  if (names && names.length === 1) {
+    const col = names[0];
+    if (oneRow) return `↳ one value: ${step}, row ${ref.rows}, column ${col}. The same for every call`;
+    if (ref.rows === undefined || ref.rows === null) {
+      if (verb && PER_ROW.has(verb)) return `↳ each row's own value from column ${col} of ${step} (the values, not the column's name). ${step} must line up row for row with what this step runs over`;
+      return `↳ all of column ${col} of ${step}, as one list of its values`;
+    }
+    return `↳ column ${col} of ${step}, ${rowsInWords(ref.rows)}, as a list of values`;
+  }
+  const colWords = names ? `columns ${names.join(', ')}` : 'every data column';
+  return `↳ part of ${step}: ${rowsInWords(ref.rows)}, ${colWords}, as a table`;
 }
 
 /**
@@ -355,8 +567,10 @@ function DefaultInputUi({ parts, op, previousSteps, resources, onWrite, onDefine
  * its settings beneath it — the same literals as the Resources menu.
  */
 function ArgRow({
-  name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit,
+  name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit, note,
 }: {
+  /** What this argument passes the tool, or where its value comes from, in words. */
+  note?: string;
   name: string;
   value: string;
   placeholder?: string;
@@ -399,7 +613,7 @@ function ArgRow({
           />
         )}
       </label>
-      {stepName && (
+      {note ? <div className="te-arg-detail te-arg-receives">{note}</div> : stepName && (
         <div className="te-arg-detail">
           {step
             ? <>↳ step <b>{stepName}</b>{step.outputColumns?.length ? ` · ${step.outputColumns.length} columns: ${step.outputColumns.slice(0, 4).join(', ')}${step.outputColumns.length > 4 ? '…' : ''}` : ' · not run yet'}</>
@@ -467,11 +681,12 @@ function ResourceArg({ name, decl, onDefine }: {
 
 // ── Modifiers ────────────────────────────────────────────────────────────────
 
-function ModifierList({ parts, catalog, resolved, onWrite }: {
+function ModifierList({ parts, catalog, resolved, onWrite, hotProps }: {
   parts: FormulaParts;
   catalog: Record<string, ModifierInfo>;
   resolved: Resolved | null;
   onWrite: (p: FormulaParts) => void;
+  hotProps?: HotProps;
 }) {
   const mods = parts.modifiers ?? [];
   const setMods = (next: typeof mods) => onWrite({ ...parts, modifiers: next.length ? next : null });
@@ -504,8 +719,8 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
         const settings = (info?.settings ?? []).filter((s) => !HIDDEN_SETTINGS.has(s.name));
         const isAuto = m.kind === AUTO;
         return (
+          <div key={`${i}-${m.kind}`} {...(hotProps ? hotProps(`mod:${i}`) : {})}>
           <ModCard
-            key={`${i}-${m.kind}`}
             title={`${i + 1}. ${m.kind}`}
             summary={isAuto ? (resolved ? `→ ${resolved.kind}` : 'from the data') : info?.class}
             badge={isAuto ? resolved?.why : undefined}
@@ -545,6 +760,7 @@ function ModifierList({ parts, catalog, resolved, onWrite }: {
               />
             ))}
           </ModCard>
+          </div>
         );
       })}
       <select className="te-add" value="" onChange={(e) => add(e.target.value)} title="Add a modifier at the end of the brackets">

@@ -147,9 +147,10 @@ export default function StepToolbar({
 
   const computeSuggestions = (value: string): OperationDefinition[] => {
     const raw = value.trim();
-    // Show suggestions when user has typed '=' but hasn't opened parenthesis yet
-    if (raw.startsWith('=') && !raw.includes('(')) {
-      const partial = raw.slice(1).toUpperCase();
+    // Every tool for an empty bar (clicking into a new step shows what it can
+    // be); then the ones matching what's typed, until the call is opened.
+    if (!raw || (raw.startsWith('=') && !raw.includes('(') && !raw.includes('['))) {
+      const partial = raw.replace(/^=/, '').toUpperCase();
       return availableOperations.filter(op =>
         op.type !== 'verb' && op.type !== 'orchestrator' &&
         (op.id.toUpperCase().startsWith(partial) || op.label.toUpperCase().startsWith(partial))

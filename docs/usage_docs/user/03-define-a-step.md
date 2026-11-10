@@ -38,19 +38,44 @@ part.
 
 ### With the Formula panel (fx)
 
-The easiest way to start. Press **fx**:
+The easiest way to start. Press **fx**: the step widens, and the panel shows
+the formula **taken apart**, with a dotted line from each part to the field
+that edits it. Hover a part, or a field, and both light up.
 
-- **Tool** — choose one from the list, grouped by category. The formula is
-  written for you, already reading the previous step (a *source* tool, which
-  reads nothing, gets no input).
-- **Inputs** — which step the tool reads, a field for each of the tool's
-  settings (with its default shown), and any resource it uses.
-- **Modifiers** — the shape verb (*map*, *filter*, *collapse*, …) and
-  anything like *retry* or *try_except*. Add one from the list at the
-  bottom; reorder or remove the ones there.
+```
+=double [mod.map(), mod.name("twice")] (wf["readings"], n=wf["readings"]["n"])
+   ┆        ┆           ┆                   ┆                ┆
+  Tool    1. map      2. name           runs over            n
+```
 
-Each change rewrites the formula bar, and editing the formula bar updates the
-panel.
+- **Tool** (left) — choose one from the list, grouped by category. The
+  formula is written for you, already reading the previous step (a *source*
+  tool, which reads nothing, gets no input). A step that's just a value
+  (`=[1, 2, 3]`) or a copy of a step (`=wf["readings"]`) has no tool, and
+  says so.
+- **Modifiers** (left) — the shape verb (*map*, *filter*, *collapse*, …),
+  the output's name, and anything like *retry* or *try_except*. Add one from
+  the list at the bottom; reorder or remove the ones there.
+- **Arguments** (right) — first **runs over**: the step whose rows the tool
+  is applied to. Its columns fill the tool's parameters **by name**: a
+  parameter called `n` reads the column `n`, and the panel says so under it.
+  Then a field for each parameter, with its default shown.
+
+Under each argument that reads a step, the panel says **exactly what the
+tool receives**: always the data, never the `#` column or a column's name.
+An argument can read any column, whatever it's called:
+`n=wf["readings"]["score"]` gives `n` each row's `score`.
+
+| you write | the tool gets |
+|---|---|
+| `n=wf["r"]["score"]` | each row's own `score` (the steps must line up row for row) |
+| `n=wf["r"][2]["score"]` | one value, the same for every row |
+| `n=wf["one_column_step"]` | that column's values as one list, the same for every row |
+| `n=wf["r"]` | the whole table, the same for every row |
+
+Drag the line between the two columns to give the tool or the arguments more
+room (double-click it to reset); the dotted lines follow. Each change
+rewrites the formula bar, and editing the formula bar updates the panel.
 
 ### In the formula bar
 

@@ -257,3 +257,81 @@
   border: 1px dashed #9aa6b2;
   border-radius: 3px;
 }
+
+/* ── The map: the formula, part by part, and a line to each part's field ─── */
+/* (FormulaMap.tsx, owner 2026-11-10). The tool and the argument columns are
+   split by a divider you drag; the lines follow it. */
+
+.tool-editor { position: relative; }
+
+.fm-formula {
+  font-family: Menlo, Monaco, 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.9;
+  padding: 8px 10px 12px;
+  border-bottom: 1px solid #eef1f4;
+  word-break: break-all;
+  color: #6b7785;
+}
+.fm-chip {
+  padding: 1px 3px;
+  border-radius: 3px;
+  border-bottom: 2px dotted currentColor;
+  cursor: default;
+  transition: background 0.1s;
+}
+.fm-tool      { color: #1f6fd1; }
+.fm-modifier  { color: #8a45c4; }
+.fm-input     { color: #1e8a4c; }
+.fm-resource  { color: #c2453b; }
+.fm-argument  { color: #b4690e; }
+.fm-value     { color: #1e8a4c; }
+.fm-chip.fm-hot { background: currentColor; }
+.fm-chip.fm-hot { color: #fff; }
+.fm-chip.fm-tool.fm-hot     { background: #1f6fd1; }
+.fm-chip.fm-modifier.fm-hot { background: #8a45c4; }
+.fm-chip.fm-input.fm-hot,
+.fm-chip.fm-value.fm-hot    { background: #1e8a4c; }
+.fm-chip.fm-resource.fm-hot { background: #c2453b; }
+.fm-chip.fm-argument.fm-hot { background: #b4690e; }
+
+.fm-lines {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.fm-line {
+  fill: none;
+  stroke-width: 1.2;
+  stroke-dasharray: 2 3;
+  opacity: 0.55;
+}
+.fm-line.fm-tool     { stroke: #1f6fd1; }
+.fm-line.fm-modifier { stroke: #8a45c4; }
+.fm-line.fm-input,
+.fm-line.fm-value    { stroke: #1e8a4c; }
+.fm-line.fm-resource { stroke: #c2453b; }
+.fm-line.fm-argument { stroke: #b4690e; }
+.fm-line.fm-hot { opacity: 1; stroke-width: 2; stroke-dasharray: none; }
+
+/* A field whose part is under the pointer. */
+[data-map-target] { border-radius: 4px; transition: box-shadow 0.1s; }
+[data-map-target].te-hot { box-shadow: 0 0 0 2px #cfe0f7; background: #f5f9ff; }
+
+/* The divider between the tool and the arguments. */
+.te-divider {
+  cursor: col-resize;
+  background: linear-gradient(to right, transparent 3px, #e3e7eb 3px, #e3e7eb 4px, transparent 4px);
+  touch-action: none;
+}
+.te-divider:hover { background: linear-gradient(to right, transparent 2px, #9ab8e0 2px, #9ab8e0 5px, transparent 5px); }
+
+/* What an argument passes the tool, in words. */
+.te-arg-receives { color: #4b5a6a; font-style: normal; }
+
+@container (max-width: 420px) {
+  .te-columns { grid-template-columns: minmax(0, 1fr) !important; }
+  .te-divider { display: none; }
+}

@@ -130,7 +130,8 @@ def describe(formula: Optional[str]) -> Dict[str, Any]:
     raw = (formula or "").strip()
     out: Dict[str, Any] = {"operationId": None, "orchestration": None, "args": {},
                            "isValid": False, "rawInput": raw,
-                           "references": references(formula or "")}
+                           "references": references(formula or ""),
+                           "spans": spans(formula or "")}
     body = _body(raw)
     if not body:
         return out
@@ -206,6 +207,78 @@ def references(formula: str) -> List[Dict[str, Any]]:
 
     visit(tree.body)
     return found
+
+
+def spans(formula: str) -> Dict[str, Any]:
+    """Where each part of a tool call is in *formula*, for the Formula panel's
+    map from the text to its fields: ``tool``, ``modifiers`` (one per
+    modifier, in written order), ``input``, ``resources`` (positional ones)
+    and ``arguments`` (``name=value`` each, by name), each ``[start, end)``
+    in characters of *formula* as given, the ``=`` included, like
+    :func:`references`. Empty for a formula that isn't a tool call or isn't
+    Python yet; from ``ast`` alone, so an unknown tool still has its parts.
+    """
+    located = _locator(formula)
+    if located is None:
+        return {}
+    tree, at = located
+    if isinstance(tree, ast.Subscript) and _wf_root(tree):
+        # A pick: the step it reads, then each selector, innermost first.
+        selectors = []
+        node = tree
+        while isinstance(node, ast.Subscript) and not _is_name(node.value, "wf"):
+            selectors.insert(0, at(node.slice))
+            node = node.value
+        return {"step": at(node), "selectors": selectors}
+    if is_literal(formula):
+        return {"value": at(tree)}
+    call = tree if isinstance(tree, ast.Call) and not _mod_call(tree) else None
+    head = call.func if call else tree
+    if not isinstance(head, (ast.Subscript, ast.Name, ast.Attribute)):
+        return {}
+    out: Dict[str, Any] = {}
+    tool = head.value if isinstance(head, ast.Subscript) and not _wf_root(head) else head
+    if isinstance(tool, ast.Subscript) and (_wf_root(tool) or _res_of(tool) is not None):
+        return {}                                        # a pick or a resource, not a call
+    out["tool"] = at(tool)
+    if isinstance(head, ast.Subscript) and tool is not head:
+        mods = head.slice.elts if isinstance(head.slice, ast.Tuple) else [head.slice]
+        out["modifiers"] = [at(m) for m in mods]
+    if call is not None:
+        combine = isinstance(call.func, ast.Name) and call.func.id in COMBINES
+        positional = list(call.args)
+        if positional and not combine and _res_of(positional[0]) is None:
+            out["input"] = at(positional.pop(0))
+        out["resources"] = [at(a) for a in positional if _res_of(a) is not None]
+        out["arguments"] = {kw.arg: at(kw) for kw in call.keywords if kw.arg}
+    return out
+
+
+def _locator(formula: str):
+    """*formula*'s expression and a function giving a node's ``[start, end)``
+    in characters of *formula* (the ``=`` and any spaces before the body
+    counted); ``None`` when it isn't Python."""
+    lead = len(formula) - len(formula.lstrip())
+    start = lead + 1 if formula[lead:lead + 1] == "=" else lead
+    start += len(formula[start:]) - len(formula[start:].lstrip(" \t"))
+    body = formula[start:]
+    try:
+        tree = ast.parse(body, mode="eval")
+    except SyntaxError:
+        return None
+    lines = body.split("\n")
+    line_starts = [0]
+    for line in lines[:-1]:
+        line_starts.append(line_starts[-1] + len(line) + 1)
+
+    def offset(lineno: int, col: int) -> int:
+        line = lines[lineno - 1]
+        return start + line_starts[lineno - 1] + len(line.encode("utf-8")[:col].decode("utf-8", "ignore"))
+
+    def at(node: ast.AST) -> List[int]:
+        return [offset(node.lineno, node.col_offset), offset(node.end_lineno, node.end_col_offset)]
+
+    return tree.body, at
 
 
 def _pick_ref(text: str) -> Optional[Dict[str, Any]]:

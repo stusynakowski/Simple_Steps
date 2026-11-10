@@ -25,6 +25,28 @@ export interface ParsedFormula {
   rawInput: string;
   /** Every step reference in the formula, where it is and what it covers (dev_plan/126 F8). */
   references?: FormulaReference[];
+  /** Where each part is in the formula's characters (`operation_formula.spans`). */
+  spans?: FormulaSpans;
+}
+
+/** `[start, end)` in the formula's characters, the `=` included. */
+export type Span = [number, number];
+
+/**
+ * Where each part of a formula is (`operation_formula.spans`), for the
+ * Formula panel's map from text to fields. A tool call has `tool`,
+ * `modifiers`, `input`, `resources` and `arguments`; a pick has `step` and
+ * its `selectors`; a literal has `value`.
+ */
+export interface FormulaSpans {
+  tool?: Span;
+  modifiers?: Span[];
+  input?: Span;
+  resources?: Span[];
+  arguments?: Record<string, Span>;
+  step?: Span;
+  selectors?: Span[];
+  value?: Span;
 }
 
 /**

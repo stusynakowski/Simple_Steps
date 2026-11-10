@@ -668,3 +668,10 @@
     justify-content: center;
     width: 100%;
 }
+
+/* An expanded step with its Formula panel open widens, so the formula and its
+   map from parts to fields have room (owner, 2026-11-10). */
+.column-wrapper.expanded:has(.tool-editor) {
+  flex: 0 0 760px;
+  width: 760px;
+}
