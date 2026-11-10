@@ -742,20 +742,18 @@ if os.path.isdir(_FRONTEND_DIR):
         name="frontend-assets",
     )
 
-    # Serve other static files at root level (vite.svg, etc.)
-    @app.get("/vite.svg")
-    async def vite_svg():
-        path = os.path.join(_FRONTEND_DIR, "vite.svg")
-        if os.path.exists(path):
-            return FileResponse(path, media_type="image/svg+xml")
-        raise HTTPException(status_code=404)
-
     # SPA fallback: any non-API route serves index.html
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         # Don't intercept API routes (they're already mounted above)
         if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("openapi"):
             raise HTTPException(status_code=404)
+        # A file at the bundle's root (frontend/public: the browser icons) is
+        # served as itself; only a bare file name, so nothing outside the bundle.
+        root_file = os.path.join(_FRONTEND_DIR, full_path)
+        if (full_path and full_path == os.path.basename(full_path)
+                and full_path != "index.html" and os.path.isfile(root_file)):
+            return FileResponse(root_file)
         # no-cache: the page names this build's hashed assets, so a cached copy
         # keeps loading the previous UI after a rebuild. The assets themselves
         # are content-hashed and may be cached forever.
