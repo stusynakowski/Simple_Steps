@@ -63,6 +63,52 @@ them, or not at all.
 every core pin move with a fixed model. If a change in core or the app makes
 the agent worse, the suite says so before a user does.
 
+## The model: any text LLM, one setting (contract 5)
+
+Owner's goal (2026-11-09): **configure one LLM, and any model that generates
+text works out of the box, without issues.**
+
+**Today** (read 2026-11-09): only Ollama works. `agent/model.py` calls
+Ollama's own `/api/chat` with its structured-output `format`, which most
+servers don't have, and `resolve()` turns the agent off for any other
+provider. A second settings model, `agent/config.py`'s `AgentConfig` (from
+the LangGraph path), lists OpenAI, Anthropic and Azure, but nothing uses its
+provider except to refuse it.
+
+**Design.** The loop asks a model for text and nothing else, so anything that
+generates text can be the model:
+
+| Part | What | Why it makes any model work |
+|---|---|---|
+| **One setting** | `Agent(model=…, base_url=…, api_key_env=…)`, given by the App, or the settings panel (`agent_config.json`), or env vars, in that order. One class; `AgentConfig` goes | one place to configure, one thing to test |
+| **Three transports**, standard library only, no SDKs | **OpenAI-compatible** `/v1/chat/completions`: OpenAI, Ollama, LM Studio, vLLM, llama.cpp's server, Groq, Together, OpenRouter, Mistral, DeepSeek, Gemini's OpenAI endpoint. **Anthropic** `/v1/messages`. **A Python callable** `generate(messages) -> str`, for anything else (a transformers model, a company gateway) | two wire formats cover nearly every hosted and local server; the callable covers the rest |
+| **Text in, JSON found** | the prompt asks for one JSON object; the answer is read leniently (inside code fences, after prose) and checked against the schema by the app. A provider's JSON mode is used where it's known to work, never relied on | a model without structured output still works |
+| **One repair turn** | an answer that isn't the JSON asked for goes back once with the reason ("missing `steps`"), counted against the budget | small or chatty models recover instead of failing |
+| **Test connection** | the settings panel, and `simple-steps agent test`, send one tiny request and say exactly what's wrong: unreachable at the URL, the key refused, no such model, an answer that isn't JSON | "without issues" means a problem is named before a task is tried |
+| **Secrets** | a key is read from an environment variable named in the setting (`api_key_env="OPENAI_API_KEY"`); typed into the panel, it's kept in memory, never written to a workflow or the repo | a saved file never carries a key |
+
+**Tested without a network:** each transport against a local stub server
+speaking its wire format; the lenient reader and the repair turn on a set of
+real-world answer shapes (prose before JSON, fenced, trailing commas,
+truncated); the task suite with a scripted fake model. Real models are the
+task suite's per-model table (A6).
+
+### A0: what goes (inventory, for the owner's go-ahead per piece)
+
+| Piece | What it does | Used by |
+|---|---|---|
+| `agent/graph.py` (329 lines) | the LangGraph loop: gather context, reason, respond | `/api/agent/chat`, `/chat/stream` only |
+| `agent/prompts.py` (141) | its prompt, which teaches the retired syntax (`=filter_rows(column=…)`) | `graph.py`; `tests/test_agent_prompts.py` |
+| `POST /api/agent/chat`, `WS /api/agent/chat/stream` | the graph over REST and a WebSocket | `agentApi.sendAgentMessage`, `createAgentWebSocket`: **nothing in the UI calls them** |
+| `GET /api/agent/health` | checks that the `langchain_*` packages are installed | `agentApi.getAgentHealth` |
+| `agent/config.py`'s `AgentConfig` and `GET/PATCH /api/agent/config` | LangGraph-era settings (provider, `max_iterations`, `system_prompt_override`, …) | `AgentConfigPanel.tsx`; `model.py` reads only its file path. **Replaced, not just removed**: the panel moves to the one setting above |
+| `pyproject` extras `agent`, `agent-anthropic`, `agent-ollama` | install LangGraph and LangChain providers | nothing once the above go |
+| ADR 006 (agent chatbot) | describes the LangGraph path | marked superseded by this plan |
+
+Stays: `agent/proposals.py` (the checked proposal), `model.py` (rewritten
+as above), `scope.py`, `POST /api/agent/propose` and `GET /api/agent/status`,
+the chat pane.
+
 ## Before the agent
 
 Each item is small and checked by the existing gates:
@@ -194,7 +240,9 @@ one agent.
 
 | # | Work |
 |---|---|
-| A0 | Remove the unused LangGraph path (owner's go-ahead first) |
+| A0 | Remove the unused LangGraph path (owner's go-ahead first; inventory above) |
+| M1 | **The model** (contract 5): one `Agent` setting; the OpenAI-compatible, Anthropic and callable transports; the lenient JSON reader and the repair turn; stub-server tests |
+| M2 | Test connection in the settings panel and `simple-steps agent test`; the panel moves to the one setting; secrets from env vars |
 | A1 | Context layers with budgets; the syntax card generated from core; relevance ranking for tools; the context meter |
 | A2 | The workflow goal (D2) in the file and the chat pane |
 | A3 | The loop (D1) behind `/api/agent/propose`; the budget, propose mode only |
