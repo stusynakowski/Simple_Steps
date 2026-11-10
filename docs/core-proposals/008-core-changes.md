@@ -1954,6 +1954,13 @@ source follows it too (`h`), or the rule says sources are the exception and
 why. The app's examples expect `value` from sources and the step's name
 from everything else.
 
+### C40–C44: `formula()` and its messages
+
+Five asks found comparing the app's parser with core's `formula()`, each
+run: [012-asks-at-fed4d1a.md](012-asks-at-fed4d1a.md). C40 positional
+resources, C41 an unquoted setting (`SHIM(core §C40)`, `SHIM(core §C41)`
+once L1 lands), C42 raw errors, C43 accepted but can't run, C44 wording.
+
 ### C36, again: `map`'s `name` defaults to `'value'`
 
 **Run:** `cat.describe()["modifiers"]["map"]["settings"]`.
