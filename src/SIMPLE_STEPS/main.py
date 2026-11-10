@@ -216,6 +216,17 @@ _SKIP_DIRS = {
 }
 _SKIP_PREFIXES = (".", "__pycache__")
 
+
+def _in_workspace(path: str) -> tuple:
+    """``(workspace root, target)`` for *path*, relative to the workspace, or
+    403 when it leads outside: symlinks resolved, and compared by path
+    components, so a sibling folder (``../ws2`` for workspace ``ws``) is out."""
+    base = os.path.realpath(_WORKSPACE)
+    target = os.path.realpath(os.path.join(base, path))
+    if os.path.commonpath([base, target]) != base:
+        raise HTTPException(status_code=403, detail="Path outside workspace")
+    return base, target
+
 @app.get("/api/files")
 async def api_list_files(path: str = ""):
     """
@@ -223,12 +234,7 @@ async def api_list_files(path: str = ""):
     Each entry has: name, type ("file" | "directory"), path (relative).
     Pass ``?path=subdir`` to list a subdirectory.
     """
-    base = os.path.abspath(_WORKSPACE)
-    target = os.path.normpath(os.path.join(base, path))
-
-    # Security: prevent traversal outside workspace
-    if not target.startswith(base):
-        raise HTTPException(status_code=403, detail="Path outside workspace")
+    base, target = _in_workspace(path)
     if not os.path.isdir(target):
         raise HTTPException(status_code=404, detail="Directory not found")
 
@@ -271,11 +277,7 @@ async def api_read_file(path: str):
     Read the contents of a file relative to the workspace root.
     Returns the text content (capped at 1 MB for safety).
     """
-    base = os.path.abspath(_WORKSPACE)
-    target = os.path.normpath(os.path.join(base, path))
-
-    if not target.startswith(base):
-        raise HTTPException(status_code=403, detail="Path outside workspace")
+    _, target = _in_workspace(path)
     if not os.path.isfile(target):
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -302,11 +304,7 @@ async def api_write_file(body: FileWriteRequest):
     Write text content to a file relative to the workspace root.
     Creates parent directories if needed. Refuses writes larger than 1 MB.
     """
-    base = os.path.abspath(_WORKSPACE)
-    target = os.path.normpath(os.path.join(base, body.path))
-
-    if not target.startswith(base):
-        raise HTTPException(status_code=403, detail="Path outside workspace")
+    _, target = _in_workspace(body.path)
 
     encoded_size = len(body.content.encode("utf-8"))
     if encoded_size > 1_048_576:
