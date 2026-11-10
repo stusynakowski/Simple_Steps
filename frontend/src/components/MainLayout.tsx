@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
-import StepMinimap from './StepMinimap';
+import StepMinimap, { runState } from './StepMinimap';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
@@ -65,7 +65,7 @@ const LOG_SNAP_THRESHOLD = 80; // of console body, below its title bar
 // Room under the tallest step, so its border doesn't touch the footer.
 const STEPS_FIT_PADDING = 4;
 // The steps' map under them (StepMinimap, .step-minimap): auto-fit leaves it room.
-const STEPS_MAP_HEIGHT = 16;
+const STEPS_MAP_HEIGHT = 20;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -974,7 +974,12 @@ export default function MainLayout() {
                       {/* The steps' map: jump to a step, see where you are. */}
                       <StepMinimap
                         scroller={canvasRef}
-                        steps={workflow.steps.map((s, i) => ({ id: s.id, label: s.label, color: s.step_color ?? getStepColor(i) }))}
+                        steps={workflow.steps.map((s, i) => ({
+                          id: s.id, label: s.label, color: s.step_color ?? getStepColor(i),
+                          // Where its run stands: a status line on the map (owner, 2026-11-10).
+                          run: runState(s, pipelineStatus === 'running' && s.status === 'pending'
+                            && pipelineCursorIndex >= 0 && i >= pipelineCursorIndex),
+                        }))}
                       />
                     </div>
 

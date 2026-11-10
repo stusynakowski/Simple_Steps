@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
-import type { ReactNode } from 'react';
 import type { PanelId } from './stepPanels';
 import { PANEL_META } from './stepPanels';
 import type { SymbolName } from './SymbolIcon';
@@ -48,10 +47,6 @@ interface StepToolbarProps {
   onRunToEnd?: () => void;
   /** Drop this step's output. */
   onClearOutput?: () => void;
-  /** The step's settings (name, colour, id, status), the top of the Settings & Notes popover. */
-  settings?: ReactNode;
-  /** The step's Markdown notes, under the settings in the same popover. */
-  notes?: ReactNode;
   /** Move this step to a position, 0 the first (core's `k.move`). */
   onMove?: (to: number) => void;
   /** How many steps the workflow has, so a move knows its ends. */
@@ -88,8 +83,6 @@ export default function StepToolbar({
   onRunAll,
   onRunToEnd,
   onClearOutput,
-  settings,
-  notes,
   onMove,
   stepCount = 1,
   onDelete, 
@@ -235,9 +228,10 @@ export default function StepToolbar({
     <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
 
       {/* The step's control bar (owner, 2026-10-29/30, 2026-11-09; dev_plan/126
-          L1): four groups split by dividers, every button sharing the full
+          L1): three groups split by dividers, every button sharing the full
           width — running (Run, Run to the end, run options), the panels menu,
-          the step's settings and notes (one popover), then managing the step.
+          then managing the step. The step's settings and notes are in its
+          header (owner, 2026-11-10).
           Each pops up over the page (StepMenu); each has a hover label. A
           narrow step shows icons without words (CSS container query). */}
       <div className="toolbar step-bar" data-testid="step-toolbar">
@@ -301,20 +295,6 @@ export default function StepToolbar({
           />
         </div>
 
-        <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
-
-        <div className="step-bar-group">
-          <StepMenu icon={['tune', 'sticky_note_2']} iconSize={20} label="Step settings & notes" align="right"
-            testId="step-settings" className="step-bar-btn">
-            {settings}
-            {notes && (
-              <>
-                <div className="step-menu-subheader">Notes</div>
-                {notes}
-              </>
-            )}
-          </StepMenu>
-        </div>
 
         <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
 

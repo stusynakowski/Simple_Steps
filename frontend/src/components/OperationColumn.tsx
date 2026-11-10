@@ -13,6 +13,9 @@ import ToolEditor from './ToolEditor';
 import StepWidget from './StepWidget';
 import type { PanelId } from './stepPanels';
 import StepOverview from './StepOverview';
+import StepMenu from './StepMenu';
+import SymbolIcon from './SymbolIcon';
+import Markdown from 'react-markdown';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
 import './OperationColumn.css';
@@ -331,6 +334,100 @@ export default function OperationColumn({
     window.addEventListener('mouseup', onUp);
   };
 
+  // The step's settings and its notes: opened from the header, on hover,
+  // beside the name and status (owner, 2026-11-10).
+  const [notesOpen, setNotesOpen] = useState(false);
+  const stepSettings = (
+      <div className="settings-content">
+         <div className="config-item">
+            <label>Step Name</label>
+            <input
+              type="text"
+              value={step.label}
+              onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
+              placeholder="Enter step name..."
+            />
+         </div>
+         {/* Colour: the swatch is a native colour input, so a
+             click opens the system picker (a colour wheel on
+             macOS). Saved as the step's meta.step_color. */}
+         <div className="config-item">
+            <label htmlFor={`step-color-${step.id}`}>Color</label>
+            <div className="step-color-row">
+              <label className="step-color-button" title="Choose the step's colour">
+                <input
+                  id={`step-color-${step.id}`}
+                  type="color"
+                  className="step-color-input"
+                  value={/^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#888888'}
+                  onChange={(e) => onUpdate?.(step.id, { step_color: e.target.value })}
+                />
+                <span>Change color…</span>
+              </label>
+              {step.step_color && (
+                <button
+                  type="button"
+                  className="step-color-reset"
+                  onClick={() => onUpdate?.(step.id, { step_color: undefined })}
+                  title="Back to the default colour for this position"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+         </div>
+         <div className="summary-item">
+            <span className="label">Step ID:</span>
+            <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
+         </div>
+         <div className="summary-item">
+            <span className="label">Status:</span>
+            <span className={`status-badge status-${step.status}`}>{step.status}</span>
+         </div>
+         {/* Core's reasons the step can't run or is suspect. */}
+         {!!step.problems?.length && (
+           <div className="summary-item step-problems" data-testid="step-problems">
+             <span className="label">Problems:</span>
+             <ul className="value">
+               {step.problems.map((p) => <li key={p}>{p}</li>)}
+             </ul>
+           </div>
+         )}
+         {coreRuns && (
+           <div className="summary-item" data-testid="step-core-formula">
+             <span className="label">Core runs:</span>
+             <code className="value step-core-formula">{coreRuns}</code>
+           </div>
+         )}
+         {/* Core's warnings from the last run (spec 009 REQ-RUN-002). */}
+         {!!step.warnings?.length && (
+           <div className="summary-item step-warnings" data-testid="step-warnings">
+             <span className="label">Warnings:</span>
+             <ul className="value">
+               {step.warnings.map((w) => <li key={w}>{w}</li>)}
+             </ul>
+           </div>
+         )}
+      </div>
+  );
+  const stepNotesEditor = (
+      // Markdown, saved as the step's meta.notes; rendered under the header
+      // (an expander) and in Analytics.
+      <div className="config-item config-item--stacked">
+         <label htmlFor={`step-notes-${step.id}`}>
+           <span className="config-hint">Markdown · shown under the header and in Analytics</span>
+         </label>
+         <textarea
+           id={`step-notes-${step.id}`}
+           className="step-notes-input"
+           rows={8}
+           value={step.notes ?? ''}
+           onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
+           placeholder="What is this step for? e.g. **Keeps** only rows with a score over 5."
+         />
+      </div>
+  );
+
   return (
     <div
       ref={columnRef}
@@ -351,9 +448,19 @@ export default function OperationColumn({
                  <span className="vertical-label">{statusSpinner}{step.label}</span>
             ) : (
                 <>
-                    <div className="header-titles">
+                    {/* Name and status on one line; the step's settings and
+                        notes beside them, shown on hover (owner, 2026-11-10). */}
+                    <div className="header-titles header-one-line">
                         <h3 className="op-name">{step.label}</h3>
                         <span className={`op-status-indicator${outOfDate ? ' is-out-of-date' : ''}`} title={statusTitle}>{statusSpinner}{statusLabel}</span>
+                        <span className="step-header-inline" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+                          <StepMenu icon="tune" iconSize={15} label="Step settings" testId="step-settings" className="step-header-btn">
+                            {stepSettings}
+                          </StepMenu>
+                          <StepMenu icon="sticky_note_2" iconSize={15} label={step.notes?.trim() ? 'Edit notes' : 'Add notes'} testId="step-notes-edit" className={`step-header-btn${step.notes?.trim() ? ' has-notes' : ''}`}>
+                            {stepNotesEditor}
+                          </StepMenu>
+                        </span>
                     </div>
                 </>
             )}
@@ -396,6 +503,25 @@ export default function OperationColumn({
         </div>
       </div>
 
+      {/* The step's notes, rendered, as an expander under the header: one
+          line folded, the whole Markdown open (owner, 2026-11-10). Not on a
+          minimized or squeezed step, which keeps its header as it was. */}
+      {!isMinimized && !isSqueezed && !!step.notes?.trim() && (
+        <div className={`step-notes-header${notesOpen ? ' open' : ''}`} onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="step-notes-toggle"
+            aria-expanded={notesOpen}
+            title={notesOpen ? 'Fold the notes' : 'Show the notes'}
+            onClick={() => setNotesOpen((o) => !o)}
+          >
+            <SymbolIcon name="arrow_drop_down" size={16} className="step-notes-chevron" />
+            <span className="step-notes-preview">{notesOpen ? 'Notes' : firstLine(step.notes)}</span>
+          </button>
+          {notesOpen && <div className="step-notes-body"><Markdown>{step.notes}</Markdown></div>}
+        </div>
+      )}
+
       {/* Progress bar — visible during row-iterating operations */}
       {step.status === 'running' && progress && progress.total > 0 && (
         <div className="step-progress-bar-container">
@@ -419,96 +545,6 @@ export default function OperationColumn({
               onDeclare={onDeclare}
               onRunAll={onRunAll}
               onRunToEnd={onRunToEnd}
-              settings={
-                <div className="settings-content">
-                   <div className="config-item">
-                      <label>Step Name</label>
-                      <input
-                        type="text"
-                        value={step.label}
-                        onChange={(e) => onUpdate?.(step.id, { label: e.target.value })}
-                        placeholder="Enter step name..."
-                      />
-                   </div>
-                   {/* Colour: the swatch is a native colour input, so a
-                       click opens the system picker (a colour wheel on
-                       macOS). Saved as the step's meta.step_color. */}
-                   <div className="config-item">
-                      <label htmlFor={`step-color-${step.id}`}>Color</label>
-                      <div className="step-color-row">
-                        <label className="step-color-button" title="Choose the step's colour">
-                          <input
-                            id={`step-color-${step.id}`}
-                            type="color"
-                            className="step-color-input"
-                            value={/^#[0-9a-f]{6}$/i.test(color) ? color.toLowerCase() : '#888888'}
-                            onChange={(e) => onUpdate?.(step.id, { step_color: e.target.value })}
-                          />
-                          <span>Change color…</span>
-                        </label>
-                        {step.step_color && (
-                          <button
-                            type="button"
-                            className="step-color-reset"
-                            onClick={() => onUpdate?.(step.id, { step_color: undefined })}
-                            title="Back to the default colour for this position"
-                          >
-                            Reset
-                          </button>
-                        )}
-                      </div>
-                   </div>
-                   <div className="summary-item">
-                      <span className="label">Step ID:</span>
-                      <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
-                   </div>
-                   <div className="summary-item">
-                      <span className="label">Status:</span>
-                      <span className={`status-badge status-${step.status}`}>{step.status}</span>
-                   </div>
-                   {/* Core's reasons the step can't run or is suspect. */}
-                   {!!step.problems?.length && (
-                     <div className="summary-item step-problems" data-testid="step-problems">
-                       <span className="label">Problems:</span>
-                       <ul className="value">
-                         {step.problems.map((p) => <li key={p}>{p}</li>)}
-                       </ul>
-                     </div>
-                   )}
-                   {coreRuns && (
-                     <div className="summary-item" data-testid="step-core-formula">
-                       <span className="label">Core runs:</span>
-                       <code className="value step-core-formula">{coreRuns}</code>
-                     </div>
-                   )}
-                   {/* Core's warnings from the last run (spec 009 REQ-RUN-002). */}
-                   {!!step.warnings?.length && (
-                     <div className="summary-item step-warnings" data-testid="step-warnings">
-                       <span className="label">Warnings:</span>
-                       <ul className="value">
-                         {step.warnings.map((w) => <li key={w}>{w}</li>)}
-                       </ul>
-                     </div>
-                   )}
-                </div>
-              }
-              notes={
-                // Markdown, shown rendered in Analytics; saved as the step's
-                // meta.notes. To become the step's Markdown file's expander header.
-                <div className="config-item config-item--stacked">
-                   <label htmlFor={`step-notes-${step.id}`}>
-                     <span className="config-hint">Markdown · shown in Analytics</span>
-                   </label>
-                   <textarea
-                     id={`step-notes-${step.id}`}
-                     className="step-notes-input"
-                     rows={8}
-                     value={step.notes ?? ''}
-                     onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
-                     placeholder="What is this step for? e.g. **Keeps** only rows with a score over 5."
-                   />
-                </div>
-              }
               onMove={onMove}
               stepCount={stepCount}
               onDelete={() => onDelete(step.id)}
@@ -590,4 +626,10 @@ export default function OperationColumn({
       </div>
     </div>
   );
+}
+
+/** A note's first line, as plain text: its title when it's folded (Markdown marks dropped). */
+function firstLine(notes: string): string {
+  const line = notes.trim().split('\n').find((l) => l.trim()) ?? '';
+  return line.replace(/^#+\s*/, '').replace(/[*_`]/g, '').trim();
 }

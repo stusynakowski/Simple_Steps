@@ -18,8 +18,8 @@ From the top of a step's column down:
 
 | part | what it does |
 |---|---|
-| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*). Click it to open or close the step. Hover for **minimize** and **maximize**; drag it out to float the step in its own window. |
-| **Toolbar** | four groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Settings & notes** (tune and note icons) holds the name, colour and notes. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
+| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*), on one line. Click it to open or close the step. Hover it for **settings** (tune icon) and **notes** (note icon) beside the name, and **minimize** and **maximize** at the right; drag it out to float the step in its own window. A step with notes shows them under the header, folded to their first line. |
+| **Toolbar** | three groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
 | **Formula row** | **fx** opens the Formula panel; then the **formula bar**. |
 | **Panels** | whichever you've opened, always in the order Analytics, Formula, Data. Click a panel's title to fold it to just the title. |
 
@@ -128,6 +128,11 @@ Then look at the output:
 The **console** (terminal icon in the workflow toolbar) logs every run, with
 the details.
 
+The **map** along the bottom of the steps shows where a run stands: a thin
+line over each step, **grey** staged (not run, or out of date), **blue**
+queued or running, **green** ran, **orange** ran with some rows failed,
+**red** failed. Hover it for the step's status; click to jump to the step.
+
 ## When a step is refused
 
 Many mistakes are caught **when you press Enter**, before anything runs,
@@ -152,8 +157,8 @@ The full list, with fixes:
 
 ## Name, colour and notes
 
-Open **Settings & Notes** (the tune and note icons, one button, in the
-step's toolbar):
+Hover the step's header: the **tune** icon opens its settings, the **note**
+icon its notes.
 
 - **Step Name** — what the step is called, and what other steps write in
   `wf["…"]` to read it.
@@ -162,7 +167,8 @@ step's toolbar):
   for its position.
 - **Notes** — anything worth remembering about the step: what it's for, why
   a setting is what it is. Write in Markdown (`**bold**`, `- lists`,
-  `` `code` ``); the notes appear, formatted, in **Analytics**.
+  `` `code` ``). The notes appear, formatted, under the step's header
+  (folded to their first line: click to open) and in **Analytics**.
 
 The name, colour and notes are saved with the workflow.
 
