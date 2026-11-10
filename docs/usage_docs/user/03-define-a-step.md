@@ -18,7 +18,7 @@ From the top of a step's column down:
 
 | part | what it does |
 |---|---|
-| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*), on one line. Click it to open or close the step. Hover it for **settings** (tune icon) and **notes** (note icon) beside the name, and **minimize** and **maximize** at the right; drag it out to float the step in its own window. A step with notes has a small arrow at the header's bottom left, on hover: it opens the notes under the header. |
+| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*), on one line. Click it to open or close the step. Hover it for its controls: **settings** (tune icon) and **notes** (note icon) at the bottom left, **minimize** and **maximize** at the bottom right; drag it out to float the step in its own window. A step with notes has a small arrow at the header's bottom left, on hover: it opens the notes under the header. |
 | **Toolbar** | three groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
 | **Formula row** | **fx** opens the Formula panel; then the **formula bar**. |
 | **Panels** | whichever you've opened, always in the order Analytics, Formula, Data. Click a panel's title to fold it to just the title. |

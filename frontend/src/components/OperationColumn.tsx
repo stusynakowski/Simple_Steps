@@ -449,24 +449,31 @@ export default function OperationColumn({
                  <span className="vertical-label">{statusSpinner}{step.label}</span>
             ) : (
                 <>
-                    {/* Name and status on one line; the step's settings and
-                        notes beside them, shown on hover (owner, 2026-11-10). */}
+                    {/* Name and status on one line (owner, 2026-11-10). */}
                     <div className="header-titles header-one-line">
                         <h3 className="op-name">{step.label}</h3>
                         <span className={`op-status-indicator${outOfDate ? ' is-out-of-date' : ''}`} title={statusTitle}>{statusSpinner}{statusLabel}</span>
-                        <span className="step-header-inline" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                          <StepMenu icon="tune" iconSize={15} label="Step settings" testId="step-settings" className="step-header-btn">
-                            {stepSettings}
-                          </StepMenu>
-                          <StepMenu icon="sticky_note_2" iconSize={15} label={step.notes?.trim() ? 'Edit notes' : 'Add notes'} testId="step-notes-edit" className={`step-header-btn${step.notes?.trim() ? ' has-notes' : ''}`}>
-                            {stepNotesEditor}
-                          </StepMenu>
-                        </span>
                     </div>
                 </>
             )}
         </div>
-        {/* Hover controls — top right of the header. They stop mousedown so a
+        {/* The step's settings and notes: bottom left of the header, right of
+            the notes' expander, on hover (owner, 2026-11-10). */}
+        {!isMinimized && !isSqueezed && (
+          <span
+            className={`step-header-inline${hasNotes ? ' after-expander' : ''}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <StepMenu icon="tune" iconSize={14} label="Step settings" testId="step-settings" className="step-header-btn">
+              {stepSettings}
+            </StepMenu>
+            <StepMenu icon="sticky_note_2" iconSize={14} label={hasNotes ? 'Edit notes' : 'Add notes'} testId="step-notes-edit" className={`step-header-btn${hasNotes ? ' has-notes' : ''}`}>
+              {stepNotesEditor}
+            </StepMenu>
+          </span>
+        )}
+        {/* Hover controls — bottom right of the header. They stop mousedown so a
             click never starts the header's drag-to-detach. */}
         <div className="step-header-controls" onMouseDown={(e) => e.stopPropagation()}>
           {!isMinimized && onMinimizeStep && (

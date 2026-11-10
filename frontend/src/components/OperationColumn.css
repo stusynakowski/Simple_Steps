@@ -1037,11 +1037,11 @@
 
 
 /* ── Step header: hover controls and status spinner ────────────────────── */
-/* Minimize / maximize, top right of the header, shown on hover. Kept clear of
-   the arrow's 28px tip. */
+/* Minimize / maximize, bottom right of the header, shown on hover (owner,
+   2026-11-10). Kept clear of the arrow's 28px tip. */
 .step-header-controls {
   position: absolute;
-  top: 4px;
+  bottom: 3px;
   right: 34px;
   z-index: 3;
   display: flex;
@@ -1451,23 +1451,25 @@
 .step-menu-hint { color: #999; font-size: 11px; }
 
 /* ── Step header on one line (owner, 2026-11-10) ───────────────────────── */
-/* The name, its status, then the step's settings and notes, shown on hover
-   like minimize and maximize. */
+/* The name and its status on one line; the hover controls sit in the
+   header's bottom corners (notes, settings left; minimize, maximize right). */
 .header-titles.header-one-line {
   flex-direction: row;
   justify-content: center;
   align-items: baseline;
   gap: 8px;
-  padding: 0 70px 0 18px;   /* clear of the hover controls and the arrow's tip */
+  padding: 0 76px 0 72px;   /* clear of the corner controls and the arrow's tip */
 }
 .header-one-line .op-name { flex: 0 1 auto; min-width: 0; }
 .header-one-line .op-status-indicator { flex: none; white-space: nowrap; }
 
 .step-header-inline {
+  position: absolute;
+  left: 6px;
+  bottom: 3px;
+  z-index: 3;
   display: inline-flex;
-  align-self: center;
   gap: 3px;
-  flex: none;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
@@ -1478,9 +1480,11 @@
   opacity: 1;
   pointer-events: auto;
 }
+/* Right of the notes' expander, when the step has notes. */
+.step-header-inline.after-expander { left: 27px; }
 .step-header-inline .step-menu-toggle.step-header-btn {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 16px;
   min-width: 0;
   padding: 0;
   border: none;
