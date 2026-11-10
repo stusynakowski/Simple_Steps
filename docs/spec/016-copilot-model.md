@@ -21,3 +21,12 @@ text works (`src/SIMPLE_STEPS/agent/model.py`).
   is sent. The copilot sees nothing the user can't (C3).
 - **REQ-AGENT-007:** a failure names its cause: nothing answering at the URL,
   no key, a refused key, an unusable answer.
+- **REQ-AGENT-008:** the setting is saved per user, outside every workspace
+  (`~/.simple_steps/agent.json`, or `$SIMPLE_STEPS_AGENT_FILE`), readable only
+  by the user (mode 600). `GET /api/agent/config` returns it with where it
+  comes from (`app`, `saved`, `default`) and whether a key is set, never the
+  key. A key is write-only: a value replaces it, `""` clears it, leaving it
+  out keeps it. A setting the App gives in code wins over the saved one.
+- **REQ-AGENT-009:** Test connection (`POST /api/agent/test`, and
+  `simple-steps agent test`) sends one tiny real request, with the panel's
+  unsaved fields or the setting in use, and says what's wrong if anything.

@@ -277,7 +277,7 @@ one agent.
 |---|---|
 | A0 | **Done 2026-11-09.** The unused LangGraph path removed (inventory above) |
 | M1 | **Done 2026-11-09.** The model (contract 5): one `Agent` setting; the OpenAI-compatible, Anthropic and callable transports; the lenient JSON reader and the repair turn; JSON mode asked for and dropped when refused; keys never shown (spec 016, `tests/test_agent_model.py`, stub servers) |
-| M2 | Test connection in the settings panel and `simple-steps agent test`; the panel moves to the one setting; secrets from env vars |
+| M2 | **Done 2026-11-09.** The settings panel on the one setting (API, model, base URL, key, temperature; Material Symbols); Test connection there, `POST /api/agent/test` and `simple-steps agent test`; the setting saved in `~/.simple_steps/agent.json` (mode 600), a key write-only and never returned; an App-given setting shown read-only. The LangGraph-era `AgentConfig` is gone (spec 016 REQ-AGENT-008, 009) |
 | A1 | Context layers with budgets; the syntax card generated from core; relevance ranking for tools; the context meter |
 | A2 | The workflow goal (D2) in the file and the chat pane |
 | A3 | The loop (D1) behind `/api/agent/propose`; the budget, propose mode only |

@@ -135,6 +135,42 @@ def run_main(argv: list) -> int:
     return 0
 
 
+def agent_main(argv: list) -> int:
+    """``simple-steps agent test [app.py]`` — send the copilot's model one tiny
+    request and say what's wrong, if anything (plan 128, M2). With an app
+    file, its ``App(agent=…)``; otherwise the saved setting, else a local Ollama."""
+    parser = argparse.ArgumentParser(
+        prog="simple-steps agent",
+        description="Check the copilot's model.",
+    )
+    sub = parser.add_subparsers(dest="action", required=True)
+    test = sub.add_parser("test", help="send the model one tiny request and report what happens")
+    test.add_argument("app", nargs="?", help="an app file whose App(agent=…) to test")
+    args = parser.parse_args(argv)
+
+    if args.app:
+        from .application import AppError, load_app_file
+        try:
+            load_app_file(os.path.abspath(args.app))
+        except AppError as exc:
+            print(f"  ✗ {exc}")
+            return 1
+    from .agent.config import settings_file
+    from .agent.model import current_agent, test_connection
+    agent = current_agent()
+    if agent is None:
+        print("  ✗ The application turned the copilot off (App(agent=False)).")
+        return 1
+    where = "a Python function" if agent.generate else f"{agent.base_url} ({agent.api})"
+    print(f"  Model: {agent.model or '(none)'} at {where}")
+    print(f"  Key:   {'set' if agent.key() else 'none'}"
+          + (f" (from {agent.api_key_env})" if agent.api_key_env and not agent.api_key else ""))
+    print(f"  Saved setting: {settings_file()}")
+    result = test_connection(agent)
+    print(f"  {'✓' if result['ok'] else '✗'} {result['detail']}")
+    return 0 if result["ok"] else 1
+
+
 #: Where the examples ship: inside the package, so a pip install has them.
 EXAMPLES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "examples")
 
@@ -164,11 +200,14 @@ def main():
     # `run` is a subcommand; everything else keeps the flags it always had.
     if sys.argv[1:2] == ["run"]:
         sys.exit(run_main(sys.argv[2:]))
+    if sys.argv[1:2] == ["agent"]:
+        sys.exit(agent_main(sys.argv[2:]))
 
     parser = argparse.ArgumentParser(
         prog="simple-steps",
         description="Start the Simple Steps pipeline orchestrator. "
-                    "To serve an app file: simple-steps run app.py",
+                    "To serve an app file: simple-steps run app.py. "
+                    "To check the copilot's model: simple-steps agent test",
     )
     parser.add_argument(
         "--port", type=int, default=8000,

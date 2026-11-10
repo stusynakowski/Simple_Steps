@@ -1,6 +1,12 @@
 """
-Agent configuration — persisted as agent_config.json alongside the projects/ dir.
-Users can update LLM provider, model, temperature, and system prompt overrides.
+config.py — the copilot's saved setting (plan 128, M2; decision C3).
+
+One setting, the same fields as :class:`~.model.Agent`, saved per user in
+``~/.simple_steps/agent.json`` (or ``$SIMPLE_STEPS_AGENT_FILE``): outside every
+workspace and the repo, readable only by the user (mode 600). A key typed into
+the settings panel is kept there and nowhere else: :func:`public_settings`,
+the only view the browser gets, says whether one is set, never what it is,
+and the copilot is never told it.
 """
 
 from __future__ import annotations
@@ -8,110 +14,84 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Any, Dict
 
-from pydantic import BaseModel, Field
-
-
-# ── Default paths ────────────────────────────────────────────────────────────
-
-_CONFIG_DIR = os.environ.get(
-    "SIMPLE_STEPS_CONFIG_DIR",
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "agent_config"),
-)
-_CONFIG_FILE = os.path.join(_CONFIG_DIR, "agent_config.json")
+#: The fields a saved setting may hold.
+FIELDS = ("api", "model", "base_url", "api_key_env", "api_key", "temperature", "max_tokens")
 
 
-# ── Config model ─────────────────────────────────────────────────────────────
-
-class AgentConfig(BaseModel):
-    """User-editable configuration for the step-definition agent."""
-
-    # LLM provider
-    provider: Literal["openai", "anthropic", "ollama", "azure_openai"] = "openai"
-    model: str = "gpt-4o"
-    api_key: Optional[str] = Field(default=None, description="API key (set via env var preferred)")
-    base_url: Optional[str] = Field(default=None, description="Custom base URL (for Ollama, Azure, etc.)")
-
-    # Generation parameters
-    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
-    max_tokens: int = Field(default=2048, ge=128, le=16384)
-
-    # Agent behaviour
-    system_prompt_override: Optional[str] = Field(
-        default=None,
-        description="If set, replaces the built-in system prompt entirely.",
-    )
-    max_iterations: int = Field(
-        default=5,
-        ge=1,
-        le=20,
-        description="Max LangGraph iterations before forcing a final answer.",
-    )
-
-    # Feature flags
-    auto_suggest: bool = Field(
-        default=True,
-        description="When a new step is added, auto-suggest a function based on context.",
-    )
-    show_reasoning: bool = Field(
-        default=False,
-        description="Show the agent's internal reasoning steps in the chat.",
-    )
+def settings_file() -> Path:
+    """Where the setting is saved."""
+    env = os.environ.get("SIMPLE_STEPS_AGENT_FILE")
+    return Path(env) if env else Path.home() / ".simple_steps" / "agent.json"
 
 
-# ── Persistence helpers ──────────────────────────────────────────────────────
-
-def _ensure_dir() -> None:
-    os.makedirs(_CONFIG_DIR, exist_ok=True)
-
-
-def get_agent_config() -> AgentConfig:
-    """Load config from disk, or return defaults."""
-    if os.path.isfile(_CONFIG_FILE):
-        try:
-            with open(_CONFIG_FILE) as f:
-                data = json.load(f)
-            return AgentConfig(**data)
-        except Exception:
-            pass
-    return AgentConfig()
+def _read() -> Dict[str, Any]:
+    try:
+        data = json.loads(settings_file().read_text())
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in data.items() if k in FIELDS} if isinstance(data, dict) else {}
 
 
-def update_agent_config(patch: dict) -> AgentConfig:
-    """Merge `patch` into the current config, persist, and return the result."""
-    current = get_agent_config()
-    updated = current.model_copy(update=patch)
-    _ensure_dir()
-    with open(_CONFIG_FILE, "w") as f:
-        json.dump(updated.model_dump(), f, indent=2)
-    return updated
+def _agent(data: Dict[str, Any]):
+    from .model import Agent
+    return Agent(**{k: v for k, v in data.items() if v not in (None, "")})
 
-
-def save_agent_config(config: AgentConfig) -> None:
-    """Full overwrite."""
-    _ensure_dir()
-    with open(_CONFIG_FILE, "w") as f:
-        json.dump(config.model_dump(), f, indent=2)
-
-
-# ── The saved setting, as the copilot's model (plan 128, M1) ─────────────────
 
 def saved_agent():
-    """The copilot's model from the saved settings, or ``None`` when nothing is
-    saved. The panel's provider maps onto the model's APIs: OpenAI, Ollama and
-    Azure are OpenAI-compatible, Anthropic is its own."""
-    from .model import Agent, _ollama_v1
-    if not os.path.isfile(_CONFIG_FILE):
-        return None
-    config = get_agent_config()
-    if config.provider == "anthropic":
-        return Agent(api="anthropic", model=config.model, base_url=config.base_url or "",
-                     api_key=config.api_key or "", temperature=config.temperature,
-                     max_tokens=config.max_tokens)
-    base_url = config.base_url or ""
-    if config.provider == "ollama":
-        base_url = _ollama_v1(base_url or os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
-    return Agent(api="openai", model=config.model, base_url=base_url,
-                 api_key=config.api_key or "", temperature=config.temperature,
-                 max_tokens=config.max_tokens)
+    """The copilot's model from the saved setting, or ``None`` when none is saved."""
+    data = _read()
+    return _agent(data) if data else None
+
+
+def save_settings(patch: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge *patch* into the saved setting and return its public view.
+
+    ``api_key`` is write-only: a value replaces the saved key, ``""`` or
+    ``None`` clears it, and leaving it out keeps it. Raises ``ValueError`` for
+    a setting the model can't use (an unknown api, say).
+    """
+    data = _read()
+    for key, value in patch.items():
+        if key not in FIELDS:
+            continue
+        if key == "api_key" and not value:
+            data.pop("api_key", None)
+        else:
+            data[key] = value
+    _agent(data)                       # refuse what can't work, before writing
+    path = settings_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2)
+    os.chmod(path, 0o600)              # an existing file keeps its old mode otherwise
+    return public_settings()
+
+
+def public_settings() -> Dict[str, Any]:
+    """The setting in use, as the browser may see it: never the key.
+    ``source`` says where it comes from: ``app`` (the App's code, which the
+    panel can't change), ``saved``, ``default`` (a local Ollama) or ``off``."""
+    from .. import application
+    from .model import Agent
+    configured = getattr(application.CURRENT, "agent", None)
+    if configured is False:
+        return {"source": "off", "reason": "the application turned the copilot off (App(agent=False))"}
+    if isinstance(configured, Agent):
+        return {"source": "app", **configured.public()}
+    saved = saved_agent()
+    if saved is not None:
+        return {"source": "saved", **saved.public()}
+    return {"source": "default", **Agent().public()}
+
+
+def agent_from(settings: Dict[str, Any]):
+    """An :class:`~.model.Agent` from the panel's unsaved fields, for Test
+    connection; a key left out falls back to the saved one."""
+    data = {k: v for k, v in settings.items() if k in FIELDS and v not in (None, "")}
+    saved_key = _read().get("api_key")
+    if "api_key" not in data and saved_key:
+        data["api_key"] = saved_key
+    return _agent(data)

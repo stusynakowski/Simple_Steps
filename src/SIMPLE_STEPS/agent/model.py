@@ -120,18 +120,26 @@ class ModelError(RuntimeError):
 # Which agent, and whether it answers
 # ─────────────────────────────────────────────────────────────────────────────
 
+def current_agent() -> Optional[Agent]:
+    """The setting in use: the App's, else the saved one, else a local Ollama;
+    ``None`` when the App turned the copilot off."""
+    from .. import application
+    configured = getattr(application.CURRENT, "agent", None)
+    if configured is False:
+        return None
+    if isinstance(configured, Agent):
+        return configured
+    from .config import saved_agent
+    return saved_agent() or Agent()
+
+
 def resolve() -> Tuple[Optional[Agent], str]:
     """The agent to use, or ``(None, why the copilot is off)``. Checks only
     that the model's server answers and takes the key; :func:`test_connection`
     tries a real request."""
-    from .. import application
-    configured = getattr(application.CURRENT, "agent", None)
-    if configured is False:
-        return None, "the application turned the copilot off (App(agent=False))"
-    agent: Optional[Agent] = configured if isinstance(configured, Agent) else None
+    agent = current_agent()
     if agent is None:
-        from .config import saved_agent
-        agent = saved_agent() or Agent()
+        return None, "the application turned the copilot off (App(agent=False))"
     ok, why = reachable(agent)
     return (agent, "") if ok else (None, why)
 

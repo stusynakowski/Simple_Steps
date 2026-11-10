@@ -21,9 +21,9 @@ const proposal: AgentProposal = {
 vi.mock('../services/agentApi', () => ({
   getAgentStatus: vi.fn(async () => ({ available: true, model: 'llama3.2:3b', provider: 'ollama' })),
   proposeChanges: vi.fn(async () => proposal),
-  getAgentConfig: vi.fn(async () => ({})),
-  updateAgentConfig: vi.fn(async () => ({})),
-  getAgentHealth: vi.fn(async () => ({ ready: true })),
+  getAgentSettings: vi.fn(async () => ({ source: 'default' })),
+  saveAgentSettings: vi.fn(async () => ({ source: 'saved' })),
+  testAgentConnection: vi.fn(async () => ({ ok: true, model: 'llama3.2:3b', detail: '' })),
 }));
 
 describe('ProposalCard', () => {

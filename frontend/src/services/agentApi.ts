@@ -67,35 +67,59 @@ export async function proposeChanges(req: {
   return body;
 }
 
-// ── Settings ─────────────────────────────────────────────────────────────────
+// ── Settings (plan 128, M2) ─────────────────────────────────────────────────
 
-export interface AgentConfig {
-  provider: 'openai' | 'anthropic' | 'ollama' | 'azure_openai';
-  model: string;
-  api_key?: string | null;
-  base_url?: string | null;
-  temperature: number;
-  max_tokens: number;
-  system_prompt_override?: string | null;
-  max_iterations: number;
-  auto_suggest: boolean;
-  show_reasoning: boolean;
+/** The copilot's model setting as the browser may see it: never the key. */
+export interface AgentSettings {
+  /** app: set in the App's code (read-only here); saved; default: a local Ollama; off. */
+  source: 'app' | 'saved' | 'default' | 'off';
+  api?: 'openai' | 'anthropic';
+  provider?: string;
+  model?: string;
+  base_url?: string;
+  api_key_env?: string;
+  /** Whether a key is set; the key itself never leaves the server. */
+  api_key_set?: boolean;
+  temperature?: number;
+  max_tokens?: number;
+  reason?: string;
 }
 
-/** Fetch current agent config. */
-export async function getAgentConfig(): Promise<AgentConfig> {
-  const r = await fetch(`${API_BASE}/config`);
-  if (!r.ok) throw new Error('Failed to fetch agent config');
+/** What the panel saves or tests. ``api_key`` is write-only: a value sets it, "" clears it. */
+export interface AgentSettingsPatch {
+  api?: 'openai' | 'anthropic';
+  model?: string;
+  base_url?: string;
+  api_key_env?: string;
+  api_key?: string;
+  temperature?: number;
+}
+
+export interface AgentTestResult { ok: boolean; model: string; detail: string }
+
+export async function getAgentSettings(): Promise<AgentSettings> {
+  const r = await fetch(`${API_BASE}/config`, { credentials: 'include' });
+  if (!r.ok) throw new Error('The copilot settings could not be read.');
   return r.json();
 }
 
-/** Partially update agent config. */
-export async function updateAgentConfig(patch: Partial<AgentConfig>): Promise<AgentConfig> {
+export async function saveAgentSettings(patch: AgentSettingsPatch): Promise<AgentSettings> {
   const r = await fetch(`${API_BASE}/config`, {
-    method: 'PATCH',
+    method: 'PUT', credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
-  if (!r.ok) throw new Error('Failed to update agent config');
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? 'The settings could not be saved.');
+  return r.json();
+}
+
+/** One tiny real request with *settings* (unsaved), or the setting in use. */
+export async function testAgentConnection(settings?: AgentSettingsPatch): Promise<AgentTestResult> {
+  const r = await fetch(`${API_BASE}/test`, {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings ?? {}),
+  });
+  if (!r.ok) return { ok: false, model: settings?.model ?? '', detail: 'The server could not run the test.' };
   return r.json();
 }

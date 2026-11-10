@@ -5,8 +5,10 @@ TEST-AGENT-01 covers REQ-AGENT-001 (OpenAI-compatible), TEST-AGENT-02
 REQ-AGENT-002 (Anthropic), TEST-AGENT-03 REQ-AGENT-003 (a Python function),
 TEST-AGENT-04 REQ-AGENT-004 (JSON found and checked; one repair turn),
 TEST-AGENT-05 REQ-AGENT-005 (JSON mode refused), TEST-AGENT-06 REQ-AGENT-006
-(keys never shown), TEST-AGENT-07 REQ-AGENT-007 (failures name their cause).
-Each server is a local stand-in speaking its wire format: no network.
+(keys never shown), TEST-AGENT-07 REQ-AGENT-007 (failures name their cause),
+TEST-AGENT-08 REQ-AGENT-008 (the saved setting), TEST-AGENT-09 REQ-AGENT-009
+(Test connection). Each server is a local stand-in speaking its wire format:
+no network.
 """
 from __future__ import annotations
 
@@ -210,3 +212,84 @@ def test_a_refused_key_is_named(stub):
     assert not ok and "the key was refused" in why
     ok, why = reachable(Agent(model="m", base_url=server.url + "/v1"))
     assert not ok and "no key is set" in why
+
+
+# ── TEST-AGENT-08 · REQ-AGENT-008 ────────────────────────────────────────────
+
+@pytest.fixture
+def saved_file(tmp_path, monkeypatch):
+    """A settings file of its own, and no App-given setting."""
+    from SIMPLE_STEPS import application
+    path = tmp_path / "home" / "agent.json"
+    monkeypatch.setenv("SIMPLE_STEPS_AGENT_FILE", str(path))
+    monkeypatch.setattr(application, "CURRENT", types.SimpleNamespace(agent=None))
+    return path
+
+
+def test_the_setting_is_saved_for_the_user_and_the_key_never_returned(saved_file):
+    """REQ-AGENT-008: mode 600; the API says a key is set, never what it is."""
+    import os
+    import stat
+    from fastapi.testclient import TestClient
+    from SIMPLE_STEPS.main import app
+
+    client = TestClient(app)
+    assert client.get("/api/agent/config").json()["source"] == "default"
+    saved = client.put("/api/agent/config", json={"api": "anthropic", "model": "claude-sonnet-5-5",
+                                                  "api_key": "sk-panel-secret"}).json()
+    assert saved["source"] == "saved" and saved["api_key_set"] is True
+    assert "sk-panel-secret" not in json.dumps(saved)
+    assert "sk-panel-secret" not in json.dumps(client.get("/api/agent/config").json())
+    assert stat.S_IMODE(os.stat(saved_file).st_mode) == 0o600
+
+
+def test_a_key_is_write_only(saved_file):
+    """REQ-AGENT-008: left out keeps it; an empty value clears it."""
+    from SIMPLE_STEPS.agent.config import save_settings, saved_agent
+    save_settings({"model": "m", "base_url": "http://127.0.0.1:1/v1", "api_key": "k-1"})
+    save_settings({"temperature": 0.5})
+    assert saved_agent().key() == "k-1"
+    save_settings({"api_key": ""})
+    assert saved_agent().key() == ""
+
+
+def test_the_apps_setting_wins_and_is_read_only(saved_file, monkeypatch):
+    """REQ-AGENT-008: an App-given model is reported as source app."""
+    from SIMPLE_STEPS import application
+    from SIMPLE_STEPS.agent.config import public_settings, save_settings
+    save_settings({"model": "saved-model", "base_url": "http://127.0.0.1:1/v1"})
+    monkeypatch.setattr(application, "CURRENT", types.SimpleNamespace(agent=Agent(model="app-model")))
+    shown = public_settings()
+    assert shown["source"] == "app" and shown["model"] == "app-model"
+
+
+def test_an_unusable_setting_is_refused(saved_file):
+    """REQ-AGENT-008: an unknown api is a 400, and nothing is saved."""
+    from fastapi.testclient import TestClient
+    from SIMPLE_STEPS.main import app
+    r = TestClient(app).put("/api/agent/config", json={"api": "carrier-pigeon"})
+    assert r.status_code == 400 and not saved_file.exists()
+
+
+# ── TEST-AGENT-09 · REQ-AGENT-009 ────────────────────────────────────────────
+
+def test_test_connection_tries_the_unsaved_form(saved_file, stub):
+    """REQ-AGENT-009: the panel's fields, before saving: ok, or what's wrong."""
+    from fastapi.testclient import TestClient
+    from SIMPLE_STEPS.main import app
+    server = stub([(200, {"data": []}), _openai_reply('{"ok": true}')])
+    client = TestClient(app)
+    good = client.post("/api/agent/test", json={"model": "m", "base_url": server.url + "/v1"}).json()
+    assert good["ok"] is True
+    bad = client.post("/api/agent/test", json={"model": "m", "base_url": "http://127.0.0.1:9/v1"}).json()
+    assert bad["ok"] is False and "nothing answers at" in bad["detail"]
+    assert not saved_file.exists()
+
+
+def test_the_cli_test_says_what_is_wrong(saved_file, capsys):
+    """REQ-AGENT-009: simple-steps agent test: non-zero, naming the problem."""
+    from SIMPLE_STEPS.agent.config import save_settings
+    from SIMPLE_STEPS.cli import agent_main
+    save_settings({"model": "m", "base_url": "http://127.0.0.1:9/v1"})
+    assert agent_main(["test"]) == 1
+    assert "nothing answers at" in capsys.readouterr().out

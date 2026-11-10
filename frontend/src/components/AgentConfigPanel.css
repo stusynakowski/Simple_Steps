@@ -56,43 +56,34 @@
   color: #fff;
 }
 
-.agent-health-banner {
+.agent-config-source {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px 16px;
   font-size: 12px;
+  color: #aaa;
   border-bottom: 1px solid #333;
 }
 
-.agent-health-banner.ready {
+.agent-test-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.agent-test-result.ok {
   background: rgba(0, 128, 0, 0.1);
   color: #4ec9b0;
 }
 
-.agent-health-banner.not-ready {
-  background: rgba(204, 120, 0, 0.1);
-  color: #dcdcaa;
-}
-
-.health-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.agent-health-banner.ready .health-dot {
-  background: #4ec9b0;
-}
-
-.agent-health-banner.not-ready .health-dot {
-  background: #dcdcaa;
-}
-
-.health-hint {
-  font-size: 11px;
-  opacity: 0.8;
+.agent-test-result.fail {
+  background: rgba(200, 50, 50, 0.1);
+  color: #f48771;
 }
 
 .agent-config-error {
@@ -177,6 +168,37 @@
   padding-top: 8px;
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.config-test-btn {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.config-test-btn:hover:not(:disabled) {
+  border-color: #888;
+  color: #fff;
+}
+
+.config-test-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.config-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #3794ff;
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .config-save-btn {
