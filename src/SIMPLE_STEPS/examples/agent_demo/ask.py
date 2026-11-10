@@ -146,7 +146,7 @@ def main(argv: List[str]) -> int:
               "    ollama pull llama3.2:3b\n"
               "or point at a model you have: OLLAMA_MODEL=qwen2.5:7b python ask.py")
         return 2
-    print(f"Asking {agent.model} at {agent.host}\n")
+    print(f"Asking {agent.model} at {agent.base_url}\n")
     return ask_one(agent, " ".join(argv)) if argv else run_tasks(agent)
 
 

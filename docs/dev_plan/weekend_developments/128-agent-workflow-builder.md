@@ -275,8 +275,8 @@ one agent.
 
 | # | Work |
 |---|---|
-| A0 | Remove the unused LangGraph path (owner's go-ahead first; inventory above) |
-| M1 | **The model** (contract 5): one `Agent` setting; the OpenAI-compatible, Anthropic and callable transports; the lenient JSON reader and the repair turn; stub-server tests |
+| A0 | **Done 2026-11-09.** The unused LangGraph path removed (inventory above) |
+| M1 | **Done 2026-11-09.** The model (contract 5): one `Agent` setting; the OpenAI-compatible, Anthropic and callable transports; the lenient JSON reader and the repair turn; JSON mode asked for and dropped when refused; keys never shown (spec 016, `tests/test_agent_model.py`, stub servers) |
 | M2 | Test connection in the settings panel and `simple-steps agent test`; the panel moves to the one setting; secrets from env vars |
 | A1 | Context layers with budgets; the syntax card generated from core; relevance ranking for tools; the context meter |
 | A2 | The workflow goal (D2) in the file and the chat pane |

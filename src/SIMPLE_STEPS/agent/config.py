@@ -93,3 +93,25 @@ def save_agent_config(config: AgentConfig) -> None:
     _ensure_dir()
     with open(_CONFIG_FILE, "w") as f:
         json.dump(config.model_dump(), f, indent=2)
+
+
+# ── The saved setting, as the copilot's model (plan 128, M1) ─────────────────
+
+def saved_agent():
+    """The copilot's model from the saved settings, or ``None`` when nothing is
+    saved. The panel's provider maps onto the model's APIs: OpenAI, Ollama and
+    Azure are OpenAI-compatible, Anthropic is its own."""
+    from .model import Agent, _ollama_v1
+    if not os.path.isfile(_CONFIG_FILE):
+        return None
+    config = get_agent_config()
+    if config.provider == "anthropic":
+        return Agent(api="anthropic", model=config.model, base_url=config.base_url or "",
+                     api_key=config.api_key or "", temperature=config.temperature,
+                     max_tokens=config.max_tokens)
+    base_url = config.base_url or ""
+    if config.provider == "ollama":
+        base_url = _ollama_v1(base_url or os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
+    return Agent(api="openai", model=config.model, base_url=base_url,
+                 api_key=config.api_key or "", temperature=config.temperature,
+                 max_tokens=config.max_tokens)

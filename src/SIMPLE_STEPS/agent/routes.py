@@ -38,8 +38,8 @@ async def agent_status():
     agent, why = resolve()
     if agent is None:
         return {"available": False, "reason": why}
-    return {"available": True, "provider": agent.provider, "model": agent.model,
-            "host": agent.host}
+    # Never the key (C3): only whether one is set.
+    return {"available": True, **agent.public()}
 
 
 @router.post("/propose")
