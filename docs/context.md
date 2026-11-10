@@ -170,6 +170,6 @@ description of the system). In short:
   labels, log levels or messages either.
 
 ## Known red
-- `tests/test_tabular_selection.py::test_select_cell` fails with `KeyError: 0` —
-  a real cell-selection bug, and the only failing test. If the count is ever
-  higher than 1, something new broke.
+- None (2026-11-09). `test_select_cell`'s `KeyError: 0` was the test's own
+  lookup, `iloc[0][0]`, which pandas reads as a column label; the app returned
+  the right cell. Every backend test passes: any failure is new.

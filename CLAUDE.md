@@ -23,5 +23,5 @@ Before pushing anything installable:
   python scripts/preflight.py --fix     # fast: pin agreement + bundle freshness
   python scripts/smoke_install.py       # slow: wheel -> clean venv -> run a workflow
 
-Baseline: backend tests are 1 failed / 0 errors (a known `KeyError: 0` in
-`test_select_cell`). More than 1 failure means something new broke.
+Baseline: every backend test passes (since 2026-11-09). Any failure means
+something new broke.

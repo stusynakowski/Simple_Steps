@@ -40,4 +40,4 @@ def test_select_cell():
     if hasattr(result, 'item'):
         assert result.item() == 75
     else:
-        assert result.iloc[0][0] == 75
+        assert result.iloc[0, 0] == 75
