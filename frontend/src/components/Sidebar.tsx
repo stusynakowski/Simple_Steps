@@ -5,6 +5,9 @@ import { fetchSettings, updateSettings } from '../services/api';
 import FileTree from './FileTree';
 import EnvironmentExplorer from './EnvironmentExplorer';
 import DocsPanel from './DocsPanel';
+import SymbolIcon from './SymbolIcon';
+import { useStepPalette } from '../context/StepPaletteContext';
+import { paletteColor } from '../styles/theme';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -31,6 +34,7 @@ interface SidebarProps {
 
 const defaultSettings: SimpleStepsSettings = {
   result_store: 'memory',
+  step_palette: '',
 };
 
 const SettingsPanel: React.FC = () => {
@@ -45,9 +49,7 @@ const SettingsPanel: React.FC = () => {
     setError(null);
     try {
       const s = await fetchSettings();
-      setSettings({
-        result_store: s.result_store ?? 'memory',
-      });
+      setSettings({ ...s, result_store: s.result_store ?? 'memory' });
     } catch {
       setError('Could not load runtime settings');
     } finally {
@@ -64,9 +66,7 @@ const SettingsPanel: React.FC = () => {
     setError(null);
     try {
       const next = await updateSettings(updates);
-      setSettings({
-        result_store: next.result_store ?? 'memory',
-      });
+      setSettings({ ...next, result_store: next.result_store ?? 'memory' });
       setSavedAt(Date.now());
     } catch {
       setError('Could not save runtime settings');
@@ -100,6 +100,8 @@ const SettingsPanel: React.FC = () => {
         </label>
       </div>
 
+      <StepColorsCard />
+
       <div className="settings-meta-row">
         <button className="settings-refresh-btn" onClick={() => void load()} disabled={loading || saving}>
           Refresh
@@ -109,6 +111,49 @@ const SettingsPanel: React.FC = () => {
         {!loading && !saving && savedAt && <span className="settings-meta">Saved</span>}
       </div>
 
+      {error && <div className="settings-error">{error}</div>}
+    </div>
+  );
+};
+
+/**
+ * Step colours (owner, 2026-11-10): the palette that colours every step
+ * without a colour of its own — the built-ins and the app's own
+ * (App(step_palettes=…)), each shown as eight steps. The app's default is
+ * App(step_palette=…); a choice here lasts until the server restarts.
+ */
+const StepColorsCard: React.FC = () => {
+  const { name, palettes, choose } = useStepPalette();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="settings-card">
+      <div className="settings-card-title">Step colours</div>
+      <div className="step-palette-list" role="radiogroup" aria-label="Step colours">
+        {Object.entries(palettes).map(([key, palette]) => (
+          <button
+            key={key}
+            type="button"
+            role="radio"
+            aria-checked={key === name}
+            className={`step-palette-option${key === name ? ' selected' : ''}`}
+            onClick={() => { setError(null); choose(key).catch(() => setError('Could not change the step colours')); }}
+          >
+            <span className="step-palette-name">
+              {key}
+              <span className="step-palette-kind">{Array.isArray(palette) ? 'in turn' : 'gradient'}</span>
+            </span>
+            <span className="step-palette-preview" aria-hidden="true">
+              {Array.from({ length: 8 }, (_, i) => (
+                <span key={i} style={{ background: paletteColor(palette, i, 8) }} />
+              ))}
+            </span>
+            {key === name && <SymbolIcon name="check" size={14} className="step-palette-check" />}
+          </button>
+        ))}
+      </div>
+      <span className="settings-help">
+        Colours every step that has no colour of its own (a step's Settings can still set one).
+      </span>
       {error && <div className="settings-error">{error}</div>}
     </div>
   );

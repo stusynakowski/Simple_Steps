@@ -585,22 +585,23 @@ async def stream_progress(
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 # --- 2b. Settings (Runtime Configuration) ---
-from .settings import get_settings, update_settings
+from .settings import settings_payload, update_settings
 
 @app.get("/api/settings")
 async def read_settings():
-    """Return current runtime settings."""
-    return get_settings().model_dump()
+    """Return current runtime settings, and the step palettes on offer."""
+    return settings_payload()
 
 @app.post("/api/settings")
 async def write_settings(body: dict = Body(...)):
     """
     Update runtime settings. Example:
       POST /api/settings  {"result_store": "parquet"}
+      POST /api/settings  {"step_palette": "ocean"}
     """
     try:
-        updated = update_settings(**body)
-        return updated.model_dump()
+        update_settings(**body)
+        return settings_payload()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

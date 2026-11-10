@@ -50,31 +50,45 @@
   pointer-events: none;
 }
 
-/* ARROW GEOMETRY: Depth 28px */
+/* ARROW GEOMETRY: Depth 28px.
+   Two layers (owner, 2026-11-10): .arrow-status is the whole arrow, painted
+   in the run's colour (.run-paint, index.css); .arrow-background, the step's
+   colour, is the same arrow with its sides pulled in by --b, so the run's
+   colour shows along the tail and the head. */
+.arrow-status {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.op-header { --b: 0px; }
+.arrow-background { --b: 4px; }
 
 /* First Step: Flat Left -> Pointed Right */
+.operation-column:first-child .arrow-status,
 .operation-column:first-child .arrow-background {
   clip-path: polygon(
-    0% 0%,                  /* Top Left */
-    calc(100% - 28px) 0%,   /* Top Right Shoulder */
-    100% 50%,               /* Tip */
-    calc(100% - 28px) 100%, /* Bottom Right Shoulder */
-    0% 100%                 /* Bottom Left */
+    var(--b) 0%,                          /* Top Left */
+    calc(100% - 28px - var(--b)) 0%,      /* Top Right Shoulder */
+    calc(100% - var(--b)) 50%,            /* Tip */
+    calc(100% - 28px - var(--b)) 100%,    /* Bottom Right Shoulder */
+    var(--b) 100%                         /* Bottom Left */
   );
 }
 
 /* Subsequent Steps: Cutout Left -> Pointed Right */
-.operation-column:not(:first-child) .arrow-background {
+.column-wrapper:not(:first-child) > .operation-column .arrow-status,
+.column-wrapper:not(:first-child) > .operation-column .arrow-background {
   left: 0;
   width: 100%;
   /* The nice interlocking shape */
   clip-path: polygon(
-    0% 0%,                  /* Top Left Outer */
-    calc(100% - 28px) 0%,   /* Top Right Shoulder */
-    100% 50%,               /* Tip */
-    calc(100% - 28px) 100%, /* Bottom Right Shoulder */
-    0% 100%,                /* Bottom Left Outer */
-    28px 50%                /* Inner Cutout (Tail) - Matching Tip Depth */
+    var(--b) 0%,                          /* Top Left Outer */
+    calc(100% - 28px - var(--b)) 0%,      /* Top Right Shoulder */
+    calc(100% - var(--b)) 50%,            /* Tip */
+    calc(100% - 28px - var(--b)) 100%,    /* Bottom Right Shoulder */
+    var(--b) 100%,                        /* Bottom Left Outer */
+    calc(28px + var(--b)) 50%             /* Inner Cutout (Tail) - Matching Tip Depth */
   );
 }
 
@@ -148,19 +162,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%; /* Ensure truncation works within flex item */
-}
-
-.op-status-indicator {
-  font-size: 0.75rem;
-  opacity: 0.8;
-  text-transform: uppercase;
-}
-
-/* Out of date (core's staleness): the output stays, marked; hover says why. */
-.op-status-indicator.is-out-of-date {
-  opacity: 1;
-  color: #fbbf24;
-  cursor: help;
 }
 
 .step-header-maximize-btn {
@@ -336,13 +337,7 @@
 .settings-content .summary-item .value,
 .settings-content .summary-item .status-badge { color: #555; }
 
-/* ── Step colour and notes (Settings) ─────────────────────────────────── */
-.config-item--stacked {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-}
-.config-item--stacked label { width: auto; }
+/* ── Step colour (Settings) ───────────────────────────────────────────── */
 .config-hint {
   font-weight: 400;
   font-size: 0.72rem;
@@ -392,17 +387,6 @@
   cursor: pointer;
 }
 .step-color-reset:hover { text-decoration: underline; }
-.step-notes-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 6px 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Menlo', monospace;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  resize: vertical;
-}
 
 .op-name {
   margin: 0;
@@ -420,22 +404,6 @@
   display: none;
 }
 
-.op-status-indicator {
-  font-size: 0.75rem;
-  margin-top: 0;
-  text-transform: uppercase;
-  color: #fff;
-  /* Make status pop */
-  background: rgba(0,0,0,0.5);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-/* Status colors */
-/* Light tints, so the status reads on the dark pill whatever the step's colour. */
-.operation-column.status-completed .op-status-indicator { color: #86efac; }
-.operation-column.status-running .op-status-indicator { color: #fdba74; }
-.operation-column.status-error .op-status-indicator { color: #fca5a5; }
 
 .cell-wait-spinner {
   width: 10px;
@@ -1069,8 +1037,8 @@
 
 
 /* ── Step header: hover controls and status spinner ────────────────────── */
-/* Minimize / maximize, bottom right of the header, shown on hover (owner,
-   2026-11-10). Kept clear of the arrow's 28px tip. */
+/* Notes, settings, minimize, maximize: bottom right of the header, shown on
+   hover (owner, 2026-11-10). Kept clear of the arrow's 28px tip. */
 .step-header-controls {
   position: absolute;
   bottom: 3px;
@@ -1078,13 +1046,18 @@
   z-index: 3;
   display: flex;
   gap: 3px;
+}
+.step-header-controls > * {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
 }
-
-.op-header:hover .step-header-controls,
-.step-header-controls:focus-within {
+/* A step with notes says so, faintly, even when not hovered. */
+.step-header-controls.has-notes > .step-notes-toggle,
+.step-header-controls > .step-notes-toggle.open { opacity: 0.6; pointer-events: auto; }
+.op-header:hover .step-header-controls > *,
+.step-header-controls:focus-within > *,
+.step-header-controls:has(.step-menu-toggle.active) > * {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1107,27 +1080,6 @@
   background: rgba(0, 0, 0, 0.5);
 }
 
-/* Spinner in the status pill (and before a collapsed step's name). */
-.status-spinner {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 5px;
-  vertical-align: -1px;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: status-spin 0.8s linear infinite;
-}
-
-.status-spinner.queued {
-  opacity: 0.55;
-  animation-duration: 1.6s;
-}
-
-@keyframes status-spin {
-  to { transform: rotate(360deg); }
-}
 
 /* Minimized: only the header, tight around the step's number. */
 .operation-column.minimized {
@@ -1436,7 +1388,6 @@
 .step-menu-pop--panel { width: min(340px, calc(100vw - 32px)); }
 .step-menu-body { padding: 6px 8px 4px; }
 .step-menu-body .config-item:last-child { margin-bottom: 0; }
-.step-menu-body .step-notes-input { width: 100%; box-sizing: border-box; resize: vertical; }
 .step-menu-divider { height: 1px; margin: 4px 2px; background: #e6e6e6; }
 /* A second part of one popover (Notes, under Step settings). */
 .step-menu-subheader {
@@ -1482,41 +1433,67 @@
 .step-menu-label { flex: 1; }
 .step-menu-hint { color: #999; font-size: 11px; }
 
-/* ── Step header on one line (owner, 2026-11-10) ───────────────────────── */
-/* The name and its status on one line; the hover controls sit in the
-   header's bottom corners (notes, settings left; minimize, maximize right). */
+/* ── Step header (owner, 2026-11-10) ───────────────────────────────────── */
+/* The name in the middle, a little high; the run's word at the bottom
+   centre; the run's icon just ahead of the tail; the hover controls at the
+   bottom right. */
 .header-titles.header-one-line {
   flex-direction: row;
   justify-content: center;
-  align-items: baseline;
-  gap: 8px;
-  padding: 0 76px 0 72px;   /* clear of the corner controls and the arrow's tip */
+  padding: 0 24px 0 44px;   /* clear of the run's icon */
 }
+.operation-column:not(.squeezed):not(.minimized) .arrow-content { padding-bottom: 12px; }
 .header-one-line .op-name { flex: 0 1 auto; min-width: 0; }
-.header-one-line .op-status-indicator { flex: none; white-space: nowrap; }
 
-.step-header-inline {
+.op-header > .op-status-indicator {
   position: absolute;
-  left: 6px;
-  bottom: 3px;
-  z-index: 3;
-  display: inline-flex;
-  gap: 3px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  z-index: 2;
+  padding: 0 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 0.62rem;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: help;
 }
-.op-header:hover .step-header-inline,
-.step-header-inline:focus-within,
-.step-header-inline:has(.step-menu-toggle.active) {
-  opacity: 1;
-  pointer-events: auto;
+
+.step-run-icon {
+  position: absolute;
+  top: 50%;
+  left: 36px;              /* just clear of the tail's notch */
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  padding: 2px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+  cursor: help;
 }
-/* Right of the notes' expander, when the step has notes. */
-.step-header-inline.after-expander { left: 27px; }
-.step-header-inline .step-menu-toggle.step-header-btn {
+.column-wrapper:first-child > .operation-column .step-run-icon { left: 10px; }
+.operation-column:not(.squeezed):not(.minimized) .step-run-icon { margin-top: -6px; }   /* level with the name */
+.run-icon-running .symbol-icon { animation: material-icon-spin 0.9s linear infinite; }
+.operation-column.squeezed .arrow-content { padding: 0 30px 0 58px; }
+.column-wrapper:first-child > .operation-column.squeezed .arrow-content { padding-left: 34px; }
+
+/* The run's icon and word, in light tints that read on any step colour. */
+.run-icon-staged  { color: #e5e7eb; }
+.run-icon-queued, .run-icon-running { color: #93c5fd; }
+.run-icon-ran     { color: #86efac; }
+.run-icon-partial, .run-icon-stale { color: #fcd34d; }
+.run-icon-failed, .run-icon-blocked { color: #fca5a5; }
+
+/* The notes' notepad: wider, a notepad and an arrow that turns when open. */
+.step-header-controls .step-notes-toggle { width: auto; padding: 0 2px; gap: 0; }
+.step-notes-chevron { transform: rotate(-90deg); transition: transform 0.12s ease; }
+.step-notes-toggle.open .step-notes-chevron { transform: none; }
+.step-header-controls .step-menu-toggle.step-header-btn {
   width: 18px;
-  height: 16px;
+  height: 18px;
   min-width: 0;
   padding: 0;
   border: none;
@@ -1524,46 +1501,13 @@
   background: rgba(0, 0, 0, 0.28);
   color: #fff;
 }
-.step-header-inline .step-menu-toggle.step-header-btn:hover,
-.step-header-inline .step-menu-toggle.step-header-btn.active { background: rgba(0, 0, 0, 0.5); }
-/* A step with notes says so, faintly, even when not hovered. */
-.op-header .step-header-inline:has(.has-notes) { opacity: 0.55; pointer-events: auto; }
-.op-header:hover .step-header-inline:has(.has-notes) { opacity: 1; }
-
-/* The notes' expander (owner, 2026-11-10): a small button at the header's
-   bottom left, shown on hover. Folded, nothing else shows. */
-.step-notes-hover-btn {
-  position: absolute;
-  left: 6px;
-  bottom: 3px;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.28);
-  color: #fff;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-}
-.op-header:hover .step-notes-hover-btn,
-.step-notes-hover-btn:focus-visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-.step-notes-hover-btn:hover { background: rgba(0, 0, 0, 0.5); }
-.step-notes-chevron { transform: rotate(-90deg); transition: transform 0.12s ease; }
-.step-notes-hover-btn.open .step-notes-chevron { transform: none; }
+.step-header-controls .step-menu-toggle.step-header-btn:hover,
+.step-header-controls .step-menu-toggle.step-header-btn.active { background: rgba(0, 0, 0, 0.5); }
 
 /* Open: the notes under the header, in its colour and type, as a
-   description of the step. */
+   description of the step; hovered, a notepad button edits them. */
 .step-notes-header {
+  position: relative;
   background: var(--step-color);
   background-image: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18));
   color: #fff;
@@ -1582,3 +1526,29 @@
 .step-notes-body h1, .step-notes-body h2, .step-notes-body h3 { font-size: 0.95rem; margin: 0 0 4px; }
 .step-notes-body a { color: #fff; text-decoration: underline; }
 .step-notes-body code { background: rgba(0, 0, 0, 0.25); padding: 0 3px; border-radius: 3px; text-shadow: none; }
+.step-notes-edit-btn {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.step-notes-header:hover .step-notes-edit-btn,
+.step-notes-edit-btn:focus-visible { opacity: 1; }
+.step-notes-inline-input {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 6px 8px 8px;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  text-shadow: none;
+  font-family: 'Consolas', 'Menlo', monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+.step-notes-inline-input::placeholder { color: rgba(255, 255, 255, 0.6); }

@@ -78,6 +78,8 @@ class App:
         cell_types: Iterable[Any] = (),
         freeze: bool = False,
         agent: Any = None,
+        step_palette: Optional[str] = None,
+        step_palettes: Optional[Mapping[str, Any]] = None,
     ):
         """
         Args:
@@ -98,6 +100,13 @@ class App:
             agent: the agent's model, ``Agent(model="qwen2.5:7b")``; ``False``
                 turns the agent off. Default: a local Ollama model if one is
                 running (``agent/model.py``), else no agent.
+            step_palette: the palette that colours the steps when the app
+                starts — a built-in (``vaporwave``, the default; ``muted``, ``ocean``,
+                ``sunset``, ``forest``, ``slate``, ``classic``) or one of
+                *step_palettes*. Users can switch it in System Settings.
+            step_palettes: the app's own palettes, by name: a list of colours
+                used in turn, ``["#1d3557", "#457b9d"]``, or a gradient blended
+                along the workflow, ``{"gradient": ["#1d3557", "#e76f51"]}``.
         """
         global CURRENT
         self.workspace = os.path.abspath(workspace or _caller_folder())
@@ -121,6 +130,15 @@ class App:
         from .cell_types import register_cell_type
         for cell_type in cell_types:
             register_cell_type(cell_type)
+        # Step colours: the app's palettes, and the one it starts with.
+        from .settings import add_palettes, update_settings
+        try:
+            add_palettes(dict(step_palettes or {}))
+            if step_palette is not None:
+                update_settings(step_palette=step_palette)
+        except ValueError as exc:
+            msg = exc.errors()[0]["msg"].removeprefix("Value error, ") if hasattr(exc, "errors") else str(exc)
+            raise AppError(msg) from None
         if CURRENT is None:
             CURRENT = self
 

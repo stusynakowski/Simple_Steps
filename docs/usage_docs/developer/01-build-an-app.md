@@ -127,6 +127,42 @@ absolute form uses.
 When you list tools, only those (plus the built-ins) are offered — the
 workspace isn't scanned.
 
+### App defaults: step colours
+
+Every step without a colour of its own takes one from a **palette**. The app
+sets which palette it starts with, and can add its own:
+
+```python
+app = App(
+    tools=[my_tools],
+    title="My shop",
+    step_palettes={
+        "shop": ["#1d3557", "#457b9d", "#2a9d8f"],    # used in turn, then round again
+        "dusk": {"gradient": ["#1d3557", "#e76f51"]}, # blended: first step to last step
+    },
+    step_palette="shop",
+)
+```
+
+- `step_palette` — the palette in use when the server starts: one of yours, or
+  a built-in: `vaporwave` (the default), `muted`, `ocean`, `sunset`, `forest`, `slate`,
+  `classic` (the original bright colours).
+- `step_palettes` — your palettes, by name. A list is used in turn; a
+  `{"gradient": [...]}` (two or more colours) spreads across the workflow,
+  so a longer workflow gets finer steps between the same ends.
+- Colours are `#rrggbb`. Header text is white: pick mid-to-dark colours.
+- A bad colour, a one-colour gradient or an unknown name stops the `App` with
+  the reason, before anything is served.
+
+Users see your palettes beside the built-ins in **Settings → Step colours**
+and can switch; the switch lasts until the server restarts, when your
+`step_palette` applies again. A colour a user sets on one step (the step's
+settings) is saved with the workflow and always wins over the palette.
+
+When you deploy an app for others (`App(..., freeze=True)`, served with
+`python app.py` or `simple-steps run app.py`), `app.py` is where its look is
+fixed: the palette everyone starts with is the one written there.
+
 ## 4. Run it
 
 ```bash

@@ -8,13 +8,14 @@ import { placePick, stepRef } from '../utils/selection';
 import type { GridPick, PlacedPick } from '../utils/selection';
 import { parseFormula } from '../utils/formulaParser';
 import type { FormulaReference, ParsedFormula } from '../utils/formulaParser';
-import { getStepColor } from '../styles/theme';
+import { useStepColor } from '../context/StepPaletteContext';
 import ToolEditor from './ToolEditor';
 import StepWidget from './StepWidget';
 import type { PanelId } from './stepPanels';
 import StepOverview from './StepOverview';
 import StepMenu from './StepMenu';
 import SymbolIcon from './SymbolIcon';
+import { runState, RUN_ICON } from '../utils/runState';
 import Markdown from 'react-markdown';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
@@ -193,7 +194,9 @@ export default function OperationColumn({
     }, 150);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [savedFormula, refsOf.formula]);
-  const colorOf = Object.fromEntries(previousSteps.map((s, i) => [s.label, s.step_color ?? getStepColor(i)]));
+  const stepColor = useStepColor();
+  const colorOf = Object.fromEntries(previousSteps.map((s, i) =>
+    [s.label, s.step_color ?? stepColor(i, stepCount ?? previousSteps.length + 1)]));
   const barReferences = refsOf.refs.map((r) => ({ start: r.span[0], end: r.span[1], color: colorOf[r.step] ?? '#888' }));
 
   // A new round of picking starts fresh: the last pick is only replaced while
@@ -212,23 +215,19 @@ export default function OperationColumn({
     pipelineCursorIndex >= 0 &&
     stepIndex >= pipelineCursorIndex;
 
-  // The status pill shows a spinner while the step runs, and a dimmer one
-  // while it waits its turn in a running pipeline.
-  const isRunning = step.status === 'running';
-  const isQueued = !isRunning && isScheduledInPipeline;
-  // Out of date: something it reads changed since it ran (core's staleness,
-  // dev_plan/124 phase 2). Its output stays; the reason is the tooltip.
-  const outOfDate = !isRunning && !isQueued && step.status === 'completed' && !!step.staleReason;
-  const statusLabel = isQueued ? 'queued' : outOfDate ? 'out of date' : step.status;
-  const statusTitle = outOfDate ? `Out of date: ${step.staleReason}. Run it again to update.`
-    : step.problems?.length ? step.problems.join('\n') : undefined;
+  // Where the step's run stands (utils/runState.ts), the same as on the
+  // steps' map: the colour of the header's sides, an icon at its tail, a
+  // word at its bottom centre (owner, 2026-11-10).
+  const run = runState(step, isScheduledInPipeline);
+  const runIcon = (
+    <span className={`step-run-icon run-icon-${run.kind}`} title={run.text}>
+      <SymbolIcon name={RUN_ICON[run.kind]} size={15} />
+    </span>
+  );
   // What core runs, when it differs from what was written: the verb it
   // decided, the bindings it wrote (core S3).
   const coreRuns = step.coreFormula && step.coreFormula.replace(/^=/, '') !== (step.formula ?? '').replace(/^=/, '').trim()
     ? step.coreFormula : undefined;
-  const statusSpinner = (isRunning || isQueued) && (
-    <span className={`status-spinner${isQueued ? ' queued' : ''}`} aria-hidden="true" />
-  );
 
   // A maximized step scrolls into view, so the wider step is what you see.
   const columnRef = useRef<HTMLDivElement | null>(null);
@@ -337,10 +336,21 @@ export default function OperationColumn({
     window.addEventListener('mouseup', onUp);
   };
 
-  // The step's settings and its notes: opened from the header, on hover,
-  // beside the name and status (owner, 2026-11-10).
+  // The step's notes (owner, 2026-11-10): the notepad at the header's bottom
+  // right drops them down under the header; hover them for the button that
+  // edits them. A step without notes opens straight to editing.
   const [notesOpen, setNotesOpen] = useState(false);
+  const [notesEditing, setNotesEditing] = useState(false);
   const hasNotes = !!step.notes?.trim();
+  const toggleNotes = () => {
+    setNotesEditing(!notesOpen && !hasNotes);
+    setNotesOpen(!notesOpen);
+  };
+  /** Done editing: back to reading them, or folded if there are none. */
+  const finishNotes = () => {
+    setNotesEditing(false);
+    if (!step.notes?.trim()) setNotesOpen(false);
+  };
   const stepSettings = (
       <div className="settings-content">
          <div className="config-item">
@@ -386,7 +396,7 @@ export default function OperationColumn({
          </div>
          <div className="summary-item">
             <span className="label">Status:</span>
-            <span className={`status-badge status-${step.status}`}>{step.status}</span>
+            <span className={`status-badge status-${step.status}`}>{run.text}</span>
          </div>
          {/* Core's reasons the step can't run or is suspect. */}
          {!!step.problems?.length && (
@@ -414,28 +424,11 @@ export default function OperationColumn({
          )}
       </div>
   );
-  const stepNotesEditor = (
-      // Markdown, saved as the step's meta.notes; rendered under the header
-      // (an expander) and in Analytics.
-      <div className="config-item config-item--stacked">
-         <label htmlFor={`step-notes-${step.id}`}>
-           <span className="config-hint">Markdown · shown under the header and in Analytics</span>
-         </label>
-         <textarea
-           id={`step-notes-${step.id}`}
-           className="step-notes-input"
-           rows={8}
-           value={step.notes ?? ''}
-           onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
-           placeholder="What is this step for? e.g. **Keeps** only rows with a score over 5."
-         />
-      </div>
-  );
 
   return (
     <div
       ref={columnRef}
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}`}
       style={{ 
         '--step-color': color,
         zIndex: zIndex,
@@ -443,42 +436,54 @@ export default function OperationColumn({
       data-testid={`operation-column-${step.id}`}
     >
       <div className={`op-header${isDragHinting ? ' drag-detach-hint' : ''}`} onClick={handleColumnClick} onMouseDown={handleHeaderMouseDown} style={{ cursor: 'pointer', position: 'relative' }}>
+        {/* The run's colour: the outer arrow, showing round the fill's sides. */}
+        <div className="arrow-status run-paint" aria-hidden="true" />
         <div className="arrow-background" />
         <div className="arrow-content">
             {isMinimized ? (
                  // As small as it gets: just the step's number (owner, 2026-10-30).
-                 <span className="vertical-label" title={`Step ${stepIndex + 1} · ${step.label}`}>{statusSpinner}{stepIndex + 1}</span>
+                 <span className="vertical-label" title={`Step ${stepIndex + 1} · ${step.label} · ${run.text}`}>{stepIndex + 1}</span>
             ) : isSqueezed ? (
-                 <span className="vertical-label">{statusSpinner}{step.label}</span>
+                 <span className="vertical-label">{step.label}</span>
             ) : (
-                <>
-                    {/* Name and status on one line (owner, 2026-11-10). */}
-                    <div className="header-titles header-one-line">
-                        <h3 className="op-name">{step.label}</h3>
-                        <span className={`op-status-indicator${outOfDate ? ' is-out-of-date' : ''}`} title={statusTitle}>{statusSpinner}{statusLabel}</span>
-                    </div>
-                </>
+                <div className="header-titles header-one-line">
+                    <h3 className="op-name">{step.label}</h3>
+                </div>
             )}
         </div>
-        {/* The step's settings and notes: bottom left of the header, right of
-            the notes' expander, on hover (owner, 2026-11-10). */}
+        {/* The run's icon, just ahead of the tail; its word at the bottom
+            centre (owner, 2026-11-10; stages will change this later). */}
+        {!isMinimized && runIcon}
         {!isMinimized && !isSqueezed && (
-          <span
-            className={`step-header-inline${hasNotes ? ' after-expander' : ''}`}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <StepMenu icon="tune" iconSize={14} label="Step settings" testId="step-settings" className="step-header-btn">
+          <span className={`op-status-indicator run-icon-${run.kind}`} title={run.text}>{run.label}</span>
+        )}
+        {/* Hover controls — bottom right of the header: the notes' notepad,
+            settings, minimize, maximize. They stop mousedown so a click never
+            starts the header's drag-to-detach. */}
+        <div
+          className={`step-header-controls${hasNotes && !isSqueezed ? ' has-notes' : ''}`}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {!isMinimized && !isSqueezed && (
+            <button
+              type="button"
+              className={`step-header-btn step-notes-toggle${notesOpen ? ' open' : ''}`}
+              aria-expanded={notesOpen}
+              aria-label={notesOpen ? `Fold ${step.label}'s notes` : hasNotes ? `Show ${step.label}'s notes` : `Add notes to ${step.label}`}
+              title={notesOpen ? 'Fold the notes' : hasNotes ? `Notes: ${firstLine(step.notes!)}` : 'Add notes'}
+              data-testid="step-notes-toggle"
+              onClick={toggleNotes}
+            >
+              <SymbolIcon name="sticky_note_2" size={12} />
+              <SymbolIcon name="arrow_drop_down" size={12} className="step-notes-chevron" />
+            </button>
+          )}
+          {!isMinimized && !isSqueezed && (
+            <StepMenu icon="tune" iconSize={13} label="Step settings" testId="step-settings" className="step-header-btn" align="right">
               {stepSettings}
             </StepMenu>
-            <StepMenu icon="sticky_note_2" iconSize={14} label={hasNotes ? 'Edit notes' : 'Add notes'} testId="step-notes-edit" className={`step-header-btn${hasNotes ? ' has-notes' : ''}`}>
-              {stepNotesEditor}
-            </StepMenu>
-          </span>
-        )}
-        {/* Hover controls — bottom right of the header. They stop mousedown so a
-            click never starts the header's drag-to-detach. */}
-        <div className="step-header-controls" onMouseDown={(e) => e.stopPropagation()}>
+          )}
           {!isMinimized && onMinimizeStep && (
             <button
               type="button"
@@ -512,29 +517,40 @@ export default function OperationColumn({
             </button>
           )}
         </div>
-        {/* The notes' expander: bottom left of the header, on hover, only
-            for a step with notes (owner, 2026-11-10). Folded, nothing else
-            shows; open, the notes sit under the header. */}
-        {!isMinimized && !isSqueezed && hasNotes && (
-          <button
-            type="button"
-            className={`step-notes-hover-btn${notesOpen ? ' open' : ''}`}
-            aria-expanded={notesOpen}
-            aria-label={notesOpen ? `Fold ${step.label}'s notes` : `Show ${step.label}'s notes`}
-            title={notesOpen ? 'Fold the notes' : `Notes: ${firstLine(step.notes!)}`}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o); }}
-          >
-            <SymbolIcon name="arrow_drop_down" size={16} className="step-notes-chevron" />
-          </button>
-        )}
       </div>
 
       {/* Open, the notes are a Markdown description under the header, in
-          its colour. Not on a minimized or squeezed step. */}
-      {!isMinimized && !isSqueezed && hasNotes && notesOpen && (
+          its colour; hovered, a notepad button edits them in place (saved
+          as the step's meta.notes). Not on a minimized or squeezed step. */}
+      {!isMinimized && !isSqueezed && notesOpen && (
         <div className="step-notes-header" onClick={(e) => e.stopPropagation()}>
-          <div className="step-notes-body"><Markdown>{step.notes}</Markdown></div>
+          {notesEditing ? (
+            <textarea
+              autoFocus
+              className="step-notes-inline-input"
+              aria-label={`${step.label}'s notes (Markdown)`}
+              rows={6}
+              value={step.notes ?? ''}
+              onChange={(e) => onUpdate?.(step.id, { notes: e.target.value || undefined })}
+              onBlur={finishNotes}
+              onKeyDown={(e) => { if (e.key === 'Escape') e.currentTarget.blur(); }}
+              placeholder="What is this step for? Markdown, e.g. **Keeps** only rows with a score over 5."
+            />
+          ) : (
+            <>
+              <div className="step-notes-body"><Markdown>{step.notes}</Markdown></div>
+              <button
+                type="button"
+                className="step-header-btn step-notes-edit-btn"
+                title="Edit the notes"
+                aria-label={`Edit ${step.label}'s notes`}
+                data-testid="step-notes-edit"
+                onClick={() => setNotesEditing(true)}
+              >
+                <SymbolIcon name="edit_note" size={14} />
+              </button>
+            </>
+          )}
         </div>
       )}
 

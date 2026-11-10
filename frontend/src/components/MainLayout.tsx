@@ -1,12 +1,13 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
-import StepMinimap, { runState } from './StepMinimap';
+import StepMinimap from './StepMinimap';
+import { runState } from '../utils/runState';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
 import useWorkflow from '../hooks/useWorkflow';
-import { getStepColor } from '../styles/theme';
+import { useStepColor } from '../context/StepPaletteContext';
 import Sidebar from './Sidebar';
 import ChatSidebar from './ChatSidebar';
 import ActivityBar from './ActivityBar';
@@ -65,7 +66,7 @@ const LOG_SNAP_THRESHOLD = 80; // of console body, below its title bar
 // Room under the tallest step, so its border doesn't touch the footer.
 const STEPS_FIT_PADDING = 4;
 // The steps' map under them (StepMinimap, .step-minimap): auto-fit leaves it room.
-const STEPS_MAP_HEIGHT = 20;
+const STEPS_MAP_HEIGHT = 22;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,8 @@ export default function MainLayout() {
     dispatchCommand,
     consoleStepMap,
   } = useWorkflow();
+  // A step without its own colour takes the palette's (System Settings).
+  const stepColor = useStepColor();
 
   // ── Tab state ────────────────────────────────────────────────────────────
   // Start with the initial workflow as the first tab
@@ -834,7 +837,7 @@ export default function MainLayout() {
                   step={step}
                   stepIndex={index}
                   previousSteps={previousSteps}
-                  color={step.step_color ?? getStepColor(index)}
+                  color={step.step_color ?? stepColor(index, workflow.steps.length)}
                   isActive={isExpanded}
                   isSqueezed={!isExpanded}
                   isMaximized={isMaximized}
@@ -977,11 +980,13 @@ export default function MainLayout() {
                       <StepMinimap
                         scroller={canvasRef}
                         steps={workflow.steps.map((s, i) => ({
-                          id: s.id, label: s.label, color: s.step_color ?? getStepColor(i),
+                          id: s.id, label: s.label, color: s.step_color ?? stepColor(i, workflow.steps.length),
                           // Where its run stands: a status line on the map (owner, 2026-11-10).
                           run: runState(s, pipelineStatus === 'running' && s.status === 'pending'
                             && pipelineCursorIndex >= 0 && i >= pipelineCursorIndex),
                         }))}
+                        // A click on a step jumps to it and opens it.
+                        onOpen={(id) => { if (!expandedStepIds.has(id)) toggleStep(id); }}
                       />
                     </div>
 
@@ -1074,7 +1079,7 @@ export default function MainLayout() {
               availableOperations={availableOperations}
               pipelineStatus={pipelineStatus}
               pipelineCursorIndex={pipelineCursorIndex}
-              color={step.step_color ?? getStepColor(stepIndex)}
+              color={step.step_color ?? stepColor(stepIndex, workflow.steps.length)}
               initialPosition={dw.position}
               onClose={() => closeDetachedWindow(dw.id)}
               onRowPage={(page) => loadRowPage(step.id, page)}

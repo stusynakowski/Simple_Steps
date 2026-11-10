@@ -528,23 +528,39 @@
 .step-minimap {
   position: relative;
   flex: none;
-  height: 20px;
+  height: 22px;
   background: #121212;
   border-top: 1px solid #1f1f1f;
   cursor: pointer;
   overflow: hidden;
 }
+/* Its sides in its run's colour, as the header's are (.run-paint, index.css;
+   owner, 2026-11-10); its fill (::before) in the step's own. */
 .step-minimap-step {
+  --d: 6px;   /* the arrow's depth */
+  --b: 2px;   /* the run outline's width */
   position: absolute;
-  top: 8px;
-  height: 8px;
+  top: 5px;
+  height: 12px;
   padding: 0;
   border: none;
-  opacity: 0.75;
+  opacity: 0.85;
   cursor: pointer;
-  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%, 4px 50%);
+  clip-path: polygon(0 0, calc(100% - var(--d)) 0, 100% 50%, calc(100% - var(--d)) 100%, 0 100%, var(--d) 50%);
 }
-.step-minimap-step.first { clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%); }
+.step-minimap-step::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--fill);
+  clip-path: polygon(var(--b) 0, calc(100% - var(--d) - var(--b)) 0, calc(100% - var(--b)) 50%,
+    calc(100% - var(--d) - var(--b)) 100%, var(--b) 100%, calc(var(--d) + var(--b)) 50%);
+}
+.step-minimap-step.first { clip-path: polygon(0 0, calc(100% - var(--d)) 0, 100% 50%, calc(100% - var(--d)) 100%, 0 100%); }
+.step-minimap-step.first::before {
+  clip-path: polygon(var(--b) 0, calc(100% - var(--d) - var(--b)) 0, calc(100% - var(--b)) 50%,
+    calc(100% - var(--d) - var(--b)) 100%, var(--b) 100%);
+}
 .step-minimap-step:hover { opacity: 1; }
 .step-minimap-view {
   position: absolute;
@@ -676,18 +692,3 @@
   width: 760px;
 }
 
-/* Where each step's run stands: a thin line over its arrow (owner,
-   2026-11-10). Quiet: grey until something runs; hover for the status. */
-.step-minimap-run {
-  position: absolute;
-  top: 3px;
-  height: 3px;
-  border-radius: 2px;
-  cursor: pointer;
-}
-.step-minimap-run.run-staged  { background: #4b5563; }
-.step-minimap-run.run-running { background: #3b82f6; animation: minimap-run-pulse 1.1s ease-in-out infinite; }
-.step-minimap-run.run-ran     { background: #22c55e; }
-.step-minimap-run.run-partial { background: #f59e0b; }
-.step-minimap-run.run-failed  { background: #ef4444; }
-@keyframes minimap-run-pulse { 50% { opacity: 0.45; } }

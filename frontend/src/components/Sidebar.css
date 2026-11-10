@@ -843,3 +843,33 @@
 .docs-repo-link { color: #bbb; text-decoration: underline dotted; cursor: help; }
 .docs-table-wrap { overflow-x: auto; }
 .docs-reader td p, .docs-reader th p { margin: 0; }
+
+/* ── Step colours (System Settings; owner, 2026-11-10) ─────────────────── */
+.step-palette-list { display: flex; flex-direction: column; gap: 4px; }
+.step-palette-option {
+  display: grid;
+  grid-template-columns: 1fr 16px;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: #1e1e1e;
+  color: #ddd;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+.step-palette-option:hover { border-color: #3c3c3c; }
+.step-palette-option.selected { border-color: #4f8fd6; background: #1f2a36; }
+.step-palette-name { display: flex; align-items: baseline; gap: 6px; min-width: 0; text-transform: capitalize; }
+.step-palette-kind { color: #888; font-size: 0.7rem; text-transform: none; }
+/* Eight steps, as small interlocking arrows, under the name. */
+.step-palette-preview { display: flex; grid-column: 1 / -1; grid-row: 2; }
+.step-palette-preview > span {
+  width: 18px;
+  height: 12px;
+  margin-right: -3px;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%);
+}
+.step-palette-check { grid-column: 2; grid-row: 1; color: #4f8fd6; }

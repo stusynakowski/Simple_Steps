@@ -78,3 +78,29 @@ button:focus-visible {
 @keyframes material-icon-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── A step's run state (utils/runState.ts; owner, 2026-11-10) ─────────── */
+/* The colour of a step's sides, in its header and on the steps' map. Can't
+   run: grey, the tail red. Running: stripes moving toward the next step (a
+   barber pole); queued: the same, fainter and slower. `.run-paint` is the
+   layer that shows it; a `.run-<kind>` on it or an ancestor picks the look. */
+.run-staged, .run-stale, .run-blocked { --run: #6b7280; }
+.run-queued, .run-running { --run: #3b82f6; --run-anim: run-pole; }
+.run-ran     { --run: #22c55e; }
+.run-partial { --run: #f59e0b; }
+.run-failed  { --run: #ef4444; }
+.run-blocked { --run-tail: #ef4444; }
+.run-running { --run-stripe: rgba(255, 255, 255, 0.6); --run-pole: 0.6s; }
+.run-queued  { --run-stripe: rgba(255, 255, 255, 0.22); --run-pole: 2.4s; }
+
+.run-paint {
+  background-color: var(--run, transparent);
+  background-image:
+    linear-gradient(to right, var(--run-tail, transparent) 50%, transparent 50%),
+    linear-gradient(45deg, var(--run-stripe, transparent) 25%, transparent 25% 50%,
+      var(--run-stripe, transparent) 50% 75%, transparent 75%);
+  background-size: 100% 100%, 16px 16px;
+  animation: var(--run-anim, none) var(--run-pole, 1s) linear infinite;
+}
+@keyframes run-pole { to { background-position: 0 0, 16px 0; } }
+@media (prefers-reduced-motion: reduce) { .run-paint { animation: none; } }

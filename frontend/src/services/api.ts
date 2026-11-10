@@ -1,4 +1,5 @@
 import type { Cell, StepConfiguration, StepPlan } from '../types/models';
+import type { StepPalette } from '../styles/theme';
 
 // When the frontend is bundled and served by the backend, use same-origin.
 // When running via Vite dev server, the backend defaults to :8000 but can
@@ -803,6 +804,10 @@ export async function writeWorkspaceFile(path: string, content: string): Promise
 
 export interface SimpleStepsSettings {
     result_store: 'memory' | 'parquet';
+    /** The palette that colours the steps, by name (one of step_palettes). */
+    step_palette: string;
+    /** Every step palette on offer (read-only: the built-ins and the app's own). */
+    step_palettes?: Record<string, StepPalette>;
 }
 
 /** Fetch current runtime settings. */

@@ -1,55 +1,30 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import type { RunState } from '../utils/runState';
+
 /** One step on the map: what it's called, its colour, and where its run stands. */
 export interface MinimapStep { id: string; label: string; color: string; run?: RunState }
-
-/**
- * Where a step's run stands, as the map's status line shows it (owner,
- * 2026-11-10): grey staged (not run, or out of date), blue queued or
- * running, green ran, orange ran with some rows failed, red failed (every
- * row, the step itself, or core can't run it).
- */
-export interface RunState { kind: 'staged' | 'running' | 'ran' | 'partial' | 'failed'; text: string }
-
-/** A step's run state, from what the app knows of it; *queued* while a run will reach it. */
-export function runState(step: {
-  status: string; uncaughtFailed?: number; outputRows?: number; staleReason?: string;
-  coreState?: string; problems?: string[];
-}, queued: boolean): RunState {
-  if (step.status === 'running') return { kind: 'running', text: 'running' };
-  if (queued) return { kind: 'running', text: 'queued' };
-  if (step.status === 'error') return { kind: 'failed', text: 'failed' };
-  if (step.coreState === 'invalid' || (step.problems?.length && step.status !== 'completed')) {
-    return { kind: 'failed', text: `can't run: ${step.problems?.[0] ?? 'invalid'}` };
-  }
-  if (step.status === 'completed') {
-    if (step.staleReason) return { kind: 'staged', text: `out of date: ${step.staleReason}` };
-    const failed = step.uncaughtFailed ?? 0;
-    const rows = step.outputRows;
-    if (failed && rows !== undefined && failed >= rows) return { kind: 'failed', text: `every row failed (${failed})` };
-    if (failed) return { kind: 'partial', text: `ran; ${failed}${rows !== undefined ? ` of ${rows}` : ''} rows failed` };
-    return { kind: 'ran', text: rows !== undefined ? `ran: ${rows} row${rows === 1 ? '' : 's'}` : 'ran' };
-  }
-  return { kind: 'staged', text: step.status === 'pending' ? 'staged, not run' : step.status };
-}
 
 interface Span { left: number; width: number }
 
 /**
  * The steps' map, along the bottom of the steps (owner, 2026-10-30): each
  * step as a thin copy of its header — the same arrow, in its colour, as wide
- * as its column — and an outline (no fill) round what's in view. It replaces
- * the horizontal scrollbar: drag the outline to scroll, click a step to jump
- * to it, click the track to centre the view there. Scrolling the steps any
+ * as its column, its sides outlined in its run's colour, as the header's are
+ * — and an outline (no fill) round what's in view. It replaces the horizontal
+ * scrollbar: drag the outline to scroll, click a step to jump to it and open
+ * it, click the track to centre the view there. Scrolling the steps any
  * other way moves the outline.
  *
  * *scroller* is the steps' scrolling element; each step's column is its
  * `.column-wrapper` child, in workflow order.
  */
-export default function StepMinimap({ scroller, steps }: {
+export default function StepMinimap({ scroller, steps, onOpen }: {
   scroller: React.RefObject<HTMLElement | null>;
   steps: MinimapStep[];
+  /** Open (expand) a step: a click on its arrow jumps to it and opens it. */
+  onOpen?: (id: string) => void;
 }) {
   const track = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ total: 1, scrollLeft: 0, visible: 1, trackWidth: 1 });
@@ -137,24 +112,14 @@ export default function StepMinimap({ scroller, steps }: {
         const left = span.left * k;
         const width = Math.max(4, span.width * k);
         return (
-          <span key={s.id}>
-            {/* Where the step's run stands: a thin line over its arrow. */}
-            {s.run && (
-              <span
-                className={`step-minimap-run run-${s.run.kind}`}
-                style={{ left, width }}
-                onClick={(e) => { e.stopPropagation(); setHover(null); jump(span.left); }}
-                aria-hidden="true"
-              />
-            )}
-            <button
-              type="button"
-              className={`step-minimap-step${i === 0 ? ' first' : ''}`}
-              style={{ left, width, background: s.color }}
-              aria-label={`Go to step ${i + 1}, ${s.label}${s.run ? `, ${s.run.text}` : ''}`}
-              onClick={(e) => { e.stopPropagation(); setHover(null); jump(span.left); }}
-            />
-          </span>
+          <button
+            key={s.id}
+            type="button"
+            className={`step-minimap-step run-paint${i === 0 ? ' first' : ''}${s.run ? ` run-${s.run.kind}` : ''}`}
+            style={{ left, width, '--fill': s.color } as React.CSSProperties}
+            aria-label={`Go to step ${i + 1}, ${s.label}${s.run ? `, ${s.run.text}` : ''}`}
+            onClick={(e) => { e.stopPropagation(); setHover(null); onOpen?.(s.id); jump(span.left); }}
+          />
         );
       })}
       <div

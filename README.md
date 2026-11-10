@@ -238,6 +238,27 @@ imported. Without an `app.py`, the standard tools are offered.
 | `cell_types` | the built-in cell types (images, Plotly, tables, JSON) |
 | `freeze` | `False`; `True` refuses new tools once the server is up |
 | `agent` | a local Ollama model if one is running (`llama3.2:3b`); `Agent(model="qwen2.5:7b")` to choose; `False` for none |
+| `step_palette` | `"vaporwave"`: the palette that colours the steps when the app starts. Built-ins: `vaporwave`, `muted`, `ocean`, `sunset`, `forest`, `slate`, `classic`. Users can switch it in **Settings** |
+| `step_palettes` | none: your own palettes, by name — a list of colours used in turn, or `{"gradient": [first, …, last]}` blended along the workflow |
+
+**Step colours.** An app sets its look with its defaults:
+
+```python
+app = App(
+    tools=[my_tools],
+    step_palettes={
+        "brand": ["#1d3557", "#457b9d", "#2a9d8f"],      # used in turn
+        "dusk": {"gradient": ["#1d3557", "#e76f51"]},    # first step to last
+    },
+    step_palette="dusk",                                 # what the app starts with
+)
+```
+
+Colours are `#rrggbb`; header text is white, so mid-to-dark colours read best.
+A bad colour or an unknown palette name stops the `App` with the reason. Your
+palettes appear in **Settings → Step colours** beside the built-ins; a user's
+choice there lasts until the server restarts, then the app's default applies
+again. A colour set on a single step (its own settings) always wins.
 
 ### The agent
 

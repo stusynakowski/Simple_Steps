@@ -18,7 +18,7 @@ From the top of a step's column down:
 
 | part | what it does |
 |---|---|
-| **Header** | the step's name and status (*pending*, *running*, *completed*, *error*), on one line. Click it to open or close the step. Hover it for its controls: **settings** (tune icon) and **notes** (note icon) at the bottom left, **minimize** and **maximize** at the bottom right; drag it out to float the step in its own window. A step with notes has a small arrow at the header's bottom left, on hover: it opens the notes under the header. |
+| **Header** | the step's name, with where its run stands: the colour of the arrow's sides, an icon just ahead of its tail, and a word at the bottom centre (see [the run's colours](#run-it)). Click it to open or close the step. Hover it for its controls at the bottom right: **notes** (notepad), **settings** (tune icon), **minimize** and **maximize**; drag it out to float the step in its own window. |
 | **Toolbar** | three groups. **Run** runs this step (⌘↵); **Run to the end** (fast-forward) runs it and every step after it; **Run options** has *Stage this step* (↵), *Run all steps* and *Clear output*. **Step Panels** opens **Analytics** and **Data** below. **Manage Step** moves the step left or right, locks it, or deletes it. A narrow step shows the icons without words. |
 | **Formula row** | **fx** opens the Formula panel; then the **formula bar**. |
 | **Panels** | whichever you've opened, always in the order Analytics, Formula, Data. Click a panel's title to fold it to just the title. |
@@ -86,7 +86,7 @@ brackets and the input for you, in exactly the form below.
 While you type, the bar only checks that the text can be read. Press
 **Enter** to stage the step: it's then checked against the workflow (does
 the tool exist, one shape verb, the settings' types, which steps it may
-read). A step's problems show on its status pill, in its summary and in the
+read). A step's problems show on its header (hover its status), in its summary and in the
 Formula panel; the other steps still run.
 
 ## Point at an earlier step
@@ -129,10 +129,16 @@ Then look at the output:
 The **console** (terminal icon in the workflow toolbar) logs every run, with
 the details.
 
-The **map** along the bottom of the steps shows where a run stands: a thin
-line over each step, **grey** staged (not run, or out of date), **blue**
-queued or running, **green** ran, **orange** ran with some rows failed,
-**red** failed. Hover it for the step's status; click to jump to the step.
+Each step's header shows where its run stands in the colour of its sides,
+with an icon at its tail and a word at the bottom: **grey** staged (not run,
+or out of date), **blue stripes** queued, moving toward the next step while
+it runs, **green** ran, **amber** ran with some rows failed, **red** failed.
+A step that **can't run** is grey with its tail outlined red; hover the icon
+or the word for why.
+
+The **map** along the bottom of the steps is a thin copy of the headers,
+outlined the same way. Hover it for a step's status; click a step to jump to
+it and open it.
 
 ## When a step is refused
 
@@ -158,19 +164,21 @@ The full list, with fixes:
 
 ## Name, colour and notes
 
-Hover the step's header: the **tune** icon opens its settings, the **note**
-icon its notes.
+Hover the step's header: at its bottom right, the **notepad** drops its notes
+down under the header, and the **tune** icon opens its settings.
 
 - **Step Name** — what the step is called, and what other steps write in
   `wf["…"]` to read it.
 - **Color** — **Change color…** opens your system's colour picker; the
-  step's header takes the colour. **Reset** goes back to the default colour
-  for its position.
+  step's header takes the colour. **Reset** goes back to the palette's
+  colour for its position (the palette is chosen in **Settings → Step
+  colours**).
 - **Notes** — anything worth remembering about the step: what it's for, why
   a setting is what it is. Write in Markdown (`**bold**`, `- lists`,
   `` `code` ``). The notes appear, formatted, in **Analytics**, and under
-  the step's header when you open them with the arrow at the header's
-  bottom left (shown on hover).
+  the step's header when you open them with the notepad. Hover them there
+  for the edit button; click away (or Esc) when done. A step without notes
+  opens straight to editing.
 
 The name, colour and notes are saved with the workflow.
 
