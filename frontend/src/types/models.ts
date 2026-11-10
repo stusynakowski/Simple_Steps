@@ -74,6 +74,8 @@ export interface Step {
   coreState?: string;
   /** Core's reasons a step can't run or is suspect. */
   problems?: string[];
+  /** The formula core runs, from the last sync: what was written plus what core decided (the verb, bindings). */
+  coreFormula?: string;
   /** The server's key for the step's view: a new one means fetch it again (/api/view). */
   viewKey?: string;
   /** The columns core plans or has, with their types. */

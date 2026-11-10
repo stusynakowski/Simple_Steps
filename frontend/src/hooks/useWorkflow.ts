@@ -166,12 +166,15 @@ export default function useWorkflow() {
       ...wf,
       steps: wf.steps.map((s) => {
         const state = states[s.label];
-        const staleReason = state?.status === 'stale' && s.outputRefId
+        // Stale, or completed but reading a stale step (core's reason: "read stale 's'").
+        const staleReason = s.outputRefId && (state?.status === 'stale' || state?.stale_reason)
           ? (state.stale_reason || 'an earlier step changed') : undefined;
         const coreState = state?.status ?? s.coreState;
         const problems = state?.problems ?? s.problems;
+        const coreFormula = state ? (state.formula ?? undefined) : s.coreFormula;
         return staleReason === s.staleReason && coreState === s.coreState && problems === s.problems
-          ? s : { ...s, staleReason, coreState, problems };
+          && coreFormula === s.coreFormula
+          ? s : { ...s, staleReason, coreState, problems, coreFormula };
       }),
     });
     workflowRef.current = patch(workflowRef.current);

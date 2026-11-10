@@ -214,7 +214,12 @@ export default function OperationColumn({
   // dev_plan/124 phase 2). Its output stays; the reason is the tooltip.
   const outOfDate = !isRunning && !isQueued && step.status === 'completed' && !!step.staleReason;
   const statusLabel = isQueued ? 'queued' : outOfDate ? 'out of date' : step.status;
-  const statusTitle = outOfDate ? `Out of date: ${step.staleReason}. Run it again to update.` : undefined;
+  const statusTitle = outOfDate ? `Out of date: ${step.staleReason}. Run it again to update.`
+    : step.problems?.length ? step.problems.join('\n') : undefined;
+  // What core runs, when it differs from what was written: the verb it
+  // decided, the bindings it wrote (core S3).
+  const coreRuns = step.coreFormula && step.coreFormula.replace(/^=/, '') !== (step.formula ?? '').replace(/^=/, '').trim()
+    ? step.coreFormula : undefined;
   const statusSpinner = (isRunning || isQueued) && (
     <span className={`status-spinner${isQueued ? ' queued' : ''}`} aria-hidden="true" />
   );
@@ -461,6 +466,21 @@ export default function OperationColumn({
                       <span className="label">Status:</span>
                       <span className={`status-badge status-${step.status}`}>{step.status}</span>
                    </div>
+                   {/* Core's reasons the step can't run or is suspect. */}
+                   {!!step.problems?.length && (
+                     <div className="summary-item step-problems" data-testid="step-problems">
+                       <span className="label">Problems:</span>
+                       <ul className="value">
+                         {step.problems.map((p) => <li key={p}>{p}</li>)}
+                       </ul>
+                     </div>
+                   )}
+                   {coreRuns && (
+                     <div className="summary-item" data-testid="step-core-formula">
+                       <span className="label">Core runs:</span>
+                       <code className="value step-core-formula">{coreRuns}</code>
+                     </div>
+                   )}
                    {/* Core's warnings from the last run (spec 009 REQ-RUN-002). */}
                    {!!step.warnings?.length && (
                      <div className="summary-item step-warnings" data-testid="step-warnings">

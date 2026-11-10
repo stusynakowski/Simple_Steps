@@ -135,6 +135,8 @@ export interface WorkflowStepState {
   /** Why it is out of date: `input r changed`, `updated args`, `r is stale`. */
   stale_reason: string | null;
   problems: string[];
+  /** The formula core runs: the verb it decided and the bindings it wrote. */
+  formula?: string | null;
   /** Changes when the step's view would (state, data version, formula, plan). */
   view_key?: string;
 }

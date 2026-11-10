@@ -381,15 +381,21 @@ def summary(s: Kernel) -> Dict[str, dict]:
     and a ``view_key`` that changes when the step's view does (its state, data
     version, formula or plan), so the UI fetches a view only then."""
     out: Dict[str, dict] = {}
+    # A step whose input is stale stays completed (core's SM rule); core
+    # still says it needs a run, and why: "read stale 's'".
+    needs = s.k.needs_run()
     for step in s.k.steps:
         problems = [str(p) for p in step.problems]
         if step.name in s.problems:
             problems.insert(0, s.problems[step.name])
         status = "invalid" if step.name in s.problems else step.state
+        reader_reason = needs.get(step.name) if status == "completed" else None
         out[step.name] = {
             "status": status,
-            "stale_reason": step.output.stale_reason,
+            "stale_reason": step.output.stale_reason or reader_reason,
             "problems": problems,
+            # What core runs: the verb it decided and the bindings it wrote.
+            "formula": step.formula or None,
             "view_key": _view_key(status, step.output.version, step.formula, step.plan, problems),
         }
     for name, problem in s.problems.items():

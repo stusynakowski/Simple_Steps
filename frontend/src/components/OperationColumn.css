@@ -1112,11 +1112,21 @@
 }
 
 /* Core's warnings from the last run, under the step's status (spec 009). */
-.step-warnings ul {
+.step-warnings ul,
+.step-problems ul {
   margin: 0;
   padding-left: 1.1em;
   color: orange;
   font-size: 0.85em;
+}
+
+.step-problems ul {
+  color: red;
+}
+
+.step-core-formula {
+  font-size: 0.75em;
+  word-break: break-all;
 }
 
 /* The selection's open control (spec 014 REQ-VIS-040): a small square at the

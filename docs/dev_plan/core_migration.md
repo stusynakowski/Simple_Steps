@@ -55,7 +55,7 @@ Not needed for today's functionality; core makes them possible.
 |---|---|---|
 | L1 | Core's `formula(text)` in place of the app's parser (`operation_formula.py`, 923 lines). The app's parser refuses core's new pick forms: conditions (`wf["r"][cols["n"] > 1]`), a string as a column (`wf["r"]["n"]`), a pick as a tool's input | the app writes none of them today. Supersedes the "replace the parser" answer of 2026-11-09's first plan |
 | L2 | `kernels.py` reads what core's kernel reports (`repr(k)`, `step.problems`, `k.needs_run()`) | a refactor; nothing fails without it |
-| L3 | The frontend shows core's new problem codes (`bad_pairing`, `id_argument`, `bad_combine`) and stale reasons | they arrive today as text |
+| L3 | **Done 2026-11-09.** A step's problems are listed in its summary and on its status pill's hover (they were synced but never shown); a step reading a stale one shows *out of date*, with core's reason (`read stale 's'`, from `k.needs_run()`); the summary shows *Core runs:* the formula core holds when it differs from the one written (the verb it decided, the bindings it wrote) | — |
 | L4 | Progress and `cancel()` (K23), the output store (C32), media (R7), stages (R9) | core hasn't built them; the app keeps its own (archive 01 §5) |
 
 ## 4. Decisions (owner, 2026-11-09)
