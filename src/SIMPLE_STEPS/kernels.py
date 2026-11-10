@@ -436,12 +436,32 @@ def view(session_id: str, key: str, name: str, start: int = 0, stop: int = 50) -
                 cells.append(out)
         return {
             "step": name, "state": v["state"], "summary": v["summary"],
+            "bindings": _bindings(s.k, name, columns),
             "problems": [str(p) for p in step.problems],
             "plan": _plain(step.plan),
             "columns": [{"name": str(c["name"]), "type": c.get("type")} for c in columns],
             "row_count": _plain(v["row_count"]), "window": _plain(v.get("window")),
             "cells": cells,
         }
+
+
+def _bindings(k: Any, name: str, columns: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Which step and columns give each of step *name*'s parameters, as core
+    binds them (``k.cell(…)["inputs"]``): by name, by type, or as written.
+    Core knows once the step's inputs have run, even if *name* hasn't; it
+    gives nothing when nothing upstream has run, or when more than one column
+    fits (then its problem proposes one). Empty when it doesn't say.
+    """
+    if not columns:
+        return {}
+    try:
+        inputs = k.cell(name, 0, columns[0]["name"]).get("inputs") or []
+    except Exception:          # no row 0 yet, or core can't say: nothing to draw
+        return {}
+    return {
+        str(i["argument"]): {"step": str(i["step"]), "columns": [str(c) for c in i.get("columns") or []]}
+        for i in inputs if i.get("argument") and i.get("step")
+    }
 
 
 def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
