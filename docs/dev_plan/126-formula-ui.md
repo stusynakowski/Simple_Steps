@@ -205,6 +205,17 @@ and the new map (its parts and lines must follow the formula as shown).
 writes back through the backend; the map's parts come with each parse. Not
 yet checked end to end since the map landed (2026-11-10).
 
+### R12 — Clean up the formula UI: passing arguments is clunky
+
+**To do (owner, 2026-11-10; after 0.1.3):** the formula bar and Formula
+panel are almost there, but passing arguments is clunky. Clean it up.
+Related, from the same day: the input and the arguments read as the same
+thing in the formula (`tool(wf["a"], k=wf["b"]["n"])`), though core treats
+them differently (the input sets the rows and fills parameters by name; an
+argument is given to each call). 0.1.3 eases it in the panel (*runs over*
+as the first argument, a note on what each argument receives); a fix in
+core's syntax is a separate decision.
+
 ## Progress
 
 | Date | Item | Done | Confirmed |
