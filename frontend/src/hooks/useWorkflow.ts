@@ -19,6 +19,7 @@ import type { LogEntry, LogLevel } from '../components/ExecutionLog';
 import type { WorkflowCommand } from '../types/commands';
 import { formatCommand } from '../types/commands';
 import { emitConsoleRecord } from '../context/ConsoleContext';
+import { ROW_PAGE } from '../utils/gridSelection';
 
 /**
  * A saved file's workflow-level parts: identity, `meta`, `resources`, and every
@@ -141,12 +142,20 @@ export default function useWorkflow() {
       const before = workflowRef.current.steps.find((s) => s.label === name);
       if (!before || !state.view_key || before.viewKey === state.view_key) continue;
       try {
-        const view = await fetchStepView(key, name);
+        // The page the grid is on, so a re-run doesn't throw you back to the
+        // first page; the first page if the step no longer has that one.
+        let page = before.rowPage ?? 0;
+        let view = await fetchStepView(key, name, page * ROW_PAGE, ROW_PAGE);
+        if (page > 0 && !view.cells.length) {
+          page = 0;
+          view = await fetchStepView(key, name, 0, ROW_PAGE);
+        }
         const latest = workflowRef.current;
         workflowRef.current = {
           ...latest,
           steps: latest.steps.map((s) => (s.label !== name ? s : {
             ...s,
+            rowPage: page,
             viewKey: state.view_key,
             coreState: view.state,
             problems: view.problems,
@@ -159,6 +168,31 @@ export default function useWorkflow() {
         setWorkflow(workflowRef.current);
       } catch { /* the step keeps what it shows */ }
     }
+  }, []);
+  /**
+   * Show page *page* of a step's rows (owner, 2026-11-10: a step's data is
+   * any size; the grid shows it a page of ROW_PAGE rows at a time, with a
+   * pager under it). The page's cells replace the grid's; their row ids are
+   * the rows' real positions, so a pick on page 3 writes the right row. A
+   * late answer for a version the step no longer shows is dropped.
+   */
+  const loadRowPage = useCallback(async (stepId: string, page: number) => {
+    const step = workflowRef.current.steps.find((s) => s.id === stepId);
+    if (!step || page < 0) return;
+    try {
+      const view = await fetchStepView(workflowKey(), step.label, page * ROW_PAGE, ROW_PAGE);
+      const latest = workflowRef.current;
+      workflowRef.current = {
+        ...latest,
+        steps: latest.steps.map((s) => (s.id !== stepId || s.viewKey !== step.viewKey ? s : {
+          ...s,
+          rowPage: page,
+          output_preview: view.cells,
+          outputRows: view.window?.of ?? s.outputRows,
+        })),
+      };
+      setWorkflow(workflowRef.current);
+    } catch { /* the grid keeps the page it has */ }
   }, []);
   /** Each step as core says: its state, its problems, out of date or not; then its view. */
   const applyStepStates = useCallback((states?: Record<string, WorkflowStepState>) => {
@@ -1114,8 +1148,9 @@ export default function useWorkflow() {
     consoleStepMap,
     resolveStepId,
     runStep,
-    declareWorkflow, 
+    declareWorkflow,
     previewStep,
+    loadRowPage,
     runPipeline,
     pausePipeline,
     stopPipeline,

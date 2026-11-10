@@ -127,6 +127,7 @@ export default function MainLayout() {
     updateStep,
     runStep,
     declareWorkflow,
+    loadRowPage,
     runPipeline,
     pausePipeline,
     stopPipeline,
@@ -849,6 +850,7 @@ export default function MainLayout() {
                   onDeclare={declareWorkflow}
                   onRunAll={runPipeline}
                   onRunToEnd={() => runPipeline(step.id)}
+                  onRowPage={(page) => loadRowPage(step.id, page)}
                   onMove={(to) => moveStep(step.id, to)}
                   stepCount={workflow.steps.length}
                   onPause={id => console.log('Pause', id)}
@@ -1075,6 +1077,7 @@ export default function MainLayout() {
               color={step.step_color ?? getStepColor(stepIndex)}
               initialPosition={dw.position}
               onClose={() => closeDetachedWindow(dw.id)}
+              onRowPage={(page) => loadRowPage(step.id, page)}
               onUpdate={(id, updates) => updateStep(id, updates)}
               onRun={runStep}
                   onDeclare={declareWorkflow}

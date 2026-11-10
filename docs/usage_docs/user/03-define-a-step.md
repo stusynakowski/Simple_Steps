@@ -119,7 +119,8 @@ A step has **one** input. To line up the rows of two steps, use a
 
 Then look at the output:
 
-- **Data** shows the step's table. A step that failed shows its error in
+- **Data** shows the step's table, any size: a step with more than 200 rows
+  shows them a page at a time, with the pages under the table. A step that failed shows its error in
   place of the table; rows that failed are marked, and the others still have
   results.
 - **Analytics** sums the step up: its name, tool, status, how many rows and

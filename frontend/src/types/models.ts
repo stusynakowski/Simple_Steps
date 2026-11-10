@@ -58,6 +58,8 @@ export interface Step {
   operation?: string;
   outputRefId?: string; // The backend reference ID for the result DataFrame
   outputRows?: number;   // Row count of the output DataFrame
+  /** Which page of its rows the grid shows (0 the first; ROW_PAGE rows a page). */
+  rowPage?: number;
   outputColumns?: string[]; // Full list of columns in the output DataFrame (for step diffing)
   output_preview?: Cell[]; 
   /** Core's warnings from the last run: valid, but probably not meant (spec 009 REQ-RUN-002). */

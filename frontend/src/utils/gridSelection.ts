@@ -50,6 +50,9 @@ export interface PickModifiers {
 
 export const cellKey = (row: number, col: string) => `${row}:${col}`;
 
+/** Rows on one page of a step's grid; a pager under it shows the rest (any size, owner 2026-11-10). */
+export const ROW_PAGE = 200;
+
 /** Everything from *a* to *b* in *order*, inclusive. */
 function span<T>(order: T[], a: T, b: T): T[] {
   const i = order.indexOf(a);

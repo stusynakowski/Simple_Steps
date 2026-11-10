@@ -1035,6 +1035,38 @@
   white-space: normal;
 }
 
+/* The pages of a step bigger than one page, under its grid (any size,
+   owner 2026-11-10). */
+.grid-pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 5px 8px;
+  background: #fafafa;
+  border-top: 1px solid #eee;
+  font-size: 0.72rem;
+  color: #555;
+}
+.grid-page-run { display: inline-flex; align-items: center; gap: 3px; }
+.grid-page-btn {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid #d5d9de;
+  border-radius: 3px;
+  background: #fff;
+  color: #333;
+  font-size: 0.72rem;
+  line-height: 18px;
+  cursor: pointer;
+}
+.grid-page-btn:hover:not(:disabled) { background: #f0f4fa; }
+.grid-pager .grid-page-btn:disabled { opacity: 0.4; background: #fff; color: #333; border-color: #d5d9de; cursor: default; }
+.grid-page-btn.current { background: #2f6fd0; border-color: #2f6fd0; color: #fff; cursor: default; }
+.grid-page-gap { color: #999; padding: 0 2px; }
+.grid-page-note { margin-left: auto; color: #888; font-style: italic; }
+
 
 /* ── Step header: hover controls and status spinner ────────────────────── */
 /* Minimize / maximize, bottom right of the header, shown on hover (owner,

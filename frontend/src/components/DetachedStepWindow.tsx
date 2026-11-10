@@ -20,6 +20,8 @@ interface DetachedStepWindowProps {
   onUpdate?: (id: string, updates: Partial<Step>) => void;
   onRun: (id: string) => void;
   onDeclare?: () => void;
+  /** Show page *page* of the step's rows (the grid's pager). */
+  onRowPage?: (page: number) => void;
   onDelete: (id: string) => void;
 }
 
@@ -54,6 +56,7 @@ export default function DetachedStepWindow({
   onUpdate,
   onRun,
   onDeclare,
+  onRowPage,
   onDelete,
 }: DetachedStepWindowProps) {
   const [pos, setPos] = useState(initialPosition);
@@ -317,6 +320,7 @@ export default function DetachedStepWindow({
               onUpdate={onUpdate}
               onRun={onRun}
               onDeclare={onDeclare}
+              onRowPage={onRowPage}
               onPause={() => {/* no-op in detached */}}
               onDelete={onDelete}
             />

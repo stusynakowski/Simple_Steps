@@ -41,6 +41,8 @@ interface OperationColumnProps {
   onRunAll?: () => void;
   /** Run this step and every step after it (the toolbar's "Run to the end"). */
   onRunToEnd?: () => void;
+  /** Show page *page* of the step's rows (the grid's pager). */
+  onRowPage?: (page: number) => void;
   /** Move this step to a position, 0 the first. */
   onMove?: (to: number) => void;
   /** How many steps the workflow has. */
@@ -84,6 +86,7 @@ export default function OperationColumn({
   onRun,
   onRunAll,
   onRunToEnd,
+  onRowPage,
   onMove,
   stepCount,
   onDeclare,
@@ -621,6 +624,8 @@ export default function OperationColumn({
                         columns={step.viewColumns}
                         planNote={planNote}
                         rowCount={step.outputRows}
+                        page={step.rowPage ?? 0}
+                        onPage={onRowPage}
                         stagedCellMode={stagedCellMode}
                         onHoverChange={(spot) => setGridHover(spot && { ...spot, step: step.label })}
                         onNoteChange={setDataNote}

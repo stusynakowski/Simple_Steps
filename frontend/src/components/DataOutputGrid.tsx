@@ -4,7 +4,7 @@ import { referenceBoxes, selectionText } from '../utils/selection';
 import { useStepWiring } from '../context/StepWiringContext';
 import type { GridPick } from '../utils/selection';
 import {
-  INDEX_COL, applyGridPick, cellKey, describeGridSel, drawnIn, inGridSel, selectionEdges, selectionExtent,
+  INDEX_COL, ROW_PAGE, applyGridPick, cellKey, describeGridSel, drawnIn, inGridSel, selectionEdges, selectionExtent,
   selectionBottomRight, selectionTopLeft, takesWholeColumns,
 } from '../utils/gridSelection';
 import type { GridSel, GridSelPick } from '../utils/gridSelection';
@@ -106,9 +106,13 @@ interface DataOutputGridProps {
   columns?: { name: string; type?: string }[];
   /** Why a staged step's rows aren't known yet, from its plan. */
   planNote?: string;
-  /** The step's total rows (the grid may show only the first page): where a
-   *  negative row in a reference, `[-1]`, lands. */
+  /** The step's total rows (the grid may have loaded only some of them): where
+   *  a negative row in a reference, `[-1]`, lands, and how many there are to load. */
   rowCount?: number;
+  /** The page of rows shown (0 the first), when the step has more than a page. */
+  page?: number;
+  /** Show another page: the pager under the grid. */
+  onPage?: (page: number) => void;
 }
 
 /**
@@ -135,6 +139,8 @@ function Grid({
   columns,
   planNote,
   rowCount,
+  page = 0,
+  onPage,
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   // Looking at data (spec 014 §6, §8): a click selects — a cell, a row, a
@@ -216,7 +222,7 @@ function Grid({
   const shownSel = selection.of === cells ? selection.sel : null;
   /** While a formula is being written, tell it what the selection reads (D1). */
   const sendPick = (sel: GridSel | null) => {
-    if (wiringMode) onPick?.({ text: selectionText(stepName, sel, rows, cols) });
+    if (wiringMode) onPick?.({ text: selectionText(stepName, sel, rows, cols, rowCount ?? rows.length) });
   };
   const select = (pick: GridSelPick, e: React.MouseEvent) => {
     // The click that ends a drag: the drag already made the selection.
@@ -520,7 +526,13 @@ function Grid({
   };
 
 
-  const note = `${rows.length} row${rows.length !== 1 ? 's' : ''}, ${cols.length} column${cols.length !== 1 ? 's' : ''}`
+  // The step's size, not just the page shown: a step's data can be any size,
+  // shown ROW_PAGE rows a page with a pager under the grid (owner, 2026-11-10).
+  const total = rowCount ?? rows.length;
+  const pages = Math.max(1, Math.ceil(total / ROW_PAGE));
+  const paged = cells.length > 0 && total > rows.length;
+  const first = rows.length ? rows[0] : 0;
+  const note = `${total.toLocaleString()} row${total !== 1 ? 's' : ''}${paged ? ` (# ${first.toLocaleString()}–${(first + rows.length - 1).toLocaleString()} shown)` : ''}, ${cols.length} column${cols.length !== 1 ? 's' : ''}`
     + (shownSel ? ` · ${describeGridSel(shownSel, rows, cols)}` : '');
   useEffect(() => { onNoteChange?.(note); }, [note, onNoteChange]);
 
@@ -790,6 +802,38 @@ function Grid({
           <div className="grid-plan-note" role="note">rows not known yet: {planNote}</div>
         )}
       </div>
+      {paged && onPage && (
+        <Pager page={page} pages={pages} first={first} shown={rows.length} total={total} onPage={onPage} />
+      )}
     </div>
+  );
+}
+
+/**
+ * The pages of a step bigger than one page (owner, 2026-11-10): back and
+ * forward, the first and last pages, and the pages around this one, with
+ * `…` between; and which rows are shown, of how many.
+ */
+function Pager({ page, pages, first, shown, total, onPage }: {
+  page: number; pages: number; first: number; shown: number; total: number;
+  onPage: (page: number) => void;
+}) {
+  const near = new Set([0, pages - 1, page - 1, page, page + 1].filter((p) => p >= 0 && p < pages));
+  const list = [...near].sort((a, b) => a - b);
+  const go = (p: number) => (e: React.MouseEvent) => { e.stopPropagation(); if (p !== page) onPage(p); };
+  return (
+    <nav className="grid-pager" aria-label="Pages of rows" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="grid-page-btn" onClick={go(page - 1)} disabled={page === 0} aria-label="Previous page">‹</button>
+      {list.map((p, i) => (
+        <span key={p} className="grid-page-run">
+          {i > 0 && p - list[i - 1] > 1 && <span className="grid-page-gap">…</span>}
+          <button type="button" className={`grid-page-btn${p === page ? ' current' : ''}`} aria-current={p === page ? 'page' : undefined}
+            onClick={go(p)}>{p + 1}</button>
+        </span>
+      ))}
+      <button type="button" className="grid-page-btn" onClick={go(page + 1)} disabled={page >= pages - 1} aria-label="Next page">›</button>
+      {/* In the # column's numbers (positions from 0), so the two agree. */}
+      <span className="grid-page-note"># {first.toLocaleString()}–{(first + shown - 1).toLocaleString()} of {total.toLocaleString()} rows</span>
+    </nav>
   );
 }

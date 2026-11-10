@@ -39,10 +39,12 @@ const lit = (v: string | number) => (typeof v === 'number' ? String(v) : JSON.st
 
 /**
  * *sel* on step *step* in core's notation. *rows* and *cols* are the grid's
- * row positions and data columns, in order.
+ * row positions and data columns, in order; *total* is the step's row count,
+ * which may be more than the rows loaded: every loaded row is the whole
+ * step only when every row is loaded.
  */
 export function selectionText(
-  step: string, sel: GridSel | null, rows: number[], cols: string[],
+  step: string, sel: GridSel | null, rows: number[], cols: string[], total: number = rows.length,
 ): string | null {
   if (!sel || sel.kind === 'index') return null;
   const ref = stepRef(step);
@@ -60,7 +62,7 @@ export function selectionText(
   const colList = cols.filter((c) => colSet.has(c));
 
   let rowPart = '';
-  if (rowList.length !== rows.length) {
+  if (rowList.length !== total) {
     const first = rows.indexOf(rowList[0]);
     const contiguous = rowList.every((r, i) => rows[first + i] === r);
     if (contiguous && rowList.length > 1) rowPart = `[${rowList[0]}:${rowList[rowList.length - 1] + 1}]`;
