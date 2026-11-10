@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simple-steps"
-version = "0.1.0"
+version = "0.1.1"
 description = "Visual pipeline orchestrator for Python functions"
 requires-python = ">=3.10"
 readme = "README.md"
@@ -30,7 +30,7 @@ dependencies = [
     # main at install time, which drifts from the submodule this repo is
     # developed against -- an older core lacks ResourceSpec and makes the
     # whole package unimportable. Bump this together with the submodule.
-    "simple-steps-core @ git+https://github.com/stusynakowski/simple-steps-core.git@fed4d1ab1739bb95f597c10ebb631d1b4100f974",
+    "simple-steps-core @ git+https://github.com/stusynakowski/simple-steps-core.git@dbaf4c735ccd07987782b04a33e62f37754e94a3",
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",

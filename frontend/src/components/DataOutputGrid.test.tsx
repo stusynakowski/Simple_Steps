@@ -31,12 +31,13 @@ describe('DataOutputGrid', () => {
   });
 
   it('shows a step with no output as a 1×1 dataframe whose cell says empty', () => {
-    // Data is always a dataframe: an empty or undefined expression still has one.
+    // Data is always a dataframe: an empty or undefined expression still has one,
+    // its column named after the step, as core names it (core 1.0.2, FT2).
     for (const cells of [[], undefined]) {
-      const { unmount } = render(<DataOutputGrid cells={cells} />);
+      const { unmount } = render(<DataOutputGrid cells={cells} stepName="totals" />);
       expect(screen.getByRole('grid')).toBeInTheDocument();
       expect(screen.getAllByRole('columnheader')).toHaveLength(1);
-      expect(screen.getByRole('columnheader', { name: 'value' })).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: 'totals' })).toBeInTheDocument();
       expect(screen.getAllByRole('row')).toHaveLength(1);
       const cell = screen.getByRole('gridcell');
       expect(cell).toHaveTextContent('empty');

@@ -54,13 +54,12 @@ function CellContent({ cell }: { cell: Cell }) {
   );
 }
 
-/** The column of the 1×1 frame shown for a step with no output yet — core's
- *  default output column name. */
-export const EMPTY_FRAME_COLUMN = 'value';
-const EMPTY_FRAME_CELL: Cell = {
-  row_id: 0, column_id: EMPTY_FRAME_COLUMN, value: null, display_value: 'empty',
+/** The 1×1 frame shown for a step with no output yet: one cell, "empty", in a
+ *  column named after the step, as core names an empty step's column. */
+const emptyFrameCell = (column: string): Cell => ({
+  row_id: 0, column_id: column, value: null, display_value: 'empty',
   metadata: { empty: true },
-};
+});
 const isEmptyFrameCell = (cell?: Cell) => cell?.metadata?.empty === true;
 
 /** A cell's tooltip: its value, and core's state when it isn't plainly known. */
@@ -167,7 +166,7 @@ function Grid({
       // or undefined expression, or a step not run — it is a 1×1 frame whose
       // one cell says "empty", drawn by the same grid as any other output.
       return {
-        cols: [EMPTY_FRAME_COLUMN], rows: [0], gridData: { [`0:${EMPTY_FRAME_COLUMN}`]: EMPTY_FRAME_CELL },
+        cols: [stepName], rows: [0], gridData: { [`0:${stepName}`]: emptyFrameCell(stepName) },
         structureType: 'grid',
       };
     }
@@ -192,7 +191,7 @@ function Grid({
       gridData: dataMap,
       structureType: type,
     };
-  }, [cells, columns]);
+  }, [cells, columns, stepName]);
 
   // Core's type for each column, and its row id for each row (dev_plan/126 R5, D8).
   const typeOf = useMemo(() => {

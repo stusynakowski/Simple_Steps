@@ -1958,8 +1958,14 @@ from everything else.
 
 Five asks found comparing the app's parser with core's `formula()`, each
 run: [012-asks-at-fed4d1a.md](012-asks-at-fed4d1a.md). C40 positional
-resources, C41 an unquoted setting (`SHIM(core §C40)`, `SHIM(core §C41)`
-once L1 lands), C42 raw errors, C43 accepted but can't run, C44 wording.
+resources, C41 an unquoted setting, C42 raw errors, C43 accepted but can't
+run, C44 wording. **All closed in core 1.0.2 (`dbaf4c7`)**, as were C39 and
+C36's `'value'` default; no shims needed.
+
+**C36 at 1.0.2, still open in the app:** `map`'s `name` now defaults to "the
+step's name", and core accepts `mod.map(name="d")`. The app's
+`SHIM(core §C36)` still hides `name=` from the palette as retired, so it may
+now hide a valid setting. Removing it is the owner's call.
 
 ### C36, again: `map`'s `name` defaults to `'value'`
 

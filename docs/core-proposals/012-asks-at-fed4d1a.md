@@ -20,9 +20,10 @@
 | **C44** | Twenty-five refusals that are right but say less than they could | wording | 2 |
 | C39, C36 | A source's, a literal's and the empty step's column is still `value`; `map`'s `name` still defaults to `'value'` | consistency (D9) | 3 |
 
-What the app does meanwhile: it takes core's wording everywhere (C44 is not
-shimmed), and keeps two shims, tagged `SHIM(core §C40)` and
-`SHIM(core §C41)`, until those land.
+**Status: all closed in core 1.0.2 (`dbaf4c7`), 2026-11-09.** C40–C44, C39
+and C36 landed on core's `core-handover` branch (step S12) and were checked
+by the app's tests and examples at that pin. The app takes core's wording
+everywhere and needs no shim for any of them.
 
 ---
 

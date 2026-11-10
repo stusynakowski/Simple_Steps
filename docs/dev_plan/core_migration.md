@@ -90,7 +90,7 @@ positions.
 | D1 | What replaces `operation_formula.py` | core reads the text; a thin app adapter keeps `/api/parse_formula` and `/api/format_formula` answering in the same shape, so the frontend is unchanged |
 | D2 | When a formula is checked | **Serious parsing and validation happen when the formula is submitted (Enter) or the formula form changes**, against the workflow's live kernel (`k.check`), which knows the inputs and their columns. While typing, only what is cheap: core's `formula()` for syntax and the reference positions. Today the bar calls `/api/parse_formula` on every keystroke |
 | D3 | Whose wording | **Core's wording everywhere, except Simple Steps' Python-development wording**: where a message tells you how to write Python, it uses Simple Steps' names (`@simple_step_tool` for core's `@tool`, `simple_step_resource` for `@resource`, `bound` for `@bound_tool`). The 25 refusals where core says less than the app (group E) take **core's wording now, with no shim**, and are handed to core to improve: [012 C44](../core-proposals/012-asks-at-fed4d1a.md). Specifics reviewed by the owner: [core_migration_L1_messages.md](core_migration_L1_messages.md), 56 cases side by side |
-| D4 | The app's own rules | drop those core decides otherwise on purpose; keep the rest as `SHIM(core §X)` plus an ask. **Outcome below: two shims, everything else is core's** |
+| D4 | The app's own rules | drop those core decides otherwise on purpose; keep the rest as `SHIM(core §X)` plus an ask. **Outcome below: everything is core's.** The two shims planned for C40 and C41 aren't needed: core 1.0.2 fixed both |
 | D5 | Reference positions (126 F8) | the app finds them with `ast` on text core accepted (about 30 lines, a shim) and asks core for them |
 | D6 | The step editor and the new picks | conditions and picks as inputs work in the formula bar; the editor shows those parts as written text, through its `{$expr}` passthrough. Real editor controls belong to plan 130 |
 | D7 | Order | its own branch, after `core-v1` merges into `main` |
@@ -103,8 +103,8 @@ positions.
 | a pick on its own as a step (`wf["s"]`) | accepts, on purpose | **dropped**: core's rule |
 | a pick as a tool's input | accepts, on purpose (S3) | **dropped** |
 | brackets with no shape verb (`dbl[mod.retry(times=2)]`) | decides the verb (S3) | **dropped** |
-| an unquoted setting (`mod.sort(by=n)`) | takes `n` as a tool, then printing raises | **`SHIM(core §C41)`**: refused while reading, *"text needs quotes"* |
-| — (the app binds it) a resource passed by position (`tool(wf["s"], res["tiny"])`) | `formula()` refuses it; the Python API binds it | **`SHIM(core §C40)`**: the app binds it by type before core reads it, as `grid_runner._bind_positional_resources` does today |
+| an unquoted setting (`mod.sort(by=n)`) | takes `n` as a tool, then printing raises | core's: fixed in 1.0.2 (C41), refused with *"text needs quotes"* |
+| — (the app binds it) a resource passed by position (`tool(wf["s"], res["tiny"])`) | `formula()` refuses it; the Python API binds it | core's: fixed in 1.0.2 (C40); `grid_runner._bind_positional_resources` goes with L1 |
 | a tool with a verb but no input; a source given an input | accepts | core's (asked, C43) |
 | everything else (one input, settings are literals, two shape verbs, a no-tool verb on a tool, …) | refuses, in its own words | core's (wording asked, C44) |
 

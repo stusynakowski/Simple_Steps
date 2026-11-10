@@ -23,7 +23,7 @@ example = Example(HERE / "app.py")
 import chart_pipeline as pipeline  # noqa: E402
 
 
-def bar_figure(x, y, title, column="value"):
+def bar_figure(x, y, title, column):
     """The step's one cell is a Plotly bar chart of *x* against *y*, titled *title*."""
     def check(data, metrics):
         figure = data[column].iloc[0]
@@ -63,7 +63,7 @@ example.check("plotly_charts", "rich-cells", twin=pipeline.build_rich_cells, exp
     "bright": {"brightness": [62.67, 82.67, 102.67, 82.67]},
     "profiles": lambda data, metrics: all(list(t.columns) == ["city", "n", "double"] for t in data["profile"])
                 or "each profile should be a city/n/double table",
-    "chart": bar_figure(["SF", "NYC", "LA"], [2, 1, 1], "Readings per city"),
+    "chart": bar_figure(["SF", "NYC", "LA"], [2, 1, 1], "Readings per city", column="chart"),
 })
 
 example.check("plotly_charts", "table-filter-chart", twin=pipeline.build_table_filter_chart, expect={

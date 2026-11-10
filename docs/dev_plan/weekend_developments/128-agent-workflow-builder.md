@@ -69,7 +69,7 @@ Each item is small and checked by the existing gates:
 
 | # | What | Why first |
 |---|---|---|
-| P1 | Take the owner's core update (C40–C44 and anything else), move the pin, release 0.1.1 | the agent's checker and syntax card come from core |
+| P1 | **Done 2026-11-09**: core 1.0.2 (C40–C44 closed), pinned; release 0.1.1 | the agent's checker and syntax card come from core |
 | P2 | **L1**: core reads formulas, one checker, check on Enter | contracts 2 and 3. An agent built on today's parser is rewritten when L1 lands |
 | P3 | **A0**: the unused LangGraph path removed (owner's go-ahead per piece) | one agent, not two |
 | P4 | **Commands on the backend** (contract 1) | propose mode can wait for it, since the UI applies proposals today; develop mode (A4) can't |
