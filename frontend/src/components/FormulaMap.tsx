@@ -72,6 +72,13 @@ export function ExplodedFormula({ formula, parts, hot, onHot }: {
 
 interface Line { key: string; d: string; kind: string; target: string }
 
+/** Pixels between the lines' lanes under the formula, and between their tracks in a column's gutter. */
+const LANE = 4;
+const TRACK = 2;
+
+/** The height of the band the lanes run in, for *n* lines: the columns start below it. */
+export const laneBand = (n: number) => LANE * (n + 1) + 4;
+
 /**
  * The dotted lines, drawn over *root*: from each chip down its column's
  * gutter into the field it maps to. Redrawn whenever *root* changes size
@@ -96,6 +103,10 @@ export function MapLines({ root, hot, deps }: {
       const chips = [...el.querySelectorAll<HTMLElement>('[data-map-key]')];
       const strip = el.querySelector('.fm-formula')?.getBoundingClientRect();
       const stripBottom = strip ? rel(strip).b : 0;
+      // Each line has its own lane in the band under the formula (LANE apart)
+      // and its own track in its column's gutter (TRACK apart), so no line
+      // runs over text or along another line.
+      const perColumn = new Map<Element, number>();
       chips.forEach((chip, i) => {
         const target = chip.dataset.mapTo!;
         const field = el.querySelector<HTMLElement>(`[data-map-target="${CSS.escape(target)}"]`);
@@ -103,9 +114,11 @@ export function MapLines({ root, hot, deps }: {
         const c = rel(chip.getBoundingClientRect());
         const f = rel(field.getBoundingClientRect());
         const column = field.closest<HTMLElement>('.te-col');
-        const gutter = column ? rel(column.getBoundingClientRect()).l + 5 : f.l - 6;
+        const k = column ? perColumn.get(column) ?? 0 : 0;
+        if (column) perColumn.set(column, k + 1);
+        const gutter = column ? rel(column.getBoundingClientRect()).l + 3 + Math.min(k, 5) * TRACK : f.l - 6;
         const x1 = (c.l + c.r) / 2;
-        const lane = stripBottom + 5 + (i % 6) * 3;      // each line its own lane under the strip
+        const lane = stripBottom + LANE + i * LANE;
         const y2 = f.t + Math.min(12, (f.b - f.t) / 2);
         next.push({
           key: chip.dataset.mapKey!, target, kind: [...chip.classList].find((k) => k.startsWith('fm-') && k !== 'fm-chip' && k !== 'fm-hot') ?? '',

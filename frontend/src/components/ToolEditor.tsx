@@ -9,7 +9,7 @@ import {
   formatFormula, inferVerb, parseFormula,
   type FormulaParts, type FormulaReference, type FormulaSpans, type ParsedFormula,
 } from '../utils/formulaParser';
-import { ExplodedFormula, MapLines, mapParts } from './FormulaMap';
+import { ExplodedFormula, MapLines, laneBand, mapParts } from './FormulaMap';
 import {
   AUTO, autoForWiring, explicitModifiers, fromFieldText, isShapeVerb, moveModifier, partsForTool,
   toFieldText, wiringChanged, withChosenVerb, withEntry,
@@ -225,7 +225,7 @@ export default function ToolEditor({
   });
 
   return (
-    <div className="tool-editor" ref={root} onClick={(e) => e.stopPropagation()}>
+    <div className={`tool-editor${!frozen && parts_.length ? ' te-mapped' : ''}`} ref={root} onClick={(e) => e.stopPropagation()}>
       {/* A formula core can't read (as you type), else what the workflow's check
           found when the step was entered (core_migration §6 D2). */}
       {(warning || !!problems?.length) && (
@@ -240,7 +240,11 @@ export default function ToolEditor({
         <ExplodedFormula formula={shown.formula} parts={parts_} hot={hot} onHot={setHot} />
       )}
 
-      <div className="te-columns" style={{ gridTemplateColumns: `minmax(140px, ${split.fraction}fr) 7px minmax(160px, ${1 - split.fraction}fr)` }}>
+      <div className="te-columns" style={{
+        gridTemplateColumns: `minmax(140px, ${split.fraction}fr) 7px minmax(160px, ${1 - split.fraction}fr)`,
+        // Room for the lines' lanes between the formula and the fields.
+        paddingTop: !frozen && parts_.length ? laneBand(parts_.length) : undefined,
+      }}>
         {/* Left: what is called, and how it is applied. */}
         <div className="te-col te-col-call">
           <Section title="Tool" part="tool" note={parts?.bound_to ? `on res["${parts.bound_to}"]` : undefined}>

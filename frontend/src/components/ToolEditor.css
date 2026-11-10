@@ -335,3 +335,8 @@
   .te-columns { grid-template-columns: minmax(0, 1fr) !important; }
   .te-divider { display: none; }
 }
+
+/* With the map shown, each column keeps a gutter at its left for the lines'
+   tracks, so a line never runs over a heading or a field. */
+.te-mapped .te-col { padding-left: 18px; }
+.te-mapped .fm-formula { border-bottom: 0; }
