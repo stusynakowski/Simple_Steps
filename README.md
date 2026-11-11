@@ -1,7 +1,7 @@
 # Simple Steps
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/stusynakowski/Simple_Steps/main/photos/simple_steps_cover_photo.png" alt="Simple Steps Cover Photo" width="600">
+  <img src="photos/simple_steps_cover_photo.png" alt="Simple Steps Cover Photo" width="600">
 </p>
 
 A visual workflow tool that lets non-technical users build and run multi-step data pipelines — backed by plain Python functions.
@@ -25,30 +25,40 @@ The formula bar is the single source of truth. The UI controls (dropdowns, param
 ---
 ## Installation
 
+### From GitHub
+
 ```bash
-pip install simple-steps
+pip install git+https://github.com/stusynakowski/Simple_Steps.git
 simple-steps
 ```
 
-That installs `simple-steps` and the one engine it runs on,
-`simple-steps-core`, from PyPI. Python 3.10+ (3.13 is the tested version).
+### Updating an existing install — read this
 
-Update, and check what you have:
+Between releases the version numbers don't change, so
+**a plain `pip install git+...` on a machine that already has them does
+nothing** — pip sees the installed copy as satisfying the requirement and keeps
+your old code. `pip install --upgrade` does not help either, for the same
+reason.
+
+To actually update:
 
 ```bash
-pip install --upgrade simple-steps
-simple-steps --version
-#   simple-steps       0.2.0
-#   simple-steps-core  1.0.2
+pip install --upgrade --force-reinstall --no-cache-dir \
+  "git+https://github.com/stusynakowski/Simple_Steps.git"
 ```
 
-Each release pins the exact `simple-steps-core` it was built with. If
-importing ever fails with *"This version of simple-steps needs a newer
-simple-steps-core"*, the environment has a stale core: `pip install --upgrade
-simple-steps` fixes it.
+Check what you really have — the commit, not the version:
 
-The latest unreleased code, from GitHub:
-`pip install "git+https://github.com/stusynakowski/Simple_Steps.git"`.
+```bash
+simple-steps --version
+#   simple-steps       0.1.3 (git …)
+#   simple-steps-core  1.0.2 (git dbaf4c735ccd)
+```
+
+If `simple-steps-core` is older than the one this release pins (`dbaf4c7`,
+core 1.0.2), importing fails with *"This version of simple-steps needs a newer
+simple-steps-core"*: a stale install, and the force-reinstall above is the
+fix. To install exactly one release, pin its tag: `…/Simple_Steps.git@v0.1.3`.
 
 ### Running the examples
 
@@ -58,7 +68,7 @@ main example that uses all three. Copy them out and run one, the way you'd run
 a Streamlit app:
 
 ```bash
-pip install simple-steps
+pip install "simple-steps @ git+https://github.com/stusynakowski/Simple_Steps.git"
 simple-steps --load-examples              # copies them to ./examples
 simple-steps run examples/app.py          # the main example; or examples/basic/app.py, …
 python examples/runme.py                  # run every example's workflows and check each step
@@ -92,16 +102,16 @@ wheel carries them; `--load-examples` copies whatever that folder holds.
 
 ### Option A: Use Simple Steps (no local repo checkout)
 
-If you want to use the tool for a project without seeing/cloning the repository, install it from PyPI:
+If you want to use the tool for a project without seeing/cloning the repository, install directly from GitHub:
 
 ```bash
-python -m pip install simple-steps
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git"
 ```
 
-Optional: pin a specific release:
+Optional: pin to a specific tag/release:
 
 ```bash
-python -m pip install "simple-steps==0.2.0"
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.3"
 ```
 
 This installs the package into your environment (`site-packages`) and gives you the `simple-steps` CLI without creating a repo folder in your current workspace.
@@ -118,8 +128,7 @@ uv venv --python 3.13        # or: python3.13 -m venv .venv
 source .venv/bin/activate   # macOS / Linux
 # .venv\Scripts\activate    # Windows
 
-git submodule update --init external/simple-steps-core
-uv pip install -e external/simple-steps-core -e .   # core from the submodule, editable
+uv pip install -e .          # or: pip install -e .
 ```
 
 That's it. The package installs the `simple-steps` CLI command and bundles a pre-built copy of the frontend.
@@ -157,7 +166,7 @@ pip install -e ".[desktop,dev]"
 # 1) Use environment (no repo checkout in your project folders)
 conda create -n simple_steps_use python=3.11 -y
 conda activate simple_steps_use
-python -m pip install "simple-steps==0.2.0"
+python -m pip install "git+https://github.com/stusynakowski/Simple_Steps.git@v0.1.3"
 
 # 2) Dev environment (full repo, editable install)
 conda create -n simple_steps_dev python=3.11 -y

@@ -73,7 +73,7 @@ runs. Every snippet here was run as written.
 
 \`\`\`bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install simple-steps
+pip install "git+https://github.com/stusynakowski/Simple_Steps.git"
 simple-steps --version
 \`\`\`
 
