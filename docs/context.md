@@ -47,20 +47,45 @@ argument that masked the behaviour being tested.
 
 ### The core pin and the submodule move together
 
-`pyproject.toml` pins core to a commit; `external/simple-steps-core` records
-one. **If they disagree, installs break** — an older core lacks `Catalog` and
-`Kernel`, and because `SIMPLE_STEPS/__init__` imports `core_bridge`, the whole
-package becomes unimportable ("This version of simple-steps needs a newer
-simple-steps-core").
+Both packages are on PyPI (since 0.2.0, 2026-11-10). `pyproject.toml` pins
+core exactly, `simple-steps-core==x.y.z`, and records the commit that release
+was built from in `[tool.simple-steps] core-commit`; `external/simple-steps-core`
+must be at that commit and declare that version. **If they disagree, installs
+break**: an older core lacks `Catalog` and `Kernel`, and because
+`SIMPLE_STEPS/__init__` imports `core_bridge`, the whole package becomes
+unimportable ("This version of simple-steps needs a newer simple-steps-core").
+PyPI refuses git-URL dependencies, so the pin can't be a commit any more.
 
-To take a core update:
+To take a core update, core needs a **new version on PyPI** first (a version
+number is never reused):
 
 ```bash
 git -C external/simple-steps-core fetch && git -C external/simple-steps-core checkout origin/main
-# then set the SAME commit in pyproject.toml's simple-steps-core @ git+...@<commit>
-python scripts/preflight.py            # fails if the two disagree
+# core's version must be new; release it (see "Releasing" below), then set
+# the pin to simple-steps-core==<that version> and core-commit to the commit
+python scripts/preflight.py            # fails if any of the three disagree
 .venv/bin/pip install -e external/simple-steps-core   # so your venv matches too
 ```
+
+### Releasing to PyPI
+
+Credentials are API tokens in `~/.pypirc` (sections `pypi` and `testpypi`),
+created by the owner on pypi.org and test.pypi.org; never in the repo or a
+chat.
+
+```bash
+python scripts/preflight.py && python scripts/smoke_install.py
+rm -rf dist && python -m build                    # sdist + wheel in dist/
+python -m twine check dist/*
+python -m twine upload -r testpypi dist/*         # first: try it from TestPyPI
+pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ simple-steps==<v>
+python -m twine upload dist/*                     # then the real index
+git tag v<v> && git push origin v<v>
+```
+
+Core is released the same way from `external/simple-steps-core` (build into
+a folder outside the submodule: `python -m build external/simple-steps-core
+--outdir <dir>`), before the app release that pins it.
 
 ---
 
@@ -125,13 +150,10 @@ description of the system). In short:
   `>=3.10`, but nothing below 3.13 is tested). Environment:
   `uv venv --python 3.13 && source .venv/bin/activate`
 - Install (dev): `python -m pip install -e ".[dev]"`
-- **Update a pip install elsewhere**: between releases the version numbers
-  don't change (`simple-steps` 0.1.3, `simple-steps-core` 1.0.2), so
-  a plain `pip install git+...` is a NO-OP on a machine that already has them —
-  pip reports the old copy as satisfying the requirement. Use
-  `pip install --upgrade --force-reinstall --no-cache-dir "git+https://github.com/stusynakowski/Simple_Steps.git"`,
-  and check the result with `simple-steps --version`, which prints each
-  package's git commit rather than its (meaningless) version.
+- **Update a pip install elsewhere**: `pip install --upgrade simple-steps`,
+  then `simple-steps --version`. A copy installed from git keeps its version
+  number between releases, so it needs `--force-reinstall --no-cache-dir`;
+  `--version` prints its commit.
 - Run backend tests: `pytest -q`
 - Run frontend tests: `cd frontend && npx vitest run`
 - Run the app in dev: `simple-steps-dev` (backend :8000 + Vite :5173 — use :5173)

@@ -59,12 +59,9 @@ def _find_free_port(host: str, preferred: int, max_attempts: int = 50) -> int:
 
 def print_versions() -> None:
     """
-    Report what is actually installed, including each package's git commit.
-
-    The version string changes only at a release, so between releases pip
-    treats any installed copy as satisfying a fresh `pip install git+...` and
-    silently leaves the old code in place. The commit is the only way to tell
-    what you really have — which is what this prints.
+    Report what is actually installed, and, for a copy installed from git or
+    editable, the commit it came from (between releases a git install keeps its
+    version number, so the commit is the only way to tell what you have).
     """
     import json
 
@@ -98,10 +95,9 @@ def print_versions() -> None:
         print(f"  {name:18} {dist.version}{detail}")
 
     print()
-    print("  The version numbers rarely change, so `pip install` sees an")
-    print("  existing copy as up to date. To genuinely update:")
-    print("    pip install --upgrade --force-reinstall --no-cache-dir \\")
-    print('      "git+https://github.com/stusynakowski/Simple_Steps.git"')
+    print("  To update: pip install --upgrade simple-steps")
+    print("  A copy installed from git keeps its version number between")
+    print("  releases; update it with --force-reinstall --no-cache-dir.")
 
 
 def run_main(argv: list) -> int:

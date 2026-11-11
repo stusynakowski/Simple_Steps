@@ -11,8 +11,10 @@ before pushing anything that someone will install:
 What it checks, and the failure each one prevents:
 
 1. **The core pin matches the submodule.** ``pyproject.toml`` pins
-   ``simple-steps-core`` to a commit; ``external/simple-steps-core`` records
-   one too. When they disagree, an installing user gets a different core than
+   ``simple-steps-core==x.y.z`` (from PyPI) and records the commit that release
+   was built from (``[tool.simple-steps] core-commit``);
+   ``external/simple-steps-core`` must be at that commit and declare that
+   version. When they disagree, an installing user gets a different core than
    this repo is developed against. That produced
    ``ImportError: cannot import name 'ResourceSpec'`` and made the whole
    package unimportable, because ``SIMPLE_STEPS/__init__`` imports
@@ -83,13 +85,18 @@ def _git(*args: str, cwd: Path = REPO) -> str | None:
 # 1 + 2. Core pin agreement                                                   #
 # --------------------------------------------------------------------------- #
 
+def pinned_version() -> str | None:
+    """The version `pyproject.toml` pins simple-steps-core to (``==x.y.z``)."""
+    m = re.search(r"[\"']simple-steps-core\s*==\s*([0-9][^\"';\s]*)", PYPROJECT.read_text())
+    return m.group(1) if m else None
+
+
 def pinned_commit() -> str | None:
-    """The commit `pyproject.toml` pins simple-steps-core to, if any."""
+    """The core commit the pinned release was built from: ``[tool.simple-steps]
+    core-commit`` (or, in an older pyproject, the commit in a git-URL pin)."""
     text = PYPROJECT.read_text()
-    m = re.search(
-        r"simple-steps-core\s*@\s*git\+[^\"'\s]*?simple-steps-core\.git@([0-9a-fA-F]{7,40})",
-        text,
-    )
+    m = re.search(r"^core-commit\s*=\s*[\"']([0-9a-fA-F]{7,40})[\"']", text, re.M) or re.search(
+        r"simple-steps-core\s*@\s*git\+[^\"'\s]*?simple-steps-core\.git@([0-9a-fA-F]{7,40})", text)
     return m.group(1) if m else None
 
 
@@ -97,24 +104,29 @@ def submodule_commit() -> str | None:
     return _git("rev-parse", "HEAD", cwd=CORE_SUBMODULE)
 
 
+def submodule_version() -> str | None:
+    path = CORE_SUBMODULE / "pyproject.toml"
+    m = re.search(r'^version\s*=\s*"([^"]+)"', path.read_text(), re.M) if path.is_file() else None
+    return m.group(1) if m else None
+
+
 def check_core_pin() -> None:
-    name = "pyproject pins core to the submodule's commit"
+    name = "pyproject pins core to the submodule (version and commit)"
 
     if not CORE_SUBMODULE.is_dir() or not any(CORE_SUBMODULE.iterdir()):
         bad(name, "external/simple-steps-core is empty.\n"
                   "Fix: git submodule update --init external/simple-steps-core")
         return
 
-    pin = pinned_commit()
-    sub = submodule_commit()
+    pin, version = pinned_commit(), pinned_version()
+    sub, sub_version = submodule_commit(), submodule_version()
 
-    if pin is None:
+    if pin is None or version is None:
         bad(name,
-            "pyproject.toml does not pin simple-steps-core to a commit.\n"
-            "An unpinned git URL resolves to core's main at install time, which\n"
-            "drifts from the submodule. Pin it:\n"
-            f'  "simple-steps-core @ git+https://github.com/stusynakowski/'
-            f'simple-steps-core.git@{sub or "<commit>"}"')
+            "pyproject.toml must pin simple-steps-core exactly and record the commit\n"
+            "that release was built from:\n"
+            f'  "simple-steps-core=={sub_version or "<version>"}"   in [project] dependencies\n'
+            f'  core-commit = "{sub or "<commit>"}"   in [tool.simple-steps]')
         return
 
     if sub is None:
@@ -124,59 +136,52 @@ def check_core_pin() -> None:
     n = min(len(pin), len(sub))
     if pin[:n].lower() != sub[:n].lower():
         bad(name,
-            f"pyproject pins {pin[:12]}\n"
-            f"submodule is at {sub[:12]}\n"
-            "These must move together. Either bump the pin to the submodule, or\n"
-            "check out the pinned commit in the submodule.")
+            f"pyproject's core-commit is {pin[:12]}\n"
+            f"submodule is at            {sub[:12]}\n"
+            "These must move together. Taking a core update means a new core\n"
+            "release on PyPI, then its version in the pin and its commit here.")
         return
 
-    ok(f"{name} ({sub[:12]})")
+    if version != sub_version:
+        bad(name,
+            f"pyproject pins simple-steps-core=={version}\n"
+            f"the submodule declares     {sub_version}\n"
+            "Pin the version the submodule's commit was released as.")
+        return
+
+    ok(f"{name} ({version}, {sub[:12]})")
 
 
 def check_installed_core() -> None:
-    """The core in *this* interpreter should be the pinned commit."""
+    """The core in *this* interpreter should be the pinned release."""
     name = "the installed core matches the pin"
-    pin = pinned_commit()
-    if pin is None:
+    version = pinned_version()
+    if version is None:
         skip(name, "no pin to compare")
         return
 
     try:
         import importlib.metadata as md
-        raw = md.distribution("simple-steps-core").read_text("direct_url.json")
+        dist = md.distribution("simple-steps-core")
     except Exception:
         skip(name, "core not installed in this interpreter")
         return
 
-    if not raw:
-        skip(name, "no direct_url.json")
-        return
-
-    info = json.loads(raw)
-    vcs = info.get("vcs_info") or {}
-    commit = vcs.get("commit_id")
-    url = info.get("url", "")
-
+    info = json.loads(dist.read_text("direct_url.json") or "{}")
     # An editable install from the submodule is the development setup and is
-    # correct by construction — it *is* the submodule.
-    if info.get("dir_info", {}).get("editable") or url.startswith("file://"):
+    # correct by construction — it *is* the submodule (check 1 compares it).
+    if info.get("dir_info", {}).get("editable") or info.get("url", "").startswith("file://"):
         ok(f"{name} (editable from the submodule)")
         return
 
-    if not commit:
-        skip(name, "installed core records no commit")
-        return
-
-    n = min(len(pin), len(commit))
-    if pin[:n].lower() != commit[:n].lower():
+    if dist.version != version:
         bad(name,
-            f"pin is       {pin[:12]}\n"
-            f"installed is {commit[:12]}\n"
-            "Fix: pip install --upgrade --force-reinstall --no-cache-dir \\\n"
-            "       \"git+https://github.com/stusynakowski/Simple_Steps.git\"")
+            f"pin is       {version}\n"
+            f"installed is {dist.version}\n"
+            f"Fix: pip install \"simple-steps-core=={version}\"")
         return
 
-    ok(f"{name} ({commit[:12]})")
+    ok(f"{name} ({dist.version})")
 
 
 # --------------------------------------------------------------------------- #

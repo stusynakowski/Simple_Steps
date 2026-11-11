@@ -54,8 +54,7 @@ except ImportError as exc:  # pragma: no cover - environment-dependent
         f"  missing: {_missing}\n"
         f"  found core at: {getattr(_core, '__file__', '?')}\n"
         "\nThe kernel API (Catalog, Kernel) landed in core 0.2.0. Upgrade it with:\n"
-        "  pip install --upgrade --force-reinstall "
-        '"simple-steps-core @ git+https://github.com/stusynakowski/simple-steps-core.git"\n'
+        "  pip install --upgrade simple-steps\n"
         "\nIf you are working from a checkout of this repo, point core at the\n"
         "submodule instead so the two cannot drift:\n"
         "  git submodule update --init external/simple-steps-core\n"

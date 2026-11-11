@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simple-steps"
-version = "0.1.3"
+version = "0.2.0"
 description = "Visual pipeline orchestrator for Python functions"
 requires-python = ">=3.10"
 readme = "README.md"
@@ -26,11 +26,11 @@ classifiers = [
     "Framework :: FastAPI",
 ]
 dependencies = [
-    # Pinned to a commit on purpose. An unpinned git URL resolves to core's
-    # main at install time, which drifts from the submodule this repo is
-    # developed against -- an older core lacks ResourceSpec and makes the
-    # whole package unimportable. Bump this together with the submodule.
-    "simple-steps-core @ git+https://github.com/stusynakowski/simple-steps-core.git@dbaf4c735ccd07987782b04a33e62f37754e94a3",
+    # Pinned exactly, from PyPI (which refuses git URLs). The release was
+    # built from [tool.simple-steps] core-commit below; the submodule must be
+    # at that commit and declare this version (scripts/preflight.py). An
+    # older core lacks ResourceSpec and makes the whole package unimportable.
+    "simple-steps-core==1.0.2",
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
     "pydantic>=2.6.0",
@@ -96,3 +96,8 @@ SIMPLE_STEPS = ["examples/**/__pycache__/*", "examples/**/*.pyc", "examples/**/.
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.simple-steps]
+# The simple-steps-core commit the pinned PyPI release was built from. Moves
+# together with the pin above and the external/simple-steps-core submodule.
+core-commit = "dbaf4c735ccd07987782b04a33e62f37754e94a3"
