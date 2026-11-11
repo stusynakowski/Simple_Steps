@@ -164,6 +164,10 @@ def _kernel_for(session_id: str, key: str, declarations: Dict[str, Any]) -> Kern
     from .catalog import catalog
     now = time.monotonic()
     cat = catalog()
+    # A resource's `meta` (its notes, colour: spec 017 REQ-RES-020) never
+    # changes how it is built, so editing it must not rebuild the kernel.
+    declarations = {n: {k: v for k, v in d.items() if k != "meta"} if isinstance(d, dict) else d
+                    for n, d in declarations.items()}
     with _GUARD:
         _cull_idle(now)
         live = _LIVE.setdefault(session_id, {})

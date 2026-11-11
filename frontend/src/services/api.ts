@@ -653,6 +653,35 @@ export async function declareResource(
     return body;
 }
 
+async function postResource(path: string, body: unknown, failure: string) {
+    const r = await fetch(`${API_BASE}/resources/${path}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out.detail || failure);
+    return out;
+}
+
+/** Build resource *name*'s live object now, in this session (spec 017 REQ-RES-009). */
+export async function loadResource(name: string, declaration: ResourceDeclaration): Promise<void> {
+    await postResource('load', { name, declaration }, `Couldn't load ${name}`);
+}
+
+/** Drop resource *name*'s live object in this session; its declaration stays. */
+export async function clearResource(name: string, declaration: ResourceDeclaration): Promise<void> {
+    await postResource('clear', { name, declaration }, `Couldn't clear ${name}`);
+}
+
+/** Per resource: true when loaded in this session, false when not, or why it can't be built. */
+export async function fetchResourceStatus(
+    resources: Record<string, ResourceDeclaration>,
+): Promise<Record<string, boolean | string>> {
+    return postResource('status', { resources }, 'Failed to read resource status');
+}
+
 /** A create-only save hit a workflow file that already exists (HTTP 409). */
 export class WorkflowExistsError extends Error {
     readonly projectId: string;

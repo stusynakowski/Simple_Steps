@@ -1,0 +1,270 @@
+/* The resource column (spec 017): ahead of step 1, quiet by default.
+   Its header is a step header's size (50px × 150px) but not an arrow: a
+   flat-left card with rounded right corners, so it reads as where the flow
+   starts rather than as a step. */
+
+.resource-column {
+  --res-bg: #1b1d21;
+  --res-line: #2c2f35;
+  --res-text: #d6d8dc;
+  --res-muted: #8a8f98;
+  flex: 0 0 150px;
+  width: 150px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  color: var(--res-text);
+  transition: flex-basis 0.25s ease, width 0.25s ease;
+}
+/* Any resource open: a step's open width (REQ-RES-004). */
+.resource-column.rc-wide { flex-basis: 450px; width: 450px; }
+
+.rc-head {
+  flex: none;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 14px;
+  background: #23262b;
+  border-right: 1px solid var(--res-line);
+  border-radius: 0 10px 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  user-select: none;
+}
+.rc-head-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rc-head-controls, .rc-card-controls { display: flex; gap: 2px; margin-left: auto; }
+/* Hover controls sit over the header's right end, so the title keeps its room. */
+.rc-head { position: relative; }
+.rc-head-controls {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  padding-left: 6px;
+  background: #23262b;
+  opacity: 0; pointer-events: none; transition: opacity 0.15s;
+}
+.rc-head:hover .rc-head-controls, .rc-head-controls:focus-within { opacity: 1; pointer-events: auto; }
+.rc-head:hover .rc-head-controls, .rc-head-controls:focus-within { opacity: 1; }
+
+.rc-count {
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: #33373e;
+  color: var(--res-muted);
+  font-weight: 500;
+}
+.rc-attention {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #e5a33b;
+  flex: none;
+}
+
+.rc-btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  border: none; border-radius: 4px;
+  background: transparent;
+  color: var(--res-muted, #8a8f98);
+  cursor: pointer;
+  padding: 0;
+}
+.rc-btn-icon:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.rc-btn-icon.on { color: #fff; }
+
+/* ── The list: one header per resource, stacked (REQ-RES-003) ── */
+.rc-list { display: flex; flex-direction: column; gap: 4px; padding: 6px 0 12px; }
+.rc-empty, .rc-meta { font-size: 11px; color: var(--res-muted); line-height: 1.4; }
+.rc-empty { padding: 4px 10px; }
+
+.rc-card {
+  background: var(--res-bg);
+  border-left: 3px solid var(--res-color, #5b6b7f);
+  border-radius: 0 8px 8px 0;
+}
+.rc-card-head {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px 0 9px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  user-select: none;
+}
+.rc-card.open > .rc-card-head { border-bottom: 1px solid var(--res-line); }
+.rc-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rc-tag { font-size: 10px; color: var(--res-muted); border: 1px solid var(--res-line); border-radius: 6px; padding: 0 4px; }
+
+/* Status (REQ-RES-011) */
+.rc-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; border: 1.5px solid #6b7079; background: transparent; }
+.rc-dot--loaded { background: #4caf7a; border-color: #4caf7a; }
+.rc-dot--error, .rc-dot--missing { background: #e05d5d; border-color: #e05d5d; }
+.rc-dot--changed { background: #e5a33b; border-color: #e5a33b; }
+.rc-dot--busy { border-color: #8ab4f8; border-top-color: transparent; animation: rc-spin 0.8s linear infinite; }
+@keyframes rc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rc-dot--busy { animation: none; } }
+
+.rc-notes { padding: 6px 10px; border-bottom: 1px solid var(--res-line); font-size: 12px; }
+.rc-notes textarea {
+  width: 100%; box-sizing: border-box; resize: vertical;
+  background: #121316; color: var(--res-text);
+  border: 1px solid var(--res-line); border-radius: 4px; padding: 6px; font: inherit;
+}
+.rc-notes-body p { margin: 0 0 4px; }
+
+/* ── A resource's panel (REQ-RES-008…014) ── */
+.rc-body { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px; }
+.rc-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rc-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 24px; padding: 0 8px;
+  border: 1px solid var(--res-line); border-radius: 4px;
+  background: #24272c; color: var(--res-text);
+  font-size: 12px; cursor: pointer;
+}
+.rc-btn:hover:not(:disabled) { background: #2d3137; }
+.rc-btn:disabled { opacity: 0.45; cursor: default; }
+.rc-btn-primary { background: #2b5a3f; border-color: #35704e; }
+.rc-btn-primary:hover:not(:disabled) { background: #336b4b; }
+.rc-status { margin-left: auto; font-size: 11px; color: var(--res-muted); }
+.rc-status--loaded { color: #6fcf97; }
+.rc-status--error, .rc-status--missing { color: #f08a8a; }
+.rc-status--changed { color: #f0b85a; }
+
+.rc-formula {
+  display: flex; align-items: center;
+  background: #121316;
+  border: 1px solid var(--res-line); border-radius: 4px;
+}
+.rc-formula:focus-within { border-color: #4d7cc7; }
+.rc-formula-label { padding: 0 6px 0 8px; color: var(--res-muted); font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
+.rc-formula-input, .rc-input {
+  flex: 1; min-width: 0;
+  height: 26px;
+  border: none; outline: none;
+  background: transparent; color: var(--res-text);
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
+}
+.rc-input { background: #121316; border: 1px solid var(--res-line); border-radius: 4px; padding: 0 8px; font-family: inherit; }
+.rc-warn { color: #f0b85a; }
+.rc-bad { color: #f08a8a; }
+
+.rc-users { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 11px; color: var(--res-muted); }
+.rc-chip {
+  padding: 1px 7px; border-radius: 9px;
+  background: color-mix(in srgb, var(--chip, #888) 30%, transparent);
+  border: 1px solid var(--chip, #888);
+  color: #fff;
+}
+
+.rc-browse {
+  padding: 14px 10px;
+  border: 1px dashed var(--res-line); border-radius: 4px;
+  font-size: 11px; color: var(--res-muted); text-align: center;
+}
+
+.rc-link {
+  border: none; background: none; padding: 0 0 0 6px;
+  color: #8ab4f8; cursor: pointer; font-size: 11px;
+}
+.rc-link:hover { text-decoration: underline; }
+
+.rc-types { display: flex; flex-wrap: wrap; gap: 4px; }
+.rc-type {
+  font-size: 11px; padding: 2px 7px; border-radius: 9px;
+  background: #24272c; border: 1px solid var(--res-line); color: var(--res-text); cursor: pointer;
+}
+.rc-type:hover { background: #2d3137; }
+
+.rc-ready { padding: 4px 0; }
+.rc-subtitle { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--res-muted); padding: 4px 10px; }
+.rc-ready-row { display: flex; align-items: center; padding: 2px 10px; font-size: 12px; }
+.rc-ready-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.rc-add {
+  display: inline-flex; align-items: center; gap: 4px;
+  align-self: flex-start;
+  margin: 2px 6px;
+  border: none; background: none;
+  color: var(--res-muted); font-size: 12px; cursor: pointer;
+}
+.rc-add:hover { color: #fff; }
+
+/* Settings popover (drawn by StepMenu) */
+.rc-settings { display: flex; flex-direction: column; gap: 8px; min-width: 200px; padding: 4px; color: #d6d8dc; }
+.rc-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #8a8f98; }
+.rc-field input:not([type='color']) {
+  height: 24px; padding: 0 6px;
+  background: #121316; color: #d6d8dc;
+  border: 1px solid #2c2f35; border-radius: 4px;
+}
+.rc-color-row { display: flex; align-items: center; gap: 6px; }
+.rc-remove {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  border: none; background: none; color: #f08a8a; cursor: pointer; font-size: 12px; padding: 0;
+}
+
+/* ── Collapsed side (REQ-RES-006) ── */
+.resource-column.rc-collapsed { flex-basis: 36px; width: 36px; }
+.rc-strip {
+  height: 50px; width: 36px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  border: none; border-radius: 0 8px 8px 0;
+  background: #23262b; color: #d6d8dc; cursor: pointer;
+}
+
+/* The soft divider between resources and steps (REQ-RES-001). */
+.rc-divider {
+  flex: 0 0 1px;
+  margin: 10px 12px 10px 8px;
+  background: linear-gradient(to bottom, transparent, #2c2f35 12%, #2c2f35 88%, transparent);
+}
+
+/* ── Pinned: the thin view at the left edge (REQ-RES-007) ── */
+.rc-thin {
+  position: sticky;
+  left: 0;
+  z-index: 200;
+  flex: 0 0 40px;
+  width: 40px;
+  margin-right: -40px;          /* takes no room: the steps scroll under it */
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: 0;
+  background: #121212;
+  border-right: 1px solid #2c2f35;
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.35);
+  white-space: normal;
+}
+.rc-thin-head {
+  position: relative;
+  height: 50px; width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: #23262b; color: #d6d8dc; cursor: pointer;
+}
+.rc-thin-head .rc-attention { position: absolute; top: 10px; right: 8px; }
+.rc-thin-item {
+  width: 34px; padding: 4px 0;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: none; border-left: 2px solid var(--res-color, #5b6b7f); border-radius: 0 4px 4px 0;
+  background: #1b1d21; color: #d6d8dc; cursor: pointer;
+}
+.rc-thin-name { font-size: 9px; color: #8a8f98; }
+
+/* The app's global button padding would squeeze the icons to nothing. */
+.rc-thin-head, .rc-thin-item, .rc-strip { padding: 0; }
+.resource-column .symbol-icon, .rc-thin .symbol-icon { flex: none; }
+
+/* A step that uses the hovered resource (REQ-RES-013). */
+.column-wrapper.resource-highlight .op-header {
+  filter: drop-shadow(0 0 6px rgba(138, 180, 248, 0.9)) brightness(1.12);
+}

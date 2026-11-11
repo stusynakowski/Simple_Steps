@@ -842,10 +842,28 @@ export default function useWorkflow() {
     const { name: clean, declaration } = await declareResource(name, definition);
     announce({ kind: 'define_resource', name: clean, definition: definition.trim() });
     const latest = workflowRef.current;
-    const updated = { ...latest, resources: { ...(latest.resources ?? {}), [clean]: declaration } };
+    // Its notes and colour (meta, spec 017 REQ-RES-020) outlive a new definition.
+    const meta = (latest.resources?.[clean] as { meta?: unknown } | undefined)?.meta;
+    const saved = meta ? { ...declaration, meta } : declaration;
+    const updated = { ...latest, resources: { ...(latest.resources ?? {}), [clean]: saved } };
     workflowRef.current = updated;      // so a run straight after sees it
     setWorkflow(updated);
   }, [announce]);
+
+  /** Change resource *name*'s notes or colour (its `meta`); never how it's built. */
+  const updateResourceMeta = useCallback((name: string, changes: { notes?: string; color?: string }): void => {
+    const latest = workflowRef.current;
+    const decl = latest.resources?.[name] as Record<string, unknown> | undefined;
+    if (!decl) return;
+    const meta: Record<string, unknown> = { ...((decl.meta as Record<string, unknown>) ?? {}), ...changes };
+    for (const k of Object.keys(meta)) if (meta[k] === undefined || meta[k] === '') delete meta[k];
+    const { meta: _old, ...rest } = decl;
+    void _old;
+    const next = Object.keys(meta).length ? { ...rest, meta } : rest;
+    const updated = { ...latest, resources: { ...latest.resources, [name]: next } };
+    workflowRef.current = updated;
+    setWorkflow(updated);
+  }, []);
 
   /** Delete resource *name*. Refused while a step uses it, listing those steps. */
   const removeResource = useCallback((name: string): void => {
@@ -1162,6 +1180,7 @@ export default function useWorkflow() {
     // resources (the workflow's `resources` section)
     defineResource,
     removeResource,
+    updateResourceMeta,
     // execution log
     executionLogs,
     clearLogs,

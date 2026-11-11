@@ -5,7 +5,7 @@ Build this project using a phased workflow: Idea → Specs → Tests → Impleme
 
 ## Current phase
 Set this manually before using an agent:
-- Phase: CLEANUP
+- Phase: IMPL
 
 ## Phase edit rules (hard guardrails)
 - IDEA: may edit only `docs/why-we-are-building-this.md` and `docs/context.md`

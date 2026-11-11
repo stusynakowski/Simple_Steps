@@ -395,6 +395,51 @@ async def declare_resource(payload: _ResourceDeclaration):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+class _ResourceLive(BaseModel):
+    name: str
+    declaration: Dict[str, Any]
+
+
+class _ResourcesLive(BaseModel):
+    resources: Dict[str, Dict[str, Any]] = {}
+
+
+@app.post("/api/resources/load")
+async def load_resource(payload: _ResourceLive, session_id: str = Depends(get_session_id)):
+    """Build a resource's live object now, in this session, rather than on a
+    step's first use (spec 017 REQ-RES-009). Steps then share it."""
+    from .resources import ResourceError, live_resource
+    try:
+        live_resource(session_id, payload.name, payload.declaration)
+    except ResourceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"name": payload.name, "loaded": True}
+
+
+@app.post("/api/resources/clear")
+async def clear_resource(payload: _ResourceLive, session_id: str = Depends(get_session_id)):
+    """Drop this session's live object for one resource; its declaration stays,
+    and the next use or Load builds a new one (spec 017 REQ-RES-009)."""
+    from .resources import drop_resource
+    drop_resource(session_id, payload.name)
+    return {"name": payload.name, "loaded": False}
+
+
+@app.post("/api/resources/status")
+async def resources_status(payload: _ResourcesLive, session_id: str = Depends(get_session_id)):
+    """Which of a workflow's resources have a live object in this session
+    (spec 017 REQ-RES-011): ``{name: true | false}``, or the reason it can't be
+    built, ``{name: "…"}``."""
+    from .resources import ResourceError, is_live
+    out: Dict[str, Any] = {}
+    for name, declaration in payload.resources.items():
+        try:
+            out[name] = is_live(session_id, name, declaration)
+        except ResourceError as exc:
+            out[name] = str(exc)
+    return out
+
+
 # --- 1.5 Project / Pipeline Management ---
 
 # Projects (folders)

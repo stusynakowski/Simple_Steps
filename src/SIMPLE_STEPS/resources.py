@@ -237,14 +237,37 @@ def resource_type(declaration: Mapping[str, Any], name: str) -> type:
     return resolve(name, declaration, secrets=False)[0]
 
 
-def live_resource(session_id: Optional[str], name: str,
-                  declaration: Mapping[str, Any]) -> Any:
-    """The live object for *declaration* in this session, built on first use."""
+def _live_key(name: str, declaration: Mapping[str, Any]) -> Tuple[Tuple[str, str, str], type, Dict[str, Any]]:
+    """The key a declaration's live object is kept under, with its class and settings."""
     cls, settings = resolve(name, declaration)
     # A fingerprint, not the settings themselves: they may hold a credential.
     fingerprint = hashlib.sha256(
         json.dumps(settings, sort_keys=True, default=str).encode()).hexdigest()
-    key = (name, cls.__name__, fingerprint)
+    return (name, cls.__name__, fingerprint), cls, settings
+
+
+def is_live(session_id: Optional[str], name: str, declaration: Mapping[str, Any]) -> bool:
+    """Whether this session already has the object *declaration* describes.
+
+    An object built from older settings doesn't count: the next use builds anew.
+    """
+    key = _live_key(name, declaration)[0]
+    with _LOCK:
+        return key in _LIVE.get(session_id or "", {})
+
+
+def drop_resource(session_id: Optional[str], name: str) -> None:
+    """Forget this session's live object for resource *name*; its declaration stays."""
+    with _LOCK:
+        bucket = _LIVE.get(session_id or "", {})
+        for old in [k for k in bucket if k[0] == name]:
+            del bucket[old]
+
+
+def live_resource(session_id: Optional[str], name: str,
+                  declaration: Mapping[str, Any]) -> Any:
+    """The live object for *declaration* in this session, built on first use."""
+    key, cls, settings = _live_key(name, declaration)
     with _LOCK:
         bucket = _LIVE.setdefault(session_id or "", {})
         obj = bucket.get(key)

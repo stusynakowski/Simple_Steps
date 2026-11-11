@@ -26,6 +26,8 @@ import { StepsStatusProvider } from '../context/StepsStatusContext';
 import StepsStatusText from './StepsStatusText';
 import InspectorChips from './InspectorChips';
 import ResourcesMenu from './ResourcesMenu';
+import ResourceColumn from './ResourceColumn';
+import { useResourceState } from '../hooks/useResourceState';
 import BarChevrons from './BarChevrons';
 import WorkflowOverview from './WorkflowOverview';
 import { useConnection } from '../hooks/useConnection';
@@ -139,6 +141,7 @@ export default function MainLayout() {
     moveStep,
     defineResource,
     removeResource,
+    updateResourceMeta,
     saveWorkflow,
     fetchWorkflow,
     loadWorkflowObject,
@@ -154,6 +157,10 @@ export default function MainLayout() {
   } = useWorkflow();
   // A step without its own colour takes the palette's (System Settings).
   const stepColor = useStepColor();
+  // The resource column (spec 017) and the overview read the same state.
+  const resourceState = useResourceState(workflow.resources, workflow.steps);
+  // The steps that use the resource under the pointer (REQ-RES-013).
+  const [highlightedSteps, setHighlightedSteps] = useState<Set<string> | null>(null);
   // The step a failed run stopped at, for the workflow's "Rerun from …".
   const failedStep = workflow.steps.find((s) => ['failed', 'partial'].includes(runState(s, false).kind));
 
@@ -846,7 +853,7 @@ export default function MainLayout() {
           <WorkflowOverview
             name={workflow.name || 'Untitled'}
             steps={workflow.steps}
-            resourceCount={Object.keys(workflow.resources ?? {}).length}
+            resources={resourceState.summary}
           />
         }
         resourcesMenu={
@@ -869,6 +876,20 @@ export default function MainLayout() {
 
   const canvasBlock = (
     <main className="main-content horizontal-scroll-area" ref={canvasRef}>
+        <ResourceColumn
+          resources={workflow.resources}
+          steps={workflow.steps}
+          state={resourceState}
+          stepColorOf={(label) => {
+            const i = workflow.steps.findIndex((s) => s.label === label);
+            return workflow.steps[i]?.step_color ?? stepColor(Math.max(0, i), workflow.steps.length);
+          }}
+          onDefine={defineResource}
+          onRemove={removeResource}
+          onMeta={updateResourceMeta}
+          onHighlight={(labels) => setHighlightedSteps(labels?.length ? new Set(labels) : null)}
+          scroller={canvasRef}
+        />
         <div
           className="columns-container"
           data-testid="columns-container"
@@ -892,7 +913,7 @@ export default function MainLayout() {
             return (
               <div
                 key={step.id}
-                className={`column-wrapper ${size}${liveWidth?.id === step.id ? ' resizing' : ''}`}
+                className={`column-wrapper ${size}${liveWidth?.id === step.id ? ' resizing' : ''}${highlightedSteps?.has(step.label) ? ' resource-highlight' : ''}`}
                 style={width ? { width, flex: `0 0 ${width}px` } : undefined}
               >
                 <OperationColumn

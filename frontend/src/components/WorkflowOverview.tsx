@@ -10,7 +10,8 @@ import type { Step, StepStatus } from '../types/models';
 interface WorkflowOverviewProps {
   name: string;
   steps: Step[];
-  resourceCount: number;
+  /** The resource column's state (spec 017 REQ-RES-019). */
+  resources: { total: number; loaded: number; attention: number };
 }
 
 const STATUS_LABEL: Record<StepStatus, string> = {
@@ -18,7 +19,7 @@ const STATUS_LABEL: Record<StepStatus, string> = {
   error: 'Error', paused: 'Paused', stopped: 'Stopped',
 };
 
-export default function WorkflowOverview({ name, steps, resourceCount }: WorkflowOverviewProps) {
+export default function WorkflowOverview({ name, steps, resources }: WorkflowOverviewProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -74,7 +75,12 @@ export default function WorkflowOverview({ name, steps, resourceCount }: Workflo
 
           <dl className="ut-session-fields">
             <dt>Steps</dt><dd>{steps.length}</dd>
-            <dt>Resources</dt><dd>{resourceCount}</dd>
+            <dt>Resources</dt>
+            <dd>
+              {resources.total}
+              {resources.total > 0 && ` · ${resources.loaded} loaded`}
+              {resources.attention > 0 && ` · ${resources.attention} need${resources.attention === 1 ? 's' : ''} attention`}
+            </dd>
             {(Object.keys(STATUS_LABEL) as StepStatus[])
               .filter((s) => counts[s])
               .map((s) => (
