@@ -32,6 +32,11 @@ pip install git+https://github.com/stusynakowski/Simple_Steps.git
 simple-steps
 ```
 
+Simple Steps is not on PyPI yet: `pip install simple-steps` finds nothing.
+Install from GitHub as above. The PyPI release is ready on the
+`pypi-release` branch and parked until known bugs are fixed
+([`docs/releases/pypi-parked.md`](docs/releases/pypi-parked.md)).
+
 ### Updating an existing install — read this
 
 Between releases the version numbers don't change, so
@@ -62,9 +67,11 @@ fix. To install exactly one release, pin its tag: `…/Simple_Steps.git@v0.1.3`.
 
 ### Running the examples
 
-The examples ship with the package: three small ones — `basic/` (core verbs
-and data manipulation), `dummy_llm/` (resources) and `plotly_charts/` — and a
-main example that uses all three. Copy them out and run one, the way you'd run
+The examples ship with the package: small ones — `basic/` (core verbs and
+data manipulation), `dummy_llm/` (resources), `resource_kinds/` (one resource
+of every kind), `plotly_charts/` (charts and rich cells), `image_processing/`,
+`agent_demo/` and `bad_examples/` (mistakes and how to fix them) — and a main
+example that uses them together. Copy them out and run one, the way you'd run
 a Streamlit app:
 
 ```bash
@@ -86,8 +93,8 @@ interpreter is `python -m simple_steps run app.py` (a module name can't hold a
 hyphen, so it's `simple_steps`, not `simple-steps`). Plotly comes with the
 install, so the chart examples run as they are.
 
-`simple-steps` on its own still starts the server for the current folder, with
-the 29 built-in tools and any tools it discovers there.
+`simple-steps` on its own starts the server for the current folder: it serves
+the folder's `app.py` if there is one, else the standard tools.
 
 In this repo the examples live in `src/SIMPLE_STEPS/examples/`, so that the
 wheel carries them; `--load-examples` copies whatever that folder holds.
@@ -121,17 +128,20 @@ This installs the package into your environment (`site-packages`) and gives you 
 If you want to work on the codebase itself:
 
 ```bash
-git clone https://github.com/stusynakowski/Simple_Steps.git
+git clone --recurse-submodules https://github.com/stusynakowski/Simple_Steps.git
 cd Simple_Steps
 
 uv venv --python 3.13        # or: python3.13 -m venv .venv
 source .venv/bin/activate   # macOS / Linux
 # .venv\Scripts\activate    # Windows
 
-uv pip install -e .          # or: pip install -e .
+uv pip install -e external/simple-steps-core -e ".[dev]"   # core from the submodule, editable
 ```
 
 That's it. The package installs the `simple-steps` CLI command and bundles a pre-built copy of the frontend.
+`external/simple-steps-core` is read-only here; `python scripts/preflight.py`
+checks that the submodule, the pin in `pyproject.toml` and your installed core
+agree.
 
 ### Option C: Add desktop mode
 
@@ -265,11 +275,21 @@ again. A colour set on a single step (its own settings) always wins.
 The chat panel's agent **proposes** steps; you choose which to keep, apply
 them, and run them. It never runs anything itself, and every formula it
 proposes is checked (it compiles, reads only earlier steps, uses only your
-tools and resources) before you see it. It runs on a local
+tools and resources) before you see it. By default it uses a local
 [Ollama](https://ollama.com) model:
 
 ```bash
 ollama pull llama3.2:3b      # small; a 7–8B model (qwen2.5:7b) gives better proposals
+```
+
+Any OpenAI-compatible server works too, or Anthropic's API, or your own
+function:
+
+```python
+App(agent=Agent(model="qwen2.5:7b"))                                      # Ollama
+App(agent=Agent(model="…", base_url="https://…/v1", api_key_env="OPENAI_API_KEY"))
+App(agent=Agent(model="…", api="anthropic", api_key_env="ANTHROPIC_API_KEY"))
+App(agent=Agent(generate=lambda messages: "…"))                           # any model
 ```
 
 Without a model the app works as usual and the panel says why the agent is off.
@@ -492,7 +512,8 @@ outermost is the *shape verb*), and the step it reads.
 
 ## Workflow Files
 
-Workflows are saved as plain JSON in `projects/`:
+Workflows are saved as plain JSON in the workspace, as
+`projects/<project>/<name>.simple-steps-workflow`:
 
 ```json
 {
@@ -505,7 +526,8 @@ Workflows are saved as plain JSON in `projects/`:
 }
 ```
 
-Each step is a name and its expression.
+Each step is a name and its expression; steps may also carry `meta` (label,
+colour, notes).
 
 ---
 
@@ -525,8 +547,8 @@ Simple_Steps/
 │       ├── main.py                # FastAPI app, REST endpoints, SPA serving
 │       ├── core_bridge.py         # The seam to simple-steps-core (contracts, resources)
 │       ├── application.py         # App: the tools, resources and settings of an app
-│       ├── decorators.py          # @simple_step_tool
-│       ├── operation_formula.py   # The formula parser: core's syntax → core's operation
+│       ├── decorators.py          # @simple_step_tool, simple_step_resource
+│       ├── operation_formula.py   # Thin UI side of formulas; core reads them
 │       ├── kernels.py             # Each open workflow, live, as a core workflow
 │       ├── engine.py              # Runs a step; stores its output for /api/data
 │       ├── operations.py          # The standard tools (sources, JSON, cleaning)
@@ -615,16 +637,16 @@ Start at [`docs/README.md`](docs/README.md), the map of every doc. The main ones
 ┌─────────────────────────────────┐     HTTP/REST      ┌──────────────────────────────┐
 │  React Frontend  (Vite + TS)    │ ◄────────────────► │  FastAPI Backend  (Python)   │
 │                                 │                     │                              │
-│  • Step canvas (arrow icons)    │                     │  • Operation Registry        │
-│  • Formula bar                  │                     │  • Orchestration Engine      │
-│  • Data grid (Glide)            │                     │  • Plugin auto-scanner       │
-│  • Autocomplete                 │                     │  • Workflow file manager     │
+│  • Step canvas (arrow headers)  │                     │  • App: your tools/resources │
+│  • Formula bar + Formula panel  │                     │  • simple-steps-core: reads  │
+│  • Data grid (Glide)            │                     │    formulas, runs workflows  │
+│  • Resource column, copilot     │                     │  • Workflow file manager     │
 └─────────────────────────────────┘                     └──────────────────────────────┘
 ```
 
-**Frontend:** React 18, TypeScript, Vite, Glide Data Grid, Lucide icons  
-**Backend:** FastAPI, Pydantic v2, pandas, uvicorn  
-**Python:** 3.9+
+**Frontend:** React 18, TypeScript, Vite, Glide Data Grid, Monaco (formula bar), Material Symbols icons  
+**Backend:** FastAPI, Pydantic v2, pandas, uvicorn, [`simple-steps-core`](https://github.com/stusynakowski/simple-steps-core)  
+**Python:** 3.10+ (developed and tested on 3.13)
 
 ---
 

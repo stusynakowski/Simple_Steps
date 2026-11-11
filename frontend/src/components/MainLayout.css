@@ -562,6 +562,24 @@
     calc(100% - var(--d) - var(--b)) 100%, var(--b) 100%);
 }
 .step-minimap-step:hover { opacity: 1; }
+/* The resource column, before the steps: an "R" block, outlined so it shows
+   on the dark track (owner, 2026-11-11). */
+.step-minimap-res {
+  position: absolute;
+  top: 3px;
+  height: 16px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid #8a8f98;
+  border-radius: 2px;
+  background: #2e3138;
+  color: #e6e6e6;
+  font: 700 10px/14px system-ui, sans-serif;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.step-minimap-res:hover { opacity: 1; border-color: #c4c8cf; }
 .step-minimap-view {
   position: absolute;
   top: 1px;

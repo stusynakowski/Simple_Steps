@@ -32,6 +32,8 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
   const track = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ total: 1, scrollLeft: 0, visible: 1, trackWidth: 1 });
   const [spans, setSpans] = useState<Span[]>([]);
+  // The resource column, left of the steps (owner, 2026-11-11): an "R" on the map.
+  const [res, setRes] = useState<Span | null>(null);
   // The hovered step's label, above its arrow: "Step 3 · scored". Over the
   // page (a portal), since the map itself is only a strip.
   const [hover, setHover] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -44,6 +46,9 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
       const cols = Array.from(el.querySelectorAll<HTMLElement>('.column-wrapper'));
       const next = cols.map((c) => ({ left: c.offsetLeft, width: c.offsetWidth }));
       setSpans((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+      const rc = el.querySelector<HTMLElement>('.resource-column');
+      const r = rc && rc.offsetWidth > 0 ? { left: rc.offsetLeft, width: rc.offsetWidth } : null;
+      setRes((prev) => (prev?.left === r?.left && prev?.width === r?.width ? prev : r));
       const v = { total: Math.max(1, el.scrollWidth), scrollLeft: el.scrollLeft, visible: el.clientWidth, trackWidth: Math.max(1, bar.clientWidth) };
       setView((prev) => (prev.total === v.total && prev.scrollLeft === v.scrollLeft && prev.visible === v.visible
         && prev.trackWidth === v.trackWidth ? prev : v));
@@ -53,7 +58,7 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     ro?.observe(el);
     ro?.observe(bar);
-    el.querySelectorAll('.column-wrapper').forEach((c) => ro?.observe(c));
+    el.querySelectorAll('.column-wrapper, .resource-column').forEach((c) => ro?.observe(c));
     return () => { el.removeEventListener('scroll', measure); ro?.disconnect(); };
     // Re-wired when the steps change, not on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,7 +67,7 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
   // The steps fill the map end to end (owner, 2026-11-11): the scale runs
   // from the first step's left to the last step's right, not the whole
   // scroll width, so space past the steps leaves no blank on the map.
-  const origin = spans.length ? spans[0].left : 0;
+  const origin = res ? res.left : spans.length ? spans[0].left : 0;
   const end = spans.length ? spans[spans.length - 1].left + spans[spans.length - 1].width : view.total;
   const k = view.trackWidth / Math.max(1, end - origin);  // track pixels per scroll pixel
   const toTrack = (x: number) => (x - origin) * k;
@@ -90,6 +95,11 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
     const x = (e.clientX - box.left) / k + origin;
     // Each step reaches to the next one's start: no gaps on the map.
     const i = spans.findIndex((sp, j) => x >= sp.left && x < (spans[j + 1]?.left ?? sp.left + sp.width));
+    if (i < 0 && res && x >= res.left && x < res.left + res.width) {
+      const at = box.left + toTrack(res.left + res.width / 2);
+      setHover((prev) => (prev && prev.text === 'Resources' && prev.x === at ? prev : { text: 'Resources', x: at, y: box.top }));
+      return;
+    }
     if (i < 0) { setHover(null); return; }
     const s = steps[i];
     const text = `Step ${i + 1} · ${s.label}${s.run ? ` · ${s.run.text}` : ''}`;
@@ -116,6 +126,15 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
       role="navigation"
       aria-label="Steps map"
     >
+      {res && (
+        <button
+          type="button"
+          className="step-minimap-res"
+          style={{ left: toTrack(res.left), width: Math.max(14, res.width * k - 2) }}
+          aria-label="Go to the resources"
+          onClick={(e) => { e.stopPropagation(); setHover(null); jump(res.left); }}
+        >R</button>
+      )}
       {steps.map((s, i) => {
         const span = spans[i];
         if (!span) return null;
