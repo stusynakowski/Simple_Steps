@@ -3,20 +3,21 @@
  * the formula centred as `f(x) = …`, each part labelled right under it, and a
  * dotted line from each label down into the field that edits it.
  *
- *              f(x) = with_tax [mod.map()] (wf["items"], rate=0.1)
- *                     tool      modifier    runs over    rate
- *        ┌────────────┘            └────────────┼──────────┼──────┐
- *        └► Tool  [with_tax ▾]                  │          │      │
- *           Modifiers  ┌ 1. map ┐ ◄─────────────┼──────────┼───┐  │
- *           Arguments  runs over [wf["items"]] ◄┼──────────┼─┐ │  │
- *                      rate      [0.1]        ◄─┼──────────┘ │ │  │
+ *            f(x) = with_tax [mod.map()] (wf["items"], rate=0.1)
+ *                   tool      modifier    runs over    rate
+ *     ┌─────────────┘   ┌────────┘          └──────┐     └────┐
+ *     └► [with_tax ▾]   │   │ runs over [wf["items"]] ◄──┘    │
+ *        ┌ 1. map ┐ ◄───┘   │   [n]  ◄── branch: a column core fills n from
+ *                           │ rate      [0.1]      ◄──────────┘
+ *       Tool + Modifiers    ┆  Arguments
  *
- * The tool's line hooks down its left side; every other part's down the
- * right. That is the only way they can't cross: the tool is the leftmost
- * part and its field the topmost, so its line and field fence off the left
- * for everything below. On the right, the part furthest right takes the
- * lane nearest the formula and the outermost track, and ends lowest (the
- * fields follow the formula's order), so the lines nest.
+ * Each line comes into its field from a gutter: the tool's from the left of
+ * its column, the modifiers' down the divider into the left column's right
+ * side, the arguments' down the right. The tool's line takes the top lane,
+ * then the arguments', then the modifiers'; within each, the part nearest
+ * its gutter takes the higher lane and the outer track. So the lines nest
+ * and none crosses another. Minimized, the modifiers' lines end at their
+ * heading.
  *
  * The parts come from the backend's parser (`operation_formula.spans`), the
  * same reader core uses, so the map never disagrees with what runs. A field
@@ -120,32 +121,63 @@ export function MapLines({ root, hot, deps }: {
       const box = el.getBoundingClientRect();
       const rel = (r: DOMRect) => ({ l: r.left - box.left, t: r.top - box.top, r: r.right - box.left, b: r.bottom - box.top });
       const strip = el.querySelector('.fm-formula');
-      const fields = el.querySelector('.te-stack');
-      if (!strip || !fields) { setLines((p) => (p.length ? [] : p)); return; }
+      if (!strip) { setLines((p) => (p.length ? [] : p)); return; }
       const stripBottom = rel(strip.getBoundingClientRect()).b;
-      const area = rel(fields.getBoundingClientRect());
       const ends = [...el.querySelectorAll<HTMLElement>('[data-map-key]')].flatMap((part) => {
         const target = part.dataset.mapTo!;
-        const field = el.querySelector<HTMLElement>(`[data-map-target="${CSS.escape(target)}"]`);
-        if (!field) return [];
+        // A modifier's field is gone while the Modifiers are minimized: its heading stands in.
+        const field = el.querySelector<HTMLElement>(`[data-map-target="${CSS.escape(target)}"]`)
+          ?? (target.startsWith('mod:') ? el.querySelector<HTMLElement>('[data-map-target="modifiers"]') : null);
+        const column = field?.closest('.te-col');
+        if (!field || !column) return [];
         const kind = [...part.classList].find((k) => k.startsWith('fm-') && k !== 'fm-part' && k !== 'fm-hot') ?? '';
-        return [{ key: part.dataset.mapKey!, target, kind, from: rel(part.getBoundingClientRect()), to: rel(field.getBoundingClientRect()) }];
+        const col = rel(column.getBoundingClientRect());
+        // The tool comes in from its column's left; the rest from their column's right.
+        const left = kind === 'fm-tool';
+        return [{
+          key: part.dataset.mapKey!, target, kind, left,
+          gutter: left ? col.l : col.r,
+          from: rel(part.getBoundingClientRect()), to: rel(field.getBoundingClientRect()),
+        }];
       });
-      // Left: the tool. Right: the rest, the part furthest right first, so
-      // it takes the top lane and the outer track and the lines nest.
-      const left = ends.filter((e) => e.kind === 'fm-tool');
-      const right = ends.filter((e) => e.kind !== 'fm-tool').sort((a, b) => b.from.l - a.from.l);
+      // Groups by gutter: the tool's (left), then the right-hand gutters from
+      // the outermost in (the arguments', then the modifiers' in the divider).
+      // Within a group, the part nearest its gutter first. The first line
+      // takes the top lane and the outer track, so the lines nest, uncrossed.
+      const groups = new Map<string, typeof ends>();
+      for (const e of ends) {
+        const g = `${e.left ? 'L' : 'R'}${Math.round(e.gutter)}`;
+        groups.set(g, [...(groups.get(g) ?? []), e]);
+      }
+      const order = [...groups.values()].sort((a, b) =>
+        (a[0].left === b[0].left ? b[0].gutter - a[0].gutter : a[0].left ? -1 : 1));
       const next: Line[] = [];
-      const route = (e: typeof ends[number], i: number, side: 'left' | 'right') => {
-        const x1 = (e.from.l + e.from.r) / 2;
-        const lane = stripBottom + LANE * (i + 1);
-        const gutter = side === 'left' ? area.l + 4 + i * TRACK : area.r - 4 - Math.min(i, 4) * TRACK;
-        const y2 = e.to.t + Math.min(11, (e.to.b - e.to.t) / 2);
-        const into = side === 'left' ? e.to.l : e.to.r;
-        next.push({ key: e.key, target: e.target, kind: e.kind, d: `M ${x1} ${e.from.b} V ${lane} H ${gutter} V ${y2} H ${into}` });
-      };
-      left.forEach((e, i) => route(e, i, 'left'));
-      right.forEach((e, i) => route(e, i + left.length, 'right'));
+      /** Where the runs-over line comes down its track: the branches leave from there. */
+      let runsOver: { gutter: number; y: number; kind: string } | null = null;
+      let lane = 0;
+      for (const group of order) {
+        const mid = (e: typeof ends[number]) => (e.from.l + e.from.r) / 2;
+        group.sort((a, b) => Math.abs(mid(a) - a.gutter) - Math.abs(mid(b) - b.gutter));
+        group.forEach((e, k) => {
+          const outer = Math.min(group.length - 1 - k, 4);
+          const gutter = e.left ? e.gutter - 5 - outer * TRACK : e.gutter + 5 + outer * TRACK;
+          const y = stripBottom + LANE * (++lane);
+          const y2 = e.to.t + Math.min(11, (e.to.b - e.to.t) / 2);
+          const into = e.left ? e.to.l : e.to.r;
+          if (e.target === 'input') runsOver = { gutter, y: y2, kind: e.kind };
+          next.push({ key: e.key, target: e.target, kind: e.kind, d: `M ${mid(e)} ${e.from.b} V ${y} H ${gutter} V ${y2} H ${into}` });
+        });
+      }
+      // The runs-over line branches into each parameter core fills from its
+      // columns, ending at the column's name over that field (owner, 2026-11-10).
+      const from = runsOver as { gutter: number; y: number; kind: string } | null;
+      if (from) {
+        el.querySelectorAll<HTMLElement>('[data-map-fill]').forEach((fill, i) => {
+          const f = rel(fill.getBoundingClientRect());
+          const y = (f.t + f.b) / 2;
+          next.push({ key: `fill:${i}`, target: 'input', kind: from.kind, d: `M ${from.gutter} ${from.y} V ${y} H ${f.r}` });
+        });
+      }
       setSize({ w: box.width, h: box.height });
       setLines((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
@@ -154,7 +186,7 @@ export function MapLines({ root, hot, deps }: {
     if (typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(schedule);
     ro.observe(el);
-    el.querySelectorAll('.te-stack, .te-section, .fm-formula').forEach((n) => ro.observe(n));
+    el.querySelectorAll('.te-stack, .te-col, .te-section, .fm-formula').forEach((n) => ro.observe(n));
     return () => { ro.disconnect(); cancelAnimationFrame(frame.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- redraw when the caller's content changes
   }, deps);

@@ -58,17 +58,42 @@
 .te-helper:disabled { opacity: 0.45; cursor: default; }
 .te-helpers .te-helper:last-child { margin-left: auto; }
 
-/* ── The fields, stacked: Tool, Modifiers, Arguments ──────────────────── */
+/* ── The fields, in two columns: Tool + Modifiers | Arguments ─────────── */
+/* The divider between them is dragged to resize (remembered per browser),
+   and is the modifiers' lines' gutter. */
 
 .te-stack {
+  display: grid;
+  min-width: 0;
+  padding: 6px 10px 10px;
+}
+/* Room either side for the lines' tracks: the tool's on the left, the arguments' on the right. */
+.te-mapped .te-stack { padding-left: 18px; padding-right: 24px; }
+
+.te-col {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 6px 10px 10px;
 }
-/* Room either side for the lines' tracks: the tool's on the left, the rest on the right. */
-.te-mapped .te-stack { padding-left: 18px; padding-right: 24px; }
+
+.te-divider {
+  cursor: col-resize;
+  background: linear-gradient(to right, transparent 8px, #e3e7eb 8px, #e3e7eb 9px, transparent 9px);
+  touch-action: none;
+}
+.te-divider:hover { background: linear-gradient(to right, transparent 7px, #9ab8e0 7px, #9ab8e0 10px, transparent 10px); }
+
+/* Too narrow for two useful columns: stack them, left first. */
+@container (max-width: 420px) {
+  .te-stack { grid-template-columns: minmax(0, 1fr) !important; row-gap: 10px; }
+  .te-divider { display: none; }
+}
+
+/* The Modifiers minimize to their heading. */
+.te-toggle { padding: 0; line-height: 0; color: #6b7785; }
+.te-toggle .te-closed { transform: rotate(-90deg); }
+.te-mapped .te-minimizable .te-heading-label { display: inline; }
 
 /* No tool (a value, a copy): the tool's field is there, faded. */
 .te-faded { opacity: 0.55; }
@@ -394,3 +419,20 @@
    sections' titles go, and a heading stays only for what it summarises. */
 .te-mapped .te-heading-label { display: none; }
 .te-mapped .te-heading:not(:has(.te-summary, .te-heading-note)) { display: none; }
+
+/* A parameter core fills from a column of what it runs over: the column's
+   name heads the field, and the runs-over line branches into it. */
+.te-fill-head { display: flex; justify-content: flex-end; }
+.te-fill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 6px;
+  border: 1px dotted #1e8a4c;
+  border-radius: 3px;
+  color: #1e8a4c;
+  background: #f1faf4;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.66rem;
+  line-height: 1.5;
+}

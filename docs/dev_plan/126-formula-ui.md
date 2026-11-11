@@ -255,9 +255,10 @@ core's syntax is a separate decision.
    fills each parameter from a column: first by name, else from the one
    column of a fitting type. If more than one fits, core proposes one. The
    runs-over line branches into each parameter it fills, headed with that
-   column's name. **Blocked on core C47:** core says which column fills
-   which parameter only after a run (per cell); before a run its warning is
-   wrong. Until then the panel says only what is certain: same-name fills.
+   column's name. **Built (2026-11-10):** the bindings are core's
+   (`k.cell(…)["inputs"]`, served in `/api/view` as `bindings`). Core knows
+   them once the input has run, even if this step hasn't. Before that it
+   says nothing, so no branch is drawn; core C47 asks for them from the plan.
 
 **Done (2026-11-10):** the panel's layout: tabs, helper placeholders,
 `f(x) = …` centred with each part labelled, Tool / Modifiers / Arguments

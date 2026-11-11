@@ -143,10 +143,15 @@ export interface WorkflowStepState {
 }
 
 /** A page of a step as the grid draws it, run or not (`/api/view`, kernels.view). */
+/** A parameter's source, as core bound it: by name, by type, or as written. */
+export type Bindings = Record<string, { step: string; columns: string[] }>;
+
 export interface StepView {
   step: string;
   state: string;
   summary: string;
+  /** Which step and columns give each parameter, as core binds them (kernels._bindings). */
+  bindings?: Bindings;
   problems: string[];
   plan: StepPlan | null;
   columns: { name: string; type?: string }[];

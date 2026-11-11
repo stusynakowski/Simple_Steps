@@ -2028,23 +2028,34 @@ int); `k["s"] = add_k[mod.map()](wf["r"])` with `add_k(n: int, k: int)`.
 - Run: `s` = `[13, 21]`. `n` was filled from column `n` by name, and `k`
   from `value`, the one int column left. `k.cell("s", 0, "s")["inputs"]`
   says so: `{argument: 'n', columns: ['n']}`, `{argument: 'k', columns: ['value']}`.
-- Before the run: `step.warnings` says `expects 'n', 'k' from 'r', which is
-  predicted to produce (value) — likely missing once it runs`. Both
-  parameters do get filled, so the warning is wrong. Nothing on the step
-  says which column fills which parameter.
-- Two int columns, one parameter `x` (`double`): a `missing_column` problem
-  that proposes `x=wf['r'][cols['n']]`. Good: a proposal, not applied.
+- Once `r` has run, `k.cell("s", 0, …)["inputs"]` gives the same bindings
+  for `s` **before `s` runs**, under `mod.auto()` too, and after an edit it
+  describes the new formula. The app reads it (`kernels._bindings`, in
+  `/api/view`): the panel's branches come from there.
+- Before `r` has run: `k.cell` has no `inputs` (`KeyError`), and
+  `step.warnings` says `expects 'n', 'k' from 'r', which is predicted to
+  produce (value) — likely missing once it runs`. Both parameters do get
+  filled, so the warning is wrong.
+- The type-filled `k` is reported with `rows: [0, 1]`, `row: None` (the
+  whole column), but each call got its own row (13, then 21). `n`, filled
+  by name, is reported as row 0.
+- More than one column fits, or none: no `inputs` at all, and a
+  `missing_column` problem that proposes a binding (`x=wf['r'][cols['n']]`,
+  or `mod.cast(ward='int')`). Good: a proposal, not applied.
 
-**Ask:** the step's plan states each parameter's binding before any run:
-`{param: {from: "column" | "argument" | "default", step, column, how:
-"name" | "type", certainty}}`, and is `ambiguous` with its candidates when
-more than one column fits. The Formula panel draws the runs-over line
-branching into each filled parameter, headed with the column's name
-(owner, 2026-11-10). Without this, the browser would have to copy core's
-name-then-type rule, and a copy that drifts is exactly the client/core
-mismatch dev_plan/126 R13 treats as a system error. Also: the
-`likely_missing_column` warning shouldn't fire for parameters that type
-matching will fill. No shim.
+**Ask:**
+1. The step's plan states each parameter's binding whenever the input's
+   columns are planned, not only once it has run: `{param: {step, column,
+   how: "name" | "type", certainty}}`, `ambiguous` with its candidates when
+   more than one fits. Without it, the browser would have to copy core's
+   name-then-type rule, and a copy that drifts is the client/core mismatch
+   dev_plan/126 R13 treats as a system error.
+2. A per-row binding is reported per row, whether it was matched by name
+   or by type.
+3. `likely_missing_column` doesn't fire for parameters that type matching
+   will fill.
+
+No shim.
 
 ## Old IDs and shim tags
 

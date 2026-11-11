@@ -162,6 +162,7 @@ export default function useWorkflow() {
             problems: view.problems,
             plan: view.plan ?? undefined,
             viewColumns: view.columns,
+            bindings: view.bindings,
             output_preview: view.cells,
             outputRows: view.window?.of ?? s.outputRows,
           })),

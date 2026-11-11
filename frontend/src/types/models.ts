@@ -82,6 +82,8 @@ export interface Step {
   viewKey?: string;
   /** The columns core plans or has, with their types. */
   viewColumns?: { name: string; type?: string }[];
+  /** Which step and columns give each parameter, from core (the step's view). */
+  bindings?: Record<string, { step: string; columns: string[] }>;
   /** The step's plan, from core. */
   plan?: StepPlan;
   /**

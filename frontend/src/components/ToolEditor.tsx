@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ComponentType } from 'react';
 import {
   fetchLoadedResources, fetchResourceTypes, getModifiers,
-  type LoadedResourceInfo, type ModifierInfo, type OperationDefinition,
+  type Bindings, type LoadedResourceInfo, type ModifierInfo, type OperationDefinition,
   type ResourceDeclaration, type ResourceTypeInfo,
 } from '../services/api';
 import type { Step } from '../types/models';
@@ -25,9 +25,10 @@ import SymbolIcon from './SymbolIcon';
  *   Infer · Ask · Clean up · Scale · Undo          helpers (placeholders)
  *          f(x) = scale [mod.map()] (wf["a"], factor=2)
  *                 tool   modifier    runs over factor
- *   Tool       [scale ▾]                           ← lines from each label
- *   Modifiers  ┌ 1. map ┐
- *   Arguments  runs over wf["a"] · factor 2
+ *   [scale ▾]            ┆ runs over  wf["a"]      ← lines from each label
+ *   ▾ Modifiers  map     ┆ factor     2
+ *   ┌ 1. map ┐           ┆
+ *   Tool + Modifiers  ┆ (divider: drag)  Arguments; Modifiers minimize
  *   ⚠ problems, at the bottom
  *
  * The parts' labels under the formula take the place of headings; a heading
@@ -69,6 +70,8 @@ export interface InputUiProps {
   copy?: boolean;
   /** Marks a field as the editor of one part of the formula (the map's lines end there). */
   hotProps?: HotProps;
+  /** Which column core gives each parameter, when it has said. */
+  bindings?: Bindings;
 }
 
 /**
@@ -105,10 +108,12 @@ interface Props {
   onChange: (formula: string, parsed: ParsedFormula) => void;
   /** Core's problems with the step, from the workflow's check when it was entered. */
   problems?: string[];
+  /** Which column core gives each parameter (the step's view). */
+  bindings?: Bindings;
 }
 
 export default function ToolEditor({
-  formula, availableOperations, previousSteps, resources = {}, onDefineResource, onChange, problems,
+  formula, availableOperations, previousSteps, resources = {}, onDefineResource, onChange, problems, bindings,
 }: Props) {
   const [parts, setParts] = useState<FormulaParts | null>(null);
   /** The committed formula is valid but isn't a tool call (a literal, a legacy formula). */
@@ -129,6 +134,8 @@ export default function ToolEditor({
   /** The tab shown: the Formula, or a card the tool or a resource brings. */
   const [tab, setTab] = useState('formula');
   const root = useRef<HTMLDivElement | null>(null);
+  const split = useSplit();
+  const [modsOpen, toggleMods] = useModifiersOpen();
 
   useEffect(() => { getModifiers().then(setCatalog).catch(() => setCatalog({})); }, []);
   const isShape = (kind: string) => isShapeVerb(kind, catalog);
@@ -290,7 +297,12 @@ export default function ToolEditor({
           {/* f(x) = the formula, each part labelled; a dotted line from each label to its field. */}
           {mapped && <ExplodedFormula formula={shown.formula} parts={parts_} hot={hot} onHot={setHot} />}
 
-          <div className="te-stack" style={{ paddingTop: mapped ? laneBand(parts_.length) : undefined }}>
+          <div className="te-stack" style={{
+            gridTemplateColumns: `minmax(140px, ${split.fraction}fr) 18px minmax(160px, ${1 - split.fraction}fr)`,
+            paddingTop: mapped ? laneBand(parts_.length) : undefined,
+          }}>
+          {/* Left: what is called, and how it is applied. */}
+          <div className="te-col te-col-call">
             {/* What is called. None (faded) for a value or a copy. */}
             <div className={noTool ? 'te-faded' : undefined}>
               <Section title="Tool" part="tool" note={parts?.bound_to ? `on res["${parts.bound_to}"]` : undefined}>
@@ -321,14 +333,30 @@ export default function ToolEditor({
             {/* How it is applied. */}
             {parts && !isCombine && (!noTool || noTool === 'pick') && (
               <fieldset {...frozenProps}>
-                <Section title="Modifiers" part="modifiers" summary={modifiersSummary(parts, resolved)}>
-                  <ModifierList parts={parts} catalog={catalog} resolved={resolved}
-                    onWrite={write} hotProps={hotProps} />
-                </Section>
+                {/* Minimized, the modifiers' lines end at this heading. */}
+                <div {...(modsOpen ? {} : hotProps('modifiers'))}>
+                  <Section title="Modifiers" part="modifiers" summary={modifiersSummary(parts, resolved)}
+                    open={modsOpen} onToggle={toggleMods}>
+                    <ModifierList parts={parts} catalog={catalog} resolved={resolved}
+                      onWrite={write} hotProps={hotProps} />
+                  </Section>
+                </div>
               </fieldset>
             )}
+          </div>
 
-            {/* What it is given: the data it runs over and its arguments. */}
+          <div
+            className="te-divider"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Drag to give the tool or the arguments more room"
+            title="Drag to resize; double-click to reset"
+            onPointerDown={(e) => split.start(e, root.current?.querySelector('.te-stack') ?? null)}
+            onDoubleClick={split.reset}
+          />
+
+          {/* Right: what it is given, the data it runs over and its arguments. */}
+          <div className="te-col te-col-args">
             {noTool === 'value' && !frozen && (
               <Section title="Arguments" part="arguments">
                 <div {...hotProps('value')}>
@@ -352,13 +380,15 @@ export default function ToolEditor({
               <fieldset {...frozenProps}>
                 <DefaultInputUi parts={parts} op={op} previousSteps={previousSteps} resources={resources}
                   onWrite={write} onDefineResource={onDefineResource}
-                  refs={shown.refs} verb={verb} copy={noTool === 'copy' || noTool === 'pick'} hotProps={hotProps} />
+                  refs={shown.refs} verb={verb} copy={noTool === 'copy' || noTool === 'pick'} hotProps={hotProps}
+                  bindings={bindings} />
               </fieldset>
             )}
 
             {!parts && !notATool && !frozen && (
               <div className="te-note">Choose a tool to see what it takes.</div>
             )}
+          </div>
           </div>
         </>
       )}
@@ -376,9 +406,54 @@ export default function ToolEditor({
         </div>
       )}
 
-      {mapped && !card && <MapLines root={root} hot={hot} deps={[shown, parts, literal, resolved, problemList.length]} />}
+      {mapped && !card && <MapLines root={root} hot={hot} deps={[shown, parts, literal, resolved, problemList.length, split.fraction, modsOpen]} />}
     </div>
   );
+}
+
+/** Whether the Modifiers section is open: per browser, open unless minimized. */
+function useModifiersOpen(): [boolean, () => void] {
+  const KEY = 'simple-steps.formula-panel.modifiers-open';
+  const [open, setOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem(KEY) !== 'false'; } catch { return true; }
+  });
+  const toggle = () => setOpen((was) => {
+    try { localStorage.setItem(KEY, String(!was)); } catch { /* not kept: fine */ }
+    return !was;
+  });
+  return [open, toggle];
+}
+
+/** The split between the tool and the arguments: a fraction of the width, dragged, remembered per browser. */
+function useSplit() {
+  const KEY = 'simple-steps.formula-panel.split';
+  const DEFAULT = 0.4;
+  const [fraction, setFraction] = useState<number>(() => {
+    try {
+      const v = Number(localStorage.getItem(KEY));
+      return v > 0.15 && v < 0.85 ? v : DEFAULT;
+    } catch { return DEFAULT; }
+  });
+  const save = (v: number) => { try { localStorage.setItem(KEY, String(v)); } catch { /* not kept: fine */ } };
+  const start = (e: React.PointerEvent, columns: Element | null) => {
+    if (!columns) return;
+    e.preventDefault();
+    const box = columns.getBoundingClientRect();
+    let last = fraction;
+    const move = (ev: PointerEvent) => {
+      last = Math.min(0.8, Math.max(0.2, (ev.clientX - box.left) / box.width));
+      setFraction(last);
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      save(last);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  const reset = () => { setFraction(DEFAULT); save(DEFAULT); };
+  return { fraction, start, reset };
 }
 
 /** What a field gets to say which part of the formula it edits, and to light up with it. */
@@ -392,7 +467,7 @@ type HotProps = (key: string) => {
 // ── Inputs: the default input UI ─────────────────────────────────────────────
 
 function DefaultInputUi({
-  parts, op, previousSteps, resources, onWrite, onDefineResource, refs = [], verb, copy, hotProps,
+  parts, op, previousSteps, resources, onWrite, onDefineResource, refs = [], verb, copy, hotProps, bindings,
 }: InputUiProps) {
   const listId = useId();
   const mark = (key: string) => (hotProps ? hotProps(key) : {});
@@ -405,15 +480,31 @@ function DefaultInputUi({
    * name, its default, or nowhere yet). An argument may name any column:
    * `weight=wf["r"]["n"]` gives `weight` each row's `n`.
    */
+  /**
+   * The column of what it runs over that core gives a parameter the formula
+   * doesn't set: by name, or the one column of a fitting type. Only what
+   * core said (its view's bindings), never guessed here: the runs-over line
+   * branches into that field, headed with the column's name.
+   */
+  const fillOf = (name: string): string | undefined => {
+    const b = bindings?.[name];
+    if (!b || !parts.input || b.step !== parts.input || parts.arguments[name] !== undefined || !b.columns.length) return undefined;
+    return b.columns.join(', ');
+  };
   const argNote = (name: string, isResource: boolean, hasDefault: boolean): string | undefined => {
     const ref = refs.find((r) => r.argument === name);
     if (ref) return receives(ref, verb, columnsOf(previousSteps.find((s) => s.label === ref.step)));
     if (isResource || parts.arguments[name] !== undefined || !parts.input) return undefined;
+    const fill = fillOf(name);
+    if (fill) {
+      const how = fill === name ? 'same name' : 'the column of a fitting type';
+      return `↳ ${perRow ? `each row's ${fill}` : `column ${fill}`} of ${parts.input} (${how}, chosen by core)`;
+    }
     if (!perRow) return undefined;
     if (inputCols.includes(name)) return `↳ from column ${name} of ${parts.input}, each row (same name)`;
     if (hasDefault) return undefined;
     // Core fills it from the one column of a fitting type, or proposes one
-    // if several fit; which, it says only after a run (core C47).
+    // if several fit; which, it says once the input has run (core C47).
     return inputCols.length
       ? `↳ no column named ${name} in ${parts.input}: core fills it from a column of a fitting type, or asks you to pick one. Or set it, e.g. ${name}=wf["${parts.input}"][cols["${inputCols[0]}"]]`
       : undefined;
@@ -504,6 +595,7 @@ function DefaultInputUi({
               onDefineResource={onDefineResource}
               onCommit={(text) => setArg(p.name, text, typeOf(p))}
               note={argNote(p.name, p.kind === 'resource', p.default != null)}
+              fill={p.kind === 'resource' ? undefined : fillOf(p.name)}
             />
           </div>
         ))}
@@ -538,7 +630,7 @@ function runsOver(step: string, verb: string | null | undefined, cols: string[])
     : verb === 'collapse' ? 'all its rows combined into one (or one per group)'
       : verb === 'table' ? 'the whole table in one call'
         : 'its rows';
-  const named = cols.length ? ` Its columns (${cols.slice(0, 6).join(', ')}${cols.length > 6 ? ', …' : ''}) fill parameters of the same name that you don't set.` : '';
+  const named = cols.length ? ` Its columns (${cols.slice(0, 6).join(', ')}${cols.length > 6 ? ', …' : ''}) fill the parameters you don't set: by name, else the one column of a fitting type.` : '';
   return `↳ ${how} of ${step}.${named}`;
 }
 
@@ -592,8 +684,10 @@ function receives(ref: FormulaReference, verb: string | null | undefined, cols: 
  * its settings beneath it — the same literals as the Resources menu.
  */
 function ArgRow({
-  name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit, note,
+  name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit, note, fill,
 }: {
+  /** The column of what it runs over that core fills it from: its header, where the branch lands. */
+  fill?: string;
   /** What this argument passes the tool, or where its value comes from, in words. */
   note?: string;
   name: string;
@@ -619,6 +713,13 @@ function ArgRow({
 
   return (
     <div className="te-arg">
+      {fill && (
+        <div className="te-fill-head">
+          <span className="te-fill" data-map-fill={fill} title={`Filled from column ${fill} of what it runs over`}>
+            <SymbolIcon name="table_chart" size={11} /> {fill}
+          </span>
+        </div>
+      )}
       <label className="te-arg-row" title={hint}>
         <span className="te-arg-name">{name}{required && <span className="te-required">*</span>}</span>
         {options && options.length > 0 ? (
@@ -808,21 +909,30 @@ function ModifierList({ parts, catalog, resolved, onWrite, hotProps }: {
  * One part of the formula, always open: a small heading over its fields.
  * `part` names the piece of the expression it edits (`data-formula-part`).
  */
-function Section({ title, part, summary, note, children }: {
+function Section({ title, part, summary, note, open = true, onToggle, children }: {
   title: string;
   part: string;
   summary?: string;
   note?: string;
+  /** With *onToggle*: the section can be minimized to its heading. */
+  open?: boolean;
+  onToggle?: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <section className="te-section" data-formula-part={part}>
+    <section className={`te-section${onToggle ? ' te-minimizable' : ''}`} data-formula-part={part}>
       <div className="te-heading">
+        {onToggle && (
+          <button className="te-icon-btn te-toggle" onClick={onToggle} aria-expanded={open}
+            title={open ? `Minimize ${title.toLowerCase()}` : `Show ${title.toLowerCase()}`}>
+            <SymbolIcon name="arrow_drop_down" size={16} className={open ? undefined : 'te-closed'} />
+          </button>
+        )}
         <span className="te-heading-label">{title}</span>
         {summary && <span className={`te-summary ${/^(auto|→)/.test(summary) ? 'te-auto' : ''}`}>{summary}</span>}
         {note && <span className="te-heading-note">{note}</span>}
       </div>
-      <div className="te-section-body">{children}</div>
+      {open && <div className="te-section-body">{children}</div>}
     </section>
   );
 }
