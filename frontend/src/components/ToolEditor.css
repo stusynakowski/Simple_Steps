@@ -177,6 +177,18 @@
 }
 
 .te-mod-head .te-actions { margin-left: auto; }
+.te-mod-title { cursor: pointer; }
+/* Minimized to its header: one row, its settings inline. */
+.te-mod-min { padding-bottom: 4px; }
+.te-mod-settings {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #6b7785;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.68rem;
+}
 
 /* index.css rings every focused button; on these small ones it hid the label. */
 .te-icon-btn:focus:not(:focus-visible) { outline: none; }
@@ -259,6 +271,14 @@
 }
 
 .te-required { color: #c0392b; margin-left: 1px; }
+
+/* An argument's type under its name; iterated over a column, a vector of it. */
+.te-arg-name { display: inline-flex; flex-direction: column; line-height: 1.2; }
+.te-arg-type { color: #8a96a3; font-size: 0.62rem; }
+.te-arg-vector { color: #1e8a4c; font-weight: 600; }
+
+/* What it runs over, below the arguments and set apart from them. */
+.te-runs-over { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #d5dbe1; }
 
 .te-arg-row input,
 .te-arg-row select {

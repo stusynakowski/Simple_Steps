@@ -537,11 +537,11 @@
 /* Its sides in its run's colour, as the header's are (.run-paint, index.css;
    owner, 2026-11-10); its fill (::before) in the step's own. */
 .step-minimap-step {
-  --d: 6px;   /* the arrow's depth */
-  --b: 2px;   /* the run outline's width */
+  --d: 6px;   /* the arrow's depth (ARROW_DEPTH in StepMinimap.tsx) */
+  --b: 1px;   /* the run outline's width: thin, as the headers' */
   position: absolute;
-  top: 5px;
-  height: 12px;
+  top: 3px;
+  height: 16px;
   padding: 0;
   border: none;
   opacity: 0.85;

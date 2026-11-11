@@ -283,26 +283,6 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
     });
   };
 
-  // The bar at rest, coloured exactly as the editor colours it: Monaco
-  // colours `tool(data)`, then the `*` (modifiers not shown) goes right
-  // after the tool's token — `tool*(` alone wouldn't read as a tool.
-  const [summaryHtml, setSummaryHtml] = useState<{ for: string; html: string } | null>(null);
-  useEffect(() => {
-    const monaco = monacoApi.current;
-    if (!summary || !monaco || !mounted) return;
-    const star = /^([A-Za-z_][\w.]*)\*/.exec(summary);
-    const plain = star ? star[1] + summary.slice(star[0].length) : summary;
-    let cancelled = false;
-    void monaco.editor.colorize(plain, SIMPLE_STEPS_LANGUAGE_ID, { tabSize: 2 }).then((html) => {
-      if (cancelled) return;
-      const marked = star
-        ? html.replace(`>${star[1]}</span>`, `>${star[1]}</span><span class="formula-summary-star" title="Has modifiers: click to see the whole formula">*</span>`)
-        : html;
-      setSummaryHtml({ for: summary, html: marked });
-    });
-    return () => { cancelled = true; };
-  }, [summary, mounted]);
-
   // Parent prop changed → push into Monaco model (only if different).
   useEffect(() => {
     const ed = monacoRef.current;
@@ -409,7 +389,7 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
           {placeholder}
         </div>
       )}
-      {/* At rest: tool*(data), in the editor's colours. Over the
+      {/* At rest: TOOL(DATA)*, caps, one colour. Over the
           editor (which stays mounted for picks); a click edits the whole. */}
       {summary && value && !focused && (
         <div
@@ -425,10 +405,7 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
             ed?.focus();
           }}
         >
-          {summaryHtml?.for === summary
-            // Monaco's own colouring (escaped by Monaco), so it matches the editor.
-            ? <span className="formula-summary-code" dangerouslySetInnerHTML={{ __html: summaryHtml.html }} />
-            : <span className="formula-summary-code">{summary}</span>}
+          <span className="formula-summary-code">{summary}</span>
         </div>
       )}
       {/* Hidden textarea — the wiring system's injection target. */}

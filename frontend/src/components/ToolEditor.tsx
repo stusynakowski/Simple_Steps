@@ -491,6 +491,23 @@ function DefaultInputUi({
     if (!b || !parts.input || b.step !== parts.input || parts.arguments[name] !== undefined || !b.columns.length) return undefined;
     return b.columns.join(', ');
   };
+  /**
+   * The column an argument is iterated over, one value per row, when it is:
+   * a per-row tool reading a column, by a pick, by core's binding or by name.
+   * Its field then takes a vector of its type, not one value.
+   */
+  const mappedCol = (name: string): string | undefined => {
+    if (!perRow || !parts.input) return undefined;
+    const ref = refs.find((r) => r.argument === name);
+    if (ref) {
+      const names = ref.columns && 'names' in ref.columns ? ref.columns.names : null;
+      return names?.length === 1 && (ref.rows === undefined || ref.rows === null) ? `${ref.step}.${names[0]}` : undefined;
+    }
+    if (parts.arguments[name] !== undefined) return undefined;
+    const fill = fillOf(name);
+    if (fill) return `${parts.input}.${fill}`;
+    return inputCols.includes(name) ? `${parts.input}.${name}` : undefined;
+  };
   const argNote = (name: string, isResource: boolean, hasDefault: boolean): string | undefined => {
     const ref = refs.find((r) => r.argument === name);
     if (ref) return receives(ref, verb, columnsOf(previousSteps.find((s) => s.label === ref.step)));
@@ -541,21 +558,6 @@ function DefaultInputUi({
       </datalist>
 
       <Section title="Arguments" part="arguments">
-        {/* What it runs over: the rows it's applied to. A tool's input is not
-            just another argument: it sets the rows, and its columns fill the
-            parameters you don't set, by name. */}
-        <div {...mark('input')}>
-          <ArgRow
-            name="runs over"
-            hint="The step this one runs over: its rows, and its columns by name"
-            value={parts.input ? `wf["${parts.input}"]` : ''}
-            placeholder={previousSteps.length ? 'a previous step, e.g. ' + stepOptions[stepOptions.length - 1].value : 'nothing: a source'}
-            listId={`${listId}-steps`}
-            previousSteps={previousSteps}
-            onCommit={setInput}
-            note={inputStep && !copy ? runsOver(parts.input!, verb, inputCols) : undefined}
-          />
-        </div>
         {!copy && parts.resources.map((name, i) => (
           <div key={`res-${i}`} {...mark(`res:${i}`)}>
             <ArgRow
@@ -596,6 +598,8 @@ function DefaultInputUi({
               onCommit={(text) => setArg(p.name, text, typeOf(p))}
               note={argNote(p.name, p.kind === 'resource', p.default != null)}
               fill={p.kind === 'resource' ? undefined : fillOf(p.name)}
+              type={p.kind === 'resource' ? undefined : typeOf(p)}
+              mapped={p.kind === 'resource' ? undefined : mappedCol(p.name)}
             />
           </div>
         ))}
@@ -606,9 +610,24 @@ function DefaultInputUi({
               listId={`${listId}-all`} previousSteps={previousSteps} resources={resources}
               onDefineResource={onDefineResource}
               onCommit={(text) => setArg(name, text)}
-              note={argNote(name, false, false)} />
+              note={argNote(name, false, false)}
+              mapped={mappedCol(name)} />
           </div>
         ))}
+        {/* What it runs over, below the arguments: the rows it's applied to,
+            whose columns become the vectors above (owner, 2026-11-11). */}
+        <div className="te-runs-over" {...mark('input')}>
+          <ArgRow
+            name="runs over"
+            hint="The step this one runs over: its rows, and its columns by name"
+            value={parts.input ? `wf["${parts.input}"]` : ''}
+            placeholder={previousSteps.length ? 'a previous step, e.g. ' + stepOptions[stepOptions.length - 1].value : 'nothing: a source'}
+            listId={`${listId}-steps`}
+            previousSteps={previousSteps}
+            onCommit={setInput}
+            note={inputStep && !copy ? runsOver(parts.input!, verb, inputCols) : undefined}
+          />
+        </div>
       </Section>
     </>
   );
@@ -626,12 +645,13 @@ function columnsOf(step: Step | undefined): string[] {
 
 /** The runs-over row's note: what the input sets, and how the parameters read it. */
 function runsOver(step: string, verb: string | null | undefined, cols: string[]): string {
-  const how = verb && PER_ROW.has(verb) ? 'one call per row'
-    : verb === 'collapse' ? 'all its rows combined into one (or one per group)'
-      : verb === 'table' ? 'the whole table in one call'
-        : 'its rows';
+  const perRow = verb && PER_ROW.has(verb);
+  const how = perRow ? `iterates over the rows of ${step}: one call per row, and each vector<…> argument above gives that row's value`
+    : verb === 'collapse' ? `all the rows of ${step} combined into one (or one per group)`
+      : verb === 'table' ? `the whole table ${step} in one call`
+        : `the rows of ${step}`;
   const named = cols.length ? ` Its columns (${cols.slice(0, 6).join(', ')}${cols.length > 6 ? ', …' : ''}) fill the parameters you don't set: by name, else the one column of a fitting type.` : '';
-  return `↳ ${how} of ${step}.${named}`;
+  return `↳ ${how}.${named}`;
 }
 
 /** Rows in core's spec, in words. */
@@ -684,8 +704,12 @@ function receives(ref: FormulaReference, verb: string | null | undefined, cols: 
  * its settings beneath it — the same literals as the Resources menu.
  */
 function ArgRow({
-  name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit, note, fill,
+  name, value, placeholder, hint, required, options, listId, previousSteps, resources, onDefineResource, onCommit, note, fill, type, mapped,
 }: {
+  /** The type the tool declares for it: one value. */
+  type?: string;
+  /** The column it is iterated over (`step.column`): it takes a vector of *type*. */
+  mapped?: string;
   /** The column of what it runs over that core fills it from: its header, where the branch lands. */
   fill?: string;
   /** What this argument passes the tool, or where its value comes from, in words. */
@@ -721,7 +745,17 @@ function ArgRow({
         </div>
       )}
       <label className="te-arg-row" title={hint}>
-        <span className="te-arg-name">{name}{required && <span className="te-required">*</span>}</span>
+        <span className="te-arg-name">
+          {name}{required && <span className="te-required">*</span>}
+          {(type || mapped) && (
+            <span className={`te-arg-type${mapped ? ' te-arg-vector' : ''}`}
+              title={mapped
+                ? `Iterated: one ${type ?? 'value'} per row, from ${mapped}. The tool is called once for each`
+                : `One ${type}`}>
+              {mapped ? `vector<${type ?? 'any'}>` : type}
+            </span>
+          )}
+        </span>
         {options && options.length > 0 ? (
           <select value={value} onChange={(e) => onCommit(e.target.value)}>
             <option value="">{placeholder || '— default —'}</option>
@@ -850,6 +884,8 @@ function ModifierList({ parts, catalog, resolved, onWrite, hotProps }: {
             title={`${i + 1}. ${m.kind}`}
             summary={isAuto ? (resolved ? `→ ${resolved.kind}` : 'from the data') : info?.class}
             badge={isAuto ? resolved?.why : undefined}
+            settings={Object.entries(m.params).filter(([k]) => !HIDDEN_SETTINGS.has(k))
+              .map(([k, v]) => `${k}=${toFieldText(v)}`).join(', ') || undefined}
             actions={
               <>
                 <button className="te-icon-btn" title="Move up (earlier in the formula)" disabled={i === 0}
@@ -937,22 +973,34 @@ function Section({ title, part, summary, note, open = true, onToggle, children }
   );
 }
 
-/** One modifier: a light card with its name, what it is, and its settings. */
-function ModCard({ title, summary, badge, actions, children }: {
+/**
+ * One modifier: a light card with its name, what it is, and its settings.
+ * Minimized to its header (owner, 2026-11-11), the settings it has show
+ * there in one line.
+ */
+function ModCard({ title, summary, badge, settings, actions, children }: {
   title: string;
   summary?: string;
   badge?: string;
+  /** Its settings as written, `name=value, …`: shown in the header when minimized. */
+  settings?: string;
   actions: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(true);
   return (
-    <div className="te-mod">
+    <div className={`te-mod${open ? '' : ' te-mod-min'}`}>
       <div className="te-mod-head" title={badge}>
-        <span className="te-mod-title">{title}</span>
+        <button className="te-icon-btn te-toggle" onClick={() => setOpen(!open)} aria-expanded={open}
+          title={open ? 'Minimize to its header' : 'Show its settings'}>
+          <SymbolIcon name="arrow_drop_down" size={16} className={open ? undefined : 'te-closed'} />
+        </button>
+        <span className="te-mod-title" onClick={() => setOpen(!open)}>{title}</span>
         {summary && <span className={`te-summary ${/^(auto|→)/.test(summary) ? 'te-auto' : ''}`}>{summary}</span>}
+        {!open && settings && <span className="te-mod-settings" title={settings}>{settings}</span>}
         <span className="te-actions">{actions}</span>
       </div>
-      {children}
+      {open && children}
     </div>
   );
 }

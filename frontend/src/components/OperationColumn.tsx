@@ -203,9 +203,11 @@ export default function OperationColumn({
   const stepColor = useStepColor();
   const colorOf = Object.fromEntries(previousSteps.map((s, i) =>
     [s.label, s.step_color ?? stepColor(i, stepCount ?? previousSteps.length + 1)]));
-  // The formula bar at rest (owner, 2026-11-10): the tool and its data, the
-  // modifiers shown as a `*` (tool*(data)); the whole expression while it's being edited.
-  const formulaSummary = summarize(savedFormula, refsOf.formula === savedFormula ? refsOf.spans : undefined);
+  // The formula bar at rest (owner, 2026-11-11): the tool and its data in
+  // caps, one colour, `*` at the end for what's hidden (TOOL(DATA)*); the
+  // whole expression while it's being edited or the fx panel is open.
+  const formulaSummary = isOpen('details') ? undefined
+    : refsOf.formula === savedFormula ? summarize(savedFormula, refsOf.spans, refsOf.refs) : undefined;
   const barReferences = refsOf.refs.map((r) => ({ start: r.span[0], end: r.span[1], color: colorOf[r.step] ?? '#888' }));
 
   // A new round of picking starts fresh: the last pick is only replaced while
@@ -692,13 +694,20 @@ export default function OperationColumn({
  * without the `=`. Where the tool and modifiers are is core's (the parse's
  * spans); a formula without modifiers, or not parsed yet, shows as written.
  */
-function summarize(formula: string, spans?: FormulaSpans): string {
-  const mods = spans?.modifiers;
+/**
+ * The bar at rest: `TOOL(DATA)*`. The data is the step it runs over, by
+ * name; the `*` says there's more (modifiers, arguments) behind a click.
+ */
+function summarize(formula: string, spans: FormulaSpans | undefined, refs: FormulaReference[]): string | undefined {
   const tool = spans?.tool;
-  if (!mods?.length || !tool) return formula.trim().replace(/^=/, '');
-  // After the last modifier: the `]` closing them, then the call.
-  const call = formula.slice(mods[mods.length - 1][1]).replace(/^\s*\]/, '');
-  return `${formula.slice(tool[0], tool[1])}*${call}`.trim();
+  if (!tool) return undefined;
+  const input = spans?.input;
+  const data = input
+    ? refs.find((r) => r.span[0] >= input[0] && r.span[1] <= input[1])?.step ?? formula.slice(input[0], input[1])
+    : '';
+  const short = `${formula.slice(tool[0], tool[1])}(${data})`.toUpperCase();
+  const whole = formula.trim().replace(/^=/, '').replace(/\s+/g, '');
+  return whole.toUpperCase() === short ? short : `${short}*`;
 }
 
 /** A note's first line, as plain text: its title when it's folded (Markdown marks dropped). */

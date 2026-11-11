@@ -8,6 +8,9 @@ export interface MinimapStep { id: string; label: string; color: string; run?: R
 
 interface Span { left: number; width: number }
 
+/** The map's arrow depth in pixels: `--d` on `.step-minimap-step`. */
+const ARROW_DEPTH = 6;
+
 /**
  * The steps' map, along the bottom of the steps (owner, 2026-10-30): each
  * step as a thin copy of its header — the same arrow, in its colour, as wide
@@ -56,7 +59,13 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scroller, steps.map((s) => s.id).join('\u0001')]);
 
-  const k = view.trackWidth / view.total;            // track pixels per scroll pixel
+  // The steps fill the map end to end (owner, 2026-11-11): the scale runs
+  // from the first step's left to the last step's right, not the whole
+  // scroll width, so space past the steps leaves no blank on the map.
+  const origin = spans.length ? spans[0].left : 0;
+  const end = spans.length ? spans[spans.length - 1].left + spans[spans.length - 1].width : view.total;
+  const k = view.trackWidth / Math.max(1, end - origin);  // track pixels per scroll pixel
+  const toTrack = (x: number) => (x - origin) * k;
   const jump = (left: number) => scroller.current?.scrollTo({ left, behavior: 'smooth' });
 
   // Drag the outline: the steps scroll with it.
@@ -78,12 +87,13 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
     const bar = track.current;
     if (!bar) return;
     const box = bar.getBoundingClientRect();
-    const x = (e.clientX - box.left) / k;
-    const i = spans.findIndex((sp) => x >= sp.left && x < sp.left + sp.width);
+    const x = (e.clientX - box.left) / k + origin;
+    // Each step reaches to the next one's start: no gaps on the map.
+    const i = spans.findIndex((sp, j) => x >= sp.left && x < (spans[j + 1]?.left ?? sp.left + sp.width));
     if (i < 0) { setHover(null); return; }
     const s = steps[i];
     const text = `Step ${i + 1} · ${s.label}${s.run ? ` · ${s.run.text}` : ''}`;
-    const at = box.left + (spans[i].left + spans[i].width / 2) * k;
+    const at = box.left + toTrack(spans[i].left + spans[i].width / 2);
     setHover((prev) => (prev && prev.text === text && prev.x === at ? prev : { text, x: at, y: box.top }));
   };
   // A click on the track, off any step: centre the view there.
@@ -91,7 +101,7 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
     const bar = track.current;
     if (!bar) return;
     const x = e.clientX - bar.getBoundingClientRect().left;
-    jump(x / k - view.visible / 2);
+    jump(x / k + origin - view.visible / 2);
   };
 
   return (
@@ -109,8 +119,11 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
       {steps.map((s, i) => {
         const span = spans[i];
         if (!span) return null;
-        const left = span.left * k;
-        const width = Math.max(4, span.width * k);
+        const left = toTrack(span.left);
+        // To the next step's start, plus the arrow's depth (--d) so its tip
+        // fills the next one's tail, as the headers interlock.
+        const next = spans[i + 1];
+        const width = Math.max(4, next ? toTrack(next.left) - left + ARROW_DEPTH : span.width * k);
         return (
           <button
             key={s.id}
@@ -124,7 +137,7 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
       })}
       <div
         className="step-minimap-view"
-        style={{ left: view.scrollLeft * k, width: Math.max(8, view.visible * k) }}
+        style={{ left: toTrack(view.scrollLeft), width: Math.max(8, view.visible * k) }}
         onPointerDown={onOutlineDown}
         onClick={(e) => e.stopPropagation()}
         role="scrollbar"
