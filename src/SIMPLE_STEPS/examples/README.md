@@ -14,6 +14,7 @@ examples/
 │
 ├── basic/            core verbs and data manipulation       → basic/README.md
 ├── dummy_llm/        resources: a dummy database and models → dummy_llm/README.md
+├── resource_kinds/   one resource of every kind: try the resource column → resource_kinds/README.md
 ├── plotly_charts/    Plotly charts and other rich cells     → plotly_charts/README.md
 ├── image_processing/ a folder of images as a resource      → image_processing/README.md
 ├── agent_demo/       build a workflow by asking the agent   → agent_demo/README.md

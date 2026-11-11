@@ -1,11 +1,11 @@
-import { useEffect, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import Markdown from 'react-markdown';
 import type { Step } from '../types/models';
 import type { LoadedResourceInfo, ResourceDeclaration, ResourceTypeInfo } from '../services/api';
-import { definitionText, pyLiteral, stepsUsingResource } from '../utils/resources';
+import { definitionText, pyLiteral, resourceKind, stepsUsingResource, type ResourceKind } from '../utils/resources';
 import { needsAttention, STATUS_TEXT, type ResourceState, type ResourceStatus } from '../hooks/useResourceState';
 import StepMenu from './StepMenu';
-import SymbolIcon from './SymbolIcon';
+import SymbolIcon, { type SymbolName } from './SymbolIcon';
 import './ResourceColumn.css';
 
 /**
@@ -38,12 +38,19 @@ interface ResourceColumnProps {
 
 const DEFAULT_COLOR = '#5b6b7f';
 const PIN_KEY = 'simple-steps.resources.pinned';
+const WIDTH_KEY = 'simple-steps.resources.width';
+/** The bar on the column's edge: click it to hide or show, drag it to resize. */
+const RAIL = 28;
+const MIN_WIDTH = 150;
+/** Dragged narrower than this, the column hides. */
+const HIDE_BELOW = 90;
 
-function readPinned(): boolean {
-  try { return localStorage.getItem(PIN_KEY) === '1'; } catch { return false; }
+// Per-viewer niceties only: storage can be missing or blocked.
+function readPref(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
 }
-function writePinned(on: boolean) {
-  try { localStorage.setItem(PIN_KEY, on ? '1' : '0'); } catch { /* per-viewer nicety only */ }
+function writePref(key: string, value: string | null) {
+  try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* ignore */ }
 }
 
 function metaOf(decl: unknown): { notes?: string; color?: string } {
@@ -57,8 +64,73 @@ function templateFor(info: ResourceTypeInfo): string {
   return `${info.type}(${settings})`;
 }
 
+const KIND_ICON: Record<ResourceKind, SymbolName> = {
+  llm: 'smart_toy', database: 'database', filesystem: 'folder',
+  compute: 'memory', service: 'cloud', other: 'deployed_code',
+};
+
+/** The icon for a resource's kind, from its type and the type's bases. */
+function kindIcon(type: string, types: Record<string, ResourceTypeInfo>): SymbolName {
+  return KIND_ICON[resourceKind(type, types[type]?.bases)];
+}
+
 function StatusDot({ status }: { status: ResourceStatus }) {
   return <span className={`rc-dot rc-dot--${status.kind}`} title={`${STATUS_TEXT[status.kind]}: ${status.detail}`} />;
+}
+
+/**
+ * The bar on the column's right edge, "Resources" written down it. Hidden, the
+ * column is this bar alone, with an icon per resource; with no resources, just
+ * the word. Pinned, a copy of it stays at the left edge while the steps scroll.
+ */
+function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHighlight, drag }: {
+  entries: [string, ResourceDeclaration][];
+  state: ResourceState;
+  steps: Step[];
+  hidden: boolean;
+  attention: boolean;
+  onToggle: () => void;
+  onPick: (name: string) => void;
+  onHighlight: (labels: string[] | null) => void;
+  drag?: React.HTMLAttributes<HTMLDivElement>;
+}) {
+  const action = hidden ? 'Show the resources' : 'Hide the resources';
+  return (
+    <div
+      className={`rc-rail${hidden ? ' hidden' : ''}${drag ? ' draggable' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-expanded={!hidden}
+      aria-label={action}
+      title={drag ? `${action} · drag to resize` : action}
+      onClick={onToggle}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+      {...drag}
+    >
+      <span className="rc-rail-chevron"><SymbolIcon name={hidden ? 'chevron_right' : 'chevron_left'} size={18} /></span>
+      {hidden && entries.map(([name, decl]) => (
+        <button
+          key={name}
+          type="button"
+          className="rc-rail-item"
+          style={{ '--res-color': metaOf(decl).color ?? DEFAULT_COLOR } as React.CSSProperties}
+          title={`${name}: ${STATUS_TEXT[state.statusOf(name).kind]}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onPick(name); }}
+          onMouseEnter={() => onHighlight(stepsUsingResource(steps, name))}
+          onMouseLeave={() => onHighlight(null)}
+        >
+          <span className="rc-kind">
+            <SymbolIcon name={kindIcon(decl.type, state.types)} size={16} />
+            <StatusDot status={state.statusOf(name)} />
+          </span>
+        </button>
+      ))}
+      <span className="rc-rail-label">Resources</span>
+      {attention && <span className="rc-attention" title="A resource needs attention" />}
+      {drag && <span className="rc-grip" aria-hidden />}
+    </div>
+  );
 }
 
 export default function ResourceColumn(props: ResourceColumnProps) {
@@ -68,8 +140,30 @@ export default function ResourceColumn(props: ResourceColumnProps) {
   const [listOpen, setListOpen] = useState(true);
   const [openNames, setOpenNames] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
-  const [pinned, setPinned] = useState(readPinned);
+  // Pinning is off unless the viewer turns it on.
+  const [pinned, setPinned] = useState(() => readPref(PIN_KEY) === '1');
   const [scrolled, setScrolled] = useState(false);
+  // Maximized: one resource as a box the size of the canvas.
+  const [maximized, setMaximized] = useState<string | null>(null);
+  const [canvasWidth, setCanvasWidth] = useState(900);
+  // A width the viewer dragged to; null follows the content (a step's widths).
+  const [width, setWidth] = useState<number | null>(() => {
+    const w = Number(readPref(WIDTH_KEY));
+    return w >= MIN_WIDTH ? w : null;
+  });
+  const [dragging, setDragging] = useState(false);
+  const columnRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragFrom = useRef<{ x: number; width: number; moved: boolean } | null>(null);
+  const justDragged = useRef(false);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setCanvasWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [scroller]);
 
   // Pinned: the thin view shows once the steps scroll off the start.
   useEffect(() => {
@@ -81,70 +175,87 @@ export default function ResourceColumn(props: ResourceColumnProps) {
     return () => el.removeEventListener('scroll', on);
   }, [pinned, scroller]);
 
-  const togglePin = () => { setPinned((p) => { writePinned(!p); return !p; }); };
+  // Hidden, the panel is still there (it slides), but out of reach: no tabbing into it.
+  useEffect(() => { if (panelRef.current) panelRef.current.inert = sideCollapsed; }, [sideCollapsed]);
+
+  useEffect(() => {
+    if (!dragging) writePref(WIDTH_KEY, width === null ? null : String(width));
+  }, [dragging, width]);
+
+  const togglePin = () => { setPinned((p) => { writePref(PIN_KEY, p ? '0' : '1'); return !p; }); };
   const toggleOpen = (name: string) => setOpenNames((s) => {
     const next = new Set(s);
     if (next.has(name)) next.delete(name); else next.add(name);
     return next;
   });
+  const pick = (name: string) => {
+    setSideCollapsed(false); setListOpen(true);
+    setOpenNames((s) => new Set(s).add(name));
+  };
+  const toggleSide = () => {
+    if (justDragged.current) { justDragged.current = false; return; }   // the click that ends a drag
+    setSideCollapsed((c) => !c);
+  };
+
+  // Dragging the bar sets the width, as a step's sides do; dragged far
+  // enough left, the column hides, and dragged out again, it shows.
+  const drag: React.HTMLAttributes<HTMLDivElement> = {
+    onPointerDown: (e) => {
+      if (e.button !== 0) return;
+      const open = sideCollapsed ? 0 : (columnRef.current?.offsetWidth ?? RAIL) - RAIL;
+      dragFrom.current = { x: e.clientX, width: open, moved: false };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    onPointerMove: (e) => {
+      const d = dragFrom.current;
+      if (!d) return;
+      const dx = e.clientX - d.x;
+      if (!d.moved && Math.abs(dx) < 4) return;
+      if (!d.moved) { d.moved = true; setDragging(true); setMaximized(null); }
+      const w = d.width + dx;
+      setSideCollapsed(w < HIDE_BELOW);
+      if (w >= HIDE_BELOW) {
+        setWidth(Math.round(Math.min(Math.max(MIN_WIDTH, w), Math.max(MIN_WIDTH, canvasWidth - 120))));
+      }
+    },
+    onPointerUp: () => {
+      if (dragFrom.current?.moved) { justDragged.current = true; setDragging(false); }
+      dragFrom.current = null;
+    },
+    onPointerCancel: () => { dragFrom.current = null; setDragging(false); },
+  };
 
   const attention = entries.some(([n]) => needsAttention(state.statusOf(n)));
   const unused = Object.entries(state.loaded).filter(([n]) => !(resources && n in resources));
   const wide = listOpen && (openNames.size > 0 || adding);
+  const railProps = { entries, state, steps, attention, onHighlight: props.onHighlight };
 
+  const toStart = () => scroller.current?.scrollTo({ left: 0, behavior: 'smooth' });
   const thin = pinned && scrolled && (
     <div className="rc-thin" aria-label="Resources (pinned)">
-      <button
-        type="button"
-        className="rc-thin-head"
-        title="Resources: back to the start of the workflow"
-        onClick={() => scroller.current?.scrollTo({ left: 0, behavior: 'smooth' })}
-      >
-        <SymbolIcon name="database" size={16} />
-        {attention && <span className="rc-attention" />}
-      </button>
-      {entries.map(([name, decl]) => (
-        <button
-          key={name}
-          type="button"
-          className="rc-thin-item"
-          style={{ '--res-color': metaOf(decl).color ?? DEFAULT_COLOR } as React.CSSProperties}
-          title={`${name}: ${STATUS_TEXT[state.statusOf(name).kind]}`}
-          onMouseEnter={() => props.onHighlight(stepsUsingResource(steps, name))}
-          onMouseLeave={() => props.onHighlight(null)}
-          onClick={() => {
-            setSideCollapsed(false); setListOpen(true);
-            setOpenNames((s) => new Set(s).add(name));
-            scroller.current?.scrollTo({ left: 0, behavior: 'smooth' });
-          }}
-        >
-          <StatusDot status={state.statusOf(name)} />
-          <span className="rc-thin-name">{name.slice(0, 3)}</span>
-        </button>
-      ))}
+      <Rail {...railProps} hidden
+            onToggle={() => { setSideCollapsed(false); toStart(); }}
+            onPick={(name) => { pick(name); toStart(); }} />
     </div>
   );
 
-  if (sideCollapsed) {
-    return (
-      <>
-        {thin}
-        <div className="resource-column rc-collapsed" data-testid="resource-column">
-          <button type="button" className="rc-strip" title="Show the resources" onClick={() => setSideCollapsed(false)}>
-            <SymbolIcon name="database" size={16} />
-            <span className="rc-count">{entries.length}</span>
-            {attention && <span className="rc-attention" />}
-          </button>
-        </div>
-        <div className="rc-divider" aria-hidden="true" />
-      </>
-    );
-  }
+  const maxed = maximized && resources && maximized in resources ? maximized : null;
+  const shown = maxed ? entries.filter(([n]) => n === maxed) : entries;
+  // The panel keeps its width while the column narrows over it, so hiding
+  // and showing slide (0.3s, as a step's do) instead of reflowing.
+  const panelWidth = maxed ? Math.max(450, canvasWidth) - RAIL : width ?? (wide ? 450 : MIN_WIDTH);
+  const columnWidth = sideCollapsed ? RAIL : panelWidth + RAIL;
 
   return (
     <>
       {thin}
-      <div className={`resource-column${wide ? ' rc-wide' : ''}`} data-testid="resource-column">
+      <div
+        ref={columnRef}
+        className={`resource-column${sideCollapsed ? ' rc-collapsed' : ''}${maxed ? ' rc-max' : ''}${dragging ? ' rc-dragging' : ''}`}
+        style={{ flexBasis: columnWidth, width: columnWidth }}
+        data-testid="resource-column"
+      >
+        <div className="rc-panel" style={{ width: panelWidth }} ref={panelRef} aria-hidden={sideCollapsed}>
         <div className="rc-head" onClick={() => setListOpen((v) => !v)} role="button" aria-expanded={listOpen}>
           <SymbolIcon name="database" size={16} />
           <span className="rc-head-title">Resources</span>
@@ -160,9 +271,6 @@ export default function ResourceColumn(props: ResourceColumnProps) {
             >
               <SymbolIcon name={pinned ? 'push_pin' : 'keep_off'} size={13} />
             </button>
-            <button type="button" className="rc-btn-icon" title="Collapse the resources" onClick={() => setSideCollapsed(true)}>
-              <SymbolIcon name="minimize" size={13} />
-            </button>
           </span>
         </div>
 
@@ -171,19 +279,24 @@ export default function ResourceColumn(props: ResourceColumnProps) {
             {entries.length === 0 && !adding && (
               <div className="rc-empty">None yet. Steps use a resource with res["name"].</div>
             )}
-            {entries.map(([name, decl]) => (
+            {shown.map(([name, decl]) => (
               <ResourceCard
                 key={name}
                 {...props}
                 name={name}
                 decl={decl}
-                open={openNames.has(name)}
-                onToggle={() => toggleOpen(name)}
-                onRenamed={(to) => setOpenNames((s) => { const n = new Set(s); n.delete(name); n.add(to); return n; })}
+                open={openNames.has(name) || maxed === name}
+                maximized={maxed === name}
+                onMaximize={() => setMaximized(maxed === name ? null : name)}
+                onToggle={() => { if (maxed === name) setMaximized(null); toggleOpen(name); }}
+                onRenamed={(to) => {
+                  setOpenNames((s) => { const n = new Set(s); n.delete(name); n.add(to); return n; });
+                  if (maxed === name) setMaximized(to);
+                }}
               />
             ))}
 
-            {unused.length > 0 && (
+            {!maxed && unused.length > 0 && (
               <div className="rc-ready">
                 <div className="rc-subtitle">From the deployment</div>
                 {unused.map(([name, info]) => (
@@ -203,7 +316,7 @@ export default function ResourceColumn(props: ResourceColumnProps) {
               </div>
             )}
 
-            {adding
+            {maxed ? null : adding
               ? <NewResource types={state.types} onDefine={props.onDefine} onDone={(name) => {
                   setAdding(false);
                   if (name) setOpenNames((s) => new Set(s).add(name));
@@ -215,8 +328,9 @@ export default function ResourceColumn(props: ResourceColumnProps) {
               )}
           </div>
         )}
+        </div>
+        <Rail {...railProps} hidden={sideCollapsed} onToggle={toggleSide} onPick={pick} drag={drag} />
       </div>
-      <div className="rc-divider" aria-hidden="true" />
     </>
   );
 }
@@ -224,11 +338,13 @@ export default function ResourceColumn(props: ResourceColumnProps) {
 // ── One resource ──────────────────────────────────────────────────────────
 
 function ResourceCard({
-  name, decl, open, onToggle, onRenamed, steps, state, stepColorOf, onDefine, onRemove, onMeta, onHighlight,
+  name, decl, open, maximized, onMaximize, onToggle, onRenamed, steps, state, stepColorOf, onDefine, onRemove, onMeta, onHighlight,
 }: ResourceColumnProps & {
   name: string;
   decl: ResourceDeclaration;
   open: boolean;
+  maximized: boolean;
+  onMaximize: () => void;
   onToggle: () => void;
   onRenamed: (to: string) => void;
 }) {
@@ -307,16 +423,20 @@ function ResourceCard({
 
   return (
     <div
-      className={`rc-card${open ? ' open' : ''}`}
+      className={`rc-card${open ? ' open' : ''}${maximized ? ' maximized' : ''}`}
       style={{ '--res-color': color } as React.CSSProperties}
       onMouseEnter={() => onHighlight(users)}
       onMouseLeave={() => onHighlight(null)}
       data-testid={`resource-${name}`}
     >
       <div className="rc-card-head" onClick={onToggle} role="button" aria-expanded={open}>
-        <StatusDot status={status} />
+        <span className="rc-kind" title={decl.type}>
+          <SymbolIcon name={kindIcon(decl.type, state.types)} size={16} />
+          <StatusDot status={status} />
+        </span>
         <span className="rc-card-name">{name}</span>
-        {decl.source === 'loaded' && <span className="rc-tag" title="Provided by the deployment">ready-made</span>}
+        {open && <span className="rc-card-type">{decl.type}</span>}
+        {open && decl.source === 'loaded' && <span className="rc-tag" title="Provided by the deployment">ready-made</span>}
         {open && (
           <span className="rc-card-controls" onClick={(e) => e.stopPropagation()}>
             <button
@@ -332,6 +452,9 @@ function ResourceCard({
             </StepMenu>
             <button type="button" className="rc-btn-icon" title="Minimize" onClick={onToggle}>
               <SymbolIcon name="minimize" size={12} />
+            </button>
+            <button type="button" className="rc-btn-icon" title={maximized ? 'Restore size' : 'Maximize'} onClick={onMaximize}>
+              <SymbolIcon name={maximized ? 'close_fullscreen' : 'open_in_full'} size={12} />
             </button>
           </span>
         )}
@@ -410,8 +533,15 @@ function ResourceCard({
               : <span className="rc-meta">not used yet</span>}
           </div>
 
-          {status.kind === 'loaded' && (
-            <div className="rc-browse">Browse: a file system's tree or a database's tables will show here.</div>
+          {(status.kind === 'loaded' || maximized) && (
+            <div className="rc-browse">
+              <SymbolIcon name={kindIcon(decl.type, state.types)} size={maximized ? 40 : 22} />
+              <span>
+                {status.kind === 'loaded'
+                  ? `Browse ${name}: a file system's tree or a database's tables will show here.`
+                  : `Load ${name} to browse it.`}
+              </span>
+            </div>
           )}
         </div>
       )}

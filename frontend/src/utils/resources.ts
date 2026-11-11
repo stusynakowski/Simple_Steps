@@ -69,6 +69,24 @@ export function loadedProblem(
     : null;
 }
 
+/** What kind of thing a resource is, for its icon: read from its type's name and bases. */
+export type ResourceKind = 'llm' | 'database' | 'filesystem' | 'compute' | 'service' | 'other';
+
+const KIND_PATTERNS: [ResourceKind, RegExp][] = [
+  ['llm', /llm|model|chat|claude|gpt|ollama|openai|anthropic/i],
+  ['database', /db|database|sql|postgres|mongo|redis|table|warehouse/i],
+  ['filesystem', /file|fs|folder|storage|bucket|s3|disk|drive/i],
+  ['compute', /compute|cluster|gpu|cpu|worker|executor|spark|dask|ray/i],
+  ['service', /api|client|service|http|rest|cloud/i],
+];
+
+export function resourceKind(type: string, bases: string[] = []): ResourceKind {
+  for (const name of [type, ...bases]) {
+    for (const [kind, pattern] of KIND_PATTERNS) if (pattern.test(name)) return kind;
+  }
+  return 'other';
+}
+
 /** The steps whose formula uses `res["name"]` (either quote style), by label. */
 export function stepsUsingResource(steps: Step[], name: string): string[] {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

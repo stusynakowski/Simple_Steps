@@ -897,7 +897,9 @@ export default function MainLayout() {
             '--canvas-width': `${canvasWidth}px`,
             // Auto-fit: lay the columns out against the full available height
             // so they can be measured (see the steps/console split).
-            ...(autoFit && bodyHeight > 0 ? { height: `${maxAutoSteps}px` } : {}),
+            // Less the steps' map under the canvas: a container taller than the
+            // canvas let a click or focus scroll the whole canvas up.
+            ...(autoFit && bodyHeight > 0 ? { height: `${Math.max(0, maxAutoSteps - STEPS_MAP_HEIGHT)}px` } : {}),
           } as React.CSSProperties}
         >
           {workflow.steps.map((step, index) => {

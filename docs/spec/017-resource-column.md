@@ -15,12 +15,16 @@ core change.
 ## The column
 
 - **REQ-RES-001:** the column comes first in the step layout, ahead of
-  step 1, and is separated from the steps by a soft divider: a thin, muted
-  line with no label and no controls.
+  step 1. It is one flat panel, flush to the top and bottom of the canvas,
+  square-cornered. Its right edge is one vertical bar with **Resources**
+  written down it, between the resources and the steps (REQ-RES-006)
+  (owner, 2026-11-10).
 - **REQ-RES-002:** the column's header, **Resources**, is a step header's
-  height and width but a different shape: a flat left edge and no notched
-  tail, so it reads as where the flow starts. It shows the number of
+  height and width but not an arrow: a flat bar. It shows the number of
   resources and a dot when any of them needs attention (REQ-RES-012).
+- **REQ-RES-002a:** each resource shows an icon for its kind, read from its
+  type's name and bases: database, file system, compute, language model,
+  service, or a generic one; its status dot sits on the icon's corner.
 - **REQ-RES-003:** clicking the header opens the column downwards: one
   header per resource in the workflow, stacked vertically, each in the same
   flat-left shape, with its name and status dot (REQ-RES-011). Clicking
@@ -32,16 +36,19 @@ core change.
 - **REQ-RES-005:** several resources can be open at once. They stack
   vertically in the column, each with its own header and panel. Each can be
   closed on its own, back to its header.
-- **REQ-RES-006:** the whole column can be collapsed to a thin strip, like a
-  minimized step, that shows an icon, the count and the attention dot.
-  Clicking the strip opens it again.
+- **REQ-RES-006:** the edge bar hides and shows the column. Its chevron
+  and a hover highlight say it can be clicked. Clicking it hides the
+  column down to the bar alone, which shows each resource's kind icon and
+  status dot (clicking one opens that resource), or with no resources just
+  the word. Dragging the bar sets the column's width, as a step's sides do;
+  dragged far enough left, the column hides. Hiding, showing and opening
+  slide (0.3s) as a step's do. The width is saved per user.
 
 ## Pinning
 
-- **REQ-RES-007:** the Resources header has a pin. While pinned, scrolling
-  the steps sideways leaves a thin view of the column stuck to the left edge
-  of the step layout: each resource's header narrowed to its status dot and
-  a short name, clickable to open the column. Scrolling all the way back to
+- **REQ-RES-007:** the Resources header has a pin, **off by default**. While
+  pinned, scrolling the steps sideways leaves the hidden bar (REQ-RES-006)
+  stuck to the left edge of the step layout, clickable to open the column. Scrolling all the way back to
   the left shows the full column again, in the state it was left in.
   Unpinned, the column scrolls away with the steps like step 0. Whether it
   is pinned is saved per user, not in the workflow.
@@ -51,9 +58,11 @@ core change.
 The panel looks and behaves like a step's: header with hover controls,
 then a toolbar, a formula bar, and panels that fold.
 
-- **REQ-RES-008:** a resource's header carries its name, its status dot,
-  and the same hover controls as a step's: notes, settings, minimize,
-  maximize. In settings the name and the colour can be changed; notes open
+- **REQ-RES-008:** a resource's header carries its kind icon, name, status
+  dot and type, and the same controls as a step's: notes, settings,
+  minimize, maximize. Maximized, the resource is a box the size of the
+  canvas, wide and tall, its browse area filling it; restore brings the
+  column back. In settings the name and the colour can be changed; notes open
   under the header as a step's do (Markdown). Renaming a resource that steps
   use is refused, naming them, until each use is changed. (Open: whether a
   rename should rewrite the steps' `res["…"]`.)

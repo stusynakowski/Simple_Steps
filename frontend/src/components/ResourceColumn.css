@@ -1,74 +1,159 @@
 /* The resource column (spec 017): ahead of step 1, quiet by default.
-   Its header is a step header's size (50px × 150px) but not an arrow: a
-   flat-left card with rounded right corners, so it reads as where the flow
-   starts rather than as a step. */
+   Flat and flush (owner, 2026-11-10): one panel from the top of the canvas to
+   the bottom, square corners. On its right edge, one vertical bar reading
+   "Resources": click it to hide or show the panel, drag it to resize.
+   The header is a step header's height (50px); the panel starts at a
+   collapsed step's width (150px). Widths are set inline. */
 
 .resource-column {
-  --res-bg: #1b1d21;
-  --res-line: #2c2f35;
+  --res-panel: #17181b;
+  --res-head: #202227;
+  --res-card: #1c1e22;
+  --res-line: #2a2d33;
   --res-text: #d6d8dc;
   --res-muted: #8a8f98;
-  flex: 0 0 150px;
-  width: 150px;
+  position: relative;
+  flex: 0 0 auto;
   height: 100%;
+  align-self: stretch;
+  background: var(--res-panel);
+  white-space: normal;
+  overflow: hidden;
+  color: var(--res-text);
+  /* As a step opens and closes (OperationColumn.css). */
+  transition: flex-basis 0.3s ease, width 0.3s ease;
+}
+.resource-column.rc-dragging { transition: none; user-select: none; }
+
+/* The panel keeps its own width; the column narrows over it, so hiding slides. */
+.rc-panel {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
   display: flex;
   flex-direction: column;
-  white-space: normal;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
-  color: var(--res-text);
-  transition: flex-basis 0.25s ease, width 0.25s ease;
+  transition: opacity 0.3s ease;
 }
-/* Any resource open: a step's open width (REQ-RES-004). */
-.resource-column.rc-wide { flex-basis: 450px; width: 450px; }
+.resource-column.rc-collapsed .rc-panel { opacity: 0; }
+.resource-column.rc-max .rc-panel { overflow: hidden; }
+
+/* ── The bar: hide / show, and resize (REQ-RES-006) ── */
+.rc-rail {
+  position: absolute;
+  top: 0; bottom: 0; right: 0;
+  z-index: 2;
+  width: 28px;                /* RAIL in ResourceColumn.tsx */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--res-head, #202227);
+  border-left: 1px solid var(--res-line, #2a2d33);
+  border-right: 1px solid var(--res-line, #2a2d33);
+  color: var(--res-muted, #8a8f98);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rc-rail:hover { background: #2a2d33; color: #fff; }
+.rc-rail:focus-visible { outline: 2px solid #4d7cc7; outline-offset: -2px; }
+.rc-rail.hidden { border-left-color: transparent; }
+.rc-rail-chevron {
+  flex: none;
+  height: 50px;               /* level with the step headers */
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.15s ease;
+}
+.rc-rail:hover .rc-rail-chevron { transform: translateX(-2px); }
+.rc-rail.hidden:hover .rc-rail-chevron { transform: translateX(2px); }
+.rc-rail-label {
+  writing-mode: vertical-rl;
+  margin-top: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.rc-rail .rc-attention { margin-top: 6px; }
+.rc-rail-item {
+  flex: none;
+  width: 100%; height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  animation: rc-fade-in 0.3s ease;
+}
+.rc-rail-item:hover { background: rgba(255, 255, 255, 0.08); }
+.rc-rail .rc-kind .rc-dot { box-shadow: 0 0 0 2px var(--res-head, #202227); }
+@keyframes rc-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .resource-column, .rc-panel, .rc-rail-item { transition: none; animation: none; }
+}
+/* The edge: a line on hover, as a step's sides show (OperationColumn.css). */
+.rc-grip {
+  position: absolute;
+  top: 0; bottom: 0; right: -1px;
+  width: 6px;
+  cursor: ew-resize;
+}
+.rc-grip::after {
+  content: '';
+  position: absolute; top: 0; bottom: 0; right: 0;
+  width: 2px;
+  background: #8ab4f8;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.rc-grip:hover::after, .rc-dragging .rc-grip::after { opacity: 0.9; }
 
 .rc-head {
+  position: relative;
   flex: none;
   height: 50px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 8px 0 14px;
-  background: #23262b;
-  border-right: 1px solid var(--res-line);
-  border-radius: 0 10px 10px 0;
+  gap: 8px;
+  padding: 0 10px 0 14px;
+  background: var(--res-head);
+  border-bottom: 1px solid var(--res-line);
   cursor: pointer;
   font-weight: 600;
   font-size: 0.9rem;
   user-select: none;
 }
-.rc-head-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.rc-head-controls, .rc-card-controls { display: flex; gap: 2px; margin-left: auto; }
+.rc-head-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Hover controls sit over the header's right end, so the title keeps its room. */
-.rc-head { position: relative; }
 .rc-head-controls {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: flex; gap: 2px;
   padding-left: 6px;
-  background: #23262b;
+  background: var(--res-head);
   opacity: 0; pointer-events: none; transition: opacity 0.15s;
 }
 .rc-head:hover .rc-head-controls, .rc-head-controls:focus-within { opacity: 1; pointer-events: auto; }
-.rc-head:hover .rc-head-controls, .rc-head-controls:focus-within { opacity: 1; }
+.rc-card-controls { display: flex; gap: 2px; margin-left: 4px; }
 
 .rc-count {
   font-size: 11px;
   padding: 0 6px;
   border-radius: 8px;
-  background: #33373e;
+  background: #2e3138;
   color: var(--res-muted);
   font-weight: 500;
 }
-.rc-attention {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #e5a33b;
-  flex: none;
-}
+.rc-attention { width: 7px; height: 7px; border-radius: 50%; background: #e5a33b; flex: none; }
 
 .rc-btn-icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px;
-  border: none; border-radius: 4px;
+  border: none; border-radius: 3px;
   background: transparent;
   color: var(--res-muted, #8a8f98);
   cursor: pointer;
@@ -77,59 +162,81 @@
 .rc-btn-icon:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .rc-btn-icon.on { color: #fff; }
 
-/* ── The list: one header per resource, stacked (REQ-RES-003) ── */
-.rc-list { display: flex; flex-direction: column; gap: 4px; padding: 6px 0 12px; }
+/* ── The list: one header per resource, stacked flush (REQ-RES-003) ── */
+.rc-list { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 .rc-empty, .rc-meta { font-size: 11px; color: var(--res-muted); line-height: 1.4; }
-.rc-empty { padding: 4px 10px; }
+.rc-empty { padding: 10px 14px; }
 
 .rc-card {
-  background: var(--res-bg);
-  border-left: 3px solid var(--res-color, #5b6b7f);
-  border-radius: 0 8px 8px 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--res-card);
+  border-bottom: 1px solid var(--res-line);
+  box-shadow: inset 3px 0 0 var(--res-color, #5b6b7f);
 }
+.rc-card.maximized { flex: 1 1 auto; min-height: 0; }
 .rc-card-head {
-  height: 34px;
+  flex: none;
+  height: 40px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 6px 0 9px;
+  gap: 8px;
+  padding: 0 6px 0 14px;
   cursor: pointer;
   font-size: 0.85rem;
   user-select: none;
 }
+.rc-card-head:hover { background: rgba(255, 255, 255, 0.03); }
 .rc-card.open > .rc-card-head { border-bottom: 1px solid var(--res-line); }
-.rc-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rc-card-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rc-card-type {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; color: var(--res-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.rc-card:not(.open) .rc-card-name { flex: 1; }
 .rc-tag { font-size: 10px; color: var(--res-muted); border: 1px solid var(--res-line); border-radius: 6px; padding: 0 4px; }
 
+/* The kind's icon, in the resource's colour, with the status dot on its corner. */
+.rc-kind {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  color: color-mix(in srgb, var(--res-color, #5b6b7f) 55%, #ffffff);
+}
+.rc-kind .rc-dot { position: absolute; right: -3px; bottom: -2px; box-shadow: 0 0 0 2px var(--res-card); }
+
 /* Status (REQ-RES-011) */
-.rc-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; border: 1.5px solid #6b7079; background: transparent; }
-.rc-dot--loaded { background: #4caf7a; border-color: #4caf7a; }
-.rc-dot--error, .rc-dot--missing { background: #e05d5d; border-color: #e05d5d; }
-.rc-dot--changed { background: #e5a33b; border-color: #e5a33b; }
-.rc-dot--busy { border-color: #8ab4f8; border-top-color: transparent; animation: rc-spin 0.8s linear infinite; }
+.rc-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #6b7079; box-sizing: border-box; }
+.rc-dot--loaded { background: #4caf7a; }
+.rc-dot--error, .rc-dot--missing { background: #e05d5d; }
+.rc-dot--changed { background: #e5a33b; }
+.rc-dot--busy { background: transparent; border: 1.5px solid #8ab4f8; border-top-color: transparent; animation: rc-spin 0.8s linear infinite; }
 @keyframes rc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .rc-dot--busy { animation: none; } }
 
-.rc-notes { padding: 6px 10px; border-bottom: 1px solid var(--res-line); font-size: 12px; }
+.rc-notes { padding: 8px 14px; border-bottom: 1px solid var(--res-line); font-size: 12px; }
 .rc-notes textarea {
   width: 100%; box-sizing: border-box; resize: vertical;
   background: #121316; color: var(--res-text);
-  border: 1px solid var(--res-line); border-radius: 4px; padding: 6px; font: inherit;
+  border: 1px solid var(--res-line); border-radius: 3px; padding: 6px; font: inherit;
 }
 .rc-notes-body p { margin: 0 0 4px; }
 
 /* ── A resource's panel (REQ-RES-008…014) ── */
-.rc-body { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px 10px; }
+.rc-body { display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 12px; }
+.rc-card.maximized .rc-body { flex: 1 1 auto; min-height: 0; }
 .rc-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .rc-btn {
   display: inline-flex; align-items: center; gap: 4px;
-  height: 24px; padding: 0 8px;
-  border: 1px solid var(--res-line); border-radius: 4px;
+  height: 26px; padding: 0 10px;
+  border: 1px solid var(--res-line); border-radius: 3px;
   background: #24272c; color: var(--res-text);
   font-size: 12px; cursor: pointer;
 }
 .rc-btn:hover:not(:disabled) { background: #2d3137; }
-.rc-btn:disabled { opacity: 0.45; cursor: default; }
+.rc-btn:disabled { opacity: 0.4; cursor: default; }
 .rc-btn-primary { background: #2b5a3f; border-color: #35704e; }
 .rc-btn-primary:hover:not(:disabled) { background: #336b4b; }
 .rc-status { margin-left: auto; font-size: 11px; color: var(--res-muted); }
@@ -140,18 +247,18 @@
 .rc-formula {
   display: flex; align-items: center;
   background: #121316;
-  border: 1px solid var(--res-line); border-radius: 4px;
+  border: 1px solid var(--res-line); border-radius: 3px;
 }
 .rc-formula:focus-within { border-color: #4d7cc7; }
 .rc-formula-label { padding: 0 6px 0 8px; color: var(--res-muted); font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; }
 .rc-formula-input, .rc-input {
   flex: 1; min-width: 0;
-  height: 26px;
+  height: 28px;
   border: none; outline: none;
   background: transparent; color: var(--res-text);
   font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
 }
-.rc-input { background: #121316; border: 1px solid var(--res-line); border-radius: 4px; padding: 0 8px; font-family: inherit; }
+.rc-input { flex: none; background: #121316; border: 1px solid var(--res-line); border-radius: 3px; padding: 0 8px; font-family: inherit; }
 .rc-warn { color: #f0b85a; }
 .rc-bad { color: #f08a8a; }
 
@@ -164,10 +271,14 @@
 }
 
 .rc-browse {
-  padding: 14px 10px;
-  border: 1px dashed var(--res-line); border-radius: 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 18px 12px;
+  background: #141518;
+  border: 1px dashed var(--res-line); border-radius: 3px;
   font-size: 11px; color: var(--res-muted); text-align: center;
 }
+.rc-browse .symbol-icon { opacity: 0.5; }
+.rc-card.maximized .rc-browse { flex: 1 1 auto; font-size: 12px; }
 
 .rc-link {
   border: none; background: none; padding: 0 0 0 6px;
@@ -177,24 +288,25 @@
 
 .rc-types { display: flex; flex-wrap: wrap; gap: 4px; }
 .rc-type {
-  font-size: 11px; padding: 2px 7px; border-radius: 9px;
+  font-size: 11px; padding: 2px 8px; border-radius: 9px;
   background: #24272c; border: 1px solid var(--res-line); color: var(--res-text); cursor: pointer;
 }
 .rc-type:hover { background: #2d3137; }
 
-.rc-ready { padding: 4px 0; }
-.rc-subtitle { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--res-muted); padding: 4px 10px; }
-.rc-ready-row { display: flex; align-items: center; padding: 2px 10px; font-size: 12px; }
+.rc-ready { padding: 6px 0; border-bottom: 1px solid var(--res-line); }
+.rc-subtitle { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--res-muted); padding: 4px 14px; }
+.rc-ready-row { display: flex; align-items: center; padding: 3px 14px; font-size: 12px; }
 .rc-ready-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .rc-add {
-  display: inline-flex; align-items: center; gap: 4px;
-  align-self: flex-start;
-  margin: 2px 6px;
-  border: none; background: none;
-  color: var(--res-muted); font-size: 12px; cursor: pointer;
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; height: 36px;
+  padding: 0 14px;
+  border: none; border-bottom: 1px solid var(--res-line);
+  background: none;
+  color: var(--res-muted); font-size: 12px; cursor: pointer; text-align: left;
 }
-.rc-add:hover { color: #fff; }
+.rc-add:hover { color: #fff; background: rgba(255, 255, 255, 0.03); }
 
 /* Settings popover (drawn by StepMenu) */
 .rc-settings { display: flex; flex-direction: column; gap: 8px; min-width: 200px; padding: 4px; color: #d6d8dc; }
@@ -202,7 +314,7 @@
 .rc-field input:not([type='color']) {
   height: 24px; padding: 0 6px;
   background: #121316; color: #d6d8dc;
-  border: 1px solid #2c2f35; border-radius: 4px;
+  border: 1px solid #2a2d33; border-radius: 3px;
 }
 .rc-color-row { display: flex; align-items: center; gap: 6px; }
 .rc-remove {
@@ -210,58 +322,21 @@
   border: none; background: none; color: #f08a8a; cursor: pointer; font-size: 12px; padding: 0;
 }
 
-/* ── Collapsed side (REQ-RES-006) ── */
-.resource-column.rc-collapsed { flex-basis: 36px; width: 36px; }
-.rc-strip {
-  height: 50px; width: 36px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  border: none; border-radius: 0 8px 8px 0;
-  background: #23262b; color: #d6d8dc; cursor: pointer;
-}
-
-/* The soft divider between resources and steps (REQ-RES-001). */
-.rc-divider {
-  flex: 0 0 1px;
-  margin: 10px 12px 10px 8px;
-  background: linear-gradient(to bottom, transparent, #2c2f35 12%, #2c2f35 88%, transparent);
-}
-
-/* ── Pinned: the thin view at the left edge (REQ-RES-007) ── */
+/* ── Pinned: the bar stays at the left edge while the steps scroll (REQ-RES-007) ── */
 .rc-thin {
   position: sticky;
   left: 0;
   z-index: 200;
-  flex: 0 0 40px;
-  width: 40px;
-  margin-right: -40px;          /* takes no room: the steps scroll under it */
+  flex: 0 0 28px;
+  width: 28px;
+  margin-right: -28px;          /* takes no room: the steps scroll under it */
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding-top: 0;
-  background: #121212;
-  border-right: 1px solid #2c2f35;
+  align-self: stretch;
   box-shadow: 4px 0 10px rgba(0, 0, 0, 0.35);
-  white-space: normal;
 }
-.rc-thin-head {
-  position: relative;
-  height: 50px; width: 100%;
-  display: flex; align-items: center; justify-content: center;
-  border: none; background: #23262b; color: #d6d8dc; cursor: pointer;
-}
-.rc-thin-head .rc-attention { position: absolute; top: 10px; right: 8px; }
-.rc-thin-item {
-  width: 34px; padding: 4px 0;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  border: none; border-left: 2px solid var(--res-color, #5b6b7f); border-radius: 0 4px 4px 0;
-  background: #1b1d21; color: #d6d8dc; cursor: pointer;
-}
-.rc-thin-name { font-size: 9px; color: #8a8f98; }
 
 /* The app's global button padding would squeeze the icons to nothing. */
-.rc-thin-head, .rc-thin-item, .rc-strip { padding: 0; }
+.rc-add { padding-top: 0; padding-bottom: 0; }
 .resource-column .symbol-icon, .rc-thin .symbol-icon { flex: none; }
 
 /* A step that uses the hovered resource (REQ-RES-013). */
