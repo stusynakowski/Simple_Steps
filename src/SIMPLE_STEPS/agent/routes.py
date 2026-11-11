@@ -6,6 +6,15 @@ FastAPI router for the agent (docs/dev_plan/weekend_developments/128).
   - GET   /api/agent/config   — the setting in use, never the key
   - PUT   /api/agent/config   — save the setting (a key is write-only)
   - POST  /api/agent/test     — one tiny real request: does the model answer?
+
+Copilot sessions, one per workflow (spec 018, ``copilot.py``):
+
+  - GET    /api/agent/sessions                 — every session: title, phase, progress
+  - GET    /api/agent/sessions/{id}            — one session (new and empty if none)
+  - PUT    /api/agent/sessions/{id}            — edit goal, notes, templates; mark applied
+  - DELETE /api/agent/sessions/{id}            — forget it
+  - POST   /api/agent/sessions/{id}/turn       — one turn: plan/ask, accept, propose, validate
+  - GET    /api/agent/templates                — workflows that can be templates
 """
 
 from __future__ import annotations
@@ -56,6 +65,68 @@ def agent_propose(req: ProposeRequest, session_id: str = Depends(get_session_id)
         return propose(agent, req.message, req.steps, req.resources, req.history, session_id)
     except ModelError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+# ── Copilot sessions: one per workflow (spec 018) ────────────────────────────
+
+class TurnRequest(BaseModel):
+    """One copilot turn, with the workflow as the UI holds it."""
+    #: continue | accept | replan
+    action: str = "continue"
+    message: str = ""
+    title: str = ""
+    steps: List[Dict[str, Any]] = Field(default_factory=list)
+    resources: Dict[str, Any] = Field(default_factory=dict)
+
+
+@router.get("/sessions")
+def list_sessions():
+    """Every saved session, newest first: title, goal, phase, progress."""
+    from .sessions import list_sessions as listed
+    return listed()
+
+
+@router.get("/sessions/{workflow_id}")
+def read_session(workflow_id: str, title: str = ""):
+    """The workflow's session, or a new empty one (not saved until a turn)."""
+    from .sessions import load
+    return load(workflow_id, title)
+
+
+@router.put("/sessions/{workflow_id}")
+def edit_session(workflow_id: str, patch: Dict[str, Any] = Body(...)):
+    """Edit title, goal, notes, templates, or mark a proposal applied."""
+    from .sessions import load, save, update
+    return save(update(load(workflow_id), patch))
+
+
+@router.delete("/sessions/{workflow_id}")
+def reset_session(workflow_id: str):
+    """Forget the workflow's session (the workflow itself is untouched)."""
+    from .sessions import delete
+    return {"deleted": delete(workflow_id)}
+
+
+@router.post("/sessions/{workflow_id}/turn")
+def session_turn(workflow_id: str, req: TurnRequest, session_id: str = Depends(get_session_id)):
+    """One turn: plan or ask, accept, propose, or validate. Nothing is applied."""
+    from .copilot import turn
+    from .model import resolve
+    from .sessions import load, save
+    if req.action not in ("continue", "accept", "replan"):
+        raise HTTPException(status_code=400, detail=f"unknown action {req.action!r}")
+    agent, why = resolve()
+    session = load(workflow_id, req.title)
+    turn(agent, session, message=req.message, action=req.action, steps=req.steps,
+         resources=req.resources, session_id=session_id, off_reason=why)
+    return save(session)
+
+
+@router.get("/templates")
+def list_templates():
+    """Workflows in the workspace a session can read as templates."""
+    from .sessions import available_templates
+    return available_templates()
 
 
 @router.get("/config")

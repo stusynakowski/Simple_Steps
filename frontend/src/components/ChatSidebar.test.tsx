@@ -20,7 +20,23 @@ const proposal: AgentProposal = {
 
 vi.mock('../services/agentApi', () => ({
   getAgentStatus: vi.fn(async () => ({ available: true, model: 'llama3.2:3b', provider: 'ollama' })),
-  proposeChanges: vi.fn(async () => proposal),
+  // The pane runs copilot session turns (spec 018); a turn returns the saved session.
+  getSession: vi.fn(async () => ({
+    id: 'w', title: 'w', phase: 'plan', goal: '', context: { notes: '', templates: [] },
+    questions: [], plan: null, messages: [], trace: [],
+  })),
+  sessionTurn: vi.fn(async () => ({
+    id: 'w', title: 'w', phase: 'build', goal: 'score it', context: { notes: '', templates: [] },
+    questions: [], plan: null, trace: [],
+    messages: [
+      { id: 'm1', role: 'user', content: 'score it' },
+      { id: 'm2', role: 'assistant', kind: 'proposal', content: 'Score the readings.', proposal },
+    ],
+  })),
+  updateSession: vi.fn(async () => ({})),
+  listSessions: vi.fn(async () => []),
+  listTemplates: vi.fn(async () => []),
+  resetSession: vi.fn(async () => {}),
   getAgentSettings: vi.fn(async () => ({ source: 'default' })),
   saveAgentSettings: vi.fn(async () => ({ source: 'saved' })),
   testAgentConnection: vi.fn(async () => ({ ok: true, model: 'llama3.2:3b', detail: '' })),

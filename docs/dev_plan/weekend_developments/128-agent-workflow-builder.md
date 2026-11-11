@@ -1,6 +1,6 @@
 # 128 — An agent that builds workflows
 
-> Status: **in progress** (A0, M1, M2 done 2026-11-09); proposed 2026-10-30, app at `bb181ab`; the six contracts and
+> Status: **in progress** (A0, M1, M2 done 2026-11-09; copilot sessions, spec 018, 2026-11-10); proposed 2026-10-30, app at `bb181ab`; the six contracts and
 > the prerequisites (P1–P4) added 2026-11-09. Owner's goal: an agent,
 > ideally on a **local model**, that helps construct workflows. Its graph is
 > very simple; it can only **propose, load and invoke the tools and
@@ -160,6 +160,24 @@ Stays: `agent/proposals.py` (the checked proposal), `model.py` (rewritten
 as above), `scope.py`, `POST /api/agent/propose` and `GET /api/agent/status`,
 the chat pane.
 
+## Copilot sessions (owner, 2026-11-10)
+
+Owner's ask: a light, sufficient framework, close to a code copilot, for any
+LLM: plan the problem, ask clarifying questions when needed, propose the
+resources and steps and a small dev plan, then build the pipeline one turn
+at a time, validating each increment; one session per workflow, managed from
+a widget; user context and earlier workflows as templates; a trace of where
+the work stands; a simple runnable example; documentation. UI changes in the
+chat pane only, plain, with the look to come later.
+
+Built as [spec 018](../../spec/018-copilot-sessions.md): `agent/copilot.py`
+(the turns), `agent/sessions.py` (the saved session), the session routes, the
+chat pane's Chat / Plan / Trace / Context tabs and its sessions list, and
+`examples/agent_demo/copilot.py` (a whole session with a scripted model; check
+4 of the example's `runme.py`). It answers T1 (sessions) and the "what the
+model used" half of T3 (the trace's context sizes). It reuses the checked
+proposal unchanged, so contracts 1–5 are as they were.
+
 ## Before the agent
 
 Each item is small and checked by the existing gates:
@@ -294,12 +312,12 @@ one agent.
 | A0 | **Done 2026-11-09.** The unused LangGraph path removed (inventory above) |
 | M1 | **Done 2026-11-09.** The model (contract 5): one `Agent` setting; the OpenAI-compatible, Anthropic and callable transports; the lenient JSON reader and the repair turn; JSON mode asked for and dropped when refused; keys never shown (spec 016, `tests/test_agent_model.py`, stub servers) |
 | M2 | **Done 2026-11-09.** The settings panel on the one setting (API, model, base URL, key, temperature; Material Symbols); Test connection there, `POST /api/agent/test` and `simple-steps agent test`; the setting saved in `~/.simple_steps/agent.json` (mode 600), a key write-only and never returned; an App-given setting shown read-only. The LangGraph-era `AgentConfig` is gone (spec 016 REQ-AGENT-008, 009) |
-| A1 | Context layers with budgets; the syntax card generated from core; relevance ranking for tools; the context meter |
-| A2 | The workflow goal (D2) in the file and the chat pane |
-| A2b | **Chat sessions** (T1): saved with the workflow, New chat, earlier chats listed; a session is the transcript (contract 6) |
-| A3 | The loop (D1) behind `/api/agent/propose`; the budget, propose mode only |
+| A1 | **In part, 2026-11-10** (spec 018): context as named layers, notes and templates with character budgets, their sizes in each turn's trace and the Context tab. Still to do: token budgets for every layer; the syntax card generated from core; relevance ranking for tools; the context meter |
+| A2 | **Done 2026-11-10, differently** (spec 018): the goal lives in the workflow's copilot session, not in the workflow file; editable on the Plan tab |
+| A2b | **Done 2026-11-10** (spec 018): one session per workflow, saved in `<workspace>/.simple_steps/agent_sessions/`; the sessions list and Start over; the session holds the messages and the trace (contract 6) |
+| A3 | **Done 2026-11-10, propose mode** (spec 018, `agent/copilot.py`): the plain-Python loop: plan (questions or a checked plan with milestones), accept, then per milestone propose → wait → validate, one turn per Continue, behind `/api/agent/sessions/{id}/turn`. The budget (D3) is still to do |
 | A4 | Develop mode, on P4's backend commands: commands applied, stage, run, observe; the activity feed; marks on agent-changed steps; pause, stop, undo; permissions |
-| A5 | Templates (D6) as few-shot context |
+| A5 | **Done 2026-11-10** (spec 018): any workspace workflow, ticked on the Context tab, given as worked examples. Ranking templates by the goal is still to do |
 | A6 | The task-suite harness: per-model results, compared |
 
 ## Tests to add

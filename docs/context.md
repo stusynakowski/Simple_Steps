@@ -114,7 +114,7 @@ description of the system). In short:
 - Components and their state: `docs/how-simple-steps-works.md`
 - User and developer docs (bundled into the app): `docs/usage_docs/`
 - System design on core: `docs/system_design/10–12`
-- Specs and test plans: `docs/spec/` (009–016), `docs/testplan/`; ADRs: `docs/adr/`
+- Specs and test plans: `docs/spec/` (009–018), `docs/testplan/`; ADRs: `docs/adr/`
 - Active plans: `docs/dev_plan/` (its README lists them)
 - Changes requested of core: `docs/core-proposals/` (008 is the live list)
 - What was removed and what is staged for removal: `docs/cleanup-map.md`

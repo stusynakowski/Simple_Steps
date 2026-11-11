@@ -251,14 +251,15 @@ def changes(proposed: List[Dict[str, str]], removed: List[str],
 
 def propose(agent: Agent, message: str, steps: List[Mapping[str, Any]],
             workflow_resources: Mapping[str, Any], history: List[Mapping[str, str]],
-            session_id: Optional[str]) -> Dict[str, Any]:
-    """One agent turn: a checked proposal for *message*."""
+            session_id: Optional[str], extra: str = "") -> Dict[str, Any]:
+    """One agent turn: a checked proposal for *message*. *extra* is more
+    context (a copilot session's goal, plan, notes and templates: ``copilot.py``)."""
     from .scope import catalog_text, resources_text, workflow_text
 
     existing = {str(s.get("name")): str(s.get("formula") or "") for s in steps if s.get("name")}
     resources = _usable_resources(workflow_resources)
-    scope = "\n\n".join([catalog_text(), resources_text(workflow_resources),
-                         workflow_text(list(steps), session_id)])
+    scope = "\n\n".join([p for p in (catalog_text(), resources_text(workflow_resources),
+                                     extra, workflow_text(list(steps), session_id)) if p])
     messages: List[Dict[str, str]] = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"Here is what you can use and the workflow so far.\n\n{scope}"},

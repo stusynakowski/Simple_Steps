@@ -68,6 +68,39 @@ A small model won't always get 5/5, and the results differ between models;
 that's what this is for. One difference from the UI: `ask.py` sends the
 workflow without the steps' outputs, so the model sees a little less.
 
+## A whole copilot session: `copilot.py`
+
+```bash
+python examples/agent_demo/copilot.py            # a scripted model: no LLM needed
+python examples/agent_demo/copilot.py --live     # the model you configured
+python examples/agent_demo/copilot.py --save     # then open copilot-built in the UI
+```
+
+It plays the user's side of one session, the way the chat pane does: it gives
+the goal (*total revenue for each city*), answers the copilot's question,
+accepts its plan (four milestones), then presses **Continue** until every
+milestone has passed, applying and running each proposal in between. On the
+way the scripted model makes the usual slip (a tool that doesn't exist); the
+checks send it back and the corrected proposal is what you apply. It prints
+the trace, then checks the result: the cities by revenue, highest first.
+
+```
+── trace
+   1. plan  ask          calls=1  0.00s  1 question(s)
+   2. plan  plan         calls=1  0.00s  5 steps, 4 milestones
+   3. plan  accept       calls=0  0.00s  building: The orders are there
+   4. build validate     calls=1  0.00s  passed: The orders are there
+   5. build propose      calls=2  0.00s  2 change(s)
+   …
+  milestones: 4/4 done; phase: done
+  result (ranked_cities): ['Nairobi', 'Quito', 'Osaka', 'Lisbon'] … → PASS
+```
+
+The scripted model is a plain function, `Agent(generate=scripted)`: read it
+to see what a good answer to each kind of turn looks like, and swap in your
+own the same way. How a session works: [spec 018](../../../../docs/spec/018-copilot-sessions.md)
+and the Developer guide's *The agent* page.
+
 ## What `runme.py` checks, without a model
 
 1. the `reference` workflow runs and passes each task's check;
@@ -75,7 +108,9 @@ workflow without the steps' outputs, so the model sees a little less.
    small model makes — a bare step name, a tool that doesn't exist, a step
    that isn't there yet, a resource the workflow doesn't have;
 3. one agent turn with a scripted model: a wrong first answer goes back to the
-   model with its problem, and the corrected one comes out as a clean change.
+   model with its problem, and the corrected one comes out as a clean change;
+4. a whole copilot session with a scripted model (`copilot.py`): goal,
+   question, plan, then each milestone proposed, applied, run and validated.
 
 ## Writing tools an agent can use
 

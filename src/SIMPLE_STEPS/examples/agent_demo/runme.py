@@ -12,7 +12,9 @@ A model's answers can't be predicted, so this checks everything around it:
    mistakes a small model makes, in so many words;
 3. **one agent turn, with a scripted model** in place of Ollama: a wrong
    first answer is sent back with its problem, and the corrected answer comes
-   out as a clean change to apply.
+   out as a clean change to apply;
+4. **a whole copilot session** (``copilot.py``, scripted model): goal,
+   question, plan, then each milestone proposed, applied, run and validated.
 
 To try a real model, run ``ask.py``. Exits non-zero if any check fails.
 """
@@ -82,6 +84,15 @@ if (change.get("kind"), change.get("formula"), change.get("problem")) != ("add",
     problems.append(f"the proposal isn't one clean add of totals: {result['changes']}")
 example._report(StepRun("totals", "wrong answer → told why → corrected"), problems,
                 note=f"{change.get('kind')} {change.get('name')} after {change.get('after')}: {change.get('formula')}")
+print()
+
+# 4 ── a whole copilot session (plan, ask, build, validate), scripted model
+print("── a whole copilot session, scripted model (copilot.py)")
+import subprocess  # noqa: E402 — copilot.py builds its own App, so it runs apart
+done = subprocess.run([sys.executable, str(HERE / "copilot.py")], cwd=HERE, capture_output=True, text=True)
+tail = (done.stdout.strip().splitlines() or [""])[-1]
+example._report(StepRun("copilot", "goal → question → plan → 4 milestones validated"),
+                [] if done.returncode == 0 else [f"copilot.py failed: {tail or done.stderr[-300:]}"], note=tail.strip())
 print()
 
 sys.exit(example.finish())
