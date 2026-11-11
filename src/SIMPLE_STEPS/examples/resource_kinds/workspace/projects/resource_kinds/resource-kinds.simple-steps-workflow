@@ -1,0 +1,142 @@
+{
+  "format_version": 2,
+  "id": "resource-kinds",
+  "name": "Resource kinds",
+  "meta": {
+    "about": "One resource of every kind, for the resource column (docs/spec/017-resource-column.md)."
+  },
+  "resources": {
+    "db": {
+      "source": "defined",
+      "type": "CityDB",
+      "meta": {
+        "notes": "City → region. Used by **regions**.",
+        "color": "#3b82c4"
+      }
+    },
+    "files": {
+      "source": "defined",
+      "type": "MemoryFS",
+      "meta": {
+        "notes": "Two files in memory: readme.txt, todo.txt.",
+        "color": "#c48a3b"
+      }
+    },
+    "pool": {
+      "source": "defined",
+      "type": "WorkerPool",
+      "settings": {
+        "workers": 2
+      },
+      "meta": {
+        "notes": "Try `WorkerPool(workers=0)` then **Load**: it fails to build.",
+        "color": "#8a5cc4"
+      }
+    },
+    "llm": {
+      "source": "defined",
+      "type": "EchoLLM",
+      "settings": {
+        "model": "echo-1"
+      },
+      "meta": {
+        "color": "#3bc48a"
+      }
+    },
+    "weather": {
+      "source": "defined",
+      "type": "WeatherAPI",
+      "settings": {
+        "units": "C"
+      }
+    },
+    "shared_fs": {
+      "source": "loaded",
+      "type": "MemoryFS",
+      "as_loaded": {
+        "files": {
+          "policy.txt": "read only"
+        }
+      }
+    }
+  },
+  "steps": [
+    {
+      "name": "cities",
+      "expression": "to_rows[mod.source()](data='{\"city\": [\"SF\", \"NYC\", \"LA\"]}')",
+      "meta": {
+        "label": "cities"
+      }
+    },
+    {
+      "name": "regions",
+      "expression": "res[\"db\"].lookup[mod.map()](wf[\"cities\"])",
+      "meta": {
+        "label": "regions"
+      }
+    },
+    {
+      "name": "temps",
+      "expression": "res[\"weather\"].temperature[mod.map()](wf[\"cities\"])",
+      "meta": {
+        "label": "temps"
+      }
+    },
+    {
+      "name": "paths",
+      "expression": "to_rows[mod.source()](data='{\"path\": [\"readme.txt\", \"todo.txt\"]}')",
+      "meta": {
+        "label": "paths"
+      }
+    },
+    {
+      "name": "texts",
+      "expression": "res[\"files\"].read[mod.map()](wf[\"paths\"])",
+      "meta": {
+        "label": "texts"
+      }
+    },
+    {
+      "name": "sizes",
+      "expression": "res[\"files\"].size[mod.map()](wf[\"paths\"])",
+      "meta": {
+        "label": "sizes"
+      }
+    },
+    {
+      "name": "numbers",
+      "expression": "to_rows[mod.source()](data='{\"x\": [1, 2, 3]}')",
+      "meta": {
+        "label": "numbers"
+      }
+    },
+    {
+      "name": "squares",
+      "expression": "res[\"pool\"].square[mod.map()](wf[\"numbers\"])",
+      "meta": {
+        "label": "squares"
+      }
+    },
+    {
+      "name": "pool_info",
+      "expression": "res[\"pool\"].whoami[mod.source()]()",
+      "meta": {
+        "label": "pool_info"
+      }
+    },
+    {
+      "name": "answer",
+      "expression": "res[\"llm\"].complete[mod.source()](prompt=\"hello\")",
+      "meta": {
+        "label": "answer"
+      }
+    },
+    {
+      "name": "policy",
+      "expression": "res[\"shared_fs\"].read[mod.source()](path=\"policy.txt\")",
+      "meta": {
+        "label": "policy"
+      }
+    }
+  ]
+}
