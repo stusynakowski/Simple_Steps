@@ -4,9 +4,63 @@
   <img src="photos/simple_steps_cover_photo.png" alt="Simple Steps Cover Photo" width="600">
 </p>
 
-A visual workflow tool that lets non-technical users build and run multi-step data pipelines — backed by plain Python functions.
+<h3 align="center"><i>"Anything a computer does can be broken into simple steps anyone can understand."</i></h3>
 
-Think of it as a spreadsheet where every cell is a Python operation, every column is a pipeline step, and every row is a piece of data flowing through it.
+## What
+
+Simple Steps is a framework that puts a team's latest software developments in everyone's hands. It's meant to be quick, easy and robust.
+
+It has three parts:
+
+- **A Python library for technical experts.** Add `@simple_step_tool` to a function you've already written, and it becomes a tool anyone on the team can use. Its name, inputs and description are what people see.
+- **An app for everyone else.** A grid that works like a spreadsheet: each column is a step, each row is an item (a file, an image, a document), and each cell can hold a number, a table, an image or a chart. A formula bar shows exactly what each step does, in one line.
+- **An AI assistant that stays inside the lines.** It suggests steps using only the team's tools, and people accept or reject each one.
+
+Behind the scenes, Simple Steps runs each tool on every row, handles batching, retries and progress, connects to LLMs and databases, and saves every workflow so it can be reopened and run again.
+
+## Why
+
+Every good tech team needs two kinds of experts, and most people are a bit of both:
+
+- **Subject-matter experts** know the subject, the goal and the vision. They're the Steve Jobses: project managers, scientists, analysts and artists who are brilliant but don't write code. An AI can write the code for them, but they have no real way to check that it did the job correctly.
+- **Technical experts** know the technical details and the code. They're the Steve Wozniaks: the Rust developers and quiet geniuses whose work not everyone understands. Their code works, but handing it off means building interfaces, servers, APIs and data pipelines that have nothing to do with the code itself. They can't just share the codebase either, because an AI helping someone else might change working code and break it.
+
+Simple Steps is the bridge between them: technical experts keep building tools, and subject-matter experts use those tools to reach their goals, with AI help that everyone can check.
+
+## How
+
+<p align="center">
+  <img src="photos/simple_steps_users.svg" alt="Simple Steps drawn as a bridge between two kinds of experts. On the left, technical experts build and test tools. On the bridge sits the Simple Steps app: a formula bar, a grid with one column per step showing file names, image thumbnails, measurements and small charts, a progress bar for running on every row, and an assistant panel with a suggested step and Accept and Reject buttons. On the right, subject-matter experts get results. Caption: tools go in on one side, results come out on the other; the AI suggests steps, people decide." width="800">
+</p>
+
+Technical experts add a decorator to the Python functions they've already written, and Simple Steps handles everything else. Subject-matter experts chain those functions into a workflow, in a grid that works like a spreadsheet:
+
+```python
+files     = list_files("/study/images")
+images    = load_image[mod.map()](wf["files"])
+metrics   = measure[mod.map()](wf["images"])
+with_meta = join(wf["metrics"], wf["metadata"])
+stats     = summarize(wf["with_meta"])
+```
+
+Each line says which tool runs, what data it runs on and how it runs. Its result appears straight away as a table, with one row per item, and a cell can hold an image, a chart or a number.
+
+### What makes it different
+
+- **The AI proposes steps; it doesn't improvise.** An assistant can suggest steps, but only with the tools technical experts provided, and only as lines the user can read and then accept or reject. It can't write code, so it can't quietly change how the work gets done.
+- **Code gets in only one way.** It comes from the technical experts' package when the app starts. Nothing a user or the AI types is run as Python.
+- **Simple Steps handles the difficult parts once, for every tool.** That means running on every row, batching, retries, progress, long jobs, connections to LLMs, databases and models, the interface and the server.
+- **Every step is plain Python.** A formula is a valid Python expression that you can read without knowing anything about Simple Steps.
+
+### Built for
+
+Goals that break into a chain of steps over many items, using specialised tools someone has already built. For example:
+
+- measuring 2,000 study images and testing them against patient metadata;
+- running an LLM over a folder of contracts;
+- pulling metadata from a video library.
+
+More in [Why we are building Simple Steps](docs/why-we-are-building-this.md).
 
 ---
 

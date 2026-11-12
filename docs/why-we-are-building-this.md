@@ -5,10 +5,33 @@
 
 ## In one sentence
 
-Simple Steps enables people who think in spreadsheets to use Python tools
-that developers write, by chaining them as one-line steps in a grid they can
-see. An AI agent helps them write those steps, but it can't do anything
-outside the tools it was given.
+**Anything a computer does can be broken into simple steps anyone can understand.**
+
+Simple Steps is a framework that puts a team's latest software developments
+in everyone's hands. It's meant to be quick, easy and robust.
+
+## The problem
+
+**Analysts** know the problem, the goal and roughly what needs to happen, but
+they get stuck on the implementation. An AI agent can do that part for them,
+but there's no real way to check that it did it correctly. Results they can't
+check are results they can't trust.
+
+**Developers** can build tools and resources they know are correct, but
+getting them to analysts takes work that has nothing to do with those tools:
+user interfaces, deployment, APIs and data engineering. They also can't
+simply share the codebase, because an agent trying to help an analyst might
+change working code and break it.
+
+## What Simple Steps does about it
+
+Simple Steps connects the two. Developers write ordinary Python functions and
+resources, and Simple Steps provides the user interface, the server, the data
+handling and the running of each step. Analysts apply those tools as
+one-line formula steps in a grid that works like the spreadsheets they
+already know, and they see their data after every step. The AI agent can
+only put those steps together. It can't write or change code, so every
+result is built from parts a developer has already checked.
 
 ## What success means
 
