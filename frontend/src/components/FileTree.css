@@ -47,6 +47,71 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* Upload / Refresh in the section title: shown on hover, as in VS Code. */
+.filetree-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 2px;
+  visibility: hidden;
+}
+.filetree-root .sidebar-section-title:hover .filetree-actions {
+  visibility: visible;
+}
+.filetree-action {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+}
+.filetree-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.filetree-status {
+  padding: 2px 16px 4px;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* Files dragged in from the computer. */
+.filetree-entries.dropping {
+  outline: 1px dashed #4ec9b0;
+  outline-offset: -2px;
+  background: rgba(78, 201, 176, 0.06);
+}
+
+.filetree-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px 0;
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.filetree-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 12px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+.filetree-menu button:hover {
+  background: #094771;
+  color: #fff;
+}
+
 .filetree-label {
   overflow: hidden;
   text-overflow: ellipsis;

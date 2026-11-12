@@ -24,6 +24,7 @@ __version__ = "0.1.3"
 from .decorators import simple_step, simple_step_tool  # noqa: F401
 from .core_bridge import simple_step_resource  # noqa: F401
 from .resources import simple_step_loaded, env, Loaded  # noqa: F401
+from .file_io import Folder  # noqa: F401 — and the ready-made res["workspace"]
 from .application import App  # noqa: F401
 from .agent.model import Agent  # noqa: F401
 

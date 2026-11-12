@@ -834,6 +834,33 @@ export async function writeWorkspaceFile(path: string, content: string): Promise
     return r.json();
 }
 
+/** Thrown by {@link uploadWorkspaceFile} when the file is already there. */
+export class FileExistsError extends Error {}
+
+/** Upload a file from the user's computer to *path* in the workspace. */
+export async function uploadWorkspaceFile(path: string, file: Blob, overwrite = false): Promise<{ path: string; size: number }> {
+    const q = `path=${encodeURIComponent(path)}${overwrite ? '&overwrite=true' : ''}`;
+    const r = await fetch(`${API_BASE}/files/upload?${q}`, { method: 'PUT', body: file });
+    if (!r.ok) {
+        const err = await r.json().catch(() => ({ detail: 'Upload failed' }));
+        if (r.status === 409 && !overwrite && String(err.detail).endsWith('already exists')) {
+            throw new FileExistsError(err.detail);
+        }
+        throw new Error(err.detail || 'Upload failed');
+    }
+    return r.json();
+}
+
+/** Save a workspace file to the user's computer. */
+export function downloadWorkspaceFile(path: string): void {
+    const a = document.createElement('a');
+    a.href = `${API_BASE}/files/download?path=${encodeURIComponent(path)}`;
+    a.download = path.split('/').pop() || 'download';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+
 // --- Settings ---
 
 export interface SimpleStepsSettings {

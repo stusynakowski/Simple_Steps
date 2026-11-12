@@ -114,6 +114,24 @@ leave their folder.
 | F3 | Explorer "Import as step"; an export's file link | the UI on top |
 | F4 | Remove `load_csv` (D3); docs: the developer guide's resources section, a user-guide page on files | cleanup |
 
+## Progress
+
+- **2026-11-12 — F0 already in** (`_in_workspace` in `main.py`: realpath + commonpath).
+- **2026-11-12 — F1 landed** (`src/SIMPLE_STEPS/file_io.py`): `Folder` with
+  `files` and `read`, containment, `data_version`, and the ready-made
+  `res["workspace"]` (D1 taken as recommended; there is no app switch to turn
+  it off yet). Run against core: a CSV read as a table; appending a row
+  marked both steps "stale: resource workspace changed" and a re-run read it;
+  `path="../…"` failed the cell with "outside the folder".
+- **2026-11-12 — Explorer upload and download** (owner's ask, beside F3): the
+  Explorer header's Upload button (into the selected folder), drag and drop of
+  files from the computer onto the tree or a folder row, and a right-click
+  menu with Download and "Upload to …". Endpoints: `PUT /api/files/upload?path=`
+  (raw body, any file type, 200 MB limit, 409 unless `overwrite=true`) and
+  `GET /api/files/download?path=`. An upload changes the folder, so steps that
+  read `res["workspace"]` go stale.
+- Open: F2 (`write`), "Import as step", D3 (`load_csv`).
+
 ## Tests to add
 
 | ID | Checks |

@@ -1,5 +1,5 @@
-from fastapi import FastAPI, HTTPException, Body, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Body, Depends, Request
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional, Dict, Any
@@ -321,6 +321,49 @@ async def api_write_file(body: FileWriteRequest):
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+#: The largest file an upload may send.
+UPLOAD_LIMIT = 200 * 1024 * 1024
+
+
+@app.put("/api/files/upload")
+async def api_upload_file(request: Request, path: str, overwrite: bool = False):
+    """
+    Save the request body, as is, to *path* in the workspace: the Explorer's
+    upload. Any file type. 409 if the file exists and *overwrite* is false.
+    """
+    _, target = _in_workspace(path)
+    if os.path.isdir(target):
+        raise HTTPException(status_code=409, detail=f"{path} is a folder")
+    if os.path.exists(target) and not overwrite:
+        raise HTTPException(status_code=409, detail=f"{path} already exists")
+    if int(request.headers.get("content-length") or 0) > UPLOAD_LIMIT:
+        raise HTTPException(status_code=413, detail="File too large to upload (>200 MB)")
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    partial = target + ".uploading"
+    size = 0
+    try:
+        with open(partial, "wb") as f:
+            async for chunk in request.stream():
+                size += len(chunk)
+                if size > UPLOAD_LIMIT:
+                    raise HTTPException(status_code=413, detail="File too large to upload (>200 MB)")
+                f.write(chunk)
+        os.replace(partial, target)
+    finally:
+        if os.path.exists(partial):
+            os.remove(partial)
+    return {"path": path, "size": size, "saved": True}
+
+
+@app.get("/api/files/download")
+async def api_download_file(path: str):
+    """A workspace file, sent as an attachment: the Explorer's download."""
+    _, target = _in_workspace(path)
+    if not os.path.isfile(target):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(target, filename=os.path.basename(target))
 
 
 # --- 1. Dynamic Discovery ---
