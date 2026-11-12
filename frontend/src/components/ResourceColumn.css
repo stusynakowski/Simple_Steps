@@ -322,22 +322,16 @@
   border: none; background: none; color: #f08a8a; cursor: pointer; font-size: 12px; padding: 0;
 }
 
-/* ── Pinned: the bar stays at the left edge while the steps scroll (REQ-RES-007) ── */
-.rc-thin {
-  position: sticky;
-  left: 0;
-  z-index: 200;
-  flex: 0 0 28px;
-  width: 28px;
-  margin-right: -28px;          /* takes no room: the steps scroll under it */
-  height: 100%;
-  align-self: stretch;
+/* ── Pinned: at the side of the steps, out of their scroll (REQ-RES-007) ── */
+.resource-column.rc-pinned {
+  border-right: 1px solid var(--res-line);
   box-shadow: 4px 0 10px rgba(0, 0, 0, 0.35);
+  z-index: 51;                  /* over .main-content's edge */
 }
 
 /* The app's global button padding would squeeze the icons to nothing. */
 .rc-add { padding-top: 0; padding-bottom: 0; }
-.resource-column .symbol-icon, .rc-thin .symbol-icon { flex: none; }
+.resource-column .symbol-icon { flex: none; }
 
 /* A step that uses the hovered resource (REQ-RES-013). */
 .column-wrapper.resource-highlight .op-header {

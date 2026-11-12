@@ -46,12 +46,12 @@ core change.
 
 ## Pinning
 
-- **REQ-RES-007:** the Resources header has a pin, **off by default**. While
-  pinned, scrolling the steps sideways leaves the hidden bar (REQ-RES-006)
-  stuck to the left edge of the step layout, clickable to open the column. Scrolling all the way back to
-  the left shows the full column again, in the state it was left in.
-  Unpinned, the column scrolls away with the steps like step 0. Whether it
-  is pinned is saved per user, not in the workflow.
+- **REQ-RES-007:** the Resources header has a pin, **off by default**.
+  Pinned, the column leaves the step layout and sits at the side of the
+  steps, always present while they scroll; it still hides to its bar and
+  opens, and resizes, as in REQ-RES-006 (owner, 2026-11-12). Unpinned, the
+  column scrolls away with the steps like step 0. Whether it is pinned is
+  saved per user, not in the workflow.
 
 ## A resource's panel
 
@@ -116,7 +116,8 @@ then a toolbar, a formula bar, and panels that fold.
 
 ## What it replaces
 
-- **REQ-RES-018:** the toolbar's Resources menu is removed once every
+- **REQ-RES-018:** (done, owner-confirmed 2026-11-12; each resource's
+  load status now shows in the workflow overview) the toolbar's Resources menu is removed once every
   behaviour above that it had is in the column: listing, adding from type
   templates, Use, Accept, locked-setting notes, edit, remove. Each removal
   is confirmed by the owner first.

@@ -166,12 +166,19 @@
 }
 .steps-region {
   display: flex;
-  flex-direction: column;
   flex-shrink: 0;
   min-height: 0;
   overflow: hidden;
 }
-.steps-region > .main-content { min-height: 0; }
+/* The steps and their map; the resource column, pinned, at their left. */
+.steps-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.steps-stack > .main-content { min-height: 0; }
 .console-region {
   display: flex;
   flex-direction: column;

@@ -4,6 +4,7 @@ import type { OperationDefinition, ResourceDeclaration } from '../services/api';
 import type { ProgressEvent } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
+import type { FormulaSummary } from './FormulaEditor';
 import { placePick, stepRef } from '../utils/selection';
 import type { GridPick, PlacedPick } from '../utils/selection';
 import { parseFormula } from '../utils/formulaParser';
@@ -203,9 +204,9 @@ export default function OperationColumn({
   const stepColor = useStepColor();
   const colorOf = Object.fromEntries(previousSteps.map((s, i) =>
     [s.label, s.step_color ?? stepColor(i, stepCount ?? previousSteps.length + 1)]));
-  // The formula bar at rest (owner, 2026-11-11): the tool and its data in
-  // caps, one colour, `*` at the end for what's hidden (TOOL(DATA)*); the
-  // whole expression while it's being edited or the fx panel is open.
+  // The formula bar at rest (owner, 2026-11-12): TOOL(DATA) in the editor's
+  // colours, or DATA alone for a data step; the whole expression while it's
+  // being edited or the fx panel is open.
   const formulaSummary = isOpen('details') ? undefined
     : refsOf.formula === savedFormula ? summarize(savedFormula, refsOf.spans, refsOf.refs) : undefined;
   const barReferences = refsOf.refs.map((r) => ({ start: r.span[0], end: r.span[1], color: colorOf[r.step] ?? '#888' }));
@@ -698,16 +699,19 @@ export default function OperationColumn({
  * The bar at rest: `TOOL(DATA)*`. The data is the step it runs over, by
  * name; the `*` says there's more (modifiers, arguments) behind a click.
  */
-function summarize(formula: string, spans: FormulaSpans | undefined, refs: FormulaReference[]): string | undefined {
+function summarize(formula: string, spans: FormulaSpans | undefined, refs: FormulaReference[]): FormulaSummary | undefined {
   const tool = spans?.tool;
-  if (!tool) return undefined;
+  if (!tool) {
+    // Data alone, `=wf["step"]`: just the data variable (owner, 2026-11-12).
+    const only = refs.length === 1 ? refs[0] : undefined;
+    const whole = formula.trim().replace(/^=/, '').trim();
+    return only && whole === formula.slice(only.span[0], only.span[1]).trim() ? { data: only.step } : undefined;
+  }
   const input = spans?.input;
   const data = input
     ? refs.find((r) => r.span[0] >= input[0] && r.span[1] <= input[1])?.step ?? formula.slice(input[0], input[1])
     : '';
-  const short = `${formula.slice(tool[0], tool[1])}(${data})`.toUpperCase();
-  const whole = formula.trim().replace(/^=/, '').replace(/\s+/g, '');
-  return whole.toUpperCase() === short ? short : `${short}*`;
+  return { tool: formula.slice(tool[0], tool[1]), data };
 }
 
 /** A note's first line, as plain text: its title when it's folded (Markdown marks dropped). */

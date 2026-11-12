@@ -23,6 +23,7 @@ import { useHoverTip } from './useHoverTip';
 // stays out of the initial JS payload.  While it's loading we render a
 // plain textarea fallback so the user can still type immediately.
 const FormulaEditor = lazy(() => import('./FormulaEditor'));
+import type { FormulaSummary } from './FormulaEditor';
 
 /** Visual colour coding for each orchestration mode — used in the autocomplete dropdown. */
 const ORCHESTRATION_BADGE_COLORS: Record<string, { bg: string; fg: string }> = {
@@ -72,8 +73,8 @@ interface StepToolbarProps {
   onReferencePick?: (sourceStep: string, pick: GridPick) => void;
   /** The formula's step references and their steps' colours, drawn dashed in the bar (R3). */
   references?: { start: number; end: number; color: string }[];
-  /** The formula at rest: the tool, `[…]` for its modifiers, its data (owner, 2026-11-10). */
-  formulaSummary?: string;
+  /** The formula at rest: TOOL(DATA), or DATA alone (owner, 2026-11-12). */
+  formulaSummary?: FormulaSummary;
 }
 
 export default function StepToolbar({

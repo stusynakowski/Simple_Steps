@@ -25,8 +25,7 @@ import { StepWiringProvider } from '../context/StepWiringContext';
 import { StepsStatusProvider } from '../context/StepsStatusContext';
 import StepsStatusText from './StepsStatusText';
 import InspectorChips from './InspectorChips';
-import ResourcesMenu from './ResourcesMenu';
-import ResourceColumn from './ResourceColumn';
+import ResourceColumn, { useResourcesPinned } from './ResourceColumn';
 import { useResourceState } from '../hooks/useResourceState';
 import BarChevrons from './BarChevrons';
 import WorkflowOverview from './WorkflowOverview';
@@ -159,6 +158,7 @@ export default function MainLayout() {
   const stepColor = useStepColor();
   // The resource column (spec 017) and the overview read the same state.
   const resourceState = useResourceState(workflow.resources, workflow.steps);
+  const [resourcesPinned, toggleResourcesPinned] = useResourcesPinned();
   // The steps that use the resource under the pointer (REQ-RES-013).
   const [highlightedSteps, setHighlightedSteps] = useState<Set<string> | null>(null);
   // The step a failed run stopped at, for the workflow's "Rerun from …".
@@ -856,14 +856,6 @@ export default function MainLayout() {
             resources={resourceState.summary}
           />
         }
-        resourcesMenu={
-          <ResourcesMenu
-            resources={workflow.resources}
-            steps={workflow.steps}
-            onDefine={defineResource}
-            onRemove={removeResource}
-          />
-        }
       />
 
       {/* Visible drag-hint at the header's bottom edge — signals that the
@@ -874,8 +866,9 @@ export default function MainLayout() {
     </header>
   );
 
-  const canvasBlock = (
-    <main className="main-content horizontal-scroll-area" ref={canvasRef}>
+  // The resource column: ahead of step 1, or pinned to the side of the
+  // steps, out of their scroll (owner, 2026-11-12).
+  const resourceColumn = (
         <ResourceColumn
           resources={workflow.resources}
           steps={workflow.steps}
@@ -889,7 +882,14 @@ export default function MainLayout() {
           onMeta={updateResourceMeta}
           onHighlight={(labels) => setHighlightedSteps(labels?.length ? new Set(labels) : null)}
           scroller={canvasRef}
+          pinned={resourcesPinned}
+          onTogglePin={toggleResourcesPinned}
         />
+  );
+
+  const canvasBlock = (
+    <main className="main-content horizontal-scroll-area" ref={canvasRef}>
+        {!resourcesPinned && resourceColumn}
         <div
           className="columns-container"
           data-testid="columns-container"
@@ -1062,6 +1062,8 @@ export default function MainLayout() {
                       className="steps-region"
                       style={bodyHeight > 0 ? { height: stepsHeight } : { flex: '1 1 0' }}
                     >
+                      {resourcesPinned && resourceColumn}
+                      <div className="steps-stack">
                       {canvasBlock}
                       {/* The steps' map: jump to a step, see where you are. */}
                       <StepMinimap
@@ -1075,6 +1077,7 @@ export default function MainLayout() {
                         // A click on a step jumps to it and opens it.
                         onOpen={(id) => { if (!expandedStepIds.has(id)) toggleStep(id); }}
                       />
+                      </div>
                     </div>
 
                     {/* The steps' bottom bar; the console's title bar sits

@@ -61,11 +61,17 @@ export interface FormulaEditorProps {
   /** Each step reference's [start, end) in *value* and its step's colour: boxed dotted while editing (R3). */
   references?: { start: number; end: number; color: string }[];
   /**
-   * What the bar shows when it isn't being edited (owner, 2026-11-10):
-   * `tool*(data)`, the `*` when it has modifiers. A click shows the whole
-   * expression, to edit. Undefined: the expression always.
+   * What the bar shows when it isn't being edited (owner, 2026-11-12):
+   * TOOL(DATA) in the editor's colours, or DATA alone for a data step. A
+   * click shows the whole expression, to edit. Undefined: the expression always.
    */
-  summary?: string;
+  summary?: FormulaSummary;
+}
+
+/** The formula at rest: its tool, if any, and the data it runs over. */
+export interface FormulaSummary {
+  tool?: string;
+  data?: string;
 }
 
 /**
@@ -389,8 +395,8 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
           {placeholder}
         </div>
       )}
-      {/* At rest: TOOL(DATA)*, caps, one colour. Over the
-          editor (which stays mounted for picks); a click edits the whole. */}
+      {/* At rest: TOOL(DATA), or DATA alone, in the editor's token colours.
+          Over the editor (which stays mounted for picks); a click edits the whole. */}
       {summary && value && !focused && (
         <div
           className="formula-summary"
@@ -405,7 +411,18 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
             ed?.focus();
           }}
         >
-          <span className="formula-summary-code">{summary}</span>
+          <span className="formula-summary-code">
+            {summary.tool ? (
+              <>
+                <span className="formula-summary-tool">{summary.tool.toUpperCase()}</span>
+                <span className="formula-summary-punct">(</span>
+                {summary.data && <span className="formula-summary-data">{summary.data.toUpperCase()}</span>}
+                <span className="formula-summary-punct">)</span>
+              </>
+            ) : (
+              <span className="formula-summary-data">{summary.data?.toUpperCase()}</span>
+            )}
+          </span>
         </div>
       )}
       {/* Hidden textarea — the wiring system's injection target. */}

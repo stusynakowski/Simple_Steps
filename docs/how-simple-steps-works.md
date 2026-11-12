@@ -68,7 +68,7 @@ below come from the old layer still being reachable.
 | **Running** | ▶ runs a step; Run runs all of them; progress; the console log | `/api/run`, SSE `/api/progress`, `ConsoleView` | built |
 | **Out-of-date marks** | editing a step marks the steps after it as stale | `/api/workflow/sync`, kernels | built |
 | **Environment panel** | every tool and resource, with its description, inputs and a starter formula | `EnvironmentExplorer`, `/api/environment` | built |
-| **Resources menu** | create a resource (a database, a model) for this workflow | `ResourcesMenu`, `/api/resources/declare` | built |
+| **Resource column** | create, load and edit the workflow's resources (a database, a model), ahead of step 1 or pinned to the side; their load status also in the Overview | `ResourceColumn`, `/api/resources/declare` | built (replaced the toolbar's Resources menu, 2026-11-12) |
 | **Explorer** | the workspace's projects and workflows | `FileTree`, `/api/projects` | built |
 | **Workspace file editor** | read and edit text files in the workspace | `WorkspaceFileEditor`, `/api/files/write` | built. Acceptable, because the workspace is data. It's only dangerous while the server imports `.py` files from the workspace ([§5](#5-contradictions-with-the-goals-ranked) #1) |
 | **Settings** | where results are kept (memory or parquet), and **eval mode** | `Sidebar`, `/api/settings` | **contradicts**: eval mode turns the formula bar into a live Python `exec()`. Decided: remove it |

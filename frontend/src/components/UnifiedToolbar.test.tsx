@@ -16,18 +16,16 @@ const renderToolbar = () => render(
     onToggleLogs={vi.fn()}
     connection={connection}
     overviewMenu={<button>Overview</button>}
-    resourcesMenu={<button>Resources</button>}
     workflowSlot={<span>wf-extra</span>}
     infoSlot={<span>info-extra</span>}
   />,
 );
 
 describe('UnifiedToolbar', () => {
-  it('puts the workflow on the top row: Overview, Resources, slot, server status', () => {
+  it('puts the workflow on the top row: Overview, slot, server status', () => {
     renderToolbar();
     const row = screen.getByTestId('ut-row-workflow');
     expect(within(row).getByText('Overview')).toBeInTheDocument();
-    expect(within(row).getByText('Resources')).toBeInTheDocument();
     expect(within(row).getByTestId('ut-workflow-slot')).toHaveTextContent('wf-extra');
     expect(within(row).queryByTitle('Run Pipeline')).toBeNull();
   });

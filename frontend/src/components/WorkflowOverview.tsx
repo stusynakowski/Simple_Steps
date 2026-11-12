@@ -1,17 +1,19 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Step, StepStatus } from '../types/models';
+import { STATUS_TEXT, type ResourceStatus } from '../hooks/useResourceState';
 
 /**
  * The workflow toolbar's Overview menu: the workflow at a glance — how many
- * steps it has, where each one stands, and how many resources it declares.
+ * steps it has, where each one stands, and its resources and whether each
+ * is loaded (the toolbar's Resources menu folded in here, owner 2026-11-12).
  */
 
 interface WorkflowOverviewProps {
   name: string;
   steps: Step[];
   /** The resource column's state (spec 017 REQ-RES-019). */
-  resources: { total: number; loaded: number; attention: number };
+  resources: { total: number; loaded: number; attention: number; items: { name: string; status: ResourceStatus }[] };
 }
 
 const STATUS_LABEL: Record<StepStatus, string> = {
@@ -61,7 +63,7 @@ export default function WorkflowOverview({ name, steps, resources }: WorkflowOve
         <span className="ut-caret">▾</span>
       </button>
 
-      {/* Portalled out of the header, which clips overflow (as ResourcesMenu). */}
+      {/* Portalled out of the header, which clips overflow. */}
       {open && createPortal(
         <div
           ref={panelRef}
@@ -89,6 +91,18 @@ export default function WorkflowOverview({ name, steps, resources }: WorkflowOve
                 </Fragment>
               ))}
           </dl>
+
+          {resources.items.length > 0 && (
+            <div className="ut-resource-list" data-testid="overview-resources">
+              {resources.items.map(({ name: r, status }) => (
+                <div key={r} className="ut-resource-row" title={status.detail}>
+                  <span className={`rc-dot rc-dot--${status.kind}`} />
+                  <span className="ut-resource-name">res["{r}"]</span>
+                  <span className="ut-resource-meta">{STATUS_TEXT[status.kind]}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {steps.length === 0 ? (
             <div className="ut-empty">No steps yet</div>

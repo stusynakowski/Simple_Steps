@@ -105,6 +105,8 @@ export function useResourceState(resources: Record<string, unknown> | undefined,
     total: names.length,
     loaded: names.filter((n) => statusOf(n).kind === 'loaded').length,
     attention: names.filter((n) => needsAttention(statusOf(n))).length,
+    /** Each resource and where it stands, for the workflow overview. */
+    items: names.map((name) => ({ name, status: statusOf(name) })),
   };
 
   return { types, loaded, statusOf, act, summary };

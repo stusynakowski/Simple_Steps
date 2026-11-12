@@ -25,9 +25,7 @@ interface UnifiedToolbarProps {
   pipelineMeta?: PipelineMeta;
   /** The workflow's Overview menu, first on the top row. */
   overviewMenu?: React.ReactNode;
-  /** The workflow's Resources menu, after Overview on the top row. */
-  resourcesMenu?: React.ReactNode;
-  /** Room for more workflow components, between Resources and server status. */
+  /** Room for more workflow components, between Overview and server status. */
   workflowSlot?: React.ReactNode;
   /** Room for more workflow info, between the run status and the log button. */
   infoSlot?: React.ReactNode;
@@ -50,7 +48,6 @@ export default function UnifiedToolbar({
   onToggleLogs,
   pipelineMeta,
   overviewMenu,
-  resourcesMenu,
   workflowSlot,
   infoSlot,
   connection,
@@ -64,11 +61,9 @@ export default function UnifiedToolbar({
   return (
     <div className="unified-toolbar" data-testid="unified-toolbar">
 
-      {/* ═══ Row 1: the workflow — Overview | Resources | … | Server status ═══ */}
+      {/* ═══ Row 1: the workflow — Overview | … | Server status ═══ */}
       <div className="ut-row ut-row-workflow" data-testid="ut-row-workflow">
         {overviewMenu}
-        {overviewMenu && resourcesMenu && <div className="ut-divider" />}
-        {resourcesMenu}
 
         <div className="ut-slot" data-testid="ut-workflow-slot">{workflowSlot}</div>
 

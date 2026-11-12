@@ -14,8 +14,9 @@ import './ResourceColumn.css';
  * A header ("Resources") opens a list of one header per resource; a
  * resource's header opens its panel — Load / Refresh / Clear, its status, the
  * formula that defines it, the steps that use it. Several can be open at
- * once, stacked. Pinned, a thin view stays at the left edge while the steps
- * scroll; scrolled back to the start, the full column shows again.
+ * once, stacked. Unpinned, it sits ahead of step 1 and scrolls with the
+ * steps; pinned, it leaves them for the side of the steps, always there.
+ * Either way it hides to its thin bar and opens again (owner, 2026-11-12).
  *
  * Every change goes through `onDefine` / `onRemove` (as the console's
  * `res["x"] = …` does) and `onMeta` (notes, colour).
@@ -32,12 +33,14 @@ interface ResourceColumnProps {
   onMeta: (name: string, changes: { notes?: string; color?: string }) => void;
   /** The steps to highlight while a resource is hovered, or null. */
   onHighlight: (labels: string[] | null) => void;
-  /** The steps' horizontal scroller, for the pinned thin view. */
+  /** The steps' horizontal scroller: the size a maximized resource takes. */
   scroller: RefObject<HTMLElement | null>;
+  /** At the side of the steps, out of their scroll, rather than ahead of step 1. */
+  pinned: boolean;
+  onTogglePin: () => void;
 }
 
 const DEFAULT_COLOR = '#5b6b7f';
-const PIN_KEY = 'simple-steps.resources.pinned';
 const WIDTH_KEY = 'simple-steps.resources.width';
 /** The bar on the column's edge: click it to hide or show, drag it to resize. */
 const RAIL = 28;
@@ -51,6 +54,15 @@ function readPref(key: string): string | null {
 }
 function writePref(key: string, value: string | null) {
   try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* ignore */ }
+}
+
+const PIN_KEY = 'simple-steps.resources.pinned';
+
+/** Whether the column is pinned to the side of the steps: off unless the viewer turns it on. */
+export function useResourcesPinned(): [boolean, () => void] {
+  const [pinned, setPinned] = useState(() => readPref(PIN_KEY) === '1');
+  const toggle = () => setPinned((p) => { writePref(PIN_KEY, p ? '0' : '1'); return !p; });
+  return [pinned, toggle];
 }
 
 function metaOf(decl: unknown): { notes?: string; color?: string } {
@@ -81,7 +93,7 @@ function StatusDot({ status }: { status: ResourceStatus }) {
 /**
  * The bar on the column's right edge, "Resources" written down it. Hidden, the
  * column is this bar alone, with an icon per resource; with no resources, just
- * the word. Pinned, a copy of it stays at the left edge while the steps scroll.
+ * the word.
  */
 function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHighlight, drag }: {
   entries: [string, ResourceDeclaration][];
@@ -134,15 +146,12 @@ function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHi
 }
 
 export default function ResourceColumn(props: ResourceColumnProps) {
-  const { resources, steps, state, scroller } = props;
+  const { resources, steps, state, scroller, pinned, onTogglePin } = props;
   const entries = Object.entries(resources ?? {}) as [string, ResourceDeclaration][];
   const [sideCollapsed, setSideCollapsed] = useState(false);
   const [listOpen, setListOpen] = useState(true);
   const [openNames, setOpenNames] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
-  // Pinning is off unless the viewer turns it on.
-  const [pinned, setPinned] = useState(() => readPref(PIN_KEY) === '1');
-  const [scrolled, setScrolled] = useState(false);
   // Maximized: one resource as a box the size of the canvas.
   const [maximized, setMaximized] = useState<string | null>(null);
   const [canvasWidth, setCanvasWidth] = useState(900);
@@ -165,16 +174,6 @@ export default function ResourceColumn(props: ResourceColumnProps) {
     return () => ro.disconnect();
   }, [scroller]);
 
-  // Pinned: the thin view shows once the steps scroll off the start.
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el || !pinned) return;   // unpinned, `thin` is off whatever `scrolled` says
-    const on = () => setScrolled(el.scrollLeft > 4);
-    on();
-    el.addEventListener('scroll', on, { passive: true });
-    return () => el.removeEventListener('scroll', on);
-  }, [pinned, scroller]);
-
   // Hidden, the panel is still there (it slides), but out of reach: no tabbing into it.
   useEffect(() => { if (panelRef.current) panelRef.current.inert = sideCollapsed; }, [sideCollapsed]);
 
@@ -182,7 +181,6 @@ export default function ResourceColumn(props: ResourceColumnProps) {
     if (!dragging) writePref(WIDTH_KEY, width === null ? null : String(width));
   }, [dragging, width]);
 
-  const togglePin = () => { setPinned((p) => { writePref(PIN_KEY, p ? '0' : '1'); return !p; }); };
   const toggleOpen = (name: string) => setOpenNames((s) => {
     const next = new Set(s);
     if (next.has(name)) next.delete(name); else next.add(name);
@@ -230,15 +228,6 @@ export default function ResourceColumn(props: ResourceColumnProps) {
   const wide = listOpen && (openNames.size > 0 || adding);
   const railProps = { entries, state, steps, attention, onHighlight: props.onHighlight };
 
-  const toStart = () => scroller.current?.scrollTo({ left: 0, behavior: 'smooth' });
-  const thin = pinned && scrolled && (
-    <div className="rc-thin" aria-label="Resources (pinned)">
-      <Rail {...railProps} hidden
-            onToggle={() => { setSideCollapsed(false); toStart(); }}
-            onPick={(name) => { pick(name); toStart(); }} />
-    </div>
-  );
-
   const maxed = maximized && resources && maximized in resources ? maximized : null;
   const shown = maxed ? entries.filter(([n]) => n === maxed) : entries;
   // The panel keeps its width while the column narrows over it, so hiding
@@ -247,11 +236,9 @@ export default function ResourceColumn(props: ResourceColumnProps) {
   const columnWidth = sideCollapsed ? RAIL : panelWidth + RAIL;
 
   return (
-    <>
-      {thin}
       <div
         ref={columnRef}
-        className={`resource-column${sideCollapsed ? ' rc-collapsed' : ''}${maxed ? ' rc-max' : ''}${dragging ? ' rc-dragging' : ''}`}
+        className={`resource-column${pinned ? ' rc-pinned' : ''}${sideCollapsed ? ' rc-collapsed' : ''}${maxed ? ' rc-max' : ''}${dragging ? ' rc-dragging' : ''}`}
         style={{ flexBasis: columnWidth, width: columnWidth }}
         data-testid="resource-column"
       >
@@ -265,9 +252,9 @@ export default function ResourceColumn(props: ResourceColumnProps) {
             <button
               type="button"
               className={`rc-btn-icon${pinned ? ' on' : ''}`}
-              title={pinned ? 'Unpin: scroll away with the steps' : 'Pin: keep a thin view at the left while the steps scroll'}
+              title={pinned ? 'Unpin: back ahead of step 1, scrolling with the steps' : 'Pin: to the side of the steps, always there'}
               aria-pressed={pinned}
-              onClick={togglePin}
+              onClick={onTogglePin}
             >
               <SymbolIcon name={pinned ? 'push_pin' : 'keep_off'} size={13} />
             </button>
@@ -331,7 +318,6 @@ export default function ResourceColumn(props: ResourceColumnProps) {
         </div>
         <Rail {...railProps} hidden={sideCollapsed} onToggle={toggleSide} onPick={pick} drag={drag} />
       </div>
-    </>
   );
 }
 

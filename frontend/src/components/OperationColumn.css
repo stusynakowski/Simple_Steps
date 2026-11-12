@@ -1564,9 +1564,9 @@
 body.is-resizing-step { cursor: ew-resize; user-select: none; }
 body.is-resizing-step * { cursor: ew-resize !important; }
 
-/* ── The formula bar at rest (owner, 2026-11-10) ───────────────────────── */
-/* Over the one-line editor: TOOL(DATA)*, caps, one colour; the * says there's
-   more behind it. A click edits the whole. */
+/* ── The formula bar at rest (owner, 2026-11-12) ───────────────────────── */
+/* Over the one-line editor: TOOL(DATA), or DATA alone, in the editor's
+   colours. A click edits the whole. */
 .formula-summary {
   position: absolute;
   inset: 0;
@@ -1586,3 +1586,8 @@ body.is-resizing-step * { cursor: ew-resize !important; }
   cursor: text;
 }
 .formula-summary-code { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The editor's own token colours (Monaco vs-dark): a tool is `type`, a step
+   reference `variable.predefined`, brackets `delimiter`. */
+.formula-summary-tool { color: #3dc9b0; }
+.formula-summary-data { color: #4864aa; }
+.formula-summary-punct { color: #dcdcdc; }
