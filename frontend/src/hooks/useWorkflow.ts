@@ -865,6 +865,18 @@ export default function useWorkflow() {
     setWorkflow(updated);
   }, []);
 
+  /** Change the workflow's own `meta` (its notes); an empty value removes the key. */
+  const updateWorkflowMeta = useCallback((changes: { notes?: string }): void => {
+    const latest = workflowRef.current;
+    const meta: Record<string, unknown> = { ...(latest.meta ?? {}), ...changes };
+    for (const k of Object.keys(meta)) if (meta[k] === undefined || meta[k] === '') delete meta[k];
+    const { meta: _old, ...rest } = latest;
+    void _old;
+    const updated = Object.keys(meta).length ? { ...rest, meta } : rest;
+    workflowRef.current = updated;
+    setWorkflow(updated);
+  }, []);
+
   /** Delete resource *name*. Refused while a step uses it, listing those steps. */
   const removeResource = useCallback((name: string): void => {
     const latest = workflowRef.current;
@@ -1181,6 +1193,8 @@ export default function useWorkflow() {
     defineResource,
     removeResource,
     updateResourceMeta,
+    // the workflow's own meta (its notes)
+    updateWorkflowMeta,
     // execution log
     executionLogs,
     clearLogs,

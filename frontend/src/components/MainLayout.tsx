@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
+import WorkflowNotes from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
 import { runState } from '../utils/runState';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
@@ -141,6 +142,7 @@ export default function MainLayout() {
     defineResource,
     removeResource,
     updateResourceMeta,
+    updateWorkflowMeta,
     saveWorkflow,
     fetchWorkflow,
     loadWorkflowObject,
@@ -854,6 +856,12 @@ export default function MainLayout() {
             name={workflow.name || 'Untitled'}
             steps={workflow.steps}
             resources={resourceState.summary}
+          />
+        }
+        workflowSlot={
+          <WorkflowNotes
+            notes={typeof workflow.meta?.notes === 'string' ? workflow.meta.notes : undefined}
+            onChange={(notes) => updateWorkflowMeta({ notes })}
           />
         }
       />

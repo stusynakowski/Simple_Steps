@@ -1,0 +1,52 @@
+/* The workflow's notes: a popover on the toolbar's top row. */
+
+.workflow-notes-btn { gap: 4px; }
+.workflow-notes-btn:not(.has-notes) { opacity: 0.7; }
+
+/* Wider than a step's settings: a workflow's notes run longer. */
+.step-menu-pop--panel:has(.workflow-notes-input, .workflow-notes-view) {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.workflow-notes-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160px;
+  padding: 6px 8px;
+  font: 0.82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.workflow-notes-view { position: relative; }
+.workflow-notes-body {
+  max-height: 60vh;
+  overflow: auto;
+  padding-right: 24px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.workflow-notes-body > :first-child { margin-top: 0; }
+.workflow-notes-body > :last-child { margin-bottom: 0; }
+.workflow-notes-body h1, .workflow-notes-body h2, .workflow-notes-body h3 { font-size: 1rem; margin: 0.6em 0 0.3em; }
+.workflow-notes-body code { background: #f2f2f2; padding: 0 3px; border-radius: 3px; }
+
+.workflow-notes-edit {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: #555;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.workflow-notes-view:hover .workflow-notes-edit,
+.workflow-notes-edit:focus-visible { opacity: 1; }
+.workflow-notes-edit:hover { background: #eee; }
