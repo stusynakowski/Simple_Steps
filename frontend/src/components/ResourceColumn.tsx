@@ -154,7 +154,11 @@ export default function ResourceColumn(props: ResourceColumnProps) {
   const { resources, steps, state, scroller, pinned, onTogglePin, floating } = props;
   const detachDrag = useDragToDetach(props.onDetach);
   const entries = Object.entries(resources ?? {}) as [string, ResourceDeclaration][];
-  const [sideCollapsed, setSideCollapsed] = useState(false);
+  // Hidden unless the workflow has resources (owner, 2026-11-13): it opens
+  // when a load brings some, and hides again when the last one goes.
+  const hasResources = entries.length > 0;
+  const [sideCollapsed, setSideCollapsed] = useState(!hasResources);
+  useEffect(() => { setSideCollapsed(!hasResources); }, [hasResources]);
   const [listOpen, setListOpen] = useState(true);
   const [openNames, setOpenNames] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
