@@ -560,13 +560,13 @@
   position: absolute;
   inset: 0;
   background: var(--fill);
-  clip-path: polygon(var(--b) 0, calc(100% - var(--d) - var(--b)) 0, calc(100% - var(--b)) 50%,
-    calc(100% - var(--d) - var(--b)) 100%, var(--b) 100%, calc(var(--d) + var(--b)) 50%);
+  clip-path: polygon(var(--b) var(--b), calc(100% - var(--d) - var(--b)) var(--b), calc(100% - var(--b)) 50%,
+    calc(100% - var(--d) - var(--b)) calc(100% - var(--b)), var(--b) calc(100% - var(--b)), calc(var(--d) + var(--b)) 50%);
 }
 .step-minimap-step.first { clip-path: polygon(0 0, calc(100% - var(--d)) 0, 100% 50%, calc(100% - var(--d)) 100%, 0 100%); }
 .step-minimap-step.first::before {
-  clip-path: polygon(var(--b) 0, calc(100% - var(--d) - var(--b)) 0, calc(100% - var(--b)) 50%,
-    calc(100% - var(--d) - var(--b)) 100%, var(--b) 100%);
+  clip-path: polygon(var(--b) var(--b), calc(100% - var(--d) - var(--b)) var(--b), calc(100% - var(--b)) 50%,
+    calc(100% - var(--d) - var(--b)) calc(100% - var(--b)), var(--b) calc(100% - var(--b)));
 }
 .step-minimap-step:hover { opacity: 1; }
 /* The resource column, before the steps: an "R" block, outlined so it shows

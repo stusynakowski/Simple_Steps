@@ -88,6 +88,7 @@
   cursor: pointer;
   width: 22px;
   height: 22px;
+  padding: 0;   /* the global button padding would squeeze the icon out */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -263,7 +264,8 @@
 /* ── Drag-hint on OperationColumn header ──────────────────────────────────── */
 
 /* Applied to the op-header when the drag-to-detach hint should be visible */
-.op-header.drag-detach-hint::before {
+.op-header.drag-detach-hint::before,
+.rc-head.drag-detach-hint::before {
   content: '⠿ drag to detach';
   position: absolute;
   top: 50%;

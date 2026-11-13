@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, type ComponentProps } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import WorkflowNotes from './WorkflowNotes';
@@ -7,6 +7,7 @@ import { runState } from '../utils/runState';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
+import FloatingWindow from './FloatingWindow';
 import useWorkflow from '../hooks/useWorkflow';
 import { useStepColor } from '../context/StepPaletteContext';
 import Sidebar from './Sidebar';
@@ -560,6 +561,8 @@ export default function MainLayout() {
   const closeDetachedWindow = useCallback((windowId: string) => {
     setDetachedWindows(prev => prev.filter(w => w.id !== windowId));
   }, []);
+  // The resources pulled off into a window: where it opened, or null. One at a time.
+  const [resourcesWindow, setResourcesWindow] = useState<{ x: number; y: number } | null>(null);
 
   // ── Sidebar refresh trigger ────────────────────────────────────────────
   const [sidebarRefreshTrigger, setSidebarRefreshTrigger] = useState(0);
@@ -876,23 +879,25 @@ export default function MainLayout() {
 
   // The resource column: ahead of step 1, or pinned to the side of the
   // steps, out of their scroll (owner, 2026-11-12).
+  // Its header dragged off, it opens in a floating window too, as a step does.
+  const resourceColumnProps: ComponentProps<typeof ResourceColumn> = {
+    resources: workflow.resources,
+    steps: workflow.steps,
+    state: resourceState,
+    stepColorOf: (label) => {
+      const i = workflow.steps.findIndex((s) => s.label === label);
+      return workflow.steps[i]?.step_color ?? stepColor(Math.max(0, i), workflow.steps.length);
+    },
+    onDefine: defineResource,
+    onRemove: removeResource,
+    onMeta: updateResourceMeta,
+    onHighlight: (labels) => setHighlightedSteps(labels?.length ? new Set(labels) : null),
+    scroller: canvasRef,
+    pinned: resourcesPinned,
+    onTogglePin: toggleResourcesPinned,
+  };
   const resourceColumn = (
-        <ResourceColumn
-          resources={workflow.resources}
-          steps={workflow.steps}
-          state={resourceState}
-          stepColorOf={(label) => {
-            const i = workflow.steps.findIndex((s) => s.label === label);
-            return workflow.steps[i]?.step_color ?? stepColor(Math.max(0, i), workflow.steps.length);
-          }}
-          onDefine={defineResource}
-          onRemove={removeResource}
-          onMeta={updateResourceMeta}
-          onHighlight={(labels) => setHighlightedSteps(labels?.length ? new Set(labels) : null)}
-          scroller={canvasRef}
-          pinned={resourcesPinned}
-          onTogglePin={toggleResourcesPinned}
-        />
+    <ResourceColumn {...resourceColumnProps} onDetach={(pos) => setResourcesWindow((w) => w ?? pos)} />
   );
 
   const canvasBlock = (
@@ -1175,6 +1180,7 @@ export default function MainLayout() {
               stepIndex={stepIndex}
               previousSteps={previousSteps}
               availableOperations={availableOperations}
+              progress={stepProgress[step.id]}
               pipelineStatus={pipelineStatus}
               pipelineCursorIndex={pipelineCursorIndex}
               color={step.step_color ?? stepColor(stepIndex, workflow.steps.length)}
@@ -1183,11 +1189,23 @@ export default function MainLayout() {
               onRowPage={(page) => loadRowPage(step.id, page)}
               onUpdate={(id, updates) => updateStep(id, updates)}
               onRun={runStep}
-                  onDeclare={declareWorkflow}
+              onDeclare={declareWorkflow}
+              onRunAll={runPipeline}
+              onRunToEnd={() => runPipeline(step.id)}
+              onMove={(to) => moveStep(step.id, to)}
+              stepCount={workflow.steps.length}
+              onPause={id => console.log('Pause', id)}
               onDelete={deleteStep}
+              resources={workflow.resources}
+              onDefineResource={defineResource}
             />
           );
         })}
+        {resourcesWindow && (
+          <FloatingWindow title="Resources" color="#5b6b7f" initialPosition={resourcesWindow} onClose={() => setResourcesWindow(null)}>
+            <ResourceColumn {...resourceColumnProps} floating />
+          </FloatingWindow>
+        )}
       </StepWiringProvider>
 
       {/* ── Save modal ──────────────────────────────────────────────────── */}

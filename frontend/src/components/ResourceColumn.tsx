@@ -6,6 +6,7 @@ import { definitionText, pyLiteral, resourceKind, stepsUsingResource, type Resou
 import { needsAttention, STATUS_TEXT, type ResourceState, type ResourceStatus } from '../hooks/useResourceState';
 import StepMenu from './StepMenu';
 import SymbolIcon, { type SymbolName } from './SymbolIcon';
+import { useDragToDetach } from '../hooks/useDragToDetach';
 import './ResourceColumn.css';
 
 /**
@@ -38,6 +39,10 @@ interface ResourceColumnProps {
   /** At the side of the steps, out of their scroll, rather than ahead of step 1. */
   pinned: boolean;
   onTogglePin: () => void;
+  /** Drag the "Resources" header off, as a step's: it opens in a floating window. */
+  onDetach?: (position: { x: number; y: number }) => void;
+  /** Inside a floating window: fill it, no side bar, no pin. */
+  floating?: boolean;
 }
 
 const DEFAULT_COLOR = '#5b6b7f';
@@ -146,7 +151,8 @@ function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHi
 }
 
 export default function ResourceColumn(props: ResourceColumnProps) {
-  const { resources, steps, state, scroller, pinned, onTogglePin } = props;
+  const { resources, steps, state, scroller, pinned, onTogglePin, floating } = props;
+  const detachDrag = useDragToDetach(props.onDetach);
   const entries = Object.entries(resources ?? {}) as [string, ResourceDeclaration][];
   const [sideCollapsed, setSideCollapsed] = useState(false);
   const [listOpen, setListOpen] = useState(true);
@@ -238,27 +244,35 @@ export default function ResourceColumn(props: ResourceColumnProps) {
   return (
       <div
         ref={columnRef}
-        className={`resource-column${pinned ? ' rc-pinned' : ''}${sideCollapsed ? ' rc-collapsed' : ''}${maxed ? ' rc-max' : ''}${dragging ? ' rc-dragging' : ''}`}
-        style={{ flexBasis: columnWidth, width: columnWidth }}
+        className={`resource-column${floating ? ' rc-floating' : ''}${pinned && !floating ? ' rc-pinned' : ''}${sideCollapsed && !floating ? ' rc-collapsed' : ''}${maxed ? ' rc-max' : ''}${dragging ? ' rc-dragging' : ''}`}
+        style={floating ? undefined : { flexBasis: columnWidth, width: columnWidth }}
         data-testid="resource-column"
       >
-        <div className="rc-panel" style={{ width: panelWidth }} ref={panelRef} aria-hidden={sideCollapsed}>
-        <div className="rc-head" onClick={() => setListOpen((v) => !v)} role="button" aria-expanded={listOpen}>
+        <div className="rc-panel" style={floating ? undefined : { width: panelWidth }} ref={panelRef} aria-hidden={sideCollapsed && !floating}>
+        <div
+          className={`rc-head${detachDrag.hinting ? ' drag-detach-hint' : ''}`}
+          onMouseDown={detachDrag.onMouseDown}
+          onClick={() => { if (!detachDrag.consumeClick()) setListOpen((v) => !v); }}
+          role="button"
+          aria-expanded={listOpen}
+        >
           <SymbolIcon name="database" size={16} />
           <span className="rc-head-title">Resources</span>
           <span className="rc-count">{entries.length}</span>
           {attention && <span className="rc-attention" title="A resource needs attention" />}
-          <span className="rc-head-controls" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              className={`rc-btn-icon${pinned ? ' on' : ''}`}
-              title={pinned ? 'Unpin: back ahead of step 1, scrolling with the steps' : 'Pin: to the side of the steps, always there'}
-              aria-pressed={pinned}
-              onClick={onTogglePin}
-            >
-              <SymbolIcon name={pinned ? 'push_pin' : 'keep_off'} size={13} />
-            </button>
-          </span>
+          {!floating && (
+            <span className="rc-head-controls" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className={`rc-btn-icon${pinned ? ' on' : ''}`}
+                title={pinned ? 'Unpin: back ahead of step 1, scrolling with the steps' : 'Pin: to the side of the steps, always there'}
+                aria-pressed={pinned}
+                onClick={onTogglePin}
+              >
+                <SymbolIcon name={pinned ? 'push_pin' : 'keep_off'} size={13} />
+              </button>
+            </span>
+          )}
         </div>
 
         {listOpen && (
@@ -316,7 +330,7 @@ export default function ResourceColumn(props: ResourceColumnProps) {
           </div>
         )}
         </div>
-        <Rail {...railProps} hidden={sideCollapsed} onToggle={toggleSide} onPick={pick} drag={drag} />
+        {!floating && <Rail {...railProps} hidden={sideCollapsed} onToggle={toggleSide} onPick={pick} drag={drag} />}
       </div>
   );
 }

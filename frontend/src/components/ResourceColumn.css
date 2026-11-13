@@ -24,6 +24,9 @@
   transition: flex-basis 0.3s ease, width 0.3s ease;
 }
 .resource-column.rc-dragging { transition: none; user-select: none; }
+/* Pulled off into a floating window: it fills the window. */
+.resource-column.rc-floating { width: 100%; height: 100%; transition: none; }
+.resource-column.rc-floating .rc-panel { right: 0; }
 
 /* The panel keeps its own width; the column narrows over it, so hiding slides. */
 .rc-panel {

@@ -53,8 +53,8 @@
 /* ARROW GEOMETRY: Depth 28px.
    Two layers (owner, 2026-11-10): .arrow-status is the whole arrow, painted
    in the run's colour (.run-paint, index.css); .arrow-background, the step's
-   colour, is the same arrow with its sides pulled in by --b, so the run's
-   colour shows along the tail and the head. */
+   colour, is the same arrow pulled in by --b on every side, so the run's
+   colour outlines the whole header: tail, top, head and bottom. */
 .arrow-status {
   position: absolute;
   inset: 0;
@@ -68,11 +68,11 @@
 .operation-column:first-child .arrow-status,
 .operation-column:first-child .arrow-background {
   clip-path: polygon(
-    var(--b) 0%,                          /* Top Left */
-    calc(100% - 28px - var(--b)) 0%,      /* Top Right Shoulder */
-    calc(100% - var(--b)) 50%,            /* Tip */
-    calc(100% - 28px - var(--b)) 100%,    /* Bottom Right Shoulder */
-    var(--b) 100%                         /* Bottom Left */
+    var(--b) var(--b),                                  /* Top Left */
+    calc(100% - 28px - var(--b)) var(--b),              /* Top Right Shoulder */
+    calc(100% - var(--b)) 50%,                          /* Tip */
+    calc(100% - 28px - var(--b)) calc(100% - var(--b)), /* Bottom Right Shoulder */
+    var(--b) calc(100% - var(--b))                      /* Bottom Left */
   );
 }
 
@@ -83,12 +83,12 @@
   width: 100%;
   /* The nice interlocking shape */
   clip-path: polygon(
-    var(--b) 0%,                          /* Top Left Outer */
-    calc(100% - 28px - var(--b)) 0%,      /* Top Right Shoulder */
-    calc(100% - var(--b)) 50%,            /* Tip */
-    calc(100% - 28px - var(--b)) 100%,    /* Bottom Right Shoulder */
-    var(--b) 100%,                        /* Bottom Left Outer */
-    calc(28px + var(--b)) 50%             /* Inner Cutout (Tail) - Matching Tip Depth */
+    var(--b) var(--b),                                  /* Top Left Outer */
+    calc(100% - 28px - var(--b)) var(--b),              /* Top Right Shoulder */
+    calc(100% - var(--b)) 50%,                          /* Tip */
+    calc(100% - 28px - var(--b)) calc(100% - var(--b)), /* Bottom Right Shoulder */
+    var(--b) calc(100% - var(--b)),                     /* Bottom Left Outer */
+    calc(28px + var(--b)) 50%                           /* Inner Cutout (Tail) - Matching Tip Depth */
   );
 }
 

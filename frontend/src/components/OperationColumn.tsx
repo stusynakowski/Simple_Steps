@@ -20,6 +20,7 @@ import { runState, RUN_ICON } from '../utils/runState';
 import Markdown from 'react-markdown';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
+import { useDragToDetach } from '../hooks/useDragToDetach';
 import './OperationColumn.css';
 
 interface OperationColumnProps {
@@ -298,6 +299,7 @@ export default function OperationColumn({
   };
 
   const handleColumnClick = () => {
+    if (detachDrag.consumeClick()) return;
     if (isActive) {
       if (onMinimize) onMinimize();
     } else {
@@ -306,48 +308,9 @@ export default function OperationColumn({
   };
 
   // ── Drag-to-detach on header ──────────────────────────────────────────────
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
-  const dragTriggered = useRef(false);
-  const [isDragHinting, setIsDragHinting] = useState(false);
-  const DETACH_THRESHOLD = 18; // px of movement before detach fires
-
-  const handleHeaderMouseDown = (e: React.MouseEvent) => {
-    // Only on left-button drags, and only if onDetach is wired up
-    if (e.button !== 0 || !onDetach) return;
-    // Ignore clicks on any interactive child (buttons, etc.)
-    if ((e.target as HTMLElement).closest('button, select, input, a')) return;
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    dragTriggered.current = false;
-
-    const onMove = (me: MouseEvent) => {
-      if (!dragStart.current) return;
-      const dx = me.clientX - dragStart.current.x;
-      const dy = me.clientY - dragStart.current.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 4) setIsDragHinting(true);
-      if (!dragTriggered.current && dist > DETACH_THRESHOLD) {
-        dragTriggered.current = true;
-        dragStart.current = null;
-        setIsDragHinting(false);
-        cleanup();
-        onDetach({ x: me.clientX - 20, y: me.clientY - 18 });
-      }
-    };
-
-    const onUp = () => {
-      dragStart.current = null;
-      setIsDragHinting(false);
-      cleanup();
-    };
-
-    const cleanup = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
-    };
-
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  };
+  const detachDrag = useDragToDetach(onDetach);
+  const isDragHinting = detachDrag.hinting;
+  const handleHeaderMouseDown = detachDrag.onMouseDown;
 
   // The step's notes (owner, 2026-11-10): the notepad at the header's bottom
   // right drops them down under the header; hover them for the button that
