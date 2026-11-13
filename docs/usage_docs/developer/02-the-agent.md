@@ -75,17 +75,11 @@ One **session per workflow**, saved as JSON in
 through three phases, and each turn does one thing
 ([spec 018](../../spec/018-copilot-sessions.md)):
 
-```
- goal ──▶ PLAN ──questions?──▶ (user answers) ──▶ PLAN
-            │ plan: resources, steps, milestones (checked)
-            ▼ user accepts
-          BUILD, per milestone, one turn per Continue:
-            steps missing / failed ──▶ PROPOSE (checked) ──▶ user applies, runs
-            steps not run          ──▶ WAIT
-            steps ran              ──▶ VALIDATE ──fail──▶ PROPOSE a fix
-                                          │ pass
-                                          ▼ next milestone … ──▶ DONE
-```
+![A copilot session: Plan (questions or a checked plan), Accept, then Build one milestone at a time (propose, wait or validate, with you applying and running in between), then Done](img/copilot-session.svg)
+
+Every arrow out of a plain box is one turn. The dashed boxes are what you
+do. If no model is set, or a model call fails, the turn replies with an
+error and the state doesn't change.
 
 - **Plan** asks the model for questions (at most three) or a plan. The plan
   is checked: real tools, usable resources, unique names, milestones that
@@ -99,6 +93,16 @@ through three phases, and each turn does one thing
   the milestone's check.
 - The copilot **never applies or runs anything**. The user applies a
   proposal (the same commands the console sends) and runs the steps.
+
+### One turn, end to end
+
+![One turn: the copilot pane posts the steps; the server loads the session, builds the context, asks the model, checks the answer (up to 2 retries), replies and saves; you apply the proposal, the kernel runs the steps, and you press Continue](img/copilot-turn.svg)
+
+The pane sends `POST /api/agent/sessions/{workflow id}/turn` with the action
+(`continue`, `accept` or `replan`), your message, and the workflow's steps
+with their states. The check is `check_plan` while planning and
+`check_proposal` while building. Everything below the dashed line happens
+on your side.
 
 ### What it reads every turn
 

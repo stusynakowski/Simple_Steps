@@ -841,6 +841,7 @@
   user-select: text;
 }
 .docs-repo-link { color: #bbb; text-decoration: underline dotted; cursor: help; }
+.docs-figure { display: block; max-width: 100%; height: auto; margin: 8px 0; border-radius: 6px; }
 .docs-table-wrap { overflow-x: auto; }
 .docs-reader td p, .docs-reader th p { margin: 0; }
 

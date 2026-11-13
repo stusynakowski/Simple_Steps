@@ -12,6 +12,18 @@ const RAW = import.meta.glob('../../../docs/usage_docs/**/*.md', {
   query: '?raw', import: 'default', eager: true,
 }) as Record<string, string>;
 
+/** The docs' SVG figures, inlined the same way, so an installed app can show them. */
+const IMAGES = import.meta.glob('../../../docs/usage_docs/**/*.svg', {
+  query: '?raw', import: 'default', eager: true,
+}) as Record<string, string>;
+
+/** An image a page refers to (`img/x.svg` on `developer/y.md`) as a data URL, or null. */
+export function docImage(from: string, src: string, images: Record<string, string> = IMAGES): string | null {
+  const target = resolveDocLink(from, src);
+  const key = target && Object.keys(images).find((k) => docPath(k) === target);
+  return key ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(images[key])}` : null;
+}
+
 /** Which part of the docs a page is in: the top level, the User or the Developer guide. */
 export type DocSection = 'start' | 'user' | 'developer';
 const SECTION_ORDER: DocSection[] = ['start', 'user', 'developer'];

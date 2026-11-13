@@ -16,7 +16,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import Markdown, { type Components } from 'react-markdown';
 import Icon from './Icon';
-import { docPages, resolveDocLink, splitTables, type DocPage } from '../utils/docs';
+import { docImage, docPages, resolveDocLink, splitTables, type DocPage } from '../utils/docs';
 
 export default function DocsPanel({ pages = docPages() }: { pages?: DocPage[] }) {
   const [active, setActive] = useState<DocPage | null>(null);
@@ -52,6 +52,11 @@ export default function DocsPanel({ pages = docPages() }: { pages?: DocPage[] })
         return <a href={`#${anchor}`} onClick={(e) => { e.preventDefault(); open(active!, anchor); }}>{children}</a>;
       }
       return <span className="docs-repo-link" title={`${href} — in the Simple Steps repository`}>{children}</span>;
+    },
+    // Figures next to the docs (img/x.svg) are bundled; anything else shows its alt text.
+    img: ({ src, alt }) => {
+      const url = typeof src === 'string' && active ? docImage(active.file, src) : null;
+      return url ? <img className="docs-figure" src={url} alt={alt ?? ''} /> : <em>{alt}</em>;
     },
     // Headings get ids so #anchors work: "## Verb, shape" → "verb-shape".
     h2: ({ children }) => <h2 id={slug(children)}>{children}</h2>,

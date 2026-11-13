@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 530" width="1000" height="530" role="img" aria-label="State machine of a copilot session. A goal starts the Plan phase, which asks up to three questions or produces a checked plan. Accepting it enters Build: for the active milestone the copilot proposes, waits, or validates; you apply and run in between. When the last milestone passes the session is Done.">
+  <style>
+    svg { --bg: #ffffff; --ink: #1c2329; --muted: #5a6670; --line: #c9d0d6; --you: #0f7a6c; --you-soft: #e3f3f0; }
+    @media (prefers-color-scheme: dark) {
+      svg { --bg: #1a2126; --ink: #e3e8ec; --muted: #94a2ad; --line: #36424b; --you: #4cc4b2; --you-soft: #16302d; }
+    }
+    text { font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .bg { fill: var(--bg); }
+    .box { fill: var(--bg); stroke: var(--ink); stroke-width: 1.3; }
+    .region { fill: none; stroke: var(--line); stroke-width: 1.2; }
+    .youbox { fill: var(--you-soft); stroke: var(--you); stroke-width: 1.3; stroke-dasharray: 5 4; }
+    .edge { fill: none; stroke: var(--ink); stroke-width: 1.3; }
+    .edge.you { stroke: var(--you); }
+    .t { fill: var(--ink); font-size: 14px; font-weight: 600; }
+    .s { fill: var(--muted); font-size: 11.5px; }
+    .l { fill: var(--ink); font-size: 11.5px; }
+    .l.you { fill: var(--you); }
+    .b { font-weight: 600; }
+    .rl { fill: var(--muted); font-size: 11px; letter-spacing: .08em; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    .ah { fill: var(--ink); }
+    .ah.you { fill: var(--you); }
+  </style>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah" d="M0 0 L10 5 L0 10 z"/></marker>
+    <marker id="a1y" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="ah you" d="M0 0 L10 5 L0 10 z"/></marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1000" height="530" rx="8"/>
+
+  <!-- PLAN -->
+  <rect class="region" x="140" y="40" width="400" height="280" rx="8"/>
+  <text class="rl" x="152" y="60">PLAN</text>
+
+  <rect class="youbox" x="16" y="116" width="100" height="40" rx="20"/>
+  <text class="t" x="66" y="141" text-anchor="middle">Your goal</text>
+  <line class="edge" x1="116" y1="136" x2="168" y2="136" marker-end="url(#a1)"/>
+
+  <rect class="box" x="170" y="110" width="150" height="52" rx="6"/>
+  <text class="t" x="245" y="132" text-anchor="middle">Plan turn</text>
+  <text class="s" x="245" y="150" text-anchor="middle">model asks or plans</text>
+
+  <rect class="youbox" x="170" y="232" width="150" height="52" rx="6"/>
+  <text class="t" x="245" y="254" text-anchor="middle">Questions</text>
+  <text class="s" x="245" y="272" text-anchor="middle">you answer</text>
+  <line class="edge" x1="215" y1="162" x2="215" y2="230" marker-end="url(#a1)"/>
+  <text class="l" x="207" y="201" text-anchor="end">≤ 3</text>
+  <line class="edge you" x1="275" y1="232" x2="275" y2="164" marker-end="url(#a1y)"/>
+  <text class="l you" x="283" y="201">answers</text>
+
+  <rect class="box" x="370" y="110" width="150" height="52" rx="6"/>
+  <text class="t" x="445" y="132" text-anchor="middle">Plan</text>
+  <text class="s" x="445" y="150" text-anchor="middle">steps + milestones</text>
+  <line class="edge" x1="320" y1="136" x2="368" y2="136" marker-end="url(#a1)"/>
+  <text class="s" x="445" y="186" text-anchor="middle">checked: real tools,</text>
+  <text class="s" x="445" y="201" text-anchor="middle">unique names, usable</text>
+  <text class="s" x="445" y="216" text-anchor="middle">resources; ≤ 2 fixes</text>
+
+  <path class="edge you" d="M445 110 C445 74 245 74 245 108" marker-end="url(#a1y)"/>
+  <text class="l you" x="345" y="84" text-anchor="middle">Replan</text>
+
+  <path class="edge you" d="M520 130 L600 130 L600 76 L678 76" marker-end="url(#a1y)"/>
+  <text class="l you" x="606" y="118">Accept</text>
+  <text class="s" x="530" y="152">refused while the</text>
+  <text class="s" x="530" y="166">plan has problems</text>
+
+  <!-- BUILD -->
+  <rect class="region" x="556" y="20" width="428" height="390" rx="8"/>
+  <text class="rl" x="568" y="40">BUILD · ONE MILESTONE AT A TIME</text>
+
+  <rect class="box" x="680" y="56" width="200" height="52" rx="6"/>
+  <text class="t" x="780" y="78" text-anchor="middle">Active milestone</text>
+  <text class="s" x="780" y="96" text-anchor="middle">the first not done</text>
+
+  <rect class="box" x="584" y="190" width="116" height="56" rx="6"/>
+  <text class="t" x="642" y="213" text-anchor="middle">Propose</text>
+  <text class="s" x="642" y="231" text-anchor="middle">checked formulas</text>
+  <rect class="box" x="722" y="190" width="116" height="56" rx="6"/>
+  <text class="t" x="780" y="213" text-anchor="middle">Wait</text>
+  <text class="s" x="780" y="231" text-anchor="middle">names what to run</text>
+  <rect class="box" x="860" y="190" width="116" height="56" rx="6"/>
+  <text class="t" x="918" y="213" text-anchor="middle">Validate</text>
+  <text class="s" x="918" y="231" text-anchor="middle">rows, then model</text>
+
+  <line class="edge" x1="722" y1="108" x2="648" y2="188" marker-end="url(#a1)"/>
+  <text class="l" x="676" y="142" text-anchor="end">missing,</text>
+  <text class="l" x="676" y="156" text-anchor="end">failed, or</text>
+  <text class="l" x="676" y="170" text-anchor="end">you typed</text>
+  <line class="edge" x1="780" y1="108" x2="780" y2="188" marker-end="url(#a1)"/>
+  <text class="l" x="786" y="152">not run</text>
+  <line class="edge" x1="838" y1="108" x2="912" y2="188" marker-end="url(#a1)"/>
+  <text class="l" x="884" y="144">ran</text>
+
+  <path class="edge" d="M946 190 L946 82 L882 82" marker-end="url(#a1)"/>
+  <text class="l" x="952" y="140">pass</text>
+
+  <path class="edge" d="M900 246 L900 292 L664 292 L664 248" marker-end="url(#a1)"/>
+  <text class="l" x="842" y="286" text-anchor="middle">fail: fix, same turn</text>
+
+  <rect class="youbox" x="584" y="330" width="330" height="64" rx="6"/>
+  <text class="l you b" x="749" y="356" text-anchor="middle">You apply the changes, run the steps, press Continue</text>
+  <text class="s" x="749" y="377" text-anchor="middle">the copilot never applies or runs anything</text>
+  <line class="edge" x1="630" y1="246" x2="630" y2="328" marker-end="url(#a1)"/>
+  <text class="l" x="636" y="318">proposal</text>
+  <line class="edge" x1="780" y1="246" x2="780" y2="328" marker-end="url(#a1)"/>
+  <path class="edge you" d="M584 362 L568 362 L568 98 L678 98" marker-end="url(#a1y)"/>
+
+  <!-- DONE -->
+  <line class="edge" x1="958" y1="246" x2="958" y2="458" marker-end="url(#a1)"/>
+  <text class="l" x="950" y="436" text-anchor="end">last one passed</text>
+  <rect class="box" x="842" y="460" width="134" height="56" rx="6"/>
+  <text class="t" x="909" y="483" text-anchor="middle">Done</text>
+  <text class="s" x="909" y="501" text-anchor="middle">asks still get proposals</text>
+
+  <!-- key -->
+  <rect class="box" x="20" y="470" width="14" height="14" rx="3"/>
+  <text class="s" x="42" y="482">a copilot turn (server)</text>
+  <rect class="youbox" x="20" y="494" width="14" height="14" rx="3"/>
+  <text class="s" x="42" y="506">what you do</text>
+</svg>

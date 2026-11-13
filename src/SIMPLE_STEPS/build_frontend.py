@@ -52,7 +52,7 @@ def source_hash(src_dir: str) -> str:
         for root, dirnames, filenames in os.walk(docs_dir):
             dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
             for name in sorted(filenames):
-                if not name.endswith(".md"):
+                if not name.endswith((".md", ".svg")):
                     continue
                 path = os.path.join(root, name)
                 rel = os.path.relpath(path, docs_dir).replace(os.sep, "/")
