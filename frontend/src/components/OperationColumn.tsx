@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Step } from '../types/models';
+import type { Step, StepRow } from '../types/models';
 import type { OperationDefinition, ResourceDeclaration } from '../services/api';
 import type { ProgressEvent } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
@@ -15,7 +15,7 @@ import StepWidget from './StepWidget';
 import type { PanelId } from './stepPanels';
 import StepOverview from './StepOverview';
 import StepMenu from './StepMenu';
-import SymbolIcon from './SymbolIcon';
+import SymbolIcon, { type SymbolName } from './SymbolIcon';
 import { runState, RUN_ICON } from '../utils/runState';
 import Markdown from 'react-markdown';
 import { useStepWiring } from '../context/StepWiringContext';
@@ -77,6 +77,13 @@ interface OperationColumnProps {
   onResizeReset?: () => void;
 }
 
+/** The rows of an open step its Settings can hide, top to bottom. */
+const ROW_TOGGLES: { row: StepRow; icon: SymbolName; label: string; hint: string }[] = [
+  { row: 'controls', icon: 'tune', label: 'Step controls', hint: 'The first row: Run, Step Panels, Manage Step' },
+  { row: 'formula', icon: 'function', label: 'Formula bar', hint: 'The second row: fx and the formula' },
+  { row: 'data', icon: 'dataset', label: 'Data', hint: "The third row: the step's data" },
+];
+
 export default function OperationColumn({
   step,
   stepIndex = 0,
@@ -116,7 +123,6 @@ export default function OperationColumn({
   const [openPanels, setOpenPanels] = useState<PanelId[]>(['data']);
   const [collapsedPanels, setCollapsedPanels] = useState<Set<PanelId>>(new Set());
   // The data's size and selection, from the grid, shown on the Data bar.
-  const [dataNote, setDataNote] = useState('');
   const isOpen = (panel: PanelId) => openPanels.includes(panel);
   const togglePanel = (panel: PanelId) =>
     setOpenPanels((open) => open.includes(panel) ? open.filter((p) => p !== panel) : [...open, panel]);
@@ -327,6 +333,7 @@ export default function OperationColumn({
     setNotesEditing(false);
     if (!step.notes?.trim()) setNotesOpen(false);
   };
+  const [showRowsOpen, setShowRowsOpen] = useState(false);
   const stepSettings = (
       <div className="settings-content">
          <div className="config-item">
@@ -398,6 +405,42 @@ export default function OperationColumn({
              </ul>
            </div>
          )}
+         {/* Show: which rows of the open step are on (owner, 2026-11-13). Its
+             own section, folded until opened, in the Step Panels menu's look. */}
+         <div className="step-rows">
+           <button
+             type="button"
+             className={`step-rows-head${showRowsOpen ? ' open' : ''}`}
+             aria-expanded={showRowsOpen}
+             title={showRowsOpen ? 'Fold' : "Choose which of the step's rows show"}
+             onClick={() => setShowRowsOpen((o) => !o)}
+           >
+             Show
+             <SymbolIcon name="chevron_right" size={14} className="step-rows-caret" />
+           </button>
+           {showRowsOpen && ROW_TOGGLES.map(({ row, icon, label, hint }) => {
+             const shown = !step.hidden_rows?.includes(row);
+             return (
+               <button
+                 key={row}
+                 type="button"
+                 role="menuitemcheckbox"
+                 aria-checked={shown}
+                 className={`step-menu-item${shown ? ' checked' : ''}`}
+                 title={hint}
+                 onClick={() => {
+                   const hidden = new Set(step.hidden_rows ?? []);
+                   if (shown) hidden.add(row); else hidden.delete(row);
+                   onUpdate?.(step.id, { hidden_rows: hidden.size ? [...hidden] : undefined });
+                 }}
+               >
+                 <SymbolIcon name={icon} size={15} />
+                 <span className="step-menu-label">{label}</span>
+                 <span className="step-menu-check">{shown && <SymbolIcon name="check" size={14} />}</span>
+               </button>
+             );
+           })}
+         </div>
       </div>
   );
 
@@ -434,7 +477,7 @@ export default function OperationColumn({
             settings, minimize, maximize. They stop mousedown so a click never
             starts the header's drag-to-detach. */}
         <div
-          className={`step-header-controls${hasNotes && !isSqueezed ? ' has-notes' : ''}`}
+          className="step-header-controls"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
@@ -616,8 +659,9 @@ export default function OperationColumn({
               )}
 
               {/* Data Tab Content */}
-              {isOpen('data') && (
-                <StepWidget id="data" collapsed={collapsedPanels.has('data')} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight} note={dataNote}>
+              {isOpen('data') && !step.hidden_rows?.includes('data') && (
+                // No name bar: the table's own header (Data ▸ / wf["step"] \ size) folds it (dev_plan/133 §2).
+                <StepWidget id="data" bare collapsed={false} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
                   <div
                     className="tab-content status-content"
                   >
@@ -634,7 +678,8 @@ export default function OperationColumn({
                         onPage={onRowPage}
                         stagedCellMode={stagedCellMode}
                         onHoverChange={(spot) => setGridHover(spot && { ...spot, step: step.label })}
-                        onNoteChange={setDataNote}
+                        collapsed={collapsedPanels.has('data')}
+                        onToggleCollapsed={() => toggleCollapsed('data')}
                         stepName={step.label}
                         stepColor={color}
                         formula={step.formula}

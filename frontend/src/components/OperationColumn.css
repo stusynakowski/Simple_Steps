@@ -320,6 +320,34 @@
   font-size: 0.85rem;
 }
 
+/* Settings → Show, at the bottom: its own part of the popover (a header as
+   .step-menu-subheader), folded until opened; its rows are the Step Panels
+   menu's checkable items (.step-menu-item). */
+.step-rows {
+  margin: 10px -8px 0;
+  padding-top: 2px;
+  border-top: 1px solid #eee;
+}
+.step-rows-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: #8a8f98;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.step-rows-head:hover { color: #444; }
+.step-rows-caret { transition: transform 0.12s ease; }
+.step-rows-head.open .step-rows-caret { transform: rotate(90deg); }
+
 /* Step ID / Status rows in Settings: the panel is white, and these inherited
    the app's white text, so they were invisible. */
 .settings-content .summary-item {
@@ -635,24 +663,86 @@
   position: relative;
   border-right: 1px solid #ddd;
   background: #eaeaea;
-  padding-left: 9px;
+  padding-left: 4px;
   padding-right: 4px;
 }
 
-/* The # header's top-left corner: a triangle that selects the whole table,
-   as in a spreadsheet (owner, 2026-10-28). */
-.corner-triangle {
-  position: absolute;
+/* The table's header, above the column headers (owner, 2026-11-13,
+   dev_plan/133 §2): `Data ›` folds it, `wf["step"]` in the middle is the whole
+   step, the size at the right. Part of the table, in its colours, not a bar
+   of its own; it stays in view while the rows scroll. */
+/*   [dataset ›]   wf["step"]   4 rows × 2 cols
+   Dark corners as the old Data bar. A click anywhere on the header but the
+   reference folds or unfolds the table; the icon and its caret show which.
+   The reference, in the middle, is drawn as a column header (the same grey,
+   weight and lines), as wide as its text: the whole step, to click. */
+.data-head {
+  position: sticky;
   top: 0;
-  left: 0;
-  width: 9px;
-  height: 9px;
-  background: #b8b8b8;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
+  z-index: 4;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;   /* the reference centred, as wide as its text */
+  height: 30px;                    /* as tall as the formula bar's row */
+  margin-right: 5px;               /* as wide as the grid (its wrapper's 5px) */
+  background: #2a2a2a;
+  font-size: 12px;
+  line-height: 30px;
+  color: #aaa;
+  cursor: pointer;
+  user-select: none;
+}
+.data-head:hover { color: #ddd; }
+.data-head button {
+  border: none;
+  border-radius: 0;                /* not the app's rounded buttons */
+  background: none;
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
   cursor: pointer;
 }
-.corner-triangle:hover { background: #8a8a8a; }
-.corner-triangle.is-selected { background: #6b7280; }
+.data-head .data-head-toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 4px 0 7px;
+}
+.data-head-caret { transition: transform 0.12s ease; }
+.data-head-toggle.open .data-head-caret { transform: rotate(90deg); }
+/* Open, the reference is the table's top header cell, edged by vertical
+   lines; folded, there is no table under it, so it goes dark with the bar. */
+.data-head .data-head-ref {
+  min-width: 0;
+  padding: 0 12px;
+  background: #f3f3f3;
+  border-right: 1px solid #c4c4c4;
+  border-left: 1px solid #c4c4c4;
+  color: #555;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.1s ease;
+}
+.data-head .data-head-ref:hover { background: #e6f7ff; color: #0b5cad; }
+.data-head .data-head-ref.is-selected { background: #d4d7dc; color: #222; }
+.data-table.is-collapsed .data-head .data-head-ref { background: transparent; border-color: transparent; color: #ccc; }
+.data-table.is-collapsed .data-head .data-head-ref:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.data-head-size {
+  justify-self: end;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px 0 6px;
+  color: #8a8a8a;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.data-head :focus:not(:focus-visible) { outline: none; }
+.data-head button:focus-visible { outline: 1px solid #0b5cad; outline-offset: -1px; }
 
 /* A row's # cell selects the row; a selected row's # cell darkens. */
 .grid-cell.row-index:hover { background: #ececec; }
@@ -911,19 +1001,6 @@
   color: #d0d0d0;
 }
 
-/* The data's size and selection, at the bar's right end. */
-.step-widget-note {
-  margin-left: auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: #8a8a8a;
-}
-
 .step-widget-chevron {
   width: 11px;
   font-size: 13px;
@@ -1053,11 +1130,11 @@
   pointer-events: none;
   transition: opacity 0.12s ease;
 }
-/* A step with notes says so, faintly, even when not hovered. */
-.step-header-controls.has-notes > .step-notes-toggle,
-.step-header-controls > .step-notes-toggle.open { opacity: 0.6; pointer-events: auto; }
+/* Only on hover (owner, 2026-11-13: the notepad was always showing); open
+   notes show themselves under the header. Keyboard focus shows them too, but a
+   mouse click doesn't pin them. */
 .op-header:hover .step-header-controls > *,
-.step-header-controls:focus-within > *,
+.step-header-controls:has(:focus-visible) > *,
 .step-header-controls:has(.step-menu-toggle.active) > * {
   opacity: 1;
   pointer-events: auto;
@@ -1281,11 +1358,9 @@
   .step-run-big { padding: 0 4px; }
 }
 .step-run-big,
-.step-menu-toggle,
-.step-fx { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13); }
+.step-menu-toggle { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13); }
 .step-run-big:hover,
-.step-menu-toggle:hover,
-.step-fx:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+.step-menu-toggle:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
 .step-run-big {
   display: inline-flex;
   align-items: center;
@@ -1372,6 +1447,11 @@
 }
 .step-fx:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
 .step-fx.active { color: #4ea1ff; background: #1f3a5f; }
+/* No outline; a caret, as on the data header's icon, turns down while the
+   Formula panel is open (owner, 2026-11-13). */
+.step-fx { gap: 1px; padding: 0 3px 0 6px; }
+.step-fx-caret { transition: transform 0.12s ease; }
+.step-fx.active .step-fx-caret { transform: rotate(90deg); }
 
 /* The pop-up: over the whole page (a portal, fixed under its button). */
 .step-menu-pop {

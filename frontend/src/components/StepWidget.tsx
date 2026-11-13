@@ -10,16 +10,15 @@ interface Props {
   background: string;
   /** Cap on the body's height; it scrolls past this. */
   maxHeight: string;
-  /** A short note at the bar's right end (the data's size and selection). */
-  note?: ReactNode;
   /** No name bar: the body alone, always shown — for a panel whose own button
-   *  already opens and closes it (the Formula panel and f(x)). */
+   *  or header already opens and closes it (the Formula panel and f(x); the
+   *  data, whose table header folds it). */
   bare?: boolean;
   children: ReactNode;
 }
 
 /** One widget: a thin name bar that collapses / expands the body below it. */
-export default function StepWidget({ id, collapsed, onToggleCollapse, background, maxHeight, note, bare, children }: Props) {
+export default function StepWidget({ id, collapsed, onToggleCollapse, background, maxHeight, bare, children }: Props) {
   const { name, accent } = PANEL_META[id];
   if (bare) {
     return (
@@ -50,7 +49,6 @@ export default function StepWidget({ id, collapsed, onToggleCollapse, background
       >
         <span className="step-widget-chevron">{collapsed ? '▸' : '▾'}</span>
         <span className="step-widget-name">{name}</span>
-        {note && <span className="step-widget-note">{note}</span>}
       </button>
       {!collapsed && (
         <div className="step-widget-body" style={{ background, maxHeight, overflowY: 'auto' }}>

@@ -229,8 +229,13 @@ export default function StepToolbar({
   const runLabel = step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)';
   const runTip = useHoverTip(runLabel);
 
+  // Rows the step's Settings turned off (owner, 2026-11-13). Hidden, not
+  // removed: the formula bar stays mounted for whoever focuses it.
+  const hides = (row: 'controls' | 'formula') => !!step.hidden_rows?.includes(row);
+  const bothHidden = hides('controls') && hides('formula');
+
   return (
-    <div className="toolbar-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
+    <div className="toolbar-wrapper" style={{ display: bothHidden ? 'none' : 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
 
       {/* The step's control bar (owner, 2026-10-29/30, 2026-11-09; dev_plan/126
           L1): three groups split by dividers, every button sharing the full
@@ -240,7 +245,7 @@ export default function StepToolbar({
           header (owner, 2026-11-10).
           Each pops up over the page (StepMenu); each has a hover label. A
           narrow step shows icons without words (CSS container query). */}
-      <div className="toolbar step-bar" data-testid="step-toolbar">
+      <div className="toolbar step-bar" data-testid="step-toolbar" style={hides('controls') ? { display: 'none' } : undefined}>
         <div className="step-bar-group step-bar-run">
           <button
             className="step-run-big"
@@ -322,7 +327,7 @@ export default function StepToolbar({
       <div
         className="formula-bar"
         style={{
-          display: 'flex',
+          display: hides('formula') ? 'none' : 'flex',
           alignItems: 'center',
           gap: '6px',
           position: 'relative',
@@ -333,9 +338,11 @@ export default function StepToolbar({
         <button
           className={`btn-icon step-fx${isOpen('details') ? ' active' : ''}`}
           onClick={(e) => { e.stopPropagation(); onTogglePanel('details'); }}
-          title="Formula: tool, parameters and modifiers"
+          title={isOpen('details') ? 'Fold the formula panel' : 'Open the formula panel: tool, arguments and modifiers'}
+          aria-expanded={isOpen('details')}
         >
           fx
+          <SymbolIcon name="chevron_right" size={16} className="step-fx-caret" />
         </button>
 
         {/* The formula field: outlined, so it reads as an input, not text

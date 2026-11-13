@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Workflow, Step, StepStatus, Cell } from '../types/models';
+import type { Workflow, Step, StepStatus, StepRow, Cell } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
 import { declareResource } from '../services/api';
 import { runStep as runStepApi, fetchDataView, fetchStepView, getOperations,
@@ -70,6 +70,7 @@ async function hydrateStep(s: PipelineFile['steps'][number], i: number): Promise
     ...(typeof s.meta?.step_color === 'string' ? { step_color: s.meta.step_color } : {}),
     ...(typeof s.meta?.notes === 'string' ? { notes: s.meta.notes } : {}),
     ...(typeof s.meta?.step_width === 'number' ? { step_width: s.meta.step_width } : {}),
+    ...(Array.isArray(s.meta?.hidden_rows) && s.meta.hidden_rows.length ? { hidden_rows: s.meta.hidden_rows as StepRow[] } : {}),
   };
 }
 
@@ -1018,12 +1019,13 @@ export default function useWorkflow() {
         config: s.configuration,
         // formula is the canonical field — always persisted
         formula: s.formula ?? s.operation ?? '',
-        // What the formula can't carry: the step's colour, notes and width.
-        ...((s.step_color || s.notes || s.step_width) ? {
+        // What the formula can't carry: the step's colour, notes, width and hidden rows.
+        ...((s.step_color || s.notes || s.step_width || s.hidden_rows?.length) ? {
           meta: {
             ...(s.step_color ? { step_color: s.step_color } : {}),
             ...(s.notes ? { notes: s.notes } : {}),
             ...(s.step_width ? { step_width: s.step_width } : {}),
+            ...(s.hidden_rows?.length ? { hidden_rows: s.hidden_rows } : {}),
           },
         } : {}),
       })),

@@ -92,11 +92,10 @@ interface DataOutputGridProps {
    * bar shows it (context/StepsStatusContext).
    */
   onHoverChange?: (spot: GridSpot | null) => void;
-  /**
-   * The data's size and the selection in one line (`3 rows, 2 columns · row 1`),
-   * whenever it changes — shown on the Data bar, not under the grid.
-   */
-  onNoteChange?: (note: string) => void;
+  /** Folded to its header: `Data ▸  wf["step"]  size`, no columns or rows. */
+  collapsed?: boolean;
+  /** The header's `Data` toggle; without it the header has no toggle. */
+  onToggleCollapsed?: () => void;
   /** The step's name, colour and formula, for the selection popover's header. */
   stepName?: string;
   stepColor?: string;
@@ -132,7 +131,8 @@ function Grid({
   stagedCellMode = 'idle',
   refId,
   onHoverChange,
-  onNoteChange,
+  collapsed = false,
+  onToggleCollapsed,
   stepName = 'step',
   stepColor,
   formula,
@@ -378,6 +378,20 @@ function Grid({
     setSelection({ sel: null, of: cells });
   };
 
+  // Looking, a click anywhere off the grid lets the selection (and its
+  // inspect tab) go; only an open inspection stays marked (owner, 2026-11-13).
+  // Not while picking for a formula: there the selection is the reference.
+  const hasSel = !!shownSel;
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!looking || !hasSel) return;
+    const away = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setSelection({ sel: null, of: cells });
+    };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, [looking, hasSel, cells]);
+
   /** The selection's header tab. */
   const openInspector = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -532,9 +546,59 @@ function Grid({
   const pages = Math.max(1, Math.ceil(total / ROW_PAGE));
   const paged = cells.length > 0 && total > rows.length;
   const first = rows.length ? rows[0] : 0;
-  const note = `${total.toLocaleString()} row${total !== 1 ? 's' : ''}${paged ? ` (# ${first.toLocaleString()}–${(first + rows.length - 1).toLocaleString()} shown)` : ''}, ${cols.length} column${cols.length !== 1 ? 's' : ''}`
-    + (shownSel ? ` · ${describeGridSel(shownSel, rows, cols)}` : '');
-  useEffect(() => { onNoteChange?.(note); }, [note, onNoteChange]);
+  const size = `${total.toLocaleString()} row${total !== 1 ? 's' : ''} × ${cols.length} col${cols.length !== 1 ? 's' : ''}`;
+
+  // The table's header (owner, 2026-11-13, dev_plan/133 §2): `Data` folds and
+  // unfolds it, `wf["step"]` in the middle is the whole step (a click selects
+  // the whole table, or, picking for a formula, references it), the size at
+  // the right. The column headers sit under it. Folded, the grid stays
+  // mounted, only hidden, so its measurements survive.
+  const header = (
+    // A click anywhere on it but the reference folds or unfolds the table.
+    // More widgets will join it, left of the dataset icon: first the toggle
+    // that opens the reference (lineage) columns left of # (dev_plan/133 §2).
+    <div
+      className="data-head"
+      title={onToggleCollapsed ? (collapsed ? 'Show the data' : 'Fold the data') : undefined}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => { e.stopPropagation(); onToggleCollapsed?.(); }}
+    >
+      {onToggleCollapsed ? (
+        <button
+          type="button"
+          className={`data-head-toggle${collapsed ? '' : ' open'}`}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Show the data' : 'Fold the data'}
+          title={collapsed ? 'Show the data' : 'Fold the data'}
+        >
+          <SymbolIcon name="dataset" size={20} />
+          <SymbolIcon name="chevron_right" size={16} className="data-head-caret" />
+        </button>
+      ) : <span className="data-head-toggle" aria-label="Data"><SymbolIcon name="dataset" size={20} /></span>}
+      <button
+        type="button"
+        className={`data-head-ref${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
+        aria-label="Select the whole table"
+        title={wiringMode ? `Use the whole step: wf["${stepName}"]` : `The whole step, wf["${stepName}"]: select the whole table`}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (collapsed && !wiringMode) onToggleCollapsed?.();
+          handleCornerClick(e);
+        }}
+        onMouseEnter={() => { setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
+        onMouseLeave={() => setHoveredCol(null)}
+      >
+        wf["{stepName}"]
+      </button>
+      <span className="data-head-size" title={`The step's size: ${size}${paged ? ` (${rows.length.toLocaleString()} shown on this page)` : ''}`}>{size}</span>
+    </div>
+  );
+  const framed = (body: React.ReactNode) => (
+    <div className={`data-table${collapsed ? ' is-collapsed' : ''}`} ref={rootRef}>
+      {header}
+      <div hidden={collapsed}>{body}</div>
+    </div>
+  );
 
   // ── Wiring overlay styles ───────────────────────────────────────────────
 
@@ -567,7 +631,7 @@ function Grid({
   // `errorCell()` (utils/errorCells.ts) builds it when a run or preview fails,
   // including an expression that doesn't parse.
   if (cells && cells.length === 1 && isErrorCell(cells[0])) {
-    return (
+    return framed(
       <div className="output-container error">
         <div className="error-cell" role="alert" data-testid="step-error-cell">
           {cells[0].display_value}
@@ -580,7 +644,7 @@ function Grid({
 
   if (structureType === 'single-value') {
     const cell = gridData[`${rows[0]}:${cols[0]}`];
-    return (
+    return framed(
       <div className="output-container single">
         <div
           className="single-value-display"
@@ -598,7 +662,7 @@ function Grid({
 
   // ── SCENARIO 2 & 3: List or Grid ──────────────────────────────────────
 
-  return (
+  return framed(
     <div className="output-container grid-wrapper">
       {/* Wiring mode banner */}
 
@@ -613,10 +677,10 @@ function Grid({
         }}
         role="grid"
       >
-        {/* Header row: the # header, then the columns'. As in a spreadsheet,
-            the triangle in the # header's top-left corner selects the whole
-            table; the rest of it selects the # column. A row is selected from
-            its # cell, as a column is from its header (owner, 2026-10-28). */}
+        {/* Column headers: the # header, then the columns'. The # header
+            selects the # column; the whole table is the table header's
+            wf["step"] (above). A row is selected from its # cell, as a column
+            is from its header (owner, 2026-10-28). */}
         <div
           className="grid-header-cell row-index-header"
           data-sel-key={cellKey(-1, INDEX_COL)}
@@ -625,15 +689,6 @@ function Grid({
           onClick={handleIndexClick}
           onMouseEnter={() => { onHoverChange?.({ kind: 'column', column: '#' }); }}
         >
-          <span
-            className={`corner-triangle${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
-            role="button"
-            aria-label="Select the whole table"
-            title="Select the whole table"
-            onClick={(e) => { e.stopPropagation(); handleCornerClick(e); }}
-            onMouseEnter={(e) => { e.stopPropagation(); setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
-            onMouseLeave={() => setHoveredCol(null)}
-          />
           #
         </div>
         {cols.map((col) => (

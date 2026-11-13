@@ -95,7 +95,13 @@ export interface Step {
   notes?: string;
   /** The step's width when open, in px, dragged at its sides. Unset = the default. Saved in `meta`. */
   step_width?: number;
+  /** Rows of the step turned off in its Settings: the controls, the formula
+   *  bar, the data. Unset = all shown. Saved in `meta`. */
+  hidden_rows?: StepRow[];
 }
+
+/** A row of an open step that its Settings can hide (owner, 2026-11-13). */
+export type StepRow = 'controls' | 'formula' | 'data';
 
 export interface Workflow {
   id: string;

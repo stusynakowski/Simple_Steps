@@ -457,9 +457,9 @@ export interface StepConfig {
     formula?: string;
     /**
      * Free-form step metadata, saved as-is (the backend's StepConfig.meta).
-     * The UI keeps `step_color`, `notes` and `step_width` here; the backend adds `label`.
+     * The UI keeps `step_color`, `notes`, `step_width` and `hidden_rows` here; the backend adds `label`.
      */
-    meta?: { step_color?: string; notes?: string; step_width?: number; [key: string]: unknown };
+    meta?: { step_color?: string; notes?: string; step_width?: number; hidden_rows?: string[]; [key: string]: unknown };
 }
 
 /** The pipeline definition written to disk — no runtime data. */
