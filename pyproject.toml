@@ -91,7 +91,8 @@ include = ["SIMPLE_STEPS*"]
 SIMPLE_STEPS = ["frontend_dist/**/*", "examples/**/*"]
 
 [tool.setuptools.exclude-package-data]
-SIMPLE_STEPS = ["examples/**/__pycache__/*", "examples/**/*.pyc", "examples/**/.DS_Store"]
+SIMPLE_STEPS = ["examples/**/__pycache__/*", "examples/**/*.pyc", "examples/**/.DS_Store",
+                "examples/**/.simple_steps_cache/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

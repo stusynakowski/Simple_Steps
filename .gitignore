@@ -55,6 +55,10 @@ frontend/build/
 # Simple Steps — cloned pack cache
 .packs/
 
+# Simple Steps — result cache: put-away kernels and stored outputs, written
+# wherever the server runs (engine.RESULT_CACHE_DIR)
+.simple_steps_cache/
+
 # Build artifacts and caches (added during cleanup)
 .pytest_cache/
 __pycache__/
