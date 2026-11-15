@@ -56,7 +56,7 @@ Each formula bar shows exactly the text to the right of the `=`.
 
 ### A. One model underneath
 
-The UI and Python both drive core's `Kernel`. The UI never has its own engine, its own step semantics or its own idea of a result. Whatever the app computes about a workflow, core must also be able to say ([core/app separation](../system_design/effective_core_app_seaparation_concepts.md)).
+The UI and Python both drive core's `Kernel`. The UI never has its own engine, its own step semantics or its own idea of a result. Whatever the app computes about a workflow, core must also be able to say ([core/app separation](../system_design/effective_core_app_separation_concepts.md)).
 
 ### B. Lossless round trips
 
