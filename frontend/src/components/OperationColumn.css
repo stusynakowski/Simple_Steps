@@ -756,10 +756,11 @@
   height: 26px;                   /* one line, as tall as a column header */
   padding: 0 12px;
   line-height: 26px;
-  /* A column header's colours and lines (.grid-header-cell), bolder. */
-  background: #f3f3f3;
+  /* A column header's lines (.grid-header-cell), bolder, and a shade darker
+     (owner, 2026-11-15): dark bar, then this, then the lighter headers. */
+  background: #e4e4e4;
   border: none;
-  border-bottom: 1px solid #ddd;
+  border-bottom: 1px solid #d0d0d0;
   color: #333;
   font-size: 0.86rem;
   font-weight: 800;
@@ -775,6 +776,10 @@
 }
 .data-head .data-head-ref:hover { background: #e6f7ff; color: #0b5cad; }
 .data-head .data-head-ref.is-selected { background: #d4d7dc; color: #222; }
+/* Open, the step's row hovers with the same slight blue as the cells
+   (owner, 2026-11-15), over its darker grey. */
+.data-table:not(.is-collapsed) .data-head .data-head-ref:hover { background: #d6e3f0; color: #0b5cad; }
+.data-table:not(.is-collapsed) .data-head .data-head-ref.is-selected { background: #d4d7dc; color: #222; }
 .data-table.is-collapsed .data-head .data-head-ref { background: transparent; border-color: transparent; color: #ccc; }
 .data-table.is-collapsed .data-head .data-head-ref:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 /* The size: under the name while open, at the bar's right while folded. */
@@ -794,7 +799,6 @@
 .data-head button:focus-visible { outline: 1px solid #0b5cad; outline-offset: -1px; }
 
 /* A row's # cell selects the row; a selected row's # cell darkens. */
-.grid-cell.row-index:hover { background: #ececec; }
 .grid-cell.row-index.is-selected { background: #d4d7dc; color: #333; }
 
 /* Data Rows */
@@ -832,7 +836,19 @@
 /* Hover only shades: a cell never changes size under the pointer (that was a
    flicker). Double-click expands one to its whole content, wrapped, and its
    row grows with it; double-click again to fold it (owner, 2026-10-30). */
-.grid-cell:hover { background-color: #e6f7ff; }
+/* Hover (owner, 2026-11-15): a slight blue over whatever is under the
+   pointer — a cell, a # cell, a column header — laid over its own colour,
+   so a cell's state (pending, failed, …) still shows through. */
+.grid-cell,
+.grid-header-cell { position: relative; }
+.grid-cell:hover::after,
+.grid-header-cell:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 144, 255, 0.1);
+  pointer-events: none;
+}
 .grid-cell.cell-expanded {
   white-space: pre-wrap;
   word-break: break-word;
@@ -1448,7 +1464,7 @@
 .step-bar--main .step-bar-run + * { margin-left: auto; }
 
 /* Step Settings: drawn as f(x) and the data icon are, a box that lights on
-   hover and turns blue while open, its label_important caret turning down.
+   hover and turns blue while open, its chevron turning down.
    Icons only; its name is the hover label. It slides the settings row (run
    options, step panels, manage step) open under the bar (Fold). */
 .step-settings-toggle {

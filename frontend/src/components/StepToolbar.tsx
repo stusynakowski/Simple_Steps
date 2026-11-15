@@ -306,7 +306,7 @@ export default function StepToolbar({
           {...settingsTip.tipProps}
         >
           <SymbolIcon name="settings" size={17} />
-          <SymbolIcon name="label_important" size={15} className="step-settings-caret" />
+          <SymbolIcon name="chevron_right" size={16} className="step-settings-caret" />
         </button>
         {settingsTip.tip}
       </div>
