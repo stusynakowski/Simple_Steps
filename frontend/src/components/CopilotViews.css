@@ -22,6 +22,25 @@
   color: #999; font-size: 12px; cursor: pointer; text-transform: capitalize;
 }
 .copilot-tab.active { color: #e0e0e0; border-bottom-color: #c586c0; }
+/* The composer (tabs + message box) and the grip on its top edge: drag it
+   up for a bigger message box, down for more of the view (owner, 2026-11-15). */
+.copilot-composer { position: relative; flex: none; display: flex; flex-direction: column; }
+.copilot-composer-grip {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  z-index: 2;
+  cursor: ns-resize;
+}
+.copilot-composer-grip:hover,
+.copilot-composer-grip:active { background: rgba(78, 161, 255, 0.5); }
+/* Sized by a drag: the message box fills what the tabs leave. */
+.copilot-composer.is-sized .chat-input-area { flex: 1; min-height: 0; }
+.copilot-composer.is-sized .chat-input-row { flex: 1; min-height: 0; align-items: stretch; }
+.copilot-composer.is-sized .chat-input { max-height: none; resize: none; }
+
 /* At the bottom, over the message box (owner, 2026-11-15): the line and the
    active mark on top, the tabs hanging from the view above them. */
 .copilot-tabs--bottom { border-bottom: 0; border-top: 1px solid #333; background: #252526; }

@@ -61,6 +61,23 @@ const PLACEHOLDER: Record<CopilotSession['phase'], string> = {
 const ChatSidebar: React.FC<ChatSidebarProps> = ({ isVisible, onClose, workflow, onApplyCommands }) => {
   const [session, setSession] = useState<CopilotSession | null>(null);
   const [input, setInput] = useState('');
+  // The composer's height once its top edge is dragged; null: as tall as it needs.
+  const composer = useRef<HTMLDivElement>(null);
+  const [composerHeight, setComposerHeight] = useState<number | null>(null);
+  const startComposerDrag = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const box = composer.current;
+    const sidebar = box?.parentElement;
+    if (!box || !sidebar) return;
+    const y0 = e.clientY;
+    const h0 = box.getBoundingClientRect().height;
+    // Room for the header above and at least a little of the view.
+    const max = sidebar.getBoundingClientRect().height - 160;
+    const move = (m: PointerEvent) => setComposerHeight(Math.round(Math.min(max, Math.max(110, h0 + y0 - m.clientY))));
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [status, setStatus] = useState<AgentStatus | null>(null);
@@ -232,8 +249,23 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isVisible, onClose, workflow,
                      onTemplates={(refs) => void edit({ templates: refs })} />
       )}
 
-      {/* The views' tabs, at the bottom by the message box: what active
-          development needs stays near where you type (owner, 2026-11-15). */}
+      {/* The composer: the views' tabs and the message box, at the bottom —
+          what active development needs stays near where you type. Its top
+          edge drags up and down against the view above (owner, 2026-11-15). */}
+      <div
+        ref={composer}
+        className={`copilot-composer${composerHeight ? ' is-sized' : ''}`}
+        style={composerHeight ? { height: composerHeight } : undefined}
+      >
+      <div
+        className="copilot-composer-grip"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Drag to resize the message box"
+        title="Drag to resize; double-click to reset"
+        onPointerDown={startComposerDrag}
+        onDoubleClick={() => setComposerHeight(null)}
+      />
       <div className="copilot-tabs copilot-tabs--bottom" role="tablist">
         {(['chat', 'plan', 'trace', 'context'] as Tab[]).map((t) => (
           <button key={t} role="tab" aria-selected={tab === t} className={`copilot-tab${tab === t ? ' active' : ''}`}
@@ -287,6 +319,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isVisible, onClose, workflow,
             {busy ? <MaterialIcon path={mdiLoading} spin /> : <MaterialIcon path={mdiArrowUp} />}
           </button>
         </div>
+      </div>
       </div>
 
       <AgentConfigPanel isOpen={configOpen} onClose={() => setConfigOpen(false)} />

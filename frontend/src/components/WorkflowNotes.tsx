@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Markdown from 'react-markdown';
 import Fold from './Fold';
 import SymbolIcon from './SymbolIcon';
@@ -41,13 +41,26 @@ export function WorkflowNotesToggle({ open, hasNotes, onToggle }: {
 }
 
 /** The notes themselves, between the toolbar's rows; *height* is their body's. */
-export function WorkflowNotesPanel({ open, notes, onChange, height, onHeight }: {
+export function WorkflowNotesPanel({ open, notes, onChange, height, onHeight, onExtent }: {
   open: boolean;
   notes?: string;
   onChange: (notes: string) => void;
   height: number;
   onHeight: (height: number) => void;
+  /** How tall the notes are on screen right now, every frame while they slide:
+   *  the header grows and shrinks with them, so nothing is cut or left blank. */
+  onExtent?: (px: number) => void;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !onExtent || typeof ResizeObserver === 'undefined') return;
+    const report = () => onExtent(Math.round(el.getBoundingClientRect().height));
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [onExtent]);
   const has = !!notes?.trim();
   const [editing, setEditing] = useState(false);
   // Opened with nothing written: straight to writing, and it stays writing
@@ -73,6 +86,7 @@ export function WorkflowNotesPanel({ open, notes, onChange, height, onHeight }: 
   };
 
   return (
+    <div ref={box}>
     <Fold open={open}>
       <div className="workflow-notes-panel" data-testid="workflow-notes-panel">
         <div className="workflow-notes-cell" style={{ height }}>
@@ -115,5 +129,6 @@ export function WorkflowNotesPanel({ open, notes, onChange, height, onHeight }: 
         />
       </div>
     </Fold>
+    </div>
   );
 }

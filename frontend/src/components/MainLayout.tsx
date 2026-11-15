@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, type ComponentProps } from 'react';
+import { flushSync } from 'react-dom';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
-import { WorkflowNotesPanel, WorkflowNotesToggle, NOTES_GRIP } from './WorkflowNotes';
+import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
 import { runState } from '../utils/runState';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
@@ -122,10 +123,15 @@ export default function MainLayout() {
   const centerSizes = useRef<number[]>([]);
 
   // The workflow notes, between the toolbar's rows (owner, 2026-11-15): the
-  // header grows by their height while they're open (border, body, grip).
+  // header grows by their height as it is on screen, frame by frame while
+  // they slide open or shut, so the run row is never cut off or left floating.
   const [notesOpen, setNotesOpen] = useState(false);
   const [notesHeight, setNotesHeight] = useState(140);
-  const headerExpanded = HEADER_EXPANDED_HEIGHT + (notesOpen ? 1 + notesHeight + NOTES_GRIP : 0);
+  const [notesExtent, setNotesExtent] = useState(0);
+  // Applied in the same frame it's measured (flushSync from the observer):
+  // a frame late, the run row was cut off at each step of the slide.
+  const onNotesExtent = useCallback((px: number) => { flushSync(() => setNotesExtent(px)); }, []);
+  const headerExpanded = HEADER_EXPANDED_HEIGHT + notesExtent;
   const headerExpandedRef = useRef(headerExpanded);
   headerExpandedRef.current = headerExpanded;
   useLayoutEffect(() => {
@@ -894,6 +900,7 @@ export default function MainLayout() {
             onChange={(notes) => updateWorkflowMeta({ notes })}
             height={notesHeight}
             onHeight={setNotesHeight}
+            onExtent={onNotesExtent}
           />
         }
       />
