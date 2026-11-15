@@ -22,6 +22,7 @@ import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
 import { useDragToDetach } from '../hooks/useDragToDetach';
 import './OperationColumn.css';
+import Fold from './Fold';
 
 interface OperationColumnProps {
   step: Step;
@@ -625,7 +626,8 @@ export default function OperationColumn({
             />
           )}
 
-          {isActive && openPanels.length > 0 && (
+          {/* Kept while the Formula panel can open or is sliding shut, even with no panel open. */}
+          {isActive && (openPanels.length > 0 || isEditMode) && (
             // `op-content-section` is kept so the detached window's taller cap applies.
             <div className="op-content-section step-widget-stack">
               {/* Analytics */}
@@ -636,7 +638,8 @@ export default function OperationColumn({
               )}
 
               {/* The Formula panel: no name bar, f(x) opens and closes it (owner, 2026-10-30). */}
-              {isOpen('details') && isEditMode && (
+              {/* Slides open and shut under the bar (Fold), as the steps do sideways. */}
+              <Fold open={isOpen('details') && isEditMode}>
                 <StepWidget id="details" bare collapsed={false} onToggleCollapse={toggleCollapsed} background="#1e1e1e" maxHeight={widgetMaxHeight}>
                   <div className="tab-content details-content">
                     <div className="expander-inner" onClick={(e) => e.stopPropagation()}>
@@ -656,7 +659,7 @@ export default function OperationColumn({
                     </div>
                   </div>
               </StepWidget>
-              )}
+              </Fold>
 
               {/* Data Tab Content */}
               {isOpen('data') && !step.hidden_rows?.includes('data') && (

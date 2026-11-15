@@ -1,0 +1,13 @@
+/* Fold.tsx: a vertical fold. Quick (0.12s): it reads as the panel
+   answering the click, never as something loading (owner, 2026-11-15). */
+.fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.12s ease-out;
+}
+.fold.open { grid-template-rows: 1fr; }
+.fold-inner { min-height: 0; overflow: hidden; }
+/* Fully open: nothing clipped, so pop-ups and sticky headers work. */
+.fold.settled > .fold-inner { overflow: visible; }
+/* Folded: hidden once the slide ends, so its controls leave the tab order. */
+.fold:not(.open) > .fold-inner { visibility: hidden; transition: visibility 0s 0.12s; }

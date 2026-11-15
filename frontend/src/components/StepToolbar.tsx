@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
+import { createPortal } from 'react-dom';
 import type { PanelId } from './stepPanels';
 import { PANEL_META } from './stepPanels';
 import type { SymbolName } from './SymbolIcon';
@@ -17,6 +18,7 @@ import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 import SymbolIcon from './SymbolIcon';
 import StepMenu from './StepMenu';
+import Fold from './Fold';
 import { useHoverTip } from './useHoverTip';
 
 // Lazy-load the Monaco-backed formula editor so the ~2 MB editor bundle
@@ -107,8 +109,31 @@ export default function StepToolbar({
   // Enter commits what the bar shows; read it through a ref so the handler
   // never sees an older formula than the one on screen.
   const [showSuggestions, setShowSuggestions] = useState(false);
+  // The Step Settings row (run options, panels, manage step): folded by
+  // default, so a step shows only what development needs (owner, 2026-11-15).
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // The suggestions open over the whole page (a portal, fixed under the
+  // field), as StepMenu's pop-ups do: inside the step they were covered by
+  // the widgets below it.
+  const fieldRef = useRef<HTMLDivElement>(null);
+  const [dropAt, setDropAt] = useState<{ top: number; left: number; width: number } | null>(null);
+  const suggestionsOpen = showSuggestions && suggestions.length > 0;
+  useLayoutEffect(() => {
+    if (!suggestionsOpen) { setDropAt(null); return; }
+    const place = () => {
+      const r = fieldRef.current?.getBoundingClientRect();
+      if (r) setDropAt({ top: r.bottom, left: r.left, width: r.width });
+    };
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [suggestionsOpen, formula]);
 
   // Wiring context — lets prior-step grids inject references into this formula bar
   const { activateWiring, deactivateWiring, wiringState } = useStepWiring();
@@ -228,6 +253,7 @@ export default function StepToolbar({
   const isOpen = (panel: PanelId) => openPanels.includes(panel);
   const runLabel = step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)';
   const runTip = useHoverTip(runLabel);
+  const settingsTip = useHoverTip('Step Settings');
 
   // Rows the step's Settings turned off (owner, 2026-11-13). Hidden, not
   // removed: the formula bar stays mounted for whoever focuses it.
@@ -245,7 +271,16 @@ export default function StepToolbar({
           header (owner, 2026-11-10).
           Each pops up over the page (StepMenu); each has a hover label. A
           narrow step shows icons without words (CSS container query). */}
-      <div className="toolbar step-bar" data-testid="step-toolbar" style={hides('controls') ? { display: 'none' } : undefined}>
+      {/* Consolidated (owner, 2026-11-15): only Run Step and the Step Settings
+          toggle show; the toggle slides the rest — run options, step panels,
+          managing the step — open in a bar below, as f(x) opens the formula. */}
+      <div
+        className={hides('formula') ? undefined : 'step-controls--lined'}
+        style={hides('controls') ? { display: 'none' } : undefined}
+      >
+      {/* Run Step at the top left, open space, then the Step Settings toggle
+          at the right: icons only, its name on hover (owner, 2026-11-15). */}
+      <div className="toolbar step-bar step-bar--main" data-testid="step-toolbar">
         <div className="step-bar-group step-bar-run">
           <button
             className="step-run-big"
@@ -258,10 +293,32 @@ export default function StepToolbar({
             <span>{step.status === 'running' ? 'Stop' : 'Run Step'}</span>
           </button>
           {runTip.tip}
+        </div>
+
+        {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
+        <button
+          type="button"
+          className={`step-settings-toggle${settingsOpen ? ' active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); setSettingsOpen((v) => !v); }}
+          aria-expanded={settingsOpen}
+          aria-label="Step Settings"
+          data-testid="step-settings-toggle"
+          {...settingsTip.tipProps}
+        >
+          <SymbolIcon name="settings" size={17} />
+          <SymbolIcon name="label_important" size={15} className="step-settings-caret" />
+        </button>
+        {settingsTip.tip}
+      </div>
+
+      <Fold open={settingsOpen} keepMounted>
+      <div className="toolbar step-bar step-bar--settings">
+        <div className="step-bar-group">
           <StepMenu
             icon="playlist_play"
             iconSize={22}
             label="Run options"
+            text="Run Options"
             testId="run-controls"
             className="step-bar-btn"
             items={[
@@ -319,8 +376,9 @@ export default function StepToolbar({
                 disabled: isLocked, danger: true, testId: 'btn-delete' },
             ]}
           />
-          {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
         </div>
+      </div>
+      </Fold>
       </div>
 
       {/* The f(x) button and the formula bar, on their own row */}
@@ -347,7 +405,7 @@ export default function StepToolbar({
 
         {/* The formula field: outlined, so it reads as an input, not text
             (owner, 2026-10-30); blue while being edited. */}
-        <div className="step-formula-field" style={{ flex: 1, position: 'relative' }}>
+        <div ref={fieldRef} className="step-formula-field" style={{ flex: 1, position: 'relative' }}>
           <Suspense
             fallback={
               <textarea
@@ -473,17 +531,18 @@ export default function StepToolbar({
           )}
 
           {/* Autocomplete Dropdown */}
-          {showSuggestions && suggestions.length > 0 && (
+          {suggestionsOpen && dropAt && createPortal(
             <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              right: 0,
+              position: 'fixed',
+              top: dropAt.top,
+              left: dropAt.left,
+              width: dropAt.width,
+              boxSizing: 'border-box',
               background: '#fff',
               border: '1px solid #ccc',
               borderRadius: '0 0 4px 4px',
               boxShadow: '0 4px 8px rgba(0,0,0,0.12)',
-              zIndex: 1000,
+              zIndex: 10000,
               maxHeight: '180px',
               overflowY: 'auto',
             }}>
@@ -529,7 +588,8 @@ export default function StepToolbar({
                   )}
                 </div>
               ))}
-            </div>
+            </div>,
+            document.body,
           )}
         </div>
       </div>

@@ -13,12 +13,14 @@
 
 /* ── Tabs and the helpers ─────────────────────────────────────────────── */
 
+/* The strip behind the tabs is the formula bar's dark shade, so the panel
+   reads as coming out of the bar; the active tab is the white sheet's top
+   (owner, 2026-11-15). */
 .te-tabs {
   display: flex;
   gap: 2px;
   padding: 4px 8px 0;
-  border-bottom: 1px solid #e3e7eb;
-  background: #f6f8fa;
+  background: #1e1e1e;
 }
 .te-tab {
   padding: 3px 10px 4px;
@@ -26,13 +28,13 @@
   border-bottom: 0;
   border-radius: 4px 4px 0 0;
   background: none;
-  color: #5f6b76;
+  color: #8b9097;
   font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
-  margin-bottom: -1px;
 }
-.te-tab.active { background: #fff; color: #111; border-color: #e3e7eb; }
+.te-tab:hover:not(.active) { color: #ddd; background: rgba(255, 255, 255, 0.07); }
+.te-tab.active { background: #fff; color: #111; }
 .te-tab:focus:not(:focus-visible) { outline: none; }
 
 .te-helpers {

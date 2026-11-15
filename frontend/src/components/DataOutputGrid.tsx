@@ -16,6 +16,7 @@ import SymbolIcon from './SymbolIcon';
 import type { SymbolName } from './SymbolIcon';
 import './OperationColumn.css'; // Ensure grid styles are available
 import './CellViewer.css';
+import Fold from './Fold';
 
 /** The selection's outline when the step has no colour (spec 014 REQ-VIS-012). */
 const SELECTION_EDGE = '#1f2937';
@@ -596,7 +597,7 @@ function Grid({
   const framed = (body: React.ReactNode) => (
     <div className={`data-table${collapsed ? ' is-collapsed' : ''}`} ref={rootRef}>
       {header}
-      <div hidden={collapsed}>{body}</div>
+      <Fold open={!collapsed} keepMounted>{body}</Fold>
     </div>
   );
 

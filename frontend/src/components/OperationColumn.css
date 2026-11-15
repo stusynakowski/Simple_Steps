@@ -684,7 +684,7 @@
   grid-template-columns: 1fr auto 1fr;   /* the reference centred, as wide as its text */
   height: 30px;                    /* as tall as the formula bar's row */
   margin-right: 5px;               /* as wide as the grid (its wrapper's 5px) */
-  background: #2a2a2a;
+  background: #1e1e1e;             /* the step bar's and formula row's shade (owner, 2026-11-15) */
   font-size: 12px;
   line-height: 30px;
   color: #aaa;
@@ -702,13 +702,23 @@
   padding: 0;
   cursor: pointer;
 }
+/* The dataset icon and its caret, drawn as f(x) is: a box that lights up
+   on hover, blue while the table is open (owner, 2026-11-15). */
 .data-head .data-head-toggle {
   justify-self: start;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  padding: 0 4px 0 7px;
+  height: 28px;
+  margin-left: 4px;
+  padding: 0 3px 0 6px;
+  border-radius: 4px;
+  color: #aaa;
+  transition: background 0.12s ease, color 0.12s ease;
 }
+.data-head:hover .data-head-toggle { color: #ddd; background: rgba(255, 255, 255, 0.07); }
+.data-head .data-head-toggle.open { color: #4ea1ff; background: #1f3a5f; }
 .data-head-caret { transition: transform 0.12s ease; }
 .data-head-toggle.open .data-head-caret { transform: rotate(90deg); }
 /* Open, the reference is the table's top header cell, edged by vertical
@@ -1350,8 +1360,13 @@
    buttons show their icons only (each keeps its hover label), and in a
    very narrow one, Run too. */
 @container (max-width: 560px) {
-  .step-bar .step-bar-btn .step-menu-text { display: none; }
-  .step-bar .step-bar-btn { padding: 0 4px; }
+  .step-bar:not(.step-bar--settings) .step-bar-btn .step-menu-text { display: none; }
+  .step-bar:not(.step-bar--settings) .step-bar-btn { padding: 0 4px; }
+}
+/* The settings row has the width to itself: words stay until it's narrow. */
+@container (max-width: 360px) {
+  .step-bar--settings .step-bar-btn .step-menu-text { display: none; }
+  .step-bar--settings .step-bar-btn { padding: 0 4px; }
 }
 @container (max-width: 260px) {
   .step-run-big > span { display: none; }
@@ -1379,6 +1394,48 @@
 .step-run-big .symbol-icon { color: #5fbf8a; }
 .step-run-big:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .step-locked-mark { flex: none; color: #c9a24a; opacity: 0.85; }
+
+/* The step bar (owner, 2026-11-15): Run Step, as wide as its words, at the
+   top left; open space; the Step Settings toggle (and a lock, if any) at the
+   right. */
+.step-bar--main .step-bar-run { flex: none; }
+.step-bar--main .step-bar-run + * { margin-left: auto; }
+
+/* Step Settings: drawn as f(x) and the data icon are, a box that lights on
+   hover and turns blue while open, its label_important caret turning down.
+   Icons only; its name is the hover label. It slides the settings row (run
+   options, step panels, manage step) open under the bar (Fold). */
+.step-settings-toggle {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #aaa;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.step-settings-toggle:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
+.step-settings-toggle.active { color: #4ea1ff; background: #1f3a5f; }
+.step-settings-caret { transition: transform 0.12s ease; }
+.step-settings-toggle.active .step-settings-caret { transform: rotate(90deg); }
+/* A thin line between the step toolbar and the formula bar, exactly as the
+   one under the formula bar (the wrapper's 1px #333, edge to edge, 4px under
+   the bar): the -4px reaches past the wrapper's padding (owner, 2026-11-15). */
+.step-controls--lined {
+  margin: 0 -4px;
+  padding: 0 4px 4px;
+  border-bottom: 1px solid #333;
+}
+/* The settings row sits under the bar, the bars' usual 4px apart. */
+.step-bar--settings { margin-top: 4px; }
 
 /* A step toolbar expander (StepMenu): a button that pops up its actions. */
 .step-menu { display: flex; }
@@ -1422,10 +1479,11 @@
 .step-formula-field {
   border: 1px solid #3f4246;
   border-radius: 4px;
-  background: #1a1a1a;
+  background: #1e1e1e;             /* the bar's shade at rest */
   min-width: 0;
 }
-.step-formula-field:focus-within { border-color: #4ea1ff; }
+/* Clicked into: a lighter grey, the data header's (owner, 2026-11-15). */
+.step-formula-field:focus-within { border-color: #4ea1ff; background: #2a2a2a; }
 
 /* f(x), at the start of the formula row: big enough to find at a glance. */
 .step-fx {

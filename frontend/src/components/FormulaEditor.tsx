@@ -200,7 +200,9 @@ const FormulaEditor = forwardRef<FormulaEditorRef, FormulaEditorProps>(function 
         inherit: true,
         rules: [],
         colors: {
-          'editor.background': '#1e1e1e',
+          // Transparent: the field round it sets the shade, lighter while
+          // it's being edited (.step-formula-field:focus-within).
+          'editor.background': '#00000000',
           'editor.foreground': '#d4d4d4',
           'editorCursor.foreground': '#aeafad',
           'editor.lineHighlightBackground': '#1e1e1e',
