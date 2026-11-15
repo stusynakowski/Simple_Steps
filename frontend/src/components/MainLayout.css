@@ -555,6 +555,23 @@
   cursor: pointer;
   clip-path: polygon(0 0, calc(100% - var(--d)) 0, 100% 50%, calc(100% - var(--d)) 100%, 0 100%, var(--d) 50%);
 }
+/* The step's number, centred in its chevron's body (between the tail and
+   the tip), over its fill. */
+.step-minimap-num {
+  position: absolute;
+  inset: 0 var(--d);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
 .step-minimap-step::before {
   content: '';
   position: absolute;

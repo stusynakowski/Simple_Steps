@@ -198,15 +198,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isVisible, onClose, workflow,
         )}
       </div>
 
-      <div className="copilot-tabs" role="tablist">
-        {(['chat', 'plan', 'trace', 'context'] as Tab[]).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={`copilot-tab${tab === t ? ' active' : ''}`}
-                  onClick={() => setTab(t)}>
-            {t === 'trace' && session ? `trace (${session.trace.length})` : t}
-          </button>
-        ))}
-      </div>
-
       {!workflowId && <div className="copilot-view copilot-muted">Open a workflow: each workflow has its own copilot session.</div>}
 
       {session && tab === 'chat' && (
@@ -240,6 +231,17 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({ isVisible, onClose, workflow,
                      onNotes={(notes) => void edit({ notes })}
                      onTemplates={(refs) => void edit({ templates: refs })} />
       )}
+
+      {/* The views' tabs, at the bottom by the message box: what active
+          development needs stays near where you type (owner, 2026-11-15). */}
+      <div className="copilot-tabs copilot-tabs--bottom" role="tablist">
+        {(['chat', 'plan', 'trace', 'context'] as Tab[]).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} className={`copilot-tab${tab === t ? ' active' : ''}`}
+                  onClick={() => setTab(t)}>
+            {t === 'trace' && session ? `trace (${session.trace.length})` : t}
+          </button>
+        ))}
+      </div>
 
       <div className="chat-input-area">
         {status && !ready && (

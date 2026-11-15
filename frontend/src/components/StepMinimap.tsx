@@ -10,6 +10,8 @@ interface Span { left: number; width: number }
 
 /** The map's arrow depth in pixels: `--d` on `.step-minimap-step`. */
 const ARROW_DEPTH = 6;
+/** Narrower than this (in track pixels), a step's chevron shows no number. */
+const MIN_NUMBER_WIDTH = 18;
 
 /**
  * The steps' map, along the bottom of the steps (owner, 2026-10-30): each
@@ -151,7 +153,10 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
             style={{ left, width, '--fill': s.color } as React.CSSProperties}
             aria-label={`Go to step ${i + 1}, ${s.label}${s.run ? `, ${s.run.text}` : ''}`}
             onClick={(e) => { e.stopPropagation(); setHover(null); onOpen?.(s.id); jump(span.left); }}
-          />
+          >
+            {/* Its number, centred in the chevron, where there's room (owner, 2026-11-15). */}
+            {width >= MIN_NUMBER_WIDTH && <span className="step-minimap-num" aria-hidden="true">{i + 1}</span>}
+          </button>
         );
       })}
       <div

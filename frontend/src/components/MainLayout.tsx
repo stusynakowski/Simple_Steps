@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, type ComponentProps } from 'react';
 import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
-import WorkflowNotes from './WorkflowNotes';
+import { WorkflowNotesPanel, WorkflowNotesToggle, NOTES_GRIP } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
 import { runState } from '../utils/runState';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
@@ -42,10 +42,11 @@ const DEFAULT_LEFT_SIDEBAR_WIDTH = 250;
 const DEFAULT_RIGHT_SIDEBAR_WIDTH = 300;
 // The header pane has two heights. Dragging its sash up hides the toolbar so
 // the steps reach the file tabs; dragging down shows it again, and no further —
-// there is nothing below the toolbar to reveal. Allotment reads min/max only
-// when the pane is created, so these are summed from the CSS rather than
-// measured: menubar 30 (MenuBar.css) + tabs 35 (WorkflowTabs.css) + the
-// header's 1px border, then the two-row toolbar 72 (UnifiedToolbar.css) + grip 4.
+// there is nothing below the toolbar to reveal. These are summed from the CSS
+// rather than measured: menubar 30 (MenuBar.css) + tabs 35 (WorkflowTabs.css) +
+// the header's 1px border, then the two-row toolbar 72 (UnifiedToolbar.css) +
+// grip 4. Open workflow notes add their height (headerExpanded below); a
+// changed maxSize is applied by Allotment 1.20 (seen in the browser).
 const HEADER_COLLAPSED_HEIGHT = 66;
 const HEADER_EXPANDED_HEIGHT = 142;
 const SIDEBAR_SNAP_THRESHOLD = 80; // dragging below this pixel width collapses the pane
@@ -117,6 +118,24 @@ export default function MainLayout() {
   // bar, console) is laid out by hand below — Allotment needs its panes to sum
   // to the full height, which would rule out showing background between them.
   const centerSplitRef = useRef<AllotmentHandle>(null);
+  // The split's last sizes [header, body], to resize it when the notes open.
+  const centerSizes = useRef<number[]>([]);
+
+  // The workflow notes, between the toolbar's rows (owner, 2026-11-15): the
+  // header grows by their height while they're open (border, body, grip).
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [notesHeight, setNotesHeight] = useState(140);
+  const headerExpanded = HEADER_EXPANDED_HEIGHT + (notesOpen ? 1 + notesHeight + NOTES_GRIP : 0);
+  const headerExpandedRef = useRef(headerExpanded);
+  headerExpandedRef.current = headerExpanded;
+  useLayoutEffect(() => {
+    const split = centerSplitRef.current;
+    const [h, body] = centerSizes.current;
+    if (!split || h === undefined || body === undefined) return;
+    // Only while the toolbar shows: a header dragged up stays up.
+    if (h <= HEADER_COLLAPSED_HEIGHT) return;
+    if (h !== headerExpanded) split.resize([headerExpanded, body + h - headerExpanded]);
+  }, [headerExpanded]);
 
   const {
     workflow,
@@ -604,8 +623,9 @@ export default function MainLayout() {
     const split = centerSplitRef.current;
     const [h, body] = sizes;
     if (!split || h === undefined || body === undefined) return;
-    const mid = (HEADER_COLLAPSED_HEIGHT + HEADER_EXPANDED_HEIGHT) / 2;
-    const next = h < mid ? HEADER_COLLAPSED_HEIGHT : HEADER_EXPANDED_HEIGHT;
+    const expanded = headerExpandedRef.current;   // taller while the notes are open
+    const mid = (HEADER_COLLAPSED_HEIGHT + expanded) / 2;
+    const next = h < mid ? HEADER_COLLAPSED_HEIGHT : expanded;
     if (next !== h) split.resize([next, body + h - next]);
   }, []);
 
@@ -862,9 +882,19 @@ export default function MainLayout() {
           />
         }
         workflowSlot={
-          <WorkflowNotes
+          <WorkflowNotesToggle
+            open={notesOpen}
+            hasNotes={typeof workflow.meta?.notes === 'string' && !!workflow.meta.notes.trim()}
+            onToggle={() => setNotesOpen((v) => !v)}
+          />
+        }
+        betweenRows={
+          <WorkflowNotesPanel
+            open={notesOpen}
             notes={typeof workflow.meta?.notes === 'string' ? workflow.meta.notes : undefined}
             onChange={(notes) => updateWorkflowMeta({ notes })}
+            height={notesHeight}
+            onHeight={setNotesHeight}
           />
         }
       />
@@ -1056,12 +1086,13 @@ export default function MainLayout() {
                 vertical
                 proportionalLayout={false}
                 ref={centerSplitRef}
+                onChange={(sizes) => { centerSizes.current = sizes; }}
                 onDragEnd={snapHeader}
               >
                 <Allotment.Pane
-                  preferredSize={HEADER_EXPANDED_HEIGHT}
+                  preferredSize={headerExpanded}
                   minSize={HEADER_COLLAPSED_HEIGHT}
-                  maxSize={HEADER_EXPANDED_HEIGHT}
+                  maxSize={headerExpanded}
                 >
                   {headerBlock}
                 </Allotment.Pane>

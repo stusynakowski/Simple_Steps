@@ -27,6 +27,8 @@ interface UnifiedToolbarProps {
   overviewMenu?: React.ReactNode;
   /** Room for more workflow components, between Overview and server status. */
   workflowSlot?: React.ReactNode;
+  /** Between the two rows: the workflow's notes, when open (owner, 2026-11-15). */
+  betweenRows?: React.ReactNode;
   /** Room for more workflow info, between the run status and the log button. */
   infoSlot?: React.ReactNode;
   /** Whether this tab's session is live; shown as the server-status pill. */
@@ -49,6 +51,7 @@ export default function UnifiedToolbar({
   pipelineMeta,
   overviewMenu,
   workflowSlot,
+  betweenRows,
   infoSlot,
   connection,
   latestLog,
@@ -71,6 +74,8 @@ export default function UnifiedToolbar({
           <SessionStatus connection={connection} />
         </div>
       </div>
+
+      {betweenRows}
 
       {/* ═══ Row 2: running it — Run controls | run status | … | Logs ═══ */}
       <div className="ut-row ut-row-run" data-testid="ut-row-run">

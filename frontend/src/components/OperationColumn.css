@@ -721,14 +721,23 @@
 .data-head .data-head-toggle.open { color: #4ea1ff; background: #1f3a5f; }
 .data-head-caret { transition: transform 0.12s ease; }
 .data-head-toggle.open .data-head-caret { transform: rotate(90deg); }
-/* Open, the reference is the table's top header cell, edged by vertical
-   lines; folded, there is no table under it, so it goes dark with the bar. */
+
+/* Open (owner, 2026-11-15): the header is two rows — the bar, then a row as
+   tall as a column header, where widgets for editing the data will go, left
+   and right of the reference. The reference spans both: a cell of the table,
+   boxed like the column headers so it reads as clickable, its name over the
+   step's size. */
+.data-table:not(.is-collapsed) .data-head {
+  grid-template-rows: 30px 26px;
+  height: 56px;
+}
+.data-table:not(.is-collapsed) .data-head .data-head-toggle { grid-row: 1; }
 .data-head .data-head-ref {
   min-width: 0;
   padding: 0 12px;
   background: #f3f3f3;
-  border-right: 1px solid #c4c4c4;
-  border-left: 1px solid #c4c4c4;
+  border: 1px solid #c4c4c4;
+  border-bottom: none;            /* the column headers' own line is under it */
   color: #555;
   font-size: 0.8rem;
   font-weight: 700;
@@ -737,10 +746,32 @@
   text-overflow: ellipsis;
   transition: background 0.1s ease;
 }
+.data-table:not(.is-collapsed) .data-head .data-head-ref {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-self: end;
+  height: 50px;                   /* almost the header's height: a gap above */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.2;
+  border-radius: 4px 4px 0 0;
+}
+.data-head-dims {
+  color: #777;
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
 .data-head .data-head-ref:hover { background: #e6f7ff; color: #0b5cad; }
 .data-head .data-head-ref.is-selected { background: #d4d7dc; color: #222; }
 .data-table.is-collapsed .data-head .data-head-ref { background: transparent; border-color: transparent; color: #ccc; }
 .data-table.is-collapsed .data-head .data-head-ref:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+/* The size: under the name while open, at the bar's right while folded. */
+.data-table.is-collapsed .data-head-dims { display: none; }
+.data-table:not(.is-collapsed) .data-head-size { display: none; }
 .data-head-size {
   justify-self: end;
   min-width: 0;
@@ -1391,8 +1422,15 @@
   cursor: pointer;
   transition: background 0.12s ease, color 0.12s ease;
 }
-.step-run-big .symbol-icon { color: #5fbf8a; }
-.step-run-big:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+/* Run Step looks and feels like the toolbar's Run Workflow (.ut-btn-run,
+   owner 2026-11-15): green words and icon in a faint green outline; hover
+   tints it green and firms the outline. */
+.step-run-big,
+.step-run-big .symbol-icon { color: #4ade80; }
+.step-run-big { box-shadow: inset 0 0 0 1px #4ade8040; }
+.step-run-big:hover { background: #4ade8018; box-shadow: inset 0 0 0 1px #4ade8080; }
+.step-run-big:hover,
+.step-run-big:hover .symbol-icon { color: #6aff9a; }
 .step-locked-mark { flex: none; color: #c9a24a; opacity: 0.85; }
 
 /* The step bar (owner, 2026-11-15): Run Step, as wide as its words, at the

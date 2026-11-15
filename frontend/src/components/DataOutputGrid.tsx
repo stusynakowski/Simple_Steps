@@ -548,6 +548,7 @@ function Grid({
   const paged = cells.length > 0 && total > rows.length;
   const first = rows.length ? rows[0] : 0;
   const size = `${total.toLocaleString()} row${total !== 1 ? 's' : ''} × ${cols.length} col${cols.length !== 1 ? 's' : ''}`;
+  const sizeTitle = `The step's size: ${size}${paged ? ` (${rows.length.toLocaleString()} shown on this page)` : ''}`;
 
   // The table's header (owner, 2026-11-13, dev_plan/133 §2): `Data` folds and
   // unfolds it, `wf["step"]` in the middle is the whole step (a click selects
@@ -589,9 +590,12 @@ function Grid({
         onMouseEnter={() => { setHoveredCol('__table__'); onHoverChange?.({ kind: 'table' }); }}
         onMouseLeave={() => setHoveredCol(null)}
       >
-        wf["{stepName}"]
+        <span className="data-head-name">wf["{stepName}"]</span>
+        {/* Open, the size is written under the name (owner, 2026-11-15). */}
+        <span className="data-head-dims" title={sizeTitle}>{size}</span>
       </button>
-      <span className="data-head-size" title={`The step's size: ${size}${paged ? ` (${rows.length.toLocaleString()} shown on this page)` : ''}`}>{size}</span>
+      {/* Folded, at the right of the bar. */}
+      <span className="data-head-size" title={sizeTitle}>{size}</span>
     </div>
   );
   const framed = (body: React.ReactNode) => (
@@ -790,6 +794,9 @@ function Grid({
                 cursor: 'pointer',
                 ...(wiringMode && hoveredRow === r ? { background: HOVER_BG } : {}),
                 ...(!wiringMode && activeCell?.row === r ? { background: ACTIVE_HEADER_BG, color: '#222' } : {}),
+                // Part of the selection's box when it holds the # column (the
+                // index selected from its header, a row, the whole table).
+                ...outline(r, INDEX_COL),
               }}
               onMouseDown={(e) => startDrag({ kind: 'row', row: r }, e)}
               onClick={(e) => handleRowClick(r, e)}

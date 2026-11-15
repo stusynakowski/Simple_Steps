@@ -400,7 +400,8 @@ export default function useWorkflow() {
     const newStep: Step = {
       id: genId('step'),
       sequence_index: index,
-      label: label || `Step ${index}`,
+      // Counted from 1, as the steps' map and a squeezed step's number are.
+      label: label || `Step ${index + 1}`,
       formula: '',
       process_type: 'noop',
       configuration: {},
