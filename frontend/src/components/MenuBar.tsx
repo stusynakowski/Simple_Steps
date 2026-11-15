@@ -19,7 +19,6 @@ interface MenuBarProps {
   onSave: () => void;
   onSaveAs: () => void;
   onRename: () => void;
-  onEditFiles?: () => void;
   // Phase A.5 — workspace management
   /** Display name of the active workspace (basename of its absolute path). */
   workspaceName?: string;
@@ -41,7 +40,6 @@ export default function MenuBar({
   onSave,
   onSaveAs,
   onRename,
-  onEditFiles,
   workspaceName,
   recentWorkspaces = [],
   onOpenWorkspace,
@@ -195,13 +193,8 @@ export default function MenuBar({
         {isModified && <span className="breadcrumb-dot" title="Unsaved changes">●</span>}
       </div>
 
-      <div className="menubar-right">
-        {onEditFiles && (
-          <button className="menubar-edit-files" onClick={onEditFiles}>
-            Edit Files
-          </button>
-        )}
-      </div>
+      {/* Edit Files moved to the explorer's toolbar (owner, 2026-11-15). */}
+      <div className="menubar-right" />
     </div>
   );
 }

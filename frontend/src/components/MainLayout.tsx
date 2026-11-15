@@ -830,7 +830,6 @@ export default function MainLayout() {
         onSave={handleSave}
         onSaveAs={handleSaveAs}
         onRename={() => setRenameModalOpen(true)}
-        onEditFiles={handleOpenFileEditor}
         workspaceName={workspaceInfo?.name}
         recentWorkspaces={workspaceInfo?.recent_workspaces ?? []}
         onOpenWorkspace={handleOpenWorkspace}
@@ -1064,6 +1063,7 @@ export default function MainLayout() {
                 onLoadPipeline={openPipelineTab}
                 onRequestSave={handleRequestSaveFromSidebar}
                 onDeletePipeline={removePipeline}
+                onEditFiles={handleOpenFileEditor}
               />
               {/* Collapse toggle pinned to the inner edge — click to hide the
                   sidebar.  A matching peek-tab (rendered below) brings it back. */}

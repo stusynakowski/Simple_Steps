@@ -591,7 +591,7 @@ function Grid({
         onMouseLeave={() => setHoveredCol(null)}
       >
         <span className="data-head-name">wf["{stepName}"]</span>
-        {/* Open, the size is written under the name (owner, 2026-11-15). */}
+        {/* Open, the size is at the right end of the step's row (owner, 2026-11-15). */}
         <span className="data-head-dims" title={sizeTitle}>{size}</span>
       </button>
       {/* Folded, at the right of the bar. */}

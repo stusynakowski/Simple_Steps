@@ -28,6 +28,8 @@ interface SidebarProps {
   /** Called when user clicks 💾 on a project folder — opens SaveModal in MainLayout */
   onRequestSave?: (projectId: string, projectDisplayName: string) => void;
   onDeletePipeline?: (projectId: string, pipelineId: string) => Promise<void>;
+  /** Open the workspace file editor: on the explorer's toolbar. */
+  onEditFiles?: () => void;
 }
 
 // ── Settings Panel ────────────────────────────────────────────────────────
@@ -218,6 +220,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
       <div className="sidebar-header">
         <span>{titles[currentView ?? ''] ?? 'Explorer'}</span>
       </div>
+
+      {/* The explorer's toolbar, above the root folder (owner, 2026-11-15). */}
+      {currentView === 'explorer' && rest.onEditFiles && (
+        <div className="explorer-toolbar" role="toolbar" aria-label="Explorer">
+          <button type="button" className="explorer-toolbar-btn" onClick={rest.onEditFiles}
+                  title="Edit the workspace's files" data-testid="edit-files">
+            <SymbolIcon name="edit" size={14} />
+            <span>Edit Files</span>
+          </button>
+        </div>
+      )}
 
       {currentView === 'explorer' && (
         <FileTree
