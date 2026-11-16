@@ -847,7 +847,7 @@ rule. REQ-MAP-012 is that rule.
 
 ## 10f. Copy as values: the data now, without references
 
-**The need (owner, 2026-11-16):** copy the data a step (or a selection of
+**The need (owner, 2026-11-16):** copy the data a step (or a pick of
 it) has now, as plain values, **without recording references**: a snapshot
 that no longer follows where the data came from.
 
@@ -883,10 +883,10 @@ once).
 
 | Action | Where | Result |
 |---|---|---|
-| **Copy as values** | a step's or a selection's popover | a **new data step** to the right, holding the copied cells; the original step is unchanged |
+| **Copy as values** | a step's or a pick's popover | a **new data step** to the right, holding the copied cells; the original step is unchanged |
 | **Make values** (135 E8) | a computed step's popover | the **same step** becomes a data step holding its current values: its expression is replaced, its references dropped |
 
-A selection copies only what it covers (rows, columns, a block), keeping
+A pick copies only what it covers (rows, columns, a block), keeping
 column names and types.
 
 ### 10f.3 The rules

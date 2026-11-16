@@ -49,7 +49,7 @@ view:  step, state, summary, formula, columns, rows, row_count, window, markers,
 k.cell(step, row, col): + inputs (input step, row, values), lineage, column_number
 ```
 
-A selection is a reference, and **the whole step and any pick of it are the
+A pick is a reference, and **the whole step and any pick of it are the
 same type** (`StepRef`): `wf["s"]`, `wf["s"][0]`, `wf["s"][0][cols["n"]]`.
 
 **What's missing:** a named object model the app, the agent and a terminal
@@ -66,7 +66,7 @@ reference for each:
 | **Column** | name, type; its header | header = the column's identity, never data |
 | **Row** | its position (the index), lineage to input rows | index = identity, never data |
 | **Cell** | value, type, state (absent, known, pending, blocked, failed, invalid), error, provenance | the only place data lives; `stale` belongs to the step |
-| **Selection** | a cell, a block, rows, columns, the whole step | a `StepRef` with a `kind`; prints as formula text |
+| **Pick** | a cell, a block, rows, columns, the whole step | every pick is a grid (no new type); prints as formula text |
 
 **Decided (owner, 2026-11-15):** core makes these objects real. Their
 definitions must be **very clear, and say how each is used**.
@@ -80,7 +80,7 @@ definitions must be **very clear, and say how each is used**.
   the formula (how it's written as text, e.g. `wf["s"][0][cols["n"]]`),
   the agent (what it reads), and a Python terminal (what you call);
 - **how it maps to core today**, and the core ask that makes it real
-  (typed `k.view` / `k.cell` results; `StepRef.kind` for selections).
+  (typed `k.view` / `k.cell` results; picks need nothing new).
 
 Agreed with the owner before the core asks go out. It answers I3 and I4
 directly, and every other track uses it.
@@ -102,7 +102,7 @@ typed table (`table[mod.source()](data={…})`, run). None of it is built.
 locks and "Make values" (E). Uploading a table is a `load_csv`-style
 source, or a paste into a data step (135 §3.1).
 
-**Depends on:** Track A for the Cell/Selection objects the gestures act on
+**Depends on:** Track A for the cells and picks the gestures act on
 (can start with today's `k.view` dict and switch).
 
 ### Track C — Data: lineage and keeping results (I5, I6) · both
@@ -187,7 +187,7 @@ step's inputs and the catalog, and returns one formula. It is the main
 agent's proposal reduced to one step, so it reuses the same checks.
 
 **Depends on:** Track A (a step agent reasons about a step's Grid and
-Selections), Track C (it should see lineage when explaining a value).
+picks), Track C (it should see lineage when explaining a value).
 
 ### Across all tracks — the overlap a reactive app needs
 
@@ -274,16 +274,16 @@ Each phase ships on its own and is confirmed with the owner first
 | Phase | What | Track | Owner |
 |---|---|---|---|
 | **P0** | The table model ([019](../spec/019-table-model.md)) and table mappings ([020](../spec/020-table-mappings.md)), decided (§5). Core refinements: flag the whole chain, a reader's own state `stale`, markers, clear/reset, F3, the chain rule, map settings (F2, F7), `StepRef.kind`, `call` in `k.cell`, unpivot/pivot, uneven data | A | spec, then core |
-| **P0c** | Prototype call keys for `1 → 1` verbs on today's row ids: hashing cost, the determinism default, re-run counts (the 6 → 2 probe). Then decide the core redesign: K31 points 4 and 7, K32 points 1, 3, 5 and 7 | A, C·I5 | core |
+| **P0c** | ~~Prototype call keys~~ **Superseded (2026-11-16) by core's own plan** (`core-handover` `73933ba`, [008 §Core's plan](../core-proposals/008-core-changes.md)): core goes P2 (states from the store) → P3 (row maps, one `relation()`) → P7d (incremental runs by row state, saving as a run goes, progress and cancel). Call keys' per-cell "may change" and early cutoff are not in it: open (§5) | A, C·I5 | core |
 | **P0b** | Reactivity tiers agreed; the shared conformance corpus; the browser's tier-1 reader (tokens, spans) behind it | all | app |
 | **P1** | Row lineage on screen: plumb `k.cell` inputs; cell formula line; lineage gutter | C·I6 | app |
 | **P2** | Editing, 135 phases A–C: `table` source, data entry, rows, columns, paste/upload | B | app |
 | **P3** | Editing, 135 phases D–E: example row → every row, locks, Make values | B | app |
-| **P4a** | Saving to disk: one output store per step (K16, K22, K26); `result_store` = `memory` / `disk` / `auto` with a size threshold; replaces the legacy `DATA_STORE` and the C32 shim. Not gated on P0c | C·I5 | core interface, then app |
+| **P4a** | Saving to disk: one output store per step (K16, K22, K26); `result_store` = `memory` / `disk` / `auto` with a size threshold; replaces the legacy `DATA_STORE` and the C32 shim. Not gated on P0c. Planned in [138](./138-runs-and-big-data.md) (B1–B4), with runs that never block the app (N0–N3) | C·I5 | app now, core's store when it lands |
 | **P4b** | Incremental runs and resuming on call keys; progress/cancel (K31, K23), if P0c says go | C·I5 | core, then app |
 | **P5** | Grouped steps: the spec field; core ask; folded groups in the UI | D·I7 | core + app |
 | **P6** | Export: script (132), then notebook by group | D·I10 | app |
-| **P7** | Components: one way to attach a UI to a tool/resource/cell type; plots first (131) | D·I9 | app (+ K21) |
+| **P7** | Components: one way to attach a UI to a tool/resource/cell type; plots first (131). Planned in [137](./137-ui-components.md) | D·I9 | app (+ K21) |
 | **P8** | Agent: polish list; step sub-agent | E | app |
 | **Ongoing** | Polish: UI fixes as found (small frontend fixes are made, not asked about) | — | app |
 
@@ -307,7 +307,10 @@ Each phase ships on its own and is confirmed with the owner first
   (a rough 1.5–3 months), not cleanup.
 - **Row picks:** a saved `wf["f"][2]` keeps its position and checks the
   row's key ("reference moved" on a mismatch).
-- **Selections:** stay `StepRef`, with a `kind`.
+- **Picks:** the word is *pick* (core's), and "selection" is retired;
+  every pick is a grid, with no new types and no `kind` (2026-11-16).
+- **Always async** ([138](./138-runs-and-big-data.md)): every run is a
+  background job; the app is never waiting on a tool.
 - **Determinism:** tools are deterministic by default; LLM, API and random
   tools declare otherwise.
 - **Chains:** a tool step may add one no-tool reshape before its tool and
@@ -324,12 +327,31 @@ Each phase ships on its own and is confirmed with the owner first
 - **Saving to disk (P4a):** each step's output can be saved to disk; a
   system setting chooses memory, disk, or automatic above a size threshold.
 
+**Core's plan (reviewed 2026-11-16, `core-handover` `73933ba`)** covers
+most of P0 and P4–P6: its P1 closes the app's shims; P1c saves a session as
+a folder (entered data, then outputs and media); P7r gives a cell's call
+(what P1 shows); P7a stages; P7b `k.to_python()` (P6's script); P7c spans
+and the corpus (P0b); P7d keeping results. The full mapping, and what it
+leaves out, is in [008 §Core's plan](../core-proposals/008-core-changes.md).
+The app's runs and storage follow it in [138](./138-runs-and-big-data.md).
+
 **Open:**
 
 1. **Export targets (I10):** after script and notebook, which framework
    first?
 2. **Agent polish (I8):** list what feels wrong in use, so P8 has concrete
    items.
+3. **Renaming "selection" in the code** (28 files: `SelectionInspector`,
+   `GridSel`, …): a retired-word cleanup, inventory first, confirmed before
+   it's done. The docs use *pick* from 2026-11-16.
+4. **Per-cell "may change"** (owner, 2026-11-16: "if it's a small change"):
+   ask core for the small form, after its P3: flag the rows an edit affects
+   by following row maps downstream, and re-run only those in P7d. Not the
+   call-key hashing, which is the large part.
+5. **Asks core's plan doesn't have yet:** the chain rule and map settings
+   (K32.4, K32.8), clearing (`k.clear`, K31.8), `async def` tools (C48),
+   saving only what changed (C49). Into core's P1/P8?
+6. **The literal table tool's name** (core P-D10: `table` is already a verb).
 
 ---
 

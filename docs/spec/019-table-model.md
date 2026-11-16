@@ -20,7 +20,7 @@ The owner's rules (2026-11-16). Everything below follows from them.
 | **T2** | **A table is a grid of data, with headers and an index** to reference the data in the grid. |
 | **T3** | **Rows are samples; columns are variables** of each sample. What counts as a sample or a variable depends on the goal, so tables are restructured by reshaping ([020](./020-table-mappings.md)). |
 | **T4** | **A tool is fixed code.** Changing a step's tool call changes only *how it's applied*: its arguments and its modifiers. |
-| **T5** | **A tool's arguments are literals, cells, or grid selections**, depending on the tool and how its modifiers apply it. |
+| **T5** | **A tool's arguments are literals, cells, or grid picks**, depending on the tool and how its modifiers apply it. |
 | **T6** | **A tool may map data in its own way;** its insides are abstracted, and that is fine. |
 | **T7** | **Modifiers are lossless with respect to references:** for any cell, you can recover the earlier cells, the arguments and the tool that made it. The one deliberate exception is **Copy as values**: an explicit snapshot that keeps the values and drops the references ([020 §10f](./020-table-mappings.md)). |
 | **T8** | **A change is seen at once:** if anything a cell was made from changes (an argument, a modifier, the tool, an input cell), the cell, and everything made from it, shows it *may change* if run again. |
@@ -171,7 +171,7 @@ lives.
 | Agent | reads a value and where it came from, to explain it |
 | Terminal | `k.cell("step", 1, "temp_c")` |
 
-### 2.4 Selection
+### 2.4 Pick
 
 **What it is:** a part of one table's grid, picked by clicking or written in
 a formula. It points at data; it holds none. Its kinds, nested by size:
@@ -186,12 +186,14 @@ Table                   wf["s"]                         every cell
 └── Cells               (⌘-click several)               scattered: UI only
 ```
 
-**REQ-TBL-005** Every selection a formula can use prints as formula text,
-and reads back to the same selection.
+**REQ-TBL-005** Every pick a formula can use prints as formula text,
+and reads back to the same pick.
 
-**Decided (owner, 2026-11-16):** a selection stays a `StepRef`, the same
-type as the whole step, so anything that takes a step takes a pick of it.
-It gains a `kind`: `table`, `rows`, `columns`, `block` or `cell`.
+**Decided (owner, 2026-11-16):** the word is **pick**, core's word, in the
+app and core alike; "selection" is retired. As core has it (core plan
+P-D6), **every pick is a grid** and there are no new types: anything that
+takes a step takes a pick of it. No `kind` is asked of core; the UI already
+knows what it picked.
 
 ### 2.5 Markers: values that aren't data
 
@@ -256,12 +258,12 @@ modifier:
 |---|---|
 | **accepted type** | the type a parameter takes, from the tool's signature (`temp_c: float`) |
 | **binds** | which column fills a parameter: **by name**, or as written in the formula; never by type alone (130 R9) |
-| **schema** | the types a selection covers: one type for a cell or column, a name → type map for a block |
-| **fits** | the bound selection's schema matches the accepted type; if not, the step has a problem naming both |
+| **schema** | the types a pick covers: one type for a cell or column, a name → type map for a block |
+| **fits** | the bound pick's schema matches the accepted type; if not, the step has a problem naming both |
 | **compatible columns** | the columns that would fit a parameter: what the UI offers when you bind by hand |
 
 **REQ-TBL-007** (T4) Changing a step's arguments or modifiers re-checks the
-binding: a selection that no longer fits is a problem on the step, before
+binding: a pick that no longer fits is a problem on the step, before
 anything runs. Changing a tool's accepted type (its code) re-checks every
 step that uses it.
 
@@ -507,7 +509,7 @@ re-assigning the same formula brings the old output back).
 | Operation | Removes | The step becomes | Steps reading it |
 |---|---|---|---|
 | **Clear output** | the data, keeps the expression | `staged`, all cells `pending` | `stale` |
-| **Clear cells** (a selection, or every `failed` cell) | those values | `staged`, those cells `pending` | `stale` |
+| **Clear cells** (a pick, or every `failed` cell) | those values | `staged`, those cells `pending` | `stale` |
 | **Clear all outputs** | every step's data | all `staged` | — |
 | **Reset step** | the expression and the data | the empty step (`EMPTY`) | invalid until rewritten |
 
@@ -533,7 +535,7 @@ the same stored output. The two are one mechanism:
 | Clear | Removes from the store | Next run computes |
 |---|---|---|
 | **Clear output** | every call of the step | the whole step |
-| **Clear cells** (a selection) | the calls that made those cells | just those calls |
+| **Clear cells** (a pick) | the calls that made those cells | just those calls |
 | **Clear failed cells** | the failed calls | just the retries |
 | **Clear all outputs** | every step's calls | everything |
 
@@ -556,7 +558,7 @@ steps downstream keep their results until a re-run shows they changed.
 | Table | a dict from `k.view(step)`: `columns, rows, state, summary, formula, row_count, window, markers, lineage` | a typed `Table` |
 | Grid, Row, Column | dicts in the view: rows `{"#", position, state, lineage, cells}` (`#` is `0..n-1`); columns `{name, type, "#"}` | typed `Row`, `Column` |
 | Cell | `{value, state, type}`; from `k.cell`: `+ inputs, lineage, row, column, column_number, step` | a typed `Cell` with full `provenance`, **including its `call`** (§4.1) |
-| Selection | every form is `StepRef` | `StepRef.kind` (§2.4): one type, with the kind of pick |
+| Pick | every form is `StepRef`; every pick is a grid | nothing new: core's P1b writes it down (§2.4) |
 | Provenance | inputs per cell; expression and `ran_with` per step; F3, F4 gaps | complete inputs for every modifier (REQ-TBL-008) |
 | Change | step `stale` with a reason; readers stay `completed`, flagged only in `needs_run()`; **two steps down isn't flagged at all**; a one-cell edit re-runs every row downstream (run: 6 calls for 2 needed) | call keys (§4.3): per-cell "may change", flagged however far down, and re-runs of only those calls (REQ-TBL-013–018); [008 K31](../core-proposals/008-core-changes.md#k31-call-keys-change-and-reuse-per-tool-call), building on K20 and K22 |
 | Markers | all `None`; `NaN` lost | `EMPTY`, `MISSING`, `ERROR`, `NAN` |
@@ -579,7 +581,7 @@ steps downstream keep their results until a re-run shows they changed.
    one key per tool call from the cells it read. Tools are deterministic by
    default; non-deterministic ones declare it and carry a recorded seed.
 8. **Row picks:** position, checked against the row's key (§2.2).
-9. **Selections:** `StepRef` with a `kind` (§2.4).
+9. **Picks:** the word is *pick*; every pick is a grid, with no new types (§2.4).
 10. **Scope:** refine first ([136 §5](../dev_plan/136-consolidation-plan.md)).
     §4.3's rollout steps 1–2 are prototyped on today's row ids before core
     commits to the reference column and the store (steps 3–4).

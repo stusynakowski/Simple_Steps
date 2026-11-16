@@ -2225,6 +2225,58 @@ int); `k["s"] = add_k[mod.map()](wf["r"])` with `add_k(n: int, k: int)`.
 
 No shim.
 
+### C48. An `async def` tool is stored as an un-awaited coroutine
+
+**Run** (2026-11-16, core `dbaf4c7`, `scripts/core_probes/probe_async_tool.py`):
+`async def slow(n: int) -> int` declared with `@tool`;
+`k["t"] = slow[mod.map()](wf["s"])`; `k.run("t")`.
+
+**Got:** state `completed`; every cell `{state: 'known', type: 'coroutine',
+value: <coroutine object slow …>}`. No error, no warning, and a
+`RuntimeWarning: coroutine was never awaited` at exit.
+
+**Ask:** a coroutine function is awaited; under `map` (and other per-row
+verbs) its calls may run concurrently, up to a limit the step or the run
+sets. Until then, refuse an `async def` tool at declaration with a clear
+problem rather than storing coroutines. App plan:
+[138 N3](../dev_plan/138-runs-and-big-data.md).
+
+### C49. A save writes only what changed, and a load reads lazily
+
+**Reviewed** (2026-11-16, core `core-handover` at `73933ba` with its
+uncommitted `saving.py`): `Kernel.save(folder)` "saving again into the same
+folder replaces it", and `Kernel.load` builds every step's data in memory.
+Run: a plain data step round-trips exactly; a numpy-array column is
+reported, not lost (`"pic": "a ndarray can't be saved"`), pending media
+files.
+
+**Ask**, for big files (app plan [138 B2](../dev_plan/138-runs-and-big-data.md)):
+1. A save into an existing session folder rewrites only the steps whose data
+   version differs from the one recorded there (and `k.save(folder, steps=[…])`
+   saves just those), so saving after each run costs what that run changed.
+2. A load reads a step's output only when it's read (core's L6), so opening a
+   big session is quick and a page reads only its rows.
+
+## Core's plan at `core-handover` `73933ba` (reviewed 2026-11-16)
+
+Core's own plan (`docs/design/plan.md`) answers the 136 asks this way; the
+app's plans follow it.
+
+| App ask | Core's answer |
+|---|---|
+| Grid, Row, Column, Cell, Selection objects (136-A) | **no new types**: every part of a grid is a *pick*, and every pick is a grid (P-D6); "selection" is retired. **Adopted by the app (owner, 2026-11-16)**: the word is *pick*, and no `kind` is asked |
+| row picks by position + key (019 §2.2) | P4, P-D3: a pick saves its row's identity, its number worked out each time. Same decision |
+| K31 call keys, per-cell "may change" | not adopted as such. Core goes **P2** (states only from the store), **P3** (row maps, one `relation()`), then **P7d**: incremental runs by row state, layer-3 saving, progress and cancel. Per-cell "may change" and early cutoff aren't in it yet |
+| K32 chain rule, map settings (F2, F7), unpivot/pivot | `melt`, `pivot` from pack/unpack (S7, P8); the chain rule and map settings aren't in it yet |
+| clearing (`k.clear`, `k.reset`) | not in it yet |
+| keeping results, output store (K16, K22, C32) | **P1c**: the session folder (`k.save`, `Kernel.load`), layer 1 in progress, layer 2 (outputs, media) next; **P7d**: the store interface |
+| a cell's call (019 §4.1, 136-P1) | **P7r**, first of P7: `k.cell` gives the tool, its hash, the verb, each argument with its source |
+| stages / grouped steps (R9) | **P7a**: `k.stage(...)`, kept valid through edits; `k.run(stage=…)` |
+| export (132) | **P7b**: `k.to_python()` |
+| spans and the corpus (136-P0b) | **P7c** |
+| determinism default (019 §4.3) | **S9** (P8): pure, seeded, versioned, volatile tools |
+| `async def` tools (C48), quick saves (C49) | not in it: to raise |
+
 ## Old IDs and shim tags
 
 | Old ID / tag | Here |
