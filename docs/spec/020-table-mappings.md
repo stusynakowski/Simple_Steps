@@ -896,6 +896,107 @@ for people only; it has no effect on keys, references or state.
 
 ---
 
+## 10g. Uneven data: conventions
+
+**The need (owner, 2026-11-16):** data is often uneven: lists of different
+lengths, empty lists, records with different fields. Reshaping it must
+follow one set of conventions, so nothing is lost or invented silently.
+
+**Today (run,** `scripts/core_probes/probe_uneven_inverses.py`**):**
+
+```text
+ d:  city   tags                    expand(tags)                #d  item │ expanded
+     Oslo   [cold]          ──▶     Oslo's 1 row                 0   0   │ cold
+     Rome   []                      Rome:  gone                  2   0   │ hot
+     Cairo  [hot, dry, sun]         Cairo's 3 rows               2   1   │ dry
+     Lima   None                    Lima:  gone                  2   2   │ sun
+```
+
+Rome (empty list) and Lima (`None`) **vanish**: two samples lost without a
+word. widen, by contrast, already does the right thing: dicts with
+different keys give the union of keys as columns, and a missing key is
+`MISSING` (state `absent`). Core also refuses up front a tool typed
+`tags: list` when the column can hold `None` ("accept list | None, or
+filter the Nones first").
+
+### The conventions
+
+**U0. One filler, `MISSING`.** Wherever reshaping has no value for a
+position, the cell holds `MISSING` (state `absent`; 019 §2.5), never
+`None`, `NaN` or a default. Nothing is invented, and a filler is always
+visible.
+
+| # | Case | Convention | Today |
+|---|---|---|---|
+| **U1** | **expand** an empty list or `None` | **keep the sample:** one row, its item `MISSING`. Dropping it is a setting you choose (`expand(empty="drop")`) | dropped silently |
+| **U2** | **expand** several list columns together, of different lengths | align by item position, pad the shorter with `MISSING` to the longest; `align="shortest"` or `"strict"` (a problem on mismatch) by choice | — (no parallel expand) |
+| **U3** | **widen** records with different keys | the union of keys, in first-seen order; a missing key → `MISSING` | ✓ |
+| **U4** | **map** a tool that returns records with different keys | as U3 | not run |
+| **U5** | **pivot** with a missing (id, name) pair | `MISSING` in that cell | — (no pivot) |
+| **U6** | **pivot** with two rows for one pair | a problem on the step, unless a reducing tool is given | — |
+| **U7** | **unpivot** a `MISSING` cell | keep the row, its value `MISSING`; `drop_missing=True` by choice | — |
+| **U8** | **stack** tables with different columns | the union of columns; a table's missing column → `MISSING` | not run |
+| **U9** | **join** with no match | inner by default (rows without a match are dropped, and the step says how many); `how="left"` keeps them with `MISSING` | not run |
+
+**REQ-MAP-018** Reshaping never drops a sample or invents a value
+silently. A position without a value holds `MISSING`; dropping is always a
+setting the user chose, and the step says how many rows it dropped.
+
+---
+
+## 10h. Inverses: operations that undo each other
+
+**The need (owner, 2026-11-16):** verbs that should be inverses must be
+exact inverses, so a reshape can always be undone, and an undo gives back
+exactly what was there.
+
+**Exact inverse** means: B applied to A's output gives back A's input,
+with the **same cells (values and markers), the same row order, the same
+column order**, and **the same cell keys**, so every reference still points
+at the original cells.
+
+### 10h.1 The pairs
+
+| A | its inverse B | Restores from | Today (run) |
+|---|---|---|---|
+| **spread** (expand) | **gather**: by parent, the items back into a list, in item order | the reference column (parent + item), not data | needs lineage copied into data first; `as_list` returns records, not the list; U1 rows can't come back |
+| **pack** (nest) | **widen** (unnest) | the column map: where each field came from | same values; **columns moved to the end** |
+| **unpivot** | **pivot** | the reference column (row + column) | — (proposed) |
+| **order** (sort) | **unsort**: back to input order | the reference column (input row) | needs lineage copied into data |
+| **rename** | rename back | the column map | ✓ |
+| **copy** (a column) | drop the copy | the column map | ✓ |
+| **stack** | **split** by input | the reference column (which input) | — |
+
+### 10h.2 Lossy verbs: no inverse, but recoverable
+
+These keep fewer cells than they read, so no verb can invert them:
+**keep** (filter, slice), **select / drop**, **distinct**, **reduce** with a
+tool, **table**. What they dropped is still in their input, and every kept
+cell references its input cell (T7), so the dropped data is **recoverable**
+by combining with the input on the references (a join on lineage).
+
+### 10h.3 The rules
+
+**REQ-MAP-019** Each invertible primitive names its inverse. Applying the
+inverse to its output gives back its input exactly: cells, row order,
+column order and cell keys (passed-through cells keep their keys, so
+nothing downstream "may change").
+
+**REQ-MAP-020** An inverse reads what it needs from the **reference column
+and the column map**, never from data the user had to copy out: gather
+knows each item's parent and place; widen knows where each packed field
+was; unsort knows each row's input position.
+
+**REQ-MAP-021** Every exact inverse pair is tested both ways on the
+fixtures: `B(A(t)) == t` for keys as well as values. U1 (keep empty
+samples) is what makes spread → gather exact.
+
+**In the UI:** a reshaping step's popover offers **Undo this reshape**,
+which writes the inverse as a new step (or removes the step, if nothing
+reads it yet).
+
+---
+
 ## 11. Findings from the run (for core, and decisions)
 
 | # | Finding | Kind |

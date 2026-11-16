@@ -1822,6 +1822,15 @@ cell key   = its call's key;  a source or literal cell: sha256(canonical value)
    Lineage columns (`#r`, lists, `#r.idx`) and `k.cell`'s `inputs` become
    views derived from these two; positions are derived, never stored as
    references. Passed-through and renamed cells keep their input cell's key.
+8. **Clearing removes stored results** (app spec 019 §5.1, REQ-TBL-019):
+   because a run reuses any stored result whose key matches, clearing must
+   remove results from the store, not hide them. `k.clear(step)` removes
+   every call of the step; `k.clear(step, rows=…)` the calls that made those
+   cells; `k.clear(step, state="failed")` the failed calls; `k.clear_all()`
+   everything. The next run computes exactly the removed calls (plus any
+   whose key changed); steps downstream keep their results, marked "may
+   change", and are reused if the re-run gives the same values (early
+   cutoff). Today core has no clear at all (019 §5.1, run).
 
 **Rollout:** (1) flag the whole chain; (2) call keys for `1 → 1` verbs; (3)
 read rules for row-moving verbs; (4) the store. Each is useful alone; (1)
@@ -1870,6 +1879,20 @@ and (2) end the false "changed" flags in interactive sessions.
    plain values keyed by their hash, with no references or lineage. Large
    values are kept once in K31's store under their content key, so a
    snapshot is reproducible from its expression alone.
+6. **Uneven data** (app spec 020 §10g; run:
+   `scripts/core_probes/probe_uneven_inverses.py`): today `expand` drops a
+   row whose list is empty or `None` (Rome and Lima vanish). Ask: one
+   filler, `MISSING`, wherever reshaping has no value; expand keeps an empty
+   sample as one row with item `MISSING` unless `empty="drop"`; parallel
+   expand pads to the longest; stack and widen take the union with
+   `MISSING`; any dropping is a setting, and the step reports how many rows
+   it dropped. (widen already does U3.)
+7. **Exact inverses** (020 §10h): each invertible primitive names its
+   inverse (spread/gather, pack/widen, unpivot/pivot, order/unsort,
+   stack/split, rename, copy), read from the reference column and column
+   map rather than copied-out data. `B(A(t)) == t` for cells, row order,
+   column order and keys. Today: pack → widen moves the fields to the end;
+   expand → gather needs lineage copied into data and returns records.
 
 ## How each ask is verified
 

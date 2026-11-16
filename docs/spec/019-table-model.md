@@ -502,6 +502,37 @@ With incremental runs by row state, "clear the failed cells, run" retries
 only those. A clear applies wherever the data is kept (kernel, disk, the
 app's copies).
 
+**Clearing is part of incremental runs (owner, 2026-11-16).** Results are
+stored under their call keys (§4.3, REQ-TBL-018), and a run reuses any
+result whose key matches. So **Clear output must remove the step's results
+from the store**, not just hide them; otherwise re-running would hand back
+the same stored output. The two are one mechanism:
+
+```text
+ Clear output / Clear cells        Run
+ ──────────────────────────        ───────────────────────────────────────
+ remove those calls' results   →   compute every call whose result is
+ from the store; cells pending     missing (cleared, never run) or whose
+                                   key changed; reuse the rest
+```
+
+| Clear | Removes from the store | Next run computes |
+|---|---|---|
+| **Clear output** | every call of the step | the whole step |
+| **Clear cells** (a selection) | the calls that made those cells | just those calls |
+| **Clear failed cells** | the failed calls | just the retries |
+| **Clear all outputs** | every step's calls | everything |
+
+Steps reading a cleared step **keep their own results**, marked "may
+change". When the cleared step re-runs: if its values come out the same,
+their keys match and they're reused untouched (early cutoff); if not, only
+the affected calls downstream recompute. This is also how a tool that reads
+an outside source (a database, an API) is refreshed: clear, then run.
+
+**REQ-TBL-019** Clear output, Clear cells and Clear failed cells remove the
+matching calls' results from the store, so the next run recomputes them;
+steps downstream keep their results until a re-run shows they changed.
+
 ---
 
 ## 6. Core today, and the asks

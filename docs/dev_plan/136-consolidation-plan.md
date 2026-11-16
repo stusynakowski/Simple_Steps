@@ -124,6 +124,10 @@ Deliverables, as core asks:
   `known` (or whose inputs changed). "Whose inputs changed" is decided by
   **cell keys** ([019 §4.3](../spec/019-table-model.md)): one mechanism for
   incremental runs and for per-cell change in interactive sessions;
+- **clearing outputs, as part of incremental runs** (owner, 2026-11-16;
+  [019 §5.1](../spec/019-table-model.md)): Clear output / cells / failed
+  cells remove those calls' results from the store, and the next run
+  computes exactly what's missing or changed;
 - **progress and cancel** (K23) for long steps.
 
 ### Track D — Structure: grouped steps, export, components (I7, I9, I10) · both
