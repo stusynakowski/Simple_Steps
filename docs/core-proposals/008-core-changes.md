@@ -1446,6 +1446,15 @@ on `to_session_json()`.
 **Ask:** `Output.ref` plus a store interface (`put`, `get`, `delete`) the app
 can back with its per-session parquet store (core's D5).
 
+**Raised (owner, 2026-11-16):** each step's output can be saved to disk, by
+a system setting (`memory`, `disk`, or `auto` above a size threshold); app
+plan [136 P4a](../dev_plan/136-consolidation-plan.md). So the interface is
+keyed by **step and data version** (K22) now, and by call key (K31) only if
+that goes ahead; `get` reads a page (`rows=(start, stop)`, K26) without
+loading the whole output; a kernel restored from its spec finds its outputs
+through the store, which ends C32's shim. Asked now, not gated on the K31
+prototype.
+
 ### C4. The tool registry can be cleared and re-filled in-process
 
 The app's planned kernel restart (`docs/dev_plan/200` B2) re-imports workspace

@@ -122,6 +122,19 @@ Per-row states exist (`known`, `failed`, …), which is what resuming needs.
 Deliverables, as core asks:
 - an **output store** keyed by data version (K22, C32), so put-away
   kernels keep outputs without the shim;
+- **each step's output saved to disk** (owner, 2026-11-16), through that
+  store. A system setting, `result_store`, chooses `memory`, `disk` or
+  `auto` (the default). `auto` keeps small outputs in memory and writes a
+  step to disk once it is larger than a threshold (a setting, e.g. 50 MB),
+  using core's size estimates (K26). A step on disk is read a page at a
+  time, and comes back when the workflow is reopened. Core gives the
+  interface (K16: `put`, `get`, `delete`, keyed by step and data version;
+  by call key later, if P0c goes ahead); the app backs it with files under
+  the workflow's folder: parquet for plain columns, a side file per value
+  parquet can't hold (arrays, objects). Clearing a step deletes its files
+  (019 REQ-TBL-012). This **replaces** the legacy `engine.DATA_STORE` and
+  its per-run parquet cache (how-simple-steps-works §5 item 6, the leak),
+  removed with the owner's confirmation. It doesn't wait on P0c;
 - **incremental runs, by row state** (decided, owner 2026-11-15): keep each
   row's result as it completes, and on re-run compute only rows not
   `known` (or whose inputs changed). "Whose inputs changed" is decided by
@@ -266,7 +279,8 @@ Each phase ships on its own and is confirmed with the owner first
 | **P1** | Row lineage on screen: plumb `k.cell` inputs; cell formula line; lineage gutter | C·I6 | app |
 | **P2** | Editing, 135 phases A–C: `table` source, data entry, rows, columns, paste/upload | B | app |
 | **P3** | Editing, 135 phases D–E: example row → every row, locks, Make values | B | app |
-| **P4** | Keeping results: output store, incremental runs, progress/cancel (core asks K22, C32, K23 + new) | C·I5 | core, then app |
+| **P4a** | Saving to disk: one output store per step (K16, K22, K26); `result_store` = `memory` / `disk` / `auto` with a size threshold; replaces the legacy `DATA_STORE` and the C32 shim. Not gated on P0c | C·I5 | core interface, then app |
+| **P4b** | Incremental runs and resuming on call keys; progress/cancel (K31, K23), if P0c says go | C·I5 | core, then app |
 | **P5** | Grouped steps: the spec field; core ask; folded groups in the UI | D·I7 | core + app |
 | **P6** | Export: script (132), then notebook by group | D·I10 | app |
 | **P7** | Components: one way to attach a UI to a tool/resource/cell type; plots first (131) | D·I9 | app (+ K21) |
@@ -307,6 +321,8 @@ Each phase ships on its own and is confirmed with the owner first
 - **Reactivity tiers:** the browser may predict; core decides, with a shared
   conformance corpus.
 - **Order:** P0, P0b and P0c first, with P1 and P2 alongside.
+- **Saving to disk (P4a):** each step's output can be saved to disk; a
+  system setting chooses memory, disk, or automatic above a size threshold.
 
 **Open:**
 
