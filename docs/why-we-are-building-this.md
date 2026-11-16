@@ -1,9 +1,10 @@
 # Why we are building Simple Steps
 
 > Consolidated from `WHY_WE ARE_BUILDING_THIS.md` (root) on 2026-10-23, with
-> the owner's answers to two rounds of questions.
-
-## In one sentence
+> the owner's answers to two rounds of questions. Opening rewritten
+> 2026-11-16 to say what Simple Steps does with data (linear workflows of
+> tidy tables, cells meaningful to their user), alongside what it does for
+> people.
 
 **Anything a computer does can be broken into simple steps anyone can understand.**
 
@@ -12,52 +13,72 @@ in everyone's hands. It's meant to be quick, easy and robust.
 
 ## The problem
 
-**Analysts** know the problem, the goal and roughly what needs to happen, but
-they get stuck on the implementation. An AI agent can do that part for them,
-but there's no real way to check that it did it correctly. Results they can't
-check are results they can't trust.
+Data work happens in one of two places, and neither serves everyone.
 
-**Developers** can build tools and resources they know are correct, but
-getting them to analysts takes work that has nothing to do with those tools:
-user interfaces, deployment, APIs and data engineering. They also can't
-simply share the codebase, because an agent trying to help an analyst might
-change working code and break it.
+- **Spreadsheets** are open to anyone: you see your data and what each
+  formula did to it. But they can't hold real tools (an image model, an LLM,
+  a database). Slow work breaks them, and a value's history disappears once
+  it's pasted or overwritten.
+- **Code and notebooks** hold any tool, but only programmers can read them.
+  State is hidden, results depend on the order cells ran, and code an AI
+  writes for an analyst is code the analyst can't check.
 
-## What Simple Steps does about it
+**Analysts** know the goal but get stuck on the implementation. An AI agent
+can do that part for them, but there's no real way to check that it did it
+correctly. **Developers** write tools they know are correct, but can't hand
+them over without building interfaces, servers, APIs and pipelines that have
+nothing to do with those tools. They can't simply share the codebase either,
+because an agent helping an analyst might change working code and break it.
+**Results nobody can trace are results nobody can trust.**
 
-Simple Steps connects the two. Developers write ordinary Python functions and
-resources, and Simple Steps provides the user interface, the server, the data
-handling and the running of each step. Analysts apply those tools as
-one-line formula steps in a grid that works like the spreadsheets they
-already know, and they see their data after every step. The AI agent can
-only put those steps together. It can't write or change code, so every
-result is built from parts a developer has already checked.
+## The idea: a linear workflow of tables
 
-## What success means
+Simple Steps organizes data work into **linear workflows that everyone can
+follow**:
 
-1. **Python functions and classes, democratized.** A function or class a
-   developer writes becomes something a non-programmer can find, apply to
-   their data and trust, without installing Python packages by hand, reading
-   the code, or writing a server.
-2. **Details consolidated; what matters to the user is exposed.** Running per
-   row, batching, retries, progress, long-running work, servers, sessions
-   and storage are handled once, by the platform. What the user does need to
-   see goes into a single expression they can read:
-   `tool[modifiers](input, arguments)`. That covers which tool runs, on what
-   data, how, and with which resources. The agent can help get that line
-   right, for example by inferring the modifiers or fixing the syntax. Either
-   way, the user can see exactly what the line does and edit it.
-3. **Agentic work that is secure by construction.** An agent can only write
-   steps, and a step is a one-line call to a registered tool or resource. So
-   nothing an agent does can reach outside the scope that the developer and
-   maintainer chose. Any argument to those tools and resources is assumed
-   to be acceptable.
+- **A workflow is an ordered list of steps.** You read it from start to
+  finish. The data can branch and merge, but the steps form one line, with
+  no graph to untangle.
+- **A step is one line:** a tool applied to earlier steps' data,
+  `measure[mod.map()](wf["images"])`. That line is everything the step does.
+- **Every step holds one table.** **Rows are samples** and **columns are
+  variables**. What counts as a sample can change from step to step (an
+  image, a ward, an item of a list), but only through a step the user can
+  see. Each table keeps a reference back to the rows it came from.
+- **A cell is a container of data, in the terms that make sense to its
+  user.** It holds what its step produced: a tool's output, data typed in,
+  or data packed together for the next step. That might be a number, a
+  document, an image, a chart, or a set of measurements: whatever unit the
+  person thinks in. Packing data into cells and unpacking it again is how a
+  user shapes it for the next step.
 
-   This is what lets developers and maintainers trust the agent. It can't
-   write its own code to reach a goal, so it can't reach one by doing the
-   work in some way nobody intended. Whatever it proposes is done with the
-   developers' own tools and resources, used the way they were designed to
-   be used.
+## What it promises
+
+1. **Everyone can understand it.** One line per step, a table after every
+   step, cells in the user's own terms.
+2. **Every value can be traced.** Click a cell to see the tool, the literal
+   arguments and the earlier cells that produced it. The same steps, tools
+   and data give the same result, and a saved workflow reopens with its data.
+3. **It never guesses.** Rows are matched only through a link core recorded.
+   Nothing is lost silently, a shape it can't know yet says why, and a
+   failure stays in its own cells.
+4. **It stays live, even for slow work.** As in a spreadsheet, an edit shows
+   at once what is out of date. Before a long run, it shows what will come
+   back. While it runs, cells fill in. Afterwards, only what changed needs
+   running again.
+5. **Developers' tools reach everyone.** A developer writes an ordinary
+   Python function or class; Simple Steps provides the interface, the
+   running (per row, batching, retries, progress, long jobs), the storage and
+   the server, once for every tool.
+6. **Everyone can check the AI's help, and it is secure by construction.**
+   The assistant can only propose steps built from the team's registered
+   tools and resources, as lines a person reads, then accepts or rejects. It
+   can't write code, so nothing it does can reach outside the scope the
+   developer and maintainer chose, and it can't reach a goal by a route
+   nobody intended.
+7. **One workflow, two notations.** What's built in the app is a Python
+   script, line for line, and the reverse
+   ([UI ⇄ Python](design_principles/ui_python_equivalence.md)).
 
 ## The four characters
 
@@ -154,7 +175,7 @@ same scope.
 step can only call what the developer registered and the maintainer enabled.
 The user can read every step as a single line and correct it.
 
-## The idea
+## A step, in detail
 
 **A workflow is a chain of one-line Python expressions that you can watch.**
 
@@ -166,16 +187,19 @@ The user can read every step as a single line and correct it.
   The general form is **`tool[modifiers](args)`**. It is how steps are
   usually written, not a rule without exceptions. The exceptions will be
   covered in a separate design doc on step expressions.
-- A step's **output** is always a table of cells. A cell can hold anything:
-  a number, a file path, an image, a figure.
-- **A step's inputs are references and literals, nothing else.**
-  - A **reference** is the output of an **earlier** step, `wf["files"]`, or a
-    selection of it (a column, a row, a cell). Any earlier step can be
-    referenced, and a step can reference several, as `join` does below.
-  - Selections are a convenience: a user can pick part of a step by hand
-    instead of making a separate step for it. A selection has to keep
-    pointing at the same data when that data shifts (rows re-sorted, added
-    or removed), and give the same result when the workflow is run again.
+- A step's **output** is always a table: rows are samples, columns are
+  variables, and each cell holds what the step produced there: a number, a
+  file path, an image, a figure, a packed structure.
+- **A step's inputs are picks and literals, nothing else.**
+  - A **pick** is an **earlier** step's table, `wf["files"]`, or part of it
+    (a column, a row, a cell, a block), which is a smaller table. Any earlier
+    step can be picked, and a step can read several, as `join` does below.
+  - Picks are a convenience: a user selects part of a step by hand instead
+    of making a separate step for it, and the app writes the pick. A pick
+    has to keep pointing at the same data when that data shifts (rows
+    re-sorted, added or removed), and give the same result when the workflow
+    is run again. That is why core keeps a hidden identity for every row:
+    a row you pick is saved as that row, not as its position.
   - A step can never reference itself or a later step. As in a notebook, you
     can't use what a cell further down will produce.
   - Everything else in the expression is a **literal**: a number, a string,
@@ -229,7 +253,7 @@ formulas, and for the agent. It holds:
 | **Modifiers** | `mod.map()`, `mod.filter()`, `mod.retry()` | core. They're on by default, and the maintainer can remove any of them |
 | **Combines** | `join`, `stack`, `zip_` | core. They're on by default, and the maintainer can remove any of them |
 | **Literal types** | numbers, strings, lists, dicts, `True`/`None` | standard Python data types; the grammar allows them |
-| **Reference forms** | `wf["step"]`, and selections of part of a step | the grammar; the user's manual selections write them |
+| **Picks** | `wf["step"]`, and picks of part of a step (`wf["s"][1]["n"]`) | the grammar; selecting cells in the app writes them |
 | **Developer tools and resource types** | whole modules of decorated tools, single tools, `@simple_step_resource` classes | the maintainer's `app.py` |
 | **Ready-made resources** | `Loaded(ClinicalDB, url=env("DB_URL"), locked=["url"])` | the maintainer's `app.py` |
 
@@ -295,12 +319,12 @@ the code, the API and the docs.
 | Word | Means | Retired words |
 |---|---|---|
 | **workflow** | a list of steps | *pipeline* |
-| **step** | one entry in that list: a name and an expression. **Its name is its identity** (references and hashes use it); its position is a lookup, and changes with `insert` and `move`. Both `wf["name"]` and `wf[index]` work; an index reference is saved by name (decided 2026-10-27, replacing "its position is its id" from 2026-10-24). A step has several forms (the line you type, the operation it parses to, the saved recipe, the live step with its data). They are different things, but they all point to the same output ([one step, several forms](system_design/12-core-and-app.md#one-step-several-forms)) | — |
+| **step** | one entry in that list: a name and an expression. **Its name is its identity** (references and hashes use it); its position is a lookup, and changes with `insert` and `move`. A step is read by its name, `wf["name"]`; `wf[0]` is refused, *wf[…] takes a step name in quotes* (core D5; run 2026-11-16. It replaced 2026-10-27's "both `wf["name"]` and `wf[index]` work"). A step has several forms (the line you type, the operation it parses to, the saved recipe, the live step with its data). They are different things, but they all point to the same output ([one step, several forms](system_design/12-core-and-app.md#one-step-several-forms)) | — |
 | **expression**, or **formula** | what's written in the formula bar: the right-hand side of `wf["name"] = …` in Python. The two words mean the same thing; scientists tend to say *formula*, programmers *expression* | — |
 | **tool** | a function from the catalog | — |
 | **operation** | what is actually executed: a tool with its modifiers, its arguments, and the data it runs on | *operation* for a plain tool |
 | **modifier** | how a tool is applied: a shape verb (`map`, `filter`, …) or an execution modifier (`retry`, …) | — |
-| **reference** | `wf["name"]`, or a selection of part of a step's output | `step1.col` |
+| **pick** | `wf["name"]`, or part of a step's table (a column, a row, a cell, a block), itself a table. **Selecting** is what you do in the app; a **pick** is what it saves. They mean the same part of the table, but a pick remembers *which rows* it chose: a row you click is saved as that row's identity (core keeps one, hidden, for every row), so it still means the same row after an upstream sort, filter or edit. A range (`[0:10]`) stays positional, like `head` | *reference* for a part of a step; *selection* as the saved thing; `step1.col` |
 | **kernel** | the live workflow on the server: every step as if it were a line of Python, run, with its output. **The kernel is the truth** about a workflow; the file is a saved copy of it, and the browser shows it. Its **`kernel.spec`** is the structure needed to reproduce the workflow with a particular set of tools: the workflow spec plus the catalog spec (2026-10-26) | — |
 | **session** | an active construction of a workflow in the UI. The user adds steps, runs them, sees the data they produce, passes in new data, and sees what changes. Later it may include the chat with the agent, which will come as a layer on top | *session* for a browser connection |
 | **workspace** | the folder the app serves | — |
@@ -323,8 +347,10 @@ it's about how this app **shows, stores or edits** them, it belongs here.
 
 ## Not goals
 
-- A general spreadsheet. Cells hold the outputs of tools, not free-typed
-  values and arbitrary formulas.
+- A general spreadsheet. A cell holds what its step produced (a tool's
+  output, data typed in, data packed for the next step), never a formula of
+  its own: every cell comes from its step's one expression, and typed-in
+  data is a step too.
 - A general Python notebook. Users and agents compose registered tools in
   one-line expressions; they don't write arbitrary code.
 - An autonomous agent. It proposes; people decide and run.

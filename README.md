@@ -13,7 +13,7 @@ Simple Steps is a framework that puts a team's latest software developments in e
 It has three parts:
 
 - **A Python library for technical experts.** Add `@simple_step_tool` to a function you've already written, and it becomes a tool anyone on the team can use. Its name, inputs and description are what people see.
-- **An app for everyone else.** A grid that works like a spreadsheet: each column is a step, each row is an item (a file, an image, a document), and each cell can hold a number, a table, an image or a chart. A formula bar shows exactly what each step does, in one line.
+- **An app for everyone else.** A linear workflow of steps, each holding a table that works like a spreadsheet: each row is a sample (a file, an image, a document), each column a variable, and each cell holds whatever is meaningful there: a number, a table, an image or a chart. A formula bar shows exactly what each step does, in one line, and clicking a cell shows how it was made.
 - **An AI assistant that stays inside the lines.** It suggests steps using only the team's tools, and people accept or reject each one.
 
 Behind the scenes, Simple Steps runs each tool on every row, handles batching, retries and progress, connects to LLMs and databases, and saves every workflow so it can be reopened and run again.
