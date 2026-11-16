@@ -529,7 +529,9 @@ column map (per step: each output column's source). No per-cell lineage is
 stored; any cell's provenance and key are derived from the two.
 
 **REQ-MAP-007** References hold row keys, never positions. Positions are
-derived, for display and for formulas.
+derived, for display and for formulas. A formula's row pick saves the
+position it says and checks it against the row's key
+([019 §2.2](./019-table-model.md)).
 
 **REQ-MAP-008** A passed-through, renamed or copied cell keeps its input
 cell's key, so changes that don't touch its value don't flag it downstream.
@@ -566,7 +568,9 @@ verb.
 ```
 
 Eight primitives (six for rows, `compute` and `columns` for columns), and
-`table` as the one escape hatch where a tool does its own mapping.
+`table` as the one escape hatch where a tool does its own mapping. §10d
+adds `unpivot` and `pivot`, which turn columns into rows and back, for ten
+in all.
 
 ### 10c.2 Every verb as an extension
 
@@ -773,15 +777,28 @@ name, no references to them.
 
 ### 10e.1 The rule
 
-| May chain | May not |
-|---|---|
-| any number of **reshaping primitives that apply no tool**: keep by position (slice), order by a column (sort), spread a list column, reduce with a built-in (`first`, `count`, …), columns (select, drop, rename, copy, pack, widen), unpivot, pivot | **more than one tool.** A step applies at most one tool, so each cell has one call ([019 §4.1](./019-table-model.md)) |
-| plus **at most one** verb that applies the step's tool (map, filter, collapse with a tool, …), anywhere in the chain | a combine (join, stack, zip) after the first verb: a step's inputs are fixed at its start |
-| execution modifiers (`retry`, `timeout`) after it, as today | |
+**Decided (owner, 2026-11-16):** a step either applies a tool or only
+reshapes, and the two allow different chains.
 
-**REQ-MAP-012** A step may chain any number of no-tool reshaping
-primitives, and at most one verb that applies a tool; the chain runs left to
-right and produces the step's one table.
+| Step | May chain | Example |
+|---|---|---|
+| **applies a tool** | **one** no-tool reshape **before** the tool (shapes what it reads), the tool's verb, and **one** no-tool reshape **after** it (tidies what it returns) | `mean_temp[mod.select(columns=["city", "temp_c"]), mod.collapse(by="city"), mod.sort(by="city")](wf["r"])` |
+| **only reshapes** (`identity`) | **any number** of no-tool reshapes | the `unpivot → sort → select` example above |
+
+In both: execution modifiers (`retry`, `timeout`) come last, as today; a
+combine (join, stack, zip) may only come first, since a step's inputs are
+fixed at its start; a step never applies more than one tool, so each cell
+has one call ([019 §4.1](./019-table-model.md)). A longer reshape around a
+tool is its own reshape-only step, before or after.
+
+The no-tool reshapes are: keep by position (slice), order by a column
+(sort), spread a list column, reduce with a built-in (`first`, `count`, …),
+columns (select, drop, rename, copy, pack, widen), unpivot, pivot.
+
+**REQ-MAP-012** A step that applies a tool chains at most one no-tool
+reshape before its tool verb and at most one after it. A step that applies
+no tool (`identity`) chains any number of no-tool reshapes. Either way the
+chain runs left to right and produces the step's one table.
 
 ### 10e.2 References compose
 
@@ -1001,22 +1018,21 @@ reads it yet).
 
 | # | Finding | Kind |
 |---|---|---|
-| F1 | **map keeps only its result column.** To see inputs and result together you add a `zip_` step. Is that the rule (one expression = one new column), or should map keep the input's columns? | decision |
-| F2 | **A dict result spreads into columns** under map (`info` → `len`, `upper`) without `widen`. Implicit; is it wanted? | decision |
+| F1 | **map keeps only its result column.** To see inputs and result together you add a `zip_` step. Is that the rule (one expression = one new column), or should map keep the input's columns? | **decided** (owner, 2026-11-16): result only; inputs show through lineage on cell select. `map` and `group` stay two verbs |
+| F2 | **A dict result spreads into columns** under map (`info` → `len`, `upper`) without `widen`. Implicit; is it wanted? | **decided** (owner, 2026-11-16): spread by default, with a setting to keep one dict column (name open, e.g. `mod.map(spread=False)`): core ask |
 | F3 | **Provenance names the wrong column** for no-tool reshapes: `pack`'s `rec` says it came from `r.rec` (no such column), `copy`'s `city2` from `r.city2`, `widen`'s `temp_c` from `pack.temp_c` (it came from `pack.rec`) | core bug |
 | F4 | **table and collapse give provenance a row of `None`**: right for "the whole grid" or "a group", but the group's member rows (in lineage) aren't in provenance | core ask |
 | F5 | **Lineage has three shapes** (one position, a list, position + item), as 130 T3 notes; a condition over lineage needs to handle each | known (130 T3) |
-| F6 | **distinct keeps the first row's values** for the other columns, silently | decision: say so on screen |
-| F7 | **Result column names differ by verb:** map, expand, collapse and sweep name the result after the step; group names its key `group` | decision: one rule (after the step), or keep `group` |
+| F6 | **distinct keeps the first row's values** for the other columns, silently | **decided:** say so on screen |
+| F7 | **Result column names differ by verb:** map, expand, collapse and sweep name the result after the step; group names its key `group` | **decided:** one rule, named after the step, `group` included: core ask |
 
 ---
 
 ## 12. Open points for the owner
 
-1. **F1:** map keeps only its result (today), or keeps the input's columns
-   too?
-2. **F2:** a dict result spreads into columns under map, or stays one dict
-   column until `widen`?
+1. **F1:** decided: map keeps only its result (§11).
+2. **F2:** decided: spread by default, with a setting to keep one dict
+   column (§11).
 3. **The five rules (§1):** are Rows, Columns, Lineage, Provenance and
    Failure the right way to describe every mapping?
 4. **Diagrams:** is this level of detail right, or would an interactive
@@ -1025,6 +1041,10 @@ reads it yet).
    mappings, ten primitives with `unpivot` and `pivot`, and chains of
    reshapes in one step (§10e). Core ask:
    [008 K32](../core-proposals/008-core-changes.md#k32-primitives-cell-to-cell-references-and-reshape-chains).
+   **Timing (owner, 2026-11-16, refine first):** the chain rule (§10e), F3,
+   `unpivot`/`pivot` and the uneven-data conventions go to core now;
+   rebuilding the verbs on primitives (§10c) and exact inverses (§10h) wait
+   for the call-key prototype ([136 §5](../dev_plan/136-consolidation-plan.md)).
 6. **Names of the primitives:** `keep`, `order`, `spread`, `reduce`,
    `generate`, `combine`, `compute`, `columns`, `unpivot`, `pivot`: keep, or
    prefer others (e.g. `explode` for spread, `aggregate` for reduce,

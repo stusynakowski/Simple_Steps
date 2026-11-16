@@ -16,7 +16,7 @@ The owner's rules (2026-11-16). Everything below follows from them.
 
 | # | Rule |
 |---|---|
-| **T1** | **A step has one expression, and produces one table.** The expression may chain several reshapes, with at most one tool ([020 §10e](./020-table-mappings.md)). |
+| **T1** | **A step has one expression, and produces one table.** A step that applies a tool may add one no-tool reshape before it and one after it; a step that applies no tool may chain several reshapes ([020 §10e](./020-table-mappings.md)). |
 | **T2** | **A table is a grid of data, with headers and an index** to reference the data in the grid. |
 | **T3** | **Rows are samples; columns are variables** of each sample. What counts as a sample or a variable depends on the goal, so tables are restructured by reshaping ([020](./020-table-mappings.md)). |
 | **T4** | **A tool is fixed code.** Changing a step's tool call changes only *how it's applied*: its arguments and its modifiers. |
@@ -140,6 +140,12 @@ a cell at every crossing.
 **REQ-TBL-003** (T2) A row is addressed by its position (`0..n-1`, like a
 Python list, 130 R1); a column by its name, never its position.
 
+**Decided (owner, 2026-11-16):** a saved row pick (`wf["f"][2]`) stores the
+**position** the formula says, and records the row's **key** beside it. If
+the row at that position no longer has that key, the step shows "reference
+moved" (130 T1); it never changes silently. Positions are what a formula
+says; keys are what a reference checks ([020 REQ-MAP-007](./020-table-mappings.md)).
+
 **REQ-TBL-004** (T3) Whether something is a row or a column is a choice of
 the table's shape, not of the data. Reshaping changes it without losing any
 value or reference ([020](./020-table-mappings.md)).
@@ -182,6 +188,10 @@ Table                   wf["s"]                         every cell
 
 **REQ-TBL-005** Every selection a formula can use prints as formula text,
 and reads back to the same selection.
+
+**Decided (owner, 2026-11-16):** a selection stays a `StepRef`, the same
+type as the whole step, so anything that takes a step takes a pick of it.
+It gains a `kind`: `table`, `rows`, `columns`, `block` or `cell`.
 
 ### 2.5 Markers: values that aren't data
 
@@ -441,8 +451,12 @@ Steps 1 and 2 already end the false "changed" alarms.
   later rows move down; a reference to `wf["f"][2]` points at a different
   sample. That's flagged as "reference moved" (130 T1), not hidden.
 - **Non-deterministic tools** (an LLM, a random sample) can change with the
-  same key. Their step key includes a seed, or the tool is marked
-  non-deterministic and its cells always "may change" when re-run.
+  same key. **Tools are deterministic by default** (owner, 2026-11-16): a
+  matching key reuses the stored result. A tool that calls an LLM, an API or
+  a random source declares itself non-deterministic; then its step key
+  includes a recorded seed, or its cells always "may change" when re-run.
+  An undeclared LLM tool will reuse its earlier answers: the catalog should
+  make the declaration easy to see and set.
 - **Resources** that don't report a data version can't be tracked: a step
   using one is marked "may change" whenever the resource is reloaded.
 
@@ -542,7 +556,7 @@ steps downstream keep their results until a re-run shows they changed.
 | Table | a dict from `k.view(step)`: `columns, rows, state, summary, formula, row_count, window, markers, lineage` | a typed `Table` |
 | Grid, Row, Column | dicts in the view: rows `{"#", position, state, lineage, cells}` (`#` is `0..n-1`); columns `{name, type, "#"}` | typed `Row`, `Column` |
 | Cell | `{value, state, type}`; from `k.cell`: `+ inputs, lineage, row, column, column_number, step` | a typed `Cell` with full `provenance`, **including its `call`** (§4.1) |
-| Selection | every form is `StepRef` | a `Selection` with a `kind` |
+| Selection | every form is `StepRef` | `StepRef.kind` (§2.4): one type, with the kind of pick |
 | Provenance | inputs per cell; expression and `ran_with` per step; F3, F4 gaps | complete inputs for every modifier (REQ-TBL-008) |
 | Change | step `stale` with a reason; readers stay `completed`, flagged only in `needs_run()`; **two steps down isn't flagged at all**; a one-cell edit re-runs every row downstream (run: 6 calls for 2 needed) | call keys (§4.3): per-cell "may change", flagged however far down, and re-runs of only those calls (REQ-TBL-013–018); [008 K31](../core-proposals/008-core-changes.md#k31-call-keys-change-and-reuse-per-tool-call), building on K20 and K22 |
 | Markers | all `None`; `NaN` lost | `EMPTY`, `MISSING`, `ERROR`, `NAN` |
@@ -550,18 +564,22 @@ steps downstream keep their results until a re-run shows they changed.
 
 ---
 
-## 7. Open points for the owner
+## 7. Decided (owner, 2026-11-16)
 
-1. **Index in formulas.** Positions stay references only (recommended,
-   REQ-TBL-002), or can a formula read `#` as a value?
-2. **Scattered cells.** UI-only (recommended), or a formula form?
-3. **Provenance depth on screen.** One level (direct inputs), with "follow
-   back" for more?
-4. **`maybe`.** Shown to users, or folded into `pending`?
-5. **Marker names.** `EMPTY`, `MISSING`, `ERROR`, `NAN` (plain, usable in
-   formulas), or `#N/A`-style?
-6. **A reader of a changed step:** `stale` too (recommended, REQ-TBL-010),
-   or a separate state such as `may change`?
-**Decided (owner, 2026-11-16):** change tracking is content-addressed call
-keys, owned by core (§4.3): one key per tool call from the cells it read;
-non-deterministic tools carry a recorded seed in their key.
+1. **Index in formulas:** positions are references only, never values
+   (REQ-TBL-002). `copy` is the explicit way to turn lineage into data.
+2. **Scattered cells:** UI-only; no formula form.
+3. **Provenance depth on screen:** one level (direct inputs), with "follow
+   back" for more.
+4. **`maybe`:** folded into `pending` on screen; core may keep it.
+5. **Marker names:** `EMPTY`, `MISSING`, `ERROR`, `NAN`, plain and usable in
+   formulas.
+6. **A reader of a changed step** is `stale` too (REQ-TBL-010).
+7. **Change tracking:** content-addressed call keys, owned by core (§4.3):
+   one key per tool call from the cells it read. Tools are deterministic by
+   default; non-deterministic ones declare it and carry a recorded seed.
+8. **Row picks:** position, checked against the row's key (§2.2).
+9. **Selections:** `StepRef` with a `kind` (§2.4).
+10. **Scope:** refine first ([136 §5](../dev_plan/136-consolidation-plan.md)).
+    §4.3's rollout steps 1–2 are prototyped on today's row ids before core
+    commits to the reference column and the store (steps 3–4).

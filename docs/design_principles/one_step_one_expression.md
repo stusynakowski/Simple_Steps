@@ -25,11 +25,11 @@ with_tax[mod.map(name="total"), mod.retry(times=2)](wf["items"], rate=0.1)
 | input | **which earlier step** it reads | `wf["items"]`, or a selection `wf["items"][0:10]` |
 | arguments | the **settings** | literals, or `res["name"]` |
 
-**A chain is still one expression.** When a step only reshapes, several
-reshaping verbs may chain left to right in its brackets (unpivot, then
-sort, then select), with at most one tool in the whole chain. The tables in
-between aren't steps, and the step still produces one table
-([spec 020 §10e](../spec/020-table-mappings.md)).
+**A chain is still one expression.** A step that applies a tool may add one
+no-tool reshape before the tool's verb and one after it. A step that only
+reshapes (`identity`) may chain several reshapes left to right (unpivot,
+then sort, then select). The tables in between aren't steps, and the step
+still produces one table ([spec 020 §10e](../spec/020-table-mappings.md)).
 
 The forms that look like exceptions are still single expressions. A source has no input, a bare literal (`=[3, 1, 2]`) is a one-cell source, and a combine (`join(wf["a"], wf["b"], on="city")`) is the one way to read several steps. None of them breaks the rule.
 

@@ -1760,10 +1760,14 @@ saved as a content-hashed reference.
 
 **Ask:** use nullable `Int64` (or `object`) for a payload column with failures.
 
-### R9. Stages
+### R9. Stages (the app's "grouped steps")
 
-**Ask:** a named group of consecutive steps that runs as one, with
-`run_stage(name)` and a section in R5's format.
+**Ask (revised, owner 2026-11-16):** a named group of consecutive steps,
+kept as a section in R5's format: a name and its steps, in order. It is for
+organizing only: it adds no inputs, outputs or computation, and doesn't
+change how anything runs. Renaming, moving or deleting a step keeps the
+groups consistent. (Replaces the earlier ask for a group that "runs as one"
+with `run_stage(name)`.)
 
 ---
 
@@ -1836,6 +1840,21 @@ cell key   = its call's key;  a source or literal cell: sha256(canonical value)
 read rules for row-moving verbs; (4) the store. Each is useful alone; (1)
 and (2) end the false "changed" flags in interactive sessions.
 
+**Timing (owner, 2026-11-16: refine first).** Ask now: (1), and the
+clearing API of point 8 (`k.clear`, `k.clear_all`, `k.reset`) on today's
+outputs. Then **prototype** (2) on core's existing row ids, to measure
+hashing cost and test the determinism default, before core commits to
+point 7 (the reference column) and (3)–(4).
+
+**Determinism (owner, 2026-11-16):** tools are deterministic by default. A
+tool declares itself non-deterministic (an LLM, an API, randomness); its
+step key then carries a recorded seed, or its cells always "may change".
+The declaration is in the catalog, where the app can show and set it.
+
+**Row picks (owner, 2026-11-16):** a saved `wf["f"][2]` keeps the position
+it says and records the row's key; a mismatch is "reference moved"
+(app spec 019 §2.2).
+
 ### K32. Primitives, cell-to-cell references, and reshape chains
 
 **Decided by the owner (2026-11-16)** (app spec
@@ -1868,9 +1887,10 @@ and (2) end the false "changed" flags in interactive sessions.
 3. **Cell-to-cell references:** a reference is `(step, row key, column)`,
    stored in the one reference column of K31 point 7, with the column part
    only where the column map can't say it (unpivot, pivot).
-4. **Chains:** a step may chain any number of no-tool reshaping primitives
-   and at most one tool-applying verb, left to right; no combine after the
-   first verb. The chain stores one reference column and column map for the
+4. **Chains** (owner, 2026-11-16): a step that applies a tool chains at
+   most one no-tool reshape before its tool verb and at most one after it;
+   a step that applies no tool (`identity`) chains any number of no-tool
+   reshapes. Left to right; no combine after the first verb. The chain stores one reference column and column map for the
    whole step, pointing at its input cells (references compose). Replace
    today's "at most one shape verb" refusal with this rule, and print
    chains back with the tool's name (`identity[…]`).
@@ -1893,6 +1913,18 @@ and (2) end the false "changed" flags in interactive sessions.
    map rather than copied-out data. `B(A(t)) == t` for cells, row order,
    column order and keys. Today: pack → widen moves the fields to the end;
    expand → gather needs lineage copied into data and returns records.
+8. **Map settings** (app spec 020 F2, F7; owner, 2026-11-16): a dict
+   result spreads into columns by default, with a setting that keeps it as
+   one dict column (name open, e.g. `mod.map(spread=False)`); every verb
+   names its result column after the step, `group`'s key included.
+9. **Selections** (app spec 019 §2.4): every pick stays a `StepRef`, with a
+   `kind` (`table`, `rows`, `columns`, `block`, `cell`).
+
+**Timing (owner, 2026-11-16: refine first).** Ask now: 2, 4, 6, 8, 9 and
+the F3 provenance bug (app spec 020 §11). After the K31 prototype: 1
+(rebuilding verbs on primitives), 3 (cell-to-cell references, which needs
+K31's reference column), 5 (snapshots, which keep large values in K31's
+store) and 7.
 
 ## How each ask is verified
 

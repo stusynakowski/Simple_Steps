@@ -56,13 +56,17 @@ same type** (`StepRef`): `wf["s"]`, `wf["s"][0]`, `wf["s"][0][cols["n"]]`.
 all share, so "a cell", "a column header", "the index" mean one thing
 everywhere:
 
+The words below are [019](../spec/019-table-model.md)'s, which is the
+reference for each:
+
 | Object | Holds | Distinguished by |
 |---|---|---|
-| **Grid** (a step's output, live) | columns, rows, cells; the step's state; its plan before it runs | always a DataFrame; the empty step is 1×1 `"empty"` |
-| **Column** | name, type, position; its header | header = the column's identity, never data |
-| **Row** | row id (the index), position, lineage to input rows, state | index = identity, never data |
-| **Cell** | value, type, state (known, pending, failed, stale, absent), error | the only place data lives |
-| **Selection** | a cell, a block, rows, columns, the index, the whole step | a typed reference that prints as formula text |
+| **Table** (a step's output, one per step) | the step header, column headers, index, lineage, the grid; the step's state; its plan before it runs | always a DataFrame; the empty step is 1×1 `EMPTY` |
+| **Grid** | the data: rows (samples) × columns (variables) | only the grid holds data |
+| **Column** | name, type; its header | header = the column's identity, never data |
+| **Row** | its position (the index), lineage to input rows | index = identity, never data |
+| **Cell** | value, type, state (absent, known, pending, blocked, failed, invalid), error, provenance | the only place data lives; `stale` belongs to the step |
+| **Selection** | a cell, a block, rows, columns, the whole step | a `StepRef` with a `kind`; prints as formula text |
 
 **Decided (owner, 2026-11-15):** core makes these objects real. Their
 definitions must be **very clear, and say how each is used**.
@@ -76,8 +80,7 @@ definitions must be **very clear, and say how each is used**.
   the formula (how it's written as text, e.g. `wf["s"][0][cols["n"]]`),
   the agent (what it reads), and a Python terminal (what you call);
 - **how it maps to core today**, and the core ask that makes it real
-  (typed `k.view` / `k.cell` results; a `Selection` type distinct from
-  `StepRef`).
+  (typed `k.view` / `k.cell` results; `StepRef.kind` for selections).
 
 Agreed with the owner before the core asks go out. It answers I3 and I4
 directly, and every other track uses it.
@@ -238,8 +241,10 @@ then the browser reader for tokens and spans (tier 1), behind the corpus.
            C keeping results (I5) ── D grouped steps (I7) ── D export (I10)
 ```
 
-- **A first:** it is the vocabulary the others are written in. Cheap to
-  start: a spec and core asks, not code.
+- **A first:** it is the vocabulary the others are written in. The specs
+  (019, 020) are written; what core is asked to do is split in two (§5,
+  refine first): small refinements now, and the call-key and
+  reference-column redesign (K31, most of K32) only after a prototype.
 - **C·I6 (lineage) and B (editing) can start in parallel with A**, on
   today's `k.view` dict; they switch to A's objects when core has them.
 - **Grouped steps before notebook export:** a notebook's sections are the groups.
@@ -255,7 +260,8 @@ Each phase ships on its own and is confirmed with the owner first
 
 | Phase | What | Track | Owner |
 |---|---|---|---|
-| **P0** | The table model ([019](../spec/019-table-model.md): table, grid, cell; rules T1–T8) and table mappings ([020](../spec/020-table-mappings.md): every verb, diagrammed from a run); then raise the core asks | A | spec, then core |
+| **P0** | The table model ([019](../spec/019-table-model.md)) and table mappings ([020](../spec/020-table-mappings.md)), decided (§5). Core refinements: flag the whole chain, a reader's own state `stale`, markers, clear/reset, F3, the chain rule, map settings (F2, F7), `StepRef.kind`, `call` in `k.cell`, unpivot/pivot, uneven data | A | spec, then core |
+| **P0c** | Prototype call keys for `1 → 1` verbs on today's row ids: hashing cost, the determinism default, re-run counts (the 6 → 2 probe). Then decide the core redesign: K31 points 4 and 7, K32 points 1, 3, 5 and 7 | A, C·I5 | core |
 | **P0b** | Reactivity tiers agreed; the shared conformance corpus; the browser's tier-1 reader (tokens, spans) behind it | all | app |
 | **P1** | Row lineage on screen: plumb `k.cell` inputs; cell formula line; lineage gutter | C·I6 | app |
 | **P2** | Editing, 135 phases A–C: `table` source, data entry, rows, columns, paste/upload | B | app |
@@ -280,16 +286,33 @@ Each phase ships on its own and is confirmed with the owner first
   not "stages" (owner, 2026-11-16).
 - **Incremental runs (I5):** by row state.
 
+**Decided (owner, 2026-11-16):**
+
+- **Refine first.** Core gets small refinements now (P0). The call-key
+  redesign is prototyped (P0c) and decided separately; it is a core 2.0
+  (a rough 1.5–3 months), not cleanup.
+- **Row picks:** a saved `wf["f"][2]` keeps its position and checks the
+  row's key ("reference moved" on a mismatch).
+- **Selections:** stay `StepRef`, with a `kind`.
+- **Determinism:** tools are deterministic by default; LLM, API and random
+  tools declare otherwise.
+- **Chains:** a tool step may add one no-tool reshape before its tool and
+  one after; a reshape-only step (`identity`) chains any number.
+- **map** keeps only its result (F1); a dict result spreads into columns by
+  default, with a setting to keep one column (F2); result columns are named
+  after the step (F7).
+- **019 §7 defaults:** index never data; scattered cells UI-only; one level
+  of provenance on screen; `maybe` shown as `pending`; plain marker names;
+  a reader of a changed step is `stale`.
+- **Reactivity tiers:** the browser may predict; core decides, with a shared
+  conformance corpus.
+- **Order:** P0, P0b and P0c first, with P1 and P2 alongside.
+
 **Open:**
 
-1. **Reactivity tiers:** the rule "the browser may predict; core decides",
-   with a shared conformance corpus (recommended), or a browser parser that
-   also validates?
-2. **Order:** P0 and P0b first, with P1 and P2 alongside (recommended), or
-   editing (P2–P3) first?
-3. **Export targets (I10):** after script and notebook, which framework
+1. **Export targets (I10):** after script and notebook, which framework
    first?
-4. **Agent polish (I8):** list what feels wrong in use, so P8 has concrete
+2. **Agent polish (I8):** list what feels wrong in use, so P8 has concrete
    items.
 
 ---
