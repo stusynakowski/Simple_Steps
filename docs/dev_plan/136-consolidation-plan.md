@@ -23,7 +23,7 @@ Renumbered (the list had two 3s and two 4s):
 | I4 | What is the object for a cell, a column, a row, or any selection in between, and what distinguishes headers, indices, cells and the data they hold? |
 | I5 | Data management for long or incremental steps: store results so a process keeps what it has done, and can be re-run or updated |
 | I6 | Row referencing: trace which input row a piece of data came from |
-| I7 | Stages: combine sequential steps into one (loading/reshaping/cleaning vs analysis vs summarizing/exporting) |
+| I7 | Grouped steps: combine sequential steps into one (loading/reshaping/cleaning vs analysis vs summarizing/exporting) |
 | I8 | The agent: polish, and sub-agents that are parts of the main one (e.g. an agent to update a single step) |
 | I9 | Prefab components for operations, resources and data: custom interactive plots, resources and functions with their own UIs |
 | I10 | Export a workflow to other formats: a notebook (e.g. Databricks, same environment), other pipeline frameworks |
@@ -121,18 +121,21 @@ Deliverables, as core asks:
   kernels keep outputs without the shim;
 - **incremental runs, by row state** (decided, owner 2026-11-15): keep each
   row's result as it completes, and on re-run compute only rows not
-  `known` (or whose inputs changed);
+  `known` (or whose inputs changed). "Whose inputs changed" is decided by
+  **cell keys** ([019 §4.3](../spec/019-table-model.md)): one mechanism for
+  incremental runs and for per-cell change in interactive sessions;
 - **progress and cancel** (K23) for long steps.
 
-### Track D — Structure: stages, export, components (I7, I9, I10) · both
+### Track D — Structure: grouped steps, export, components (I7, I9, I10) · both
 
-**I7, stages — core:** nothing in core today (run; ask
-[R9](../core-proposals/008-core-changes.md)). **Decided (owner,
-2026-11-15): a stage is a grouping of sequential steps**, there to
+**I7, grouped steps — core:** nothing in core today (run; core's ask
+[R9](../core-proposals/008-core-changes.md) calls them "stages"; the app's
+name is **grouped steps**, owner 2026-11-16). **Decided (owner,
+2026-11-15): grouped steps are a grouping of sequential steps**, there to
 consolidate a part of the process and simplify how the workflow is
 organized (loading/cleaning, analysis, summarizing/exporting). Not a
 sub-workflow: it adds no inputs, outputs or computation. Each step keeps its
-one line; the stage is a named range in the workflow spec, shown folded as
+one line; a group is a named range in the workflow spec, shown folded as
 one block that expands to its steps, and in exported code a section or a
 notebook cell group. Deliverable: the spec field (a name and its steps),
 raised with core, and the folded view in the UI.
@@ -140,9 +143,9 @@ raised with core, and the folded view in the UI.
 **I10, export — app:** [132](./weekend_developments/132-workflow-export.md)
 proposes `export_script()` (one `wf["step"] = …` line per step). Core
 prints every step (`to_source()`, run). Deliverables: script (132), then
-a **notebook** (one cell per step or per stage; Databricks-ready when the
+a **notebook** (one cell per step or per group; Databricks-ready when the
 environment matches), then other frameworks as adapters over the same
-spec. Stages (I7) become the notebook's sections.
+spec. Grouped steps (I7) become the notebook's sections.
 
 **I9, prefab components — both:** the pieces are partly planned:
 [131](./weekend_developments/131-explore-widgets.md) (explore widgets that
@@ -228,14 +231,14 @@ then the browser reader for tokens and spans (tier 1), behind the corpus.
    B editing  C lineage  E agent  D components (I9)
    (I1, I2)   (I6)      (I8)
                 │
-           C keeping results (I5) ── D stages (I7) ── D export (I10)
+           C keeping results (I5) ── D grouped steps (I7) ── D export (I10)
 ```
 
 - **A first:** it is the vocabulary the others are written in. Cheap to
   start: a spec and core asks, not code.
 - **C·I6 (lineage) and B (editing) can start in parallel with A**, on
   today's `k.view` dict; they switch to A's objects when core has them.
-- **Stages before notebook export:** a notebook's sections are stages.
+- **Grouped steps before notebook export:** a notebook's sections are the groups.
 - **I5 is the largest core ask;** start it early so core can work on it
   while the app builds B and C·I6.
 
@@ -248,14 +251,14 @@ Each phase ships on its own and is confirmed with the owner first
 
 | Phase | What | Track | Owner |
 |---|---|---|---|
-| **P0** | Grid model spec (Grid, Column, Row, Cell, Selection; header vs index vs data; how each is used); raise the core asks | A | spec, then core |
+| **P0** | The table model ([019](../spec/019-table-model.md): table, grid, cell; rules T1–T8) and table mappings ([020](../spec/020-table-mappings.md): every verb, diagrammed from a run); then raise the core asks | A | spec, then core |
 | **P0b** | Reactivity tiers agreed; the shared conformance corpus; the browser's tier-1 reader (tokens, spans) behind it | all | app |
 | **P1** | Row lineage on screen: plumb `k.cell` inputs; cell formula line; lineage gutter | C·I6 | app |
 | **P2** | Editing, 135 phases A–C: `table` source, data entry, rows, columns, paste/upload | B | app |
 | **P3** | Editing, 135 phases D–E: example row → every row, locks, Make values | B | app |
 | **P4** | Keeping results: output store, incremental runs, progress/cancel (core asks K22, C32, K23 + new) | C·I5 | core, then app |
-| **P5** | Stages: decide what a stage is; core ask; group in the UI | D·I7 | core + app |
-| **P6** | Export: script (132), then notebook by stage | D·I10 | app |
+| **P5** | Grouped steps: the spec field; core ask; folded groups in the UI | D·I7 | core + app |
+| **P6** | Export: script (132), then notebook by group | D·I10 | app |
 | **P7** | Components: one way to attach a UI to a tool/resource/cell type; plots first (131) | D·I9 | app (+ K21) |
 | **P8** | Agent: polish list; step sub-agent | E | app |
 | **Ongoing** | Polish: UI fixes as found (small frontend fixes are made, not asked about) | — | app |
@@ -268,8 +271,9 @@ Each phase ships on its own and is confirmed with the owner first
 
 - **Track A:** core makes the objects real; the definitions are very clear
   and say how each is used.
-- **A stage (I7):** a grouping of sequential steps, to consolidate a part
-  of the process and simplify organization.
+- **Grouped steps (I7):** a grouping of sequential steps, to consolidate a
+  part of the process and simplify organization. Called "grouped steps",
+  not "stages" (owner, 2026-11-16).
 - **Incremental runs (I5):** by row state.
 
 **Open:**

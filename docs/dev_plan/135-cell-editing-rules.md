@@ -51,7 +51,7 @@ marks, not chrome.
 | **E5** | **Calling a tool always makes a new step** to the right, reading the step you started from. It never adds a computed column to a data step | Mixing typed and computed columns would put two expressions in one step (R-B) |
 | **E6** | **A tool call starts on one row, the example, and extends to all rows by mapping.** One row is `wf["p"][r]`; every row is `wf["p"]` | One gesture from example to column, as Excel's fill handle |
 | **E7** | **A step that has run is locked** until cleared (133). A data step is the exception: editing its values just re-stages it, and steps that read it go stale | A data step has nothing to recompute; its values are its expression |
-| **E8** | **Turning a computed step into data is explicit**: "Make values" on the popover replaces its expression with a data expression holding its current values. Then it can be edited | The change from computed to typed is visible and can be undone |
+| **E8** | **Turning a computed step into data is explicit**: "Make values" on the popover replaces its expression with a data expression holding its current values. Then it can be edited. Its sibling, **"Copy as values"**, leaves the step alone and makes a new data step with the copy ([spec 020 §10f](../spec/020-table-mappings.md)); both drop references | The change from computed to typed is visible and can be undone |
 | **E9** | **Controls live on the selection popover**, not as grid buttons. Keys work as in a spreadsheet: Enter moves down, Tab moves right | The [UI rule](../design_principles/intuitive_tabular_ui_design_notes.md), and familiar gestures |
 
 ---

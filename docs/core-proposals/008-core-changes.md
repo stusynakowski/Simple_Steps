@@ -1767,6 +1767,110 @@ saved as a content-hashed reference.
 
 ---
 
+### K31. Call keys: change and reuse per tool call
+
+**Decided by the owner (2026-11-16)** (app spec
+[019 §4.3](../spec/019-table-model.md)): change is tracked per tool call, by
+content-addressed keys owned by core, so an interactive edit flags (and a
+run recomputes) only what it actually affects.
+
+**Today** (run on `dbaf4c7`, `scripts/core_probes/probe_call_keys.py`):
+`r` (3 rows) → `f = to_f[mod.map()](wf["r"])` → `h = half[mod.map()](wf["f"])`.
+Editing **one** value of `r`:
+
+| | Today | Asked |
+|---|---|---|
+| flagged | `r` stale; `f` as a whole (`needs_run`: "read stale 'r'"); **`h` not at all** | `r[1]`, `f[1]`, `h[1]` may change; the rest unchanged |
+| re-run | **6** calls (every row of `f` and `h`) | **2** (`f[1]`, `h[1]`) |
+
+Re-entering an identical formula already changes nothing (good).
+
+**Ask:**
+
+```
+step key   = sha256(tool hash (K20), value-changing modifiers and their settings,
+                    literal arguments, resource data versions, seed if declared
+                    non-deterministic)          — not the step's name (a rename
+                                                  is not a recompute)
+call key   = sha256(step key, keys of the cells this call read)
+cell key   = its call's key;  a source or literal cell: sha256(canonical value)
+```
+
+1. **Read sets per verb:** a call's key covers only the cells it read: its
+   bound columns for `1 → 1` verbs (map, group, filter, select, rename); the
+   group's members and the key column for collapse/distinct; the sort column
+   for sort; the matched rows and keys for join/stack/zip; the whole input
+   for `table`.
+2. **Two phases:** at assignment, mark "may change" by following lineage
+   and read sets downstream, all the way (no hashing). At run, recompute a
+   call's key: equal to the stored key → reuse the result; a recomputed
+   value equal to the old one → stop propagating (early cutoff).
+3. **Per-cell state:** "may change" readable per cell and rolled up per
+   step (`1 of 3`), in each step's own state, however far downstream.
+4. **Store by key:** outputs stored under their call keys; this is K22's
+   store and C32's put-away kernels, and gives incremental runs (by row
+   state) and resuming. Unreferenced results are collected.
+5. **Hash once:** a value's hash is computed when it's made and kept;
+   execution-only modifiers (`retry`, `timeout`) are not in the key.
+6. **Terminal:** `k.cell("f", 1)["key"]`, `k.may_change()` →
+   `{step: [rows]}`.
+7. **One reference column + a column map** (app spec
+   [020 §10b](../spec/020-table-mappings.md)): keep each table's mapping as
+   one reference column (per row: its key and its input rows **by key**) and
+   one column map per step (each output column's source: passed through,
+   renamed, computed by the tool, packed, widened, a setting, a group key).
+   Lineage columns (`#r`, lists, `#r.idx`) and `k.cell`'s `inputs` become
+   views derived from these two; positions are derived, never stored as
+   references. Passed-through and renamed cells keep their input cell's key.
+
+**Rollout:** (1) flag the whole chain; (2) call keys for `1 → 1` verbs; (3)
+read rules for row-moving verbs; (4) the store. Each is useful alone; (1)
+and (2) end the false "changed" flags in interactive sessions.
+
+### K32. Primitives, cell-to-cell references, and reshape chains
+
+**Decided by the owner (2026-11-16)** (app spec
+[020 §10b–10e](../spec/020-table-mappings.md)).
+
+**Today** (run on `dbaf4c7`):
+- Columns → rows takes three steps (pack → expand with a custom tool →
+  widen), drops the id column, and loses the cell trace: the result's
+  `temp` cell names only "row 1 of `long`", not `w[0].y2024`.
+- `distinct(columns=["city"])` and `first[mod.collapse(by="city")]` give
+  identical values and lineage; `group` = map keeping the input's columns.
+- Chains are inconsistent: `sort` then `select` is accepted and both apply;
+  `drop` then `rename` is refused ("2 shape verbs in one step"). The
+  accepted chain prints back as `op("identity")[…]`.
+
+**Ask:**
+
+1. **Ten primitives and `table`.** Rows: keep, order, spread, reduce,
+   generate, combine. Columns: compute, columns. Turning: unpivot, pivot.
+   `table` stays the escape hatch (a tool's own mapping). Every other verb
+   is a named extension (filter = compute → keep; distinct = reduce with
+   `first`; select/drop/rename/copy/pack/widen = columns; …), keeping its
+   name in formulas. Row map, column map, read set, keys and losslessness
+   are defined once per primitive.
+2. **`unpivot`** (columns → rows) and **`pivot`** (rows → columns): each
+   output cell references its exact input cell; headers become data or
+   data headers only through them; unpivot then pivot is the identity; a
+   duplicate (id, name) in pivot is a problem unless a reducing tool is
+   given.
+3. **Cell-to-cell references:** a reference is `(step, row key, column)`,
+   stored in the one reference column of K31 point 7, with the column part
+   only where the column map can't say it (unpivot, pivot).
+4. **Chains:** a step may chain any number of no-tool reshaping primitives
+   and at most one tool-applying verb, left to right; no combine after the
+   first verb. The chain stores one reference column and column map for the
+   whole step, pointing at its input cells (references compose). Replace
+   today's "at most one shape verb" refusal with this rule, and print
+   chains back with the tool's name (`identity[…]`).
+5. **Snapshots (copy as values)** (app spec 020 §10f): a system source,
+   `snapshot[mod.source()](values=…)` or `(id="ss:…")`, whose cells are
+   plain values keyed by their hash, with no references or lineage. Large
+   values are kept once in K31's store under their content key, so a
+   snapshot is reproducible from its expression alone.
+
 ## How each ask is verified
 
 Every ask's **Done when** is written as a check that can be run against core.
