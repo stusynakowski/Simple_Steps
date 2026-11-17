@@ -112,6 +112,11 @@ Their arguments use §2.2's widgets.
 
 ### 2.4 Resources: settings widgets and a panel
 
+> **Panel superseded (2026-11-17):** the "panel = a named method" below is
+> replaced by interactive panels, a `panel(ui, ctx)` function attached to a
+> tool, resource or cell type: [139](./139-interactive-panels.md) (deferred).
+> The settings widgets here still stand.
+
 `@simple_step_resource` gains the same optional `ui`:
 
 ```python
@@ -163,6 +168,9 @@ Every `frontend/src` change is followed by `python -m SIMPLE_STEPS.build_fronten
 | **C3** | Explore tools on a pick (§2.3, 131's phases): plots first | a block of two columns plots as a scatter in the inspector, with nothing written to the workflow |
 | **C4** | Resource settings and panel (§2.4) | a database example shows its tables when loaded; a secret setting is never saved in the workflow file |
 | **C5** | The developer page and the example | `runme.py` passes with the new example |
+
+C3 and C4's panel part move to [139](./139-interactive-panels.md) P4 and P2
+when it is scheduled; until then C3 can be built as 131 proposes.
 
 C1 and C2 are independent and can go in parallel. C2's image-heavy views
 use 138's image endpoint (B3) once it exists; until then, today's `data:`
