@@ -2299,6 +2299,27 @@ columns; plain Parquet columns need no per-cell pass.
 edit. **Ask:** states and needs-a-run from recorded versions (likely with
 P2), with a speed test. [014](014-asks-at-adfaf87.md).
 
+### C53. Clear a step's output
+
+**Run** (2026-11-17, v1.0.3): `Kernel` has no clear, reset or drop; assigning
+the same expression again leaves the step `completed` with its output, and
+`k["d"] = None` loses the expression and makes its readers `invalid`. The
+app's plan 135 needs *Clear* (E7: a ran step is locked until cleared). **Ask:**
+clear a step's output, keeping its expression (back to `staged`, readers
+`stale`, memory freed); and clear it to the empty step. The owner is adding
+this to core's next version.
+
+### C54. Run only a stage's steps
+
+**Run** (2026-11-17, v1.0.3; `src → a → b → c → d`, stage `g` = `b..c`):
+`k.run_stage("g")` with `a` never run runs `a`, then `b`, `c`. `k.run(s,
+fresh=False)` for `b`, `c` leaves a **stale** `a` as it is (the stage reads its
+current output) but still runs a **never-run** `a`. **Ask:** `k.run_stage(name,
+fresh=False)`: only the stage's steps, on what their inputs show; an input
+outside it that has never run blocks the stage, naming it. App plan
+[141](../dev_plan/141-step-groups.md) §3.4 (owner: "runs only the steps in
+the group").
+
 ## Core's plan at `core-handover` `73933ba` (reviewed 2026-11-16)
 
 Core's own plan (`docs/design/plan.md`) answers the 136 asks this way; the
