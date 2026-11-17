@@ -2137,6 +2137,14 @@ run against core alone:* core **refuses** it at declaration (`checks.py`:
 verb"), so `SHIM(core §C36)`, which hides `name=` from the palette, is right
 and stays.
 
+**C36 at 1.0.3 (`adfaf87`, 2026-11-17), still open**, though core's
+`app-update-1.0.3.md` §3 H and §6 say to delete the shim. Run against core
+alone: `cat.describe()["modifiers"]` lists `name` for `collapse`, `expand`,
+`group`, `map`, `pack` and `sweep` (`map`: `default_is: "the step's name"`);
+`check_modifier("map", {"name": "z"})` refuses it (`unknown_setting`), and
+`n[mod.map(name="z")](wf["s"])` declares `invalid`. **Ask:** `describe()`
+lists only settings `check_modifier` accepts; correct the guide. The shim stays.
+
 ## At core 1.0.2 (`dbaf4c7`): references and selection
 
 Found checking every pick the grid writes and every form a user can type,
@@ -2256,6 +2264,40 @@ files.
    saves just those), so saving after each run costs what that run changed.
 2. A load reads a step's output only when it's read (core's L6), so opening a
    big session is quick and a page reads only its rows.
+
+**Still open at v1.0.3** (`adfaf87`, 2026-11-17,
+`scripts/core_probes/probe_big_session.py`): a second `k.save(folder,
+outputs=True)` with nothing changed rewrote 10 of 13 files (every table,
+states file and meta; only the content-named media were skipped), 2.37 s at
+1M rows. Details: [014](014-asks-at-adfaf87.md). C48 also still reproduces
+there.
+
+### C50. A page view costs the page, not the step
+
+**Run** (2026-11-17, v1.0.3 `adfaf87`,
+`scripts/core_probes/probe_big_session.py`): `k.view("d", (0, 50))` on a
+1M-row `map` step, in memory, took **13.56 s**; `k.cell("d", 5)` 13.61 s;
+4.0 s at 300k rows (2.64 s on 1.0.2). `Workflow._preview_rows` reads every
+row with `.at` before cutting the window. The app holds the workflow's lock
+during `k.view`, so a scroll blocks the workflow.
+
+**Ask:** cut `data`, `states`, stale rows and notes to the window first; a
+test that a 1M-row view returns in < 50 ms with today's output. Priority 1,
+as 1.0.4. Details: [014](014-asks-at-adfaf87.md).
+
+### C51. A load converts columns, not cells
+
+**Run** (same probe): `Kernel.load` 2.97 s at 1M rows, with `saving.untag`
+called once per cell (3,000,047 times). **Ask:** untag only tagged-JSON
+columns; plain Parquet columns need no per-cell pass.
+[014](014-asks-at-adfaf87.md).
+
+### C52. Run-state reads after an edit don't scan rows
+
+**Run** (same probe), 1M rows: `needs_run()` 0.89 s, four step states
+0.59 s, `run(name)` on a current step 0.59 s. The app reads these after every
+edit. **Ask:** states and needs-a-run from recorded versions (likely with
+P2), with a speed test. [014](014-asks-at-adfaf87.md).
 
 ## Core's plan at `core-handover` `73933ba` (reviewed 2026-11-16)
 

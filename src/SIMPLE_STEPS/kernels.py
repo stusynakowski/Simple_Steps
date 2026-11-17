@@ -58,7 +58,7 @@ class Kernel:
 # As in JupyterHub, a kernel belongs to a session and a workflow; unlike a
 # Jupyter kernel it has no hidden state, so it can be saved whole and brought
 # back exactly — outputs, versions and row links — without recomputing
-# anything (core_bridge.save_with_outputs, until core's output store).
+# anything: core's session folder (k.save(folder, outputs=True), Kernel.load).
 #
 # At most MAX_LIVE kernels per session are live (owner, 2026-10-21: one
 # workflow is worked on at a time). Opening another saves the least recently
@@ -80,62 +80,52 @@ _GUARD = threading.Lock()
 
 
 def _snapshot_path(session_id: str, key: str) -> str:
-    import hashlib
+    """Where a put-away kernel lives: core's session folder at this path, and
+    the app's own fields beside it in ``<path>.json``."""
     import os
     from .engine import RESULT_CACHE_DIR, _session_token
     name = hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
-    return os.path.join(RESULT_CACHE_DIR, _session_token(session_id), "kernels", f"{name}.json")
+    return os.path.join(RESULT_CACHE_DIR, _session_token(session_id), "kernels", name)
 
 
 def _save(session_id: str, s: Kernel) -> bool:
     """Put a kernel away on disk: its workflow, outputs and all."""
-    import json
     import os
-    from .core_bridge import save_with_outputs
     if not PERSIST:
         return False
+    path = _snapshot_path(session_id, s.key)
     with s.lock:
         try:
-            core, outputs = save_with_outputs(s.k), True
-        except Exception as exc:
-            # An output core can't save — an image array, a Figure (core asks
-            # C29/C30). Save the steps without outputs: restored, they re-run
-            # when needed rather than coming back.
-            print(f"  kernel '{s.key}': outputs not saved ({exc}); its steps will re-run")
-            core, outputs = json.loads(s.k.to_json()), False
-        try:
             text = json.dumps({"key": s.key, "declarations": s.declarations,
-                               "problems": s.problems, "ids": s.ids,
-                               "outputs": outputs, "core": core})
-        except (TypeError, ValueError) as exc:
+                               "problems": s.problems, "ids": s.ids})
+            report = s.k.save(path, outputs=True)
+        except Exception as exc:
             print(f"  kernel '{s.key}' not saved: {exc}")
             return False
-    path = _snapshot_path(session_id, s.key)
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
+    if not report.get("exact", True):
+        # What core couldn't keep exactly loads as needing a run, never lost.
+        print(f"  kernel '{s.key}': saved; not kept exactly: {report.get('steps')}")
+    tmp = path + ".json.tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
-    os.replace(tmp, path)
+    os.replace(tmp, path + ".json")
     return True
 
 
 def _restore(session_id: str, key: str, declarations: Dict[str, Any]) -> Optional[Kernel]:
     """A saved kernel, brought back as it was; None when there is none (or it
     was saved with other resources, or core can no longer read it)."""
-    import json
     import os
     from .catalog import catalog
-    from .core_bridge import restore_with_outputs
     path = _snapshot_path(session_id, key)
-    if not PERSIST or not os.path.exists(path):
+    if not PERSIST or not os.path.exists(path + ".json"):
         return None
     try:
-        with open(path, encoding="utf-8") as fh:
+        with open(path + ".json", encoding="utf-8") as fh:
             blob = json.load(fh)
         if blob.get("key") != key or blob.get("declarations") != declarations:
             return None
-        k = (restore_with_outputs(blob["core"], catalog()) if blob.get("outputs")
-             else CoreKernel.from_json(json.dumps(blob["core"]), catalog()))
+        k = CoreKernel.load(path, catalog())
     except Exception as exc:
         print(f"  kernel '{key}' not restored, starting fresh: {exc}")
         return None

@@ -18,12 +18,6 @@ Every shim below is tagged with what removes it::
                      modifier's settings as you type with them
     SHIM(core §C36)  describe() lists a verb's retired name= setting, which
                      core then refuses
-    SHIM(core §C32)  a kernel can't be saved with its outputs (the output
-                     store); a put-away kernel keeps them through the
-                     workflow's internal session export
-    SHIM(core §C37)  k.view / k.cell crash on a cell holding an array (an
-                     image): core's _plain calls .item() on anything with a
-                     dtype; unwrap numpy scalars only
     SHIM(core §C45)  formula() raises SelectionError, not FormulaError, for a
                      selection it won't read (wf["s"][1][2]); read it as the
                      FormulaError it is
@@ -36,7 +30,6 @@ from __future__ import annotations
 
 import functools
 import inspect
-import json
 from typing import Any, Callable, Tuple
 
 # `simple-steps-core` is declared as a git dependency, so an environment can
@@ -44,7 +37,7 @@ from typing import Any, Callable, Tuple
 # a bare ImportError from four frames down: SIMPLE_STEPS/__init__ imports this
 # module, so an older core otherwise makes the whole package unimportable.
 try:
-    from simple_steps_core import Catalog, Kernel, bound_tool, resource
+    from simple_steps_core import Catalog, Kernel, bound_tool, resource  # noqa: F401  (Kernel: the version check)
 except ImportError as exc:  # pragma: no cover - environment-dependent
     import simple_steps_core as _core
 
@@ -68,44 +61,9 @@ __all__ = [
     "check_modifier",
     "shape_verbs",
     "described_modifiers",
-    "save_with_outputs",
-    "restore_with_outputs",
     "simple_step_resource",
     "formula",
 ]
-
-
-# --------------------------------------------------------------------------- #
-# Cell values                                                                 #
-# --------------------------------------------------------------------------- #
-
-def _patch_plain() -> None:
-    """SHIM(core §C37): ``simple_steps_core.values._plain`` unwraps any value
-    with ``item`` and ``dtype``, meant for numpy scalars (``np.int64(3)``).
-    An image is a numpy array too, and ``.item()`` on it raises, so
-    ``k.view(step)`` and ``k.cell(…)`` crash on a step that holds images and
-    the grid shows nothing. Unwrap numpy scalars only; everything else as core
-    does. ``workflow`` imports ``_plain`` by name, so both bindings are set.
-    """
-    import numpy as np
-    from simple_steps_core import values as _values
-    from simple_steps_core import workflow as _workflow
-
-    core_plain = _values._plain
-    if getattr(core_plain, "_shimmed", False):
-        return
-
-    def _plain(value: Any) -> Any:
-        if isinstance(value, np.ndarray):
-            return value
-        return core_plain(value)
-
-    _plain._shimmed = True  # type: ignore[attr-defined]
-    _values._plain = _plain
-    _workflow._plain = _plain
-
-
-_patch_plain()
 
 
 # --------------------------------------------------------------------------- #
@@ -195,30 +153,6 @@ def described_modifiers(catalog: Catalog) -> dict:
                            for p in check_modifier(kind, {s["name"]: s.get("default")}))]
         out[kind] = {**entry, "settings": kept}
     return out
-
-
-# --------------------------------------------------------------------------- #
-# Putting a kernel away with its outputs                                      #
-# --------------------------------------------------------------------------- #
-
-def save_with_outputs(k: Kernel) -> dict:
-    """*k*'s workflow with its outputs, as plain data.
-
-    SHIM(core §C32): ``k.to_json()`` never holds output data, and core's output
-    store isn't built yet, so a kernel put away (another workflow opened, idle,
-    the server stopping) would come back with nothing run. The workflow's own
-    session export keeps the outputs. Delete when core's output store lands.
-    """
-    return json.loads(k.workflow.to_session_json())
-
-
-def restore_with_outputs(blob: dict, catalog: Catalog) -> Kernel:
-    """A kernel from :func:`save_with_outputs`, checked against *catalog*.
-    SHIM(core §C32), as above: mirrors ``Kernel.from_spec``, outputs kept."""
-    from simple_steps_core.workflow import Workflow
-    k = Kernel(catalog)
-    k.workflow = Workflow.from_dict(blob, catalog=catalog)
-    return k
 
 
 # --------------------------------------------------------------------------- #
