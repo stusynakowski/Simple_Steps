@@ -12,29 +12,35 @@ export type StepPalette = string[] | { gradient: string[] };
 /** Before the palettes arrive (and if they can't): a neutral grey. */
 const NO_PALETTE = '#5c6370';
 
-/**
- * Step groups' colours (dev_plan/141): deeper tones than a step's, so a
- * group's half of the header never matches its steps' half. Used in turn by
- * group; a group's own `meta.color` wins. Nested palettes (a group's steps in
- * shades of its colour) come later.
- */
-export const GROUP_PALETTE = ['#3b4a6b', '#2f5d55', '#5b3f6b', '#6b4f2f', '#3f5f7a', '#5a3a3a'];
-
-/** The colour of group *index* (0-based) in its workflow. */
-export function groupColor(index: number): string {
-  return GROUP_PALETTE[index % GROUP_PALETTE.length];
+/** A palette's tones, in order: its colours, or its gradient's stops. */
+export function paletteTones(palette: StepPalette | undefined): string[] {
+  if (!palette) return [NO_PALETTE];
+  return Array.isArray(palette) ? palette : palette.gradient;
 }
 
-/** The colour of step *index* (0-based) in a workflow of *count* steps. */
+/**
+ * The colour of step *index* (0-based) in a workflow of *count* steps
+ * (*index* may fall between steps). One palette, blended smoothly along the
+ * workflow, its tones as the stops (owner, 2026-11-18: "pick a color palette
+ * and then have smooth transitions between each tone"), so steps and their
+ * groups read as one scheme.
+ */
 export function paletteColor(palette: StepPalette | undefined, index: number, count: number): string {
-  if (!palette) return NO_PALETTE;
-  if (Array.isArray(palette)) return palette.length ? palette[index % palette.length] : NO_PALETTE;
-  const stops = palette.gradient;
+  const stops = paletteTones(palette);
   if (stops.length < 2) return stops[0] ?? NO_PALETTE;
   const t = count > 1 ? Math.min(1, Math.max(0, index / (count - 1))) : 0;
   const at = t * (stops.length - 1);
   const i = Math.min(stops.length - 2, Math.floor(at));
   return mix(stops[i], stops[i + 1], at - i);
+}
+
+/**
+ * A group's tone (dev_plan/141): the palette's colour where the group sits,
+ * deeper, so its half of the header is its steps' scheme but never their
+ * exact colour.
+ */
+export function deepen(color: string): string {
+  return /^#[0-9a-f]{6}$/i.test(color) ? mix(color, '#0d0d12', 0.38) : color;
 }
 
 /** *a* to *b*, a fraction *t* of the way (both #rrggbb). */

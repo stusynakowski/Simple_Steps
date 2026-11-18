@@ -5,7 +5,7 @@ import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
 import { runState, groupRunState, groupErrorLabel } from '../utils/runState';
-import { groupColor } from '../styles/theme';
+import GroupBand from './GroupBand';
 import { popUnder } from './StepMenu';
 import { GroupControls, GroupSettingsPop, type OpenSettings } from './StepGroupPops';
 import FoldedGroup from './FoldedGroup';
@@ -19,7 +19,7 @@ import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
 import FloatingWindow from './FloatingWindow';
 import useWorkflow from '../hooks/useWorkflow';
-import { useStepColor } from '../context/StepPaletteContext';
+import { useStepColor, useGroupColor } from '../context/StepPaletteContext';
 import Sidebar from './Sidebar';
 import ChatSidebar from './ChatSidebar';
 import ActivityBar from './ActivityBar';
@@ -197,8 +197,42 @@ export default function MainLayout() {
     dispatchCommand,
     consoleStepMap,
   } = useWorkflow();
-  // A step without its own colour takes the palette's (System Settings).
+  // A step without its own colour takes the palette's (System Settings); a
+  // group without its own takes the same palette's tone where it sits, deeper.
   const stepColor = useStepColor();
+  const groupTone = useGroupColor();
+  const colorOfGroup = (g: { steps: string[]; meta?: { color?: string } }) => {
+    if (g.meta?.color) return g.meta.color;
+    const at = g.steps.map((id) => workflow.steps.findIndex((s) => s.id === id)).filter((i) => i >= 0);
+    return groupTone(Math.min(...at), Math.max(...at), workflow.steps.length);
+  };
+  // Where each group's band sits: over its steps' headers' top halves, from
+  // the first one's tail to the last one's point (measured, as the columns
+  // size themselves).
+  const columnsRef = useRef<HTMLDivElement>(null);
+  const [bandAt, setBandAt] = useState<Record<string, { left: number; top: number; width: number; height: number }>>({});
+  useLayoutEffect(() => {
+    const box = columnsRef.current;
+    if (!box) return;
+    const measure = () => {
+      const origin = box.getBoundingClientRect();
+      const next: typeof bandAt = {};
+      for (const g of workflow.groups ?? []) {
+        const heads = Array.from(box.querySelectorAll<HTMLElement>('[data-group] > .operation-column > .op-header'))
+          .filter((h) => h.closest<HTMLElement>('[data-group]')!.dataset.group === g.name && h.offsetWidth > 0)
+          .map((h) => h.getBoundingClientRect());
+        if (!heads.length) continue;
+        next[g.name] = { left: heads[0].left - origin.left, top: heads[0].top - origin.top,
+          width: heads[heads.length - 1].right - heads[0].left, height: heads[0].height / 2 };
+      }
+      setBandAt((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    };
+    measure();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    ro?.observe(box);
+    box.querySelectorAll('.column-wrapper').forEach((c) => ro?.observe(c));
+    return () => ro?.disconnect();
+  });
   // Step groups (dev_plan/141): the group whose settings are open.
   const [groupSettings, setGroupSettings] = useState<OpenSettings | null>(null);
   // Folded groups (dev_plan/141 §3.3): each viewer's own, kept in this
@@ -977,6 +1011,7 @@ export default function MainLayout() {
     <main className="main-content horizontal-scroll-area" ref={canvasRef}>
         {!resourcesPinned && resourceColumn}
         <div
+          ref={columnsRef}
           className="columns-container"
           data-testid="columns-container"
           style={{
@@ -989,35 +1024,14 @@ export default function MainLayout() {
           } as React.CSSProperties}
         >
           {workflow.steps.map((step, index) => {
-            // Its step group, if any (dev_plan/141): the header's top half.
-            const groupIndex = (workflow.groups ?? []).findIndex((g) => g.steps.includes(step.id));
-            const grp = groupIndex >= 0 ? workflow.groups![groupIndex] : undefined;
-            const group = grp && {
-              name: grp.name,
-              color: grp.meta?.color ?? groupColor(groupIndex),
-              first: grp.steps[0] === step.id,
-              last: grp.steps[grp.steps.length - 1] === step.id,
-              error: grp.runError && groupErrorLabel(grp.runError),
-              // Running while any of its steps is (a Run group in flight).
-              run: workflow.steps.some((s) => grp.steps.includes(s.id) && s.status === 'running')
-                ? { kind: 'running' as const, text: 'running' } : groupRunState(grp),
-            };
-            // The group's buttons, inline on its band (run options, notes, settings, fold).
-            const controls = grp && (
-              <GroupControls
-                workflow={workflow}
-                group={grp}
-                folded={folded.has(grp.name)}
-                onRun={(name, force) => { void runGroup(name, force); }}
-                onMeta={setGroupMeta}
-                onSettings={(rect) => setGroupSettings({ name: grp.name, at: popUnder(rect) })}
-                onFold={() => toggleFold(grp.name)}
-              />
-            );
+            // Its step group, if any (dev_plan/141): the header's top half
+            // (under the group's band, drawn after the columns).
+            const grp = (workflow.groups ?? []).find((g) => g.steps.includes(step.id));
+            const group = grp && { name: grp.name, color: colorOfGroup(grp) };
             // Folded: the group is one header on its first step's place; its
             // other steps keep an empty place, so the steps' map stays in step.
             if (grp && group && folded.has(grp.name)) {
-              if (!group.first) return <div key={step.id} className="column-wrapper folded-away" />;
+              if (grp.steps[0] !== step.id) return <div key={step.id} className="column-wrapper folded-away" />;
               const members = grp.steps
                 .map((id) => workflow.steps.findIndex((s) => s.id === id))
                 .filter((i) => i >= 0)
@@ -1027,14 +1041,12 @@ export default function MainLayout() {
                 });
               const width = Math.max(150, 40 + 72 * members.length);
               return (
-                <div key={step.id} className="column-wrapper collapsed" style={{ width, flex: `0 0 ${width}px` }}>
+                <div key={step.id} className="column-wrapper collapsed" data-group={grp.name} style={{ width, flex: `0 0 ${width}px` }}>
                   <FoldedGroup
                     name={grp.name}
                     color={group.color}
-                    run={group.run}
                     steps={members}
                     zIndex={workflow.steps.length - index}
-                    controls={controls}
                     onUnfold={() => toggleFold(grp.name)}
                     onOpenStep={(id) => { toggleFold(grp.name); if (!expandedStepIds.has(id)) toggleStep(id); }}
                   />
@@ -1054,6 +1066,7 @@ export default function MainLayout() {
               <div
                 key={step.id}
                 className={`column-wrapper ${size}${liveWidth?.id === step.id ? ' resizing' : ''}${highlightedSteps?.has(step.label) ? ' resource-highlight' : ''}`}
+                data-group={grp?.name}
                 style={width ? { width, flex: `0 0 ${width}px` } : undefined}
               >
                 <OperationColumn
@@ -1090,22 +1103,44 @@ export default function MainLayout() {
                   onDefineResource={defineResource}
                   onDetach={(pos) => handleDetach(step.id, pos)}
                   group={group}
-                  onFoldGroup={grp ? () => toggleFold(grp.name) : undefined}
-                  groupControls={controls}
                   onMakeGroup={() => makeGroup(step.id)}
                 />
               </div>
             );
           })}
+          {/* Each group's band: one piece over its steps' top halves, its
+              name, run state and controls (shown on hover); a click folds. */}
+          {(workflow.groups ?? []).map((g) => bandAt[g.name] && (
+            <GroupBand
+              key={g.name}
+              name={g.name}
+              color={colorOfGroup(g)}
+              run={workflow.steps.some((s) => g.steps.includes(s.id) && s.status === 'running')
+                ? { kind: 'running', text: 'running' } : groupRunState(g)}
+              error={g.runError && groupErrorLabel(g.runError)}
+              at={bandAt[g.name]}
+              first={workflow.steps[0]?.id === g.steps[0]}
+              controlsOpen={groupSettings?.name === g.name}
+              onFold={() => toggleFold(g.name)}
+              controls={(
+                <GroupControls
+                  workflow={workflow}
+                  group={g}
+                  folded={folded.has(g.name)}
+                  onRun={(name, force) => { void runGroup(name, force); }}
+                  onMeta={setGroupMeta}
+                  onSettings={(rect) => setGroupSettings({ name: g.name, at: popUnder(rect) })}
+                  onFold={() => toggleFold(g.name)}
+                />
+              )}
+            />
+          ))}
           {groupSettings && (
             <GroupSettingsPop
               key={groupSettings.name}
               workflow={workflow}
               open={groupSettings}
-              color={(() => {
-                const i = (workflow.groups ?? []).findIndex((g) => g.name === groupSettings.name);
-                return workflow.groups?.[i]?.meta?.color ?? groupColor(i);
-              })()}
+              color={colorOfGroup((workflow.groups ?? []).find((g) => g.name === groupSettings.name) ?? { steps: [] })}
               onRename={(from, to) => {
                 const ok = renameGroup(from, to);
                 const name = to.trim();
@@ -1242,6 +1277,14 @@ export default function MainLayout() {
                           run: runState(s, pipelineStatus === 'running' && s.status === 'pending'
                             && pipelineCursorIndex >= 0 && i >= pipelineCursorIndex),
                         }))}
+                        // Each group as one split chevron, "i–j" (dev_plan/141 §3.6).
+                        groups={(workflow.groups ?? []).flatMap((g) => {
+                          const at = g.steps.map((id) => workflow.steps.findIndex((s) => s.id === id)).filter((i) => i >= 0);
+                          return at.length ? [{
+                            name: g.name, first: Math.min(...at), last: Math.max(...at), color: colorOfGroup(g),
+                            folded: folded.has(g.name), run: groupRunState(g),
+                          }] : [];
+                        })}
                         // A click on a step jumps to it and opens it.
                         onOpen={(id) => { if (!expandedStepIds.has(id)) toggleStep(id); }}
                       />

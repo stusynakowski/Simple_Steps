@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { fetchSettings, updateSettings } from '../services/api';
-import { paletteColor } from '../styles/theme';
+import { deepen, paletteColor, paletteTones } from '../styles/theme';
 import type { StepPalette } from '../styles/theme';
 
 /**
@@ -48,4 +48,24 @@ export function useStepColor(): (index: number, count: number) => string {
   const { name, palettes } = useContext(StepPaletteContext);
   const palette = palettes[name];
   return useCallback((index: number, count: number) => paletteColor(palette, index, count), [palette]);
+}
+
+/**
+ * A step group's colour (dev_plan/141): the palette's tone where the group
+ * sits (the middle of steps *first*..*last*, 0-based, of *count*), deeper.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useGroupColor(): (first: number, last: number, count: number) => string {
+  const { name, palettes } = useContext(StepPaletteContext);
+  const palette = palettes[name];
+  return useCallback((first: number, last: number, count: number) =>
+    deepen(paletteColor(palette, (first + last) / 2, count)), [palette]);
+}
+
+/** The palette's tones, deeper: the colours a group can pick (its settings). */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useGroupTones(): string[] {
+  const { name, palettes } = useContext(StepPaletteContext);
+  const palette = palettes[name];
+  return useMemo(() => paletteTones(palette).map(deepen), [palette]);
 }

@@ -5,6 +5,12 @@ import type { RunState } from '../utils/runState';
 
 /** One step on the map: what it's called, its colour, and where its run stands. */
 export interface MinimapStep { id: string; label: string; color: string; run?: RunState }
+/**
+ * A step group on the map (dev_plan/141 §3.6): steps *first*..*last*
+ * (0-based), drawn as one chevron, split as its headers are: the group's
+ * colour on top, its steps' colours below; labelled "i–j".
+ */
+export interface MinimapGroup { name: string; first: number; last: number; color: string; folded: boolean; run?: RunState }
 
 interface Span { left: number; width: number }
 
@@ -25,9 +31,10 @@ const MIN_NUMBER_WIDTH = 18;
  * *scroller* is the steps' scrolling element; each step's column is its
  * `.column-wrapper` child, in workflow order.
  */
-export default function StepMinimap({ scroller, steps, onOpen }: {
+export default function StepMinimap({ scroller, steps, groups = [], onOpen }: {
   scroller: React.RefObject<HTMLElement | null>;
   steps: MinimapStep[];
+  groups?: MinimapGroup[];
   /** Open (expand) a step: a click on its arrow jumps to it and opens it. */
   onOpen?: (id: string) => void;
 }) {
@@ -74,6 +81,11 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
   const k = view.trackWidth / Math.max(1, end - origin);  // track pixels per scroll pixel
   const toTrack = (x: number) => (x - origin) * k;
   const jump = (left: number) => scroller.current?.scrollTo({ left, behavior: 'smooth' });
+  // A group's extent, in scroll pixels: its first step's left to the next
+  // step's start (or its last step's right).
+  const groupLeft = (g: MinimapGroup) => spans[g.first]?.left ?? 0;
+  const groupRight = (g: MinimapGroup) => spans[g.last + 1]?.left
+    ?? ((spans[g.last]?.left ?? 0) + (spans[g.last]?.width ?? 0));
 
   // Drag the outline: the steps scroll with it.
   const drag = useRef<{ x: number; scrollLeft: number } | null>(null);
@@ -103,6 +115,13 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
       return;
     }
     if (i < 0) { setHover(null); return; }
+    const g = groups.find((x) => i >= x.first && i <= x.last);
+    if (g) {
+      const text = `Steps ${g.first + 1}–${g.last + 1} · ${g.name}${g.run ? ` · ${g.run.text}` : ''}`;
+      const at = box.left + toTrack((groupLeft(g) + groupRight(g)) / 2);
+      setHover((prev) => (prev && prev.text === text && prev.x === at ? prev : { text, x: at, y: box.top }));
+      return;
+    }
     const s = steps[i];
     const text = `Step ${i + 1} · ${s.label}${s.run ? ` · ${s.run.text}` : ''}`;
     const at = box.left + toTrack(spans[i].left + spans[i].width / 2);
@@ -137,9 +156,47 @@ export default function StepMinimap({ scroller, steps, onOpen }: {
           onClick={(e) => { e.stopPropagation(); setHover(null); jump(res.left); }}
         >R</button>
       )}
+      {groups.map((g) => {
+        if (!spans[g.first]) return null;
+        const left = toTrack(groupLeft(g));
+        const right = toTrack(groupRight(g));
+        const width = Math.max(6, right - left + (spans[g.last + 1] ? ARROW_DEPTH : 0));
+        // Below, each step's colour across its share: its column's width, or
+        // (folded, the steps sharing one header) equal parts.
+        const total = Math.max(1, groupRight(g) - groupLeft(g));
+        let at = 0;
+        const stops = steps.slice(g.first, g.last + 1).map((s, k) => {
+          const i = g.first + k;
+          const share = g.folded ? 100 / (g.last - g.first + 1)
+            : 100 * ((spans[i + 1]?.left ?? groupRight(g)) - spans[i].left) / total;
+          const stop = `${s.color} ${at}% ${at + share}%`;
+          at += share;
+          return stop;
+        });
+        const fill = `linear-gradient(to bottom, ${g.color} 0 50%, transparent 50%), linear-gradient(to right, ${stops.join(', ')})`;
+        return (
+          <button
+            key={`g:${g.name}`}
+            type="button"
+            className={`step-minimap-step step-minimap-group run-paint${g.first === 0 ? ' first' : ''}${g.run ? ` run-${g.run.kind}` : ''}`}
+            style={{ left, width, '--fill': fill } as React.CSSProperties}
+            aria-label={`Go to steps ${g.first + 1}–${g.last + 1}, group ${g.name}`}
+            data-testid={`minimap-group-${g.name}`}
+            onClick={(e) => { e.stopPropagation(); setHover(null); jump(groupLeft(g)); }}
+          >
+            {width >= MIN_NUMBER_WIDTH && (
+              <span className="step-minimap-num" aria-hidden="true">
+                {g.first === g.last ? g.first + 1 : `${g.first + 1}–${g.last + 1}`}
+              </span>
+            )}
+          </button>
+        );
+      })}
       {steps.map((s, i) => {
         const span = spans[i];
         if (!span) return null;
+        // A grouped step is drawn as part of its group's chevron.
+        if (groups.some((g) => i >= g.first && i <= g.last)) return null;
         const left = toTrack(span.left);
         // To the next step's start, plus the arrow's depth (--d) so its tip
         // fills the next one's tail, as the headers interlock.

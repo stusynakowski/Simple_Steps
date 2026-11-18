@@ -17,7 +17,6 @@ import StepOverview from './StepOverview';
 import StepMenu from './StepMenu';
 import SymbolIcon, { type SymbolName } from './SymbolIcon';
 import { runState, RUN_ICON } from '../utils/runState';
-import type { RunState } from '../utils/runState';
 import Markdown from 'react-markdown';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
@@ -79,14 +78,9 @@ interface OperationColumnProps {
   onResizeReset?: () => void;
   /**
    * The step group this step is in (dev_plan/141): its header splits in two,
-   * the group's colour on top, the step's below. The group's first step
-   * carries the group's name and run state.
+   * the group's colour on top (under the group's band), the step's below.
    */
-  group?: { name: string; color: string; first: boolean; last: boolean; run: RunState; error?: string };
-  /** A click on the group's half: fold the group, as a click on a step's header folds the step. */
-  onFoldGroup?: () => void;
-  /** The group's controls (run options, notes, settings, fold), inline on its last step's band. */
-  groupControls?: React.ReactNode;
+  group?: { name: string; color: string };
   /** Not in a group: the header's group button makes this step a group of its own. */
   onMakeGroup?: () => void;
 }
@@ -131,8 +125,6 @@ export default function OperationColumn({
   pipelineStatus = 'idle',
   pipelineCursorIndex = -1,
   group,
-  onFoldGroup,
-  groupControls,
   onMakeGroup,
 }: OperationColumnProps) {
   const widgetMaxHeight = isMaximized ? 'calc(100vh - 200px)' : '400px';
@@ -478,31 +470,8 @@ export default function OperationColumn({
         <div className="arrow-status run-paint" aria-hidden="true" />
         {/* The step's colour; in a group, the group's colour on its top half. */}
         <div className="arrow-background" />
-        {/* The group half (dev_plan/141 §3.2): the group's name and run state
-            on its first step, its controls inline at the band's end (its last
-            step), as a step header's controls sit on it; the band carries on
-            over the steps between. A click on it folds the group. */}
-        {group && (
-          <div
-            className={`group-half${group.first ? ' first' : ''}${group.last ? ' last' : ''}`}
-            data-testid={group.first ? 'group-half' : undefined}
-            title={`Group ${group.name}: ${group.run.text}. Click to fold`}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); onFoldGroup?.(); }}
-          >
-            {group.first && <span className="group-half-name">{group.name}</span>}
-            {group.first && RUN_ICON[group.run.kind] && (
-              <span className={`group-run-icon run-icon-${group.run.kind}`}>
-                <SymbolIcon name={RUN_ICON[group.run.kind]!} size={12} />
-              </span>
-            )}
-            {/* Why its last Run group didn't run, on the band (not only the log). */}
-            {group.first && group.error && (
-              <span className="group-run-error" data-testid="group-run-error">{group.error}</span>
-            )}
-            {group.last && groupControls}
-          </div>
-        )}
+        {/* In a group, its top half is the group's band, drawn over the
+            group's headers as one piece (GroupBand, dev_plan/141 §3.2). */}
         <div className="arrow-content">
             {isMinimized ? (
                  // As small as it gets: just the step's number (owner, 2026-10-30).

@@ -3,7 +3,7 @@ import Markdown from 'react-markdown';
 import type { StepGroup, Workflow } from '../types/models';
 import StepMenu, { StepPop, type PopAt } from './StepMenu';
 import SymbolIcon from './SymbolIcon';
-import { GROUP_PALETTE } from '../styles/theme';
+import { useGroupTones } from '../context/StepPaletteContext';
 import { groupRunState } from '../utils/runState';
 
 /**
@@ -117,6 +117,8 @@ export function GroupSettingsPop({ workflow, open, color, onRename, onSteps, onM
   const group = (workflow.groups ?? []).find((g) => g.name === open.name);
   const [name, setName] = useState(open.name);
   const [refused, setRefused] = useState(false);
+  // The colours on offer: the step palette's tones, deeper (as a group's own).
+  const tones = useGroupTones();
   if (!group) return null;
   const order = workflow.steps.map((s) => s.id);
   const label = (id: string) => workflow.steps.find((s) => s.id === id)?.label ?? id;
@@ -181,7 +183,7 @@ export function GroupSettingsPop({ workflow, open, color, onRename, onSteps, onM
       <div className="group-set-row">
         <span>Colour</span>
         <div className="group-pop-colors" role="radiogroup" aria-label="Group colour">
-          {GROUP_PALETTE.map((c) => (
+          {tones.map((c) => (
             <button
               key={c}
               type="button"
