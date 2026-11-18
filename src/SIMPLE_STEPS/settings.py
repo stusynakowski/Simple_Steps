@@ -15,10 +15,13 @@ from pydantic import BaseModel, field_validator
 # ── Step colours ────────────────────────────────────────────────────────────
 # A palette colours the steps that have no colour of their own (owner,
 # 2026-11-10). Two kinds:
-#   - a list of colours, used in turn: step 1 the first, step 2 the second, …
-#     and round again;
-#   - {"gradient": [first, …, last]}: blended along the workflow, its first
-#     step the first colour, its last step the last.
+#   - a list of colours;
+#   - {"gradient": [first, …, last]}.
+# Both are blended along the workflow, the colours as stops: its first step
+# the first colour, its last step the last, the steps between in smooth
+# transitions (owner, 2026-11-18), and a step group takes the tone where it
+# sits, deeper (the frontend's theme.ts). So list a palette's colours in the
+# order they should flow.
 # Colours are #rrggbb. The header's text is white, so mid-to-dark colours read
 # best.
 
@@ -26,11 +29,12 @@ Palette = Union[List[str], Dict[str, List[str]]]
 
 #: The palettes every app offers; an App adds its own (``step_palettes=``).
 BUILTIN_PALETTES: Dict[str, Palette] = {
-    # Vaporwave (the default; owner, 2026-11-10): magenta, cyan-teal, violet,
-    # pink, in two depths. Kept 30°+ of hue from the run's colours (blue,
-    # green, amber, red: index.css) so a step's colour never reads as its
-    # status; dark enough for the header's white text.
-    "vaporwave": ["#c2187a", "#10939e", "#8a3fcf", "#d6589a", "#0b6e7a", "#5b2a9e"],
+    # Vaporwave (the default; owner, 2026-11-10): pink, magenta, violet, deep
+    # violet, deep teal, cyan-teal, in that order so neighbouring steps flow
+    # into each other (owner, 2026-11-18). Kept 30°+ of hue from the run's
+    # colours (blue, green, amber, red: index.css) so a step's colour never
+    # reads as its status; dark enough for the header's white text.
+    "vaporwave": ["#d6589a", "#c2187a", "#8a3fcf", "#5b2a9e", "#0b6e7a", "#10939e"],
     "muted": ["#4f6d8f", "#5f8a76", "#a0784a", "#7a6293", "#9a5a63", "#4f8790", "#86844f", "#66707f"],
     "ocean": {"gradient": ["#1f3b63", "#2f7f8c", "#3e9e86"]},
     "sunset": {"gradient": ["#5a2d82", "#b0456a", "#d9773a"]},

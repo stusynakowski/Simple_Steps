@@ -137,7 +137,7 @@ app = App(
     tools=[my_tools],
     title="My shop",
     step_palettes={
-        "shop": ["#1d3557", "#457b9d", "#2a9d8f"],    # used in turn, then round again
+        "shop": ["#1d3557", "#457b9d", "#2a9d8f"],    # blended along the workflow, in this order
         "dusk": {"gradient": ["#1d3557", "#e76f51"]}, # blended: first step to last step
     },
     step_palette="shop",
@@ -147,9 +147,12 @@ app = App(
 - `step_palette` — the palette in use when the server starts: one of yours, or
   a built-in: `vaporwave` (the default), `muted`, `ocean`, `sunset`, `forest`, `slate`,
   `classic` (the original bright colours).
-- `step_palettes` — your palettes, by name. A list is used in turn; a
-  `{"gradient": [...]}` (two or more colours) spreads across the workflow,
-  so a longer workflow gets finer steps between the same ends.
+- `step_palettes` — your palettes, by name: a list, or a
+  `{"gradient": [...]}` (two or more colours). Either is blended across the
+  workflow with its colours as stops, the first step the first colour and the
+  last step the last, so a longer workflow gets finer steps between the same
+  colours. List them in the order they should flow. A step group takes the
+  palette's tone where it sits, a little deeper.
 - Colours are `#rrggbb`. Header text is white: pick mid-to-dark colours.
 - A bad colour, a one-colour gradient or an unknown name stops the `App` with
   the reason, before anything is served.
