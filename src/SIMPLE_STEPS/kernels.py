@@ -318,6 +318,46 @@ def sync(s: Kernel, steps: List[Dict[str, Any]]) -> None:
             _declare(s, position, name, None)
 
 
+def sync_groups(s: Kernel, groups: Optional[List[Dict[str, Any]]]) -> Dict[str, str]:
+    """Make core's stages match the app's *groups* (``[{name, steps}]``), after
+    :func:`sync`. ``None`` leaves them as they are. Returns group → why core
+    refused it; core's membership (``k.stages``) is what :func:`group_summary`
+    reports back, so an insert, move or delete core resolved is what's saved.
+    """
+    if groups is None:
+        return {}
+    want: Dict[str, List[str]] = {}
+    for g in groups:
+        members = [str(n) for n in g.get("steps") or [] if str(n) in s.k]
+        if g.get("name") and members:
+            want[str(g["name"])] = members
+    for name, members in s.k.stages.items():
+        if want.get(name) != members:
+            s.k.unstage(name)
+    refused: Dict[str, str] = {}
+    for name, members in want.items():
+        if s.k.stages.get(name) != members:
+            try:
+                s.k.stage(name, first=members[0], last=members[-1])
+            except (KeyError, ValueError) as exc:
+                refused[name] = str(exc).strip("'\"")
+    return refused
+
+
+def group_summary(s: Kernel, refused: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
+    """Each group as core has it, in workflow order: its steps, its state as
+    one step, which of its steps need a run (``k.stage_status``); then any
+    group core refused, with why."""
+    out = []
+    for name in s.k.stages:
+        status = s.k.stage_status(name)
+        out.append({"name": name, "steps": list(status["steps"]), "state": status["state"],
+                    "needs_run": _plain(status["needs_run"])})
+    out += [{"name": n, "steps": [], "state": "invalid", "problem": p}
+            for n, p in (refused or {}).items()]
+    return out
+
+
 def _declare(s: Kernel, position: int, name: str, operation: Any) -> None:
     """Declare *name* at *position*, unless core already has exactly it there."""
     current = _declared(s, name)
@@ -458,27 +498,56 @@ def _bindings(k: Any, name: str, columns: List[Dict[str, Any]]) -> Dict[str, Dic
     }
 
 
-def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
+def _group_members(s: Kernel, group: str) -> List[str]:
+    """Group *group*'s steps, refusing to run it when a step it reads from
+    outside has never run: a group runs only its own steps (dev_plan/141 §3.4),
+    so it never runs that step for you."""
+    if group not in s.k.stages:
+        raise GridStepError(f"no group '{group}'")
+    members = s.k.stages[group]
+    outside = []
+    for n in members:
+        operation = s.k.step(n).operation
+        for read in (operation.reads if operation is not None else ()):
+            if read not in members and read not in outside and s.k.step(read).state == "staged":
+                outside.append(read)
+    if outside:
+        names = ", ".join(f"'{n}'" for n in outside)
+        raise GridStepError(f"group '{group}' reads {names}, which has never run: run it first")
+    return members
+
+
+def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: Optional[str],
              declarations: Optional[Dict[str, Any]],
-             live: Callable[[str, Any], Any], store: Callable[[Any], str]) -> Tuple[str, dict]:
+             live: Callable[[str, Any], Any], store: Callable[[Any], str],
+             force: bool = False, group: Optional[str] = None,
+             groups: Optional[List[Dict[str, Any]]] = None) -> Tuple[str, dict]:
     """Run step *name* of the session's workflow. Returns ``(output_ref, metrics)``.
 
     *store(frame)* saves an output and returns its ref; *live(name, decl)* is a
     resource's live object. Inputs that never ran run first; their refs are
-    reported under ``metrics["outputs"]`` so the UI can show them too.
+    reported under ``metrics["outputs"]`` so the UI can show them too. A step
+    already current is left as it is unless *force* (core 1.0.3).
+
+    With *group*, its steps run in order, each on what its inputs show, and
+    nothing outside it runs; the output is the group's last step's.
     """
     s = _kernel_for(session_id, key, declarations or {})
     with s.lock:
         sync(s, steps)
-        if name in s.problems:
-            raise GridStepError(s.problems[name])
-        step = _declared(s, name)
-        if step is None or (step.literal is None and step.operation is None):
-            raise GridStepError(f"step '{name}' has no formula to run")
-        if step.problems:
-            raise GridStepError("; ".join(str(p) for p in step.problems))
+        refused = sync_groups(s, groups)
+        members = _group_members(s, group) if group else None
+        name = members[-1] if members else name
+        for n in members or [name]:
+            if n in s.problems:
+                raise GridStepError(s.problems[n])
+            step = _declared(s, n)
+            if step is None or (step.literal is None and step.operation is None):
+                raise GridStepError(f"step '{n}' has no formula to run")
+            if step.problems:
+                raise GridStepError("; ".join(str(p) for p in step.problems))
 
-        upstream = _upstream(s, name)
+        upstream = members or _upstream(s, name)
         needed = {r for n in upstream for r in (s.k.step(n).operation.resources
                                                  if s.k.step(n).operation is not None else ())}
         try:
@@ -489,10 +558,12 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
 
         before = {n: s.k.step(n).output.version for n in upstream}
         try:
-            s.k.run(name)
+            for n in members or [name]:
+                s.k.run(n, fresh=not members, force=force)
         except Exception as exc:
             raise GridStepError(str(exc)) from exc
-        ran = [n for n in upstream if s.k.step(n).output.version != before[n] or n == name]
+        ran = [n for n in upstream if s.k.step(n).output.version != before[n] or n == name
+               or (force and members is not None)]
         for n in ran:
             output = s.k.step(n).output
             if output.meta.get("verb") == "source" and len(output.failed):
@@ -508,6 +579,7 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
             "columns": [str(c) for c in frame.columns],
             **_engine_metrics(step.spec.operation, step, step.output),
             "steps": summary(s),
+            "groups": group_summary(s, refused),
         }
         first = [n for n in reversed(ran) if n != name]
         if first:
@@ -518,7 +590,8 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: str,
 
 def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
               declarations: Optional[Dict[str, Any]],
-              store: Optional[Callable[[Any], str]] = None) -> Dict[str, Any]:
+              store: Optional[Callable[[Any], str]] = None,
+              groups: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Declare the app's steps without running anything.
 
     What the UI calls after an edit (which later steps are now stale?) and
@@ -527,11 +600,13 @@ def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
     a reopened workflow — has its output stored, and its ref returned, so the
     UI shows it without anything re-running.
 
-    Returns ``{"steps": every step's state, "outputs": {name: ref}}``.
+    Returns ``{"steps": every step's state, "outputs": {name: ref},
+    "groups": each group as core has it}`` (:func:`group_summary`).
     """
     s = _kernel_for(session_id, key, declarations or {})
     with s.lock:
         sync(s, steps)
+        refused = sync_groups(s, groups)
         outputs: Dict[str, str] = {}
         if store is not None:
             for step in steps:
@@ -541,4 +616,4 @@ def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
                     continue
                 if ran.state in ("completed", "stale", "failed"):
                     outputs[name] = store(ran.data)
-        return {"steps": summary(s), "outputs": outputs}
+        return {"steps": summary(s), "outputs": outputs, "groups": group_summary(s, refused)}

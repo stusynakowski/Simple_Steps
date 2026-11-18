@@ -179,6 +179,10 @@ class PipelineFile(BaseModel):
     steps: List[StepConfig]
     #: name → {"source": "defined", "type": "<Class>", "settings": {...}}
     resources: Dict[str, Any] = Field(default_factory=dict)
+    #: Step groups (core's stages, dev_plan/141): [{"name", "steps": [step
+    #: names], "meta": {color, notes}}]. Which steps are in a group is core's,
+    #: read back after each edit; meta is the app's.
+    groups: List[Dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -208,7 +212,8 @@ class ProjectInfo(BaseModel):
 
 # --- 4. Reference Passing (Run Single Step) ---
 class StepRunRequest(BaseModel):
-    step_id: str
+    # The step to run; None when `group` names a group to run instead.
+    step_id: Optional[str] = None
     formula: Optional[str] = None
     # step name → output ref, for a formula run outside a workflow.
     step_map: Optional[Dict[str, str]] = None
@@ -225,6 +230,13 @@ class StepRunRequest(BaseModel):
     # core workflow: its kernel (kernels.py, dev_plan/124 phase 2).
     workflow_key: Optional[str] = None
     workflow_steps: Optional[List[Dict[str, Any]]] = None
+    # The workflow's groups, as in its file ([{name, steps: [step names]}]);
+    # None leaves the kernel's groups as they are (dev_plan/141).
+    workflow_groups: Optional[List[Dict[str, Any]]] = None
+    # Run this group's steps only, instead of step_id (dev_plan/141 §3.4).
+    group: Optional[str] = None
+    # Run again even when current: a retry or a recompute (dev_plan/140).
+    force: bool = False
 
 
 class WorkflowSyncRequest(BaseModel):
@@ -232,6 +244,7 @@ class WorkflowSyncRequest(BaseModel):
     workflow_key: str
     workflow_steps: List[Dict[str, Any]]
     resources: Optional[Dict[str, Any]] = None
+    workflow_groups: Optional[List[Dict[str, Any]]] = None
 
 class StepRunResponse(BaseModel):
     status: Literal['success', 'failed']

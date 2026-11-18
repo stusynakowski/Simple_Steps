@@ -150,20 +150,24 @@ def run_operation(
     workflow_key: Optional[str] = None,
     workflow_steps: Optional[list] = None,
     step_map: Optional[Dict[str, str]] = None,
+    workflow_groups: Optional[list] = None,
+    group: Optional[str] = None,
+    force: bool = False,
 ) -> tuple[str, dict]:
-    """Run one step. Returns ``(output_ref, metrics)``.
+    """Run one step, or one group's steps. Returns ``(output_ref, metrics)``.
 
     With *workflow_steps* (``[{id, name, formula, ref}]``, what the UI sends),
     the step runs in its workflow's kernel (``kernels``), so row links and
     staleness carry across steps. Without them, a formula in core's syntax runs
     alone, reading the steps in *step_map* (name → ref).
 
-    *resources* is the workflow's ``resources`` section.
+    *resources* is the workflow's ``resources`` section. *group* runs that
+    group's steps instead of *step_id*; *force* runs again what is current.
     """
     from .operation_formula import is_canonical, is_literal, not_a_step
 
     formula = (formula or "").strip()
-    if workflow_steps is not None and step_id:
+    if workflow_steps is not None and (step_id or group):
         from . import kernels
         from .resources import live_resource
         # The UI sends a step's id; formulas (and core) name steps.
@@ -175,6 +179,7 @@ def run_operation(
                 resources,
                 live=lambda name, decl: live_resource(session_id, name, decl),
                 store=lambda frame: save_dataframe(frame, session_id=session_id, store_mode=result_store),
+                force=force, group=group, groups=workflow_groups,
             )
         except Exception as e:
             raise ValueError(f"Error executing step: {e}") from e

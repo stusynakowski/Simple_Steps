@@ -579,6 +579,9 @@ async def execute_step(
             workflow_key=payload.workflow_key,
             workflow_steps=payload.workflow_steps,
             step_map=payload.step_map,
+            workflow_groups=payload.workflow_groups,
+            group=payload.group,
+            force=payload.force,
         ))
 
         
@@ -620,6 +623,7 @@ async def sync_workflow(
             _normalize_session_id(session_id), payload.workflow_key, payload.workflow_steps,
             payload.resources,
             store=lambda frame: save_dataframe(frame, session_id=session_id),
+            groups=payload.workflow_groups,
         )
     except Exception as e:
         return JSONResponse(status_code=400, content={"detail": str(e)})

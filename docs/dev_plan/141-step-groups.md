@@ -179,7 +179,14 @@ what's saved. The file never decides membership on its own.
 | 4 | A group of one step | **allowed** |
 | 5 | Colours | a group palette now; **nested palettes later**: a group's colour, its steps in shades or close colours of it |
 
-## 8. Asks of core
+## 8. Progress
+
+| Phase | Status |
+|---|---|
+| **G1** backend | **done 2026-11-17** (owner: "start building"). `PipelineFile.groups` (`[{name, steps, meta}]`); `workflow_groups` on `/api/workflow/sync` and `/api/run` (`None` leaves the kernel's groups as they are); `kernels.sync_groups` makes core's stages match after the steps sync, `group_summary` reads them back (`{name, steps, state, needs_run}`, or `problem` when core refuses one) in the sync response and run metrics; `/api/run` takes `group` (runs only its steps, each `k.run(n, fresh=False)`, refusing by name a never-run step it reads from outside) and `force` (*Run again*, for a step or a group; `step_id` is now optional). Checked through the HTTP API with counted tool calls (15 checks: refusal runs nothing; a group run calls only its steps; a current group or step runs nothing; `force` reruns; an insert inside joins; a refused group says why; ungroup; the file keeps `groups` with `meta`); groups survive put-away and restore; pytest all pass. Core's refusals say "stage" (its word); the UI may show them as they are or swap the word |
+| G2–G6 | to do |
+
+## 9. Asks of core
 
 | | Ask | Why |
 |---|---|---|
