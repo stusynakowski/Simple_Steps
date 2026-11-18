@@ -1814,9 +1814,10 @@ body.is-resizing-step * { cursor: ew-resize !important; }
   position: absolute;
   top: 4px;
   left: 0;
+  right: 28px;             /* the band, short of the head's point */
   height: calc(50% - 4px);
-  max-width: calc(100% - 40px);
   z-index: 2;
+  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1827,8 +1828,26 @@ body.is-resizing-step * { cursor: ew-resize !important; }
   letter-spacing: 0.02em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   white-space: nowrap;
-  pointer-events: none;
+  overflow: hidden;
 }
+.group-half:hover { background: rgba(255, 255, 255, 0.08); }
 .column-wrapper:first-child > .operation-column .group-half { padding-left: 14px; }
+/* A header in the selection (shift-click, for Group steps): outlined white. */
+.operation-column.header-selected .arrow-status { background: #fff; }
+/* The group's popover: its name, its steps. */
+.group-pop-name { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+.group-pop-name input {
+  flex: 1;
+  min-width: 140px;
+  padding: 3px 6px;
+  border: 1px solid #555;
+  border-radius: 3px;
+  background: #1e1e1e;
+  color: #eee;
+  font: inherit;
+}
+.group-pop-name input[aria-invalid='true'] { border-color: #f87171; }
+.group-pop-error { margin-top: 4px; color: #f87171; font-size: 0.75rem; }
+.group-pop-steps { margin-top: 6px; color: #9ca3af; font-size: 0.75rem; }
 .group-half-name { overflow: hidden; text-overflow: ellipsis; }
 .group-run-icon { display: flex; }

@@ -83,6 +83,12 @@ interface OperationColumnProps {
    * carries the group's name and run state.
    */
   group?: { name: string; color: string; first: boolean; run: RunState };
+  /** Shift-click on the header: add this step to (or take it from) the header selection. */
+  onSelectHeader?: () => void;
+  /** In the header selection: marked, for *Group steps*. */
+  headerSelected?: boolean;
+  /** A click on the group's half: open the group's popover under it. */
+  onOpenGroup?: (rect: DOMRect) => void;
 }
 
 /** The rows of an open step its Settings can hide, top to bottom. */
@@ -125,6 +131,9 @@ export default function OperationColumn({
   pipelineStatus = 'idle',
   pipelineCursorIndex = -1,
   group,
+  onSelectHeader,
+  headerSelected = false,
+  onOpenGroup,
 }: OperationColumnProps) {
   const widgetMaxHeight = isMaximized ? 'calc(100vh - 200px)' : '400px';
   // Widgets: any number open at once (toolbar buttons toggle them); each
@@ -313,8 +322,10 @@ export default function OperationColumn({
     }
   };
 
-  const handleColumnClick = () => {
+  const handleColumnClick = (e: React.MouseEvent) => {
     if (detachDrag.consumeClick()) return;
+    // Shift-click selects headers, for Group steps (dev_plan/141 §3.5).
+    if (e.shiftKey && onSelectHeader) { onSelectHeader(); return; }
     if (isActive) {
       if (onMinimize) onMinimize();
     } else {
@@ -325,7 +336,12 @@ export default function OperationColumn({
   // ── Drag-to-detach on header ──────────────────────────────────────────────
   const detachDrag = useDragToDetach(onDetach);
   const isDragHinting = detachDrag.hinting;
-  const handleHeaderMouseDown = detachDrag.onMouseDown;
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    // A shift-click selects headers; without this the browser also extends a
+    // text selection across the page.
+    if (e.shiftKey) { e.preventDefault(); return; }
+    detachDrag.onMouseDown(e);
+  };
 
   // The step's notes (owner, 2026-11-10): the notepad at the header's bottom
   // right drops them down under the header; hover them for the button that
@@ -456,7 +472,7 @@ export default function OperationColumn({
   return (
     <div
       ref={columnRef}
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}${group ? ' in-group' : ''}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}${group ? ' in-group' : ''}${headerSelected ? ' header-selected' : ''}`}
       style={{
         '--step-color': color,
         ...(group ? { '--group-color': group.color } : {}),
@@ -470,11 +486,18 @@ export default function OperationColumn({
         {/* The step's colour; in a group, the group's colour on its top half. */}
         <div className="arrow-background" />
         {/* The group half (dev_plan/141 §3.2): the group's name and run state
-            on its first step; the band carries on over the others. */}
-        {group?.first && (
-          <div className="group-half" data-testid="group-half" title={`Group ${group.name}: ${group.run.text}`}>
-            <span className="group-half-name">{group.name}</span>
-            {RUN_ICON[group.run.kind] && (
+            on its first step; the band carries on over the others. A click
+            anywhere on it opens the group's popover. */}
+        {group && (
+          <div
+            className="group-half"
+            data-testid={group.first ? 'group-half' : undefined}
+            title={`Group ${group.name}: ${group.run.text}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onOpenGroup?.(e.currentTarget.getBoundingClientRect()); }}
+          >
+            {group.first && <span className="group-half-name">{group.name}</span>}
+            {group.first && RUN_ICON[group.run.kind] && (
               <span className={`group-run-icon run-icon-${group.run.kind}`}>
                 <SymbolIcon name={RUN_ICON[group.run.kind]!} size={12} />
               </span>

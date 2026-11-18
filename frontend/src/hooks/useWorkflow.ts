@@ -925,6 +925,40 @@ export default function useWorkflow() {
     setWorkflow(updated);
   }, []);
 
+  // ── Step groups (dev_plan/141) ──────────────────────────────────────────
+  /** Change the groups, then sync at once: core checks them and says what it has. */
+  const setGroups = useCallback((change: (groups: StepGroup[]) => StepGroup[]) => {
+    const { groups: before, ...rest } = workflowRef.current;
+    const groups = change(before ?? []);
+    workflowRef.current = groups.length ? { ...rest, groups } : rest;
+    setWorkflow(workflowRef.current);
+    scheduleSync(0);
+  }, [scheduleSync]);
+  /** Group the consecutive steps *ids*, named `group N`; returns its name. */
+  const groupSteps = useCallback((ids: string[]): string => {
+    const order = workflowRef.current.steps.map((s) => s.id);
+    const at = (id: string) => order.indexOf(id);
+    const taken = new Set((workflowRef.current.groups ?? []).map((g) => g.name));
+    let n = taken.size + 1;
+    while (taken.has(`group ${n}`)) n += 1;
+    const name = `group ${n}`;
+    setGroups((groups) => [...groups, { name, steps: [...ids].sort((a, b) => at(a) - at(b)) }]
+      .sort((a, b) => at(a.steps[0]) - at(b.steps[0])));
+    return name;
+  }, [setGroups]);
+  /** Rename group *from* to *to* (trimmed); refused when empty or taken. */
+  const renameGroup = useCallback((from: string, to: string): boolean => {
+    const name = to.trim();
+    const groups = workflowRef.current.groups ?? [];
+    if (!name || (name !== from && groups.some((g) => g.name === name))) return false;
+    if (name !== from) setGroups((gs) => gs.map((g) => (g.name === from ? { ...g, name } : g)));
+    return true;
+  }, [setGroups]);
+  /** Take group *name* apart: its steps stay as they are. */
+  const ungroup = useCallback((name: string) => {
+    setGroups((groups) => groups.filter((g) => g.name !== name));
+  }, [setGroups]);
+
   /** Delete resource *name*. Refused while a step uses it, listing those steps. */
   const removeResource = useCallback((name: string): void => {
     const latest = workflowRef.current;
@@ -1245,6 +1279,9 @@ export default function useWorkflow() {
     updateResourceMeta,
     // the workflow's own meta (its notes)
     updateWorkflowMeta,
+    groupSteps,
+    renameGroup,
+    ungroup,
     // execution log
     executionLogs,
     clearLogs,

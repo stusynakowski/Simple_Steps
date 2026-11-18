@@ -6,6 +6,8 @@ import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
 import { runState, groupRunState } from '../utils/runState';
 import { groupColor } from '../styles/theme';
+import { popUnder } from './StepMenu';
+import { SelectionPop, GroupPop, type HeaderSelection, type OpenGroup } from './StepGroupPops';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
@@ -170,6 +172,9 @@ export default function MainLayout() {
     removeResource,
     updateResourceMeta,
     updateWorkflowMeta,
+    groupSteps,
+    renameGroup,
+    ungroup,
     saveWorkflow,
     fetchWorkflow,
     loadWorkflowObject,
@@ -185,6 +190,17 @@ export default function MainLayout() {
   } = useWorkflow();
   // A step without its own colour takes the palette's (System Settings).
   const stepColor = useStepColor();
+  // Step groups (dev_plan/141): shift-clicked headers, and the open group's popover.
+  const [headerSelection, setHeaderSelection] = useState<HeaderSelection | null>(null);
+  const [openGroup, setOpenGroup] = useState<OpenGroup | null>(null);
+  /** Add step *id* to the header selection, or take it out; its popover under that header. */
+  const selectHeader = (id: string) => {
+    const header = document.querySelector(`[data-testid="operation-column-${id}"] .op-header`);
+    setHeaderSelection((sel) => {
+      const ids = sel?.ids.includes(id) ? sel.ids.filter((x) => x !== id) : [...(sel?.ids ?? []), id];
+      return ids.length && header ? { ids, at: popUnder(header.getBoundingClientRect()) } : null;
+    });
+  };
   // The resource column (spec 017) and the overview read the same state.
   const resourceState = useResourceState(workflow.resources, workflow.steps);
   const [resourcesPinned, toggleResourcesPinned] = useResourcesPinned();
@@ -993,7 +1009,7 @@ export default function MainLayout() {
                   progress={stepProgress[step.id]}
                   pipelineStatus={pipelineStatus}
                   pipelineCursorIndex={pipelineCursorIndex}
-                  onActivate={() => toggleStep(step.id)}
+                  onActivate={() => { setHeaderSelection(null); toggleStep(step.id); }}
                   onUpdate={(id, updates) => updateStep(id, updates)}
                   onRun={runStep}
                   onDeclare={declareWorkflow}
@@ -1011,10 +1027,39 @@ export default function MainLayout() {
                   onDefineResource={defineResource}
                   onDetach={(pos) => handleDetach(step.id, pos)}
                   group={group}
+                  onSelectHeader={() => selectHeader(step.id)}
+                  headerSelected={!!headerSelection?.ids.includes(step.id)}
+                  onOpenGroup={grp ? (rect) => setOpenGroup({ name: grp.name, at: popUnder(rect) }) : undefined}
                 />
               </div>
             );
           })}
+          {headerSelection && (
+            <SelectionPop
+              workflow={workflow}
+              selection={headerSelection}
+              onClose={() => setHeaderSelection(null)}
+              onGroup={(ids) => {
+                const name = groupSteps(ids);
+                setOpenGroup({ name, at: headerSelection.at });   // name it straight away
+                setHeaderSelection(null);
+              }}
+            />
+          )}
+          {openGroup && (
+            <GroupPop
+              key={openGroup.name}
+              workflow={workflow}
+              open={openGroup}
+              onRename={(from, to) => {
+                const ok = renameGroup(from, to);
+                if (ok && to.trim() !== from) setOpenGroup((g) => g && { ...g, name: to.trim() });
+                return ok;
+              }}
+              onUngroup={(name) => { ungroup(name); setOpenGroup(null); }}
+              onClose={() => setOpenGroup(null)}
+            />
+          )}
           <div className="add-step-container">
             <button className="rectangular-add-btn" onClick={() => addStepAt(workflow.steps.length)} title="Add New Step">
               + Add Step

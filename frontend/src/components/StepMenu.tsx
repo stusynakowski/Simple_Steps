@@ -47,41 +47,15 @@ export default function StepMenu({ icon, label, items = [], children, align = 'l
 }) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
-  const pop = useRef<HTMLDivElement>(null);
-  const [at, setAt] = useState<{ top: number; left?: number; right?: number } | null>(null);
+  const [at, setAt] = useState<PopAt | null>(null);
   const { tipProps, tip } = useHoverTip(label, open);
 
   /** Open under the button (where it is now on screen), or close. */
   const toggle = () => {
     if (open || !button.current) { setOpen(false); return; }
-    const r = button.current.getBoundingClientRect();
-    setAt(align === 'left'
-      ? { top: r.bottom + 4, left: r.left }
-      : { top: r.bottom + 4, right: window.innerWidth - r.right });
+    setAt(popUnder(button.current.getBoundingClientRect(), align));
     setOpen(true);
   };
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (!button.current?.contains(t) && !pop.current?.contains(t)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    // Scrolling the page moves the button away from the pop-up; scrolling
-    // inside the pop-up (a long note, say) does not.
-    const close = (e: Event) => { if (!pop.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', away);
-    document.addEventListener('keydown', esc);
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    return () => {
-      document.removeEventListener('mousedown', away);
-      document.removeEventListener('keydown', esc);
-      window.removeEventListener('scroll', close, true);
-      window.removeEventListener('resize', close);
-    };
-  }, [open]);
 
   return (
     <div className="step-menu" onClick={(e) => e.stopPropagation()}>
@@ -106,43 +80,112 @@ export default function StepMenu({ icon, label, items = [], children, align = 'l
         )}
       </button>
       {tip}
-      {open && createPortal(
-        <div
-          ref={pop}
-          className={`step-menu-pop${children ? ' step-menu-pop--panel' : ''}`}
-          role={children ? 'dialog' : 'menu'}
-          aria-label={label}
-          style={{ top: at?.top ?? -9999, left: at?.left, right: at?.right }}
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          {/* What this menu is (owner, 2026-10-30): its name, else its label. */}
-          <div className="step-menu-header" aria-hidden="true">{text ?? label}</div>
-          {children && <div className="step-menu-body">{children}</div>}
-          {items.map((item, i) => (item.divider
-            ? <div key={`d${i}`} className="step-menu-divider" role="separator" />
-            : (
-              <button
-                key={item.label}
-                type="button"
-                role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
-                aria-checked={item.checked}
-                className={`step-menu-item${item.danger ? ' danger' : ''}${item.checked ? ' checked' : ''}`}
-                disabled={item.disabled}
-                data-testid={item.testId}
-                onClick={() => { if (item.checked === undefined) setOpen(false); item.onClick(); }}
-              >
-                <SymbolIcon name={item.icon} size={15} />
-                <span className="step-menu-label">{item.label}</span>
-                {item.hint && <span className="step-menu-hint">{item.hint}</span>}
-                {item.checked !== undefined && (
-                  <span className="step-menu-check">{item.checked && <SymbolIcon name="check" size={14} />}</span>
-                )}
-              </button>
-            )))}
-        </div>,
-        document.body,
+      {open && at && (
+        <StepPop at={at} label={label} title={text ?? label} items={items} anchor={button}
+          onClose={() => setOpen(false)}>
+          {children}
+        </StepPop>
       )}
     </div>
+  );
+}
+
+/** Where a pop-up sits on screen: under its anchor, lined up with one edge. */
+export type PopAt = { top: number; left?: number; right?: number };
+
+/** Under *rect*, lined up with its *align* edge. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function popUnder(rect: DOMRect, align: 'left' | 'right' = 'left'): PopAt {
+  return align === 'left'
+    ? { top: rect.bottom + 4, left: rect.left }
+    : { top: rect.bottom + 4, right: window.innerWidth - rect.right };
+}
+
+/**
+ * The pop-up of a step menu, on its own (dev_plan/141): drawn over the whole
+ * page at *at*, with a title, then *children* (a popover) or *items* (a menu).
+ * Closes on a click outside it and its *anchor*, on Esc, on scroll or resize,
+ * and after an action. A step menu opens one from its button; the step
+ * headers open one from a selection of headers, or from a group's half.
+ */
+export function StepPop({ at, label, title, items = [], children, anchor, inside, onClose, testId }: {
+  at: PopAt;
+  label: string;
+  title?: string;
+  items?: StepMenuItem[];
+  children?: ReactNode;
+  /** What opened it: a click on it doesn't count as a click outside. */
+  anchor?: React.RefObject<HTMLElement | null>;
+  /** Other clicks that don't count as outside (a shift-click adding a header to a selection). */
+  inside?: (target: Element) => boolean;
+  onClose: () => void;
+  testId?: string;
+}) {
+  const pop = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  const keep = useRef(inside);
+  useEffect(() => { close.current = onClose; keep.current = inside; });
+
+  useEffect(() => {
+    const away = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (anchor?.current?.contains(t) || pop.current?.contains(t)) return;
+      if (t instanceof Element && keep.current?.(t)) return;
+      close.current();
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') close.current(); };
+    // Scrolling the page moves the anchor away from the pop-up; scrolling
+    // inside the pop-up (a long note, say) does not.
+    const moved = (e: Event) => { if (!pop.current?.contains(e.target as Node)) close.current(); };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    window.addEventListener('scroll', moved, true);
+    window.addEventListener('resize', moved);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+      window.removeEventListener('scroll', moved, true);
+      window.removeEventListener('resize', moved);
+    };
+  }, [anchor]);
+
+  return createPortal(
+    <div
+      ref={pop}
+      className={`step-menu-pop${children ? ' step-menu-pop--panel' : ''}`}
+      role={children ? 'dialog' : 'menu'}
+      aria-label={label}
+      data-testid={testId}
+      style={{ top: at.top, left: at.left, right: at.right }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {/* What this menu is (owner, 2026-10-30): its name, else its label. */}
+      <div className="step-menu-header" aria-hidden="true">{title ?? label}</div>
+      {children && <div className="step-menu-body">{children}</div>}
+      {items.map((item, i) => (item.divider
+        ? <div key={`d${i}`} className="step-menu-divider" role="separator" />
+        : (
+          <button
+            key={item.label}
+            type="button"
+            role={item.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+            aria-checked={item.checked}
+            className={`step-menu-item${item.danger ? ' danger' : ''}${item.checked ? ' checked' : ''}`}
+            disabled={item.disabled}
+            data-testid={item.testId}
+            title={item.disabled ? item.hint : undefined}
+            onClick={() => { if (item.checked === undefined) close.current(); item.onClick(); }}
+          >
+            <SymbolIcon name={item.icon} size={15} />
+            <span className="step-menu-label">{item.label}</span>
+            {item.hint && <span className="step-menu-hint">{item.hint}</span>}
+            {item.checked !== undefined && (
+              <span className="step-menu-check">{item.checked && <SymbolIcon name="check" size={14} />}</span>
+            )}
+          </button>
+        )))}
+    </div>,
+    document.body,
   );
 }
