@@ -7,7 +7,7 @@ import StepMinimap from './StepMinimap';
 import { runState, groupRunState } from '../utils/runState';
 import { groupColor } from '../styles/theme';
 import { popUnder } from './StepMenu';
-import { SelectionPop, GroupPop, type HeaderSelection, type OpenGroup } from './StepGroupPops';
+import { GroupControls, GroupSettingsPop, type OpenSettings } from './StepGroupPops';
 import FoldedGroup from './FoldedGroup';
 
 /** The groups folded in this browser for the workflow under *key*. */
@@ -183,6 +183,7 @@ export default function MainLayout() {
     ungroup,
     setGroupMeta,
     runGroup,
+    setGroupSteps,
     saveWorkflow,
     fetchWorkflow,
     loadWorkflowObject,
@@ -198,27 +199,27 @@ export default function MainLayout() {
   } = useWorkflow();
   // A step without its own colour takes the palette's (System Settings).
   const stepColor = useStepColor();
-  // Step groups (dev_plan/141): shift-clicked headers, and the open group's popover.
-  const [headerSelection, setHeaderSelection] = useState<HeaderSelection | null>(null);
-  const [openGroup, setOpenGroup] = useState<OpenGroup | null>(null);
+  // Step groups (dev_plan/141): the group whose settings are open.
+  const [groupSettings, setGroupSettings] = useState<OpenSettings | null>(null);
   // Folded groups (dev_plan/141 §3.3): each viewer's own, kept in this
   // browser per workflow, never in the workflow file.
   const foldKey = `simple-steps:folded-groups:${workflow.id}`;
   const [foldState, setFoldState] = useState(() => ({ key: foldKey, names: readFolded(foldKey) }));
   const folded = foldState.key === foldKey ? foldState.names : readFolded(foldKey);
-  const toggleFold = (name: string) => {
-    const next = new Set(folded);
-    if (!next.delete(name)) next.add(name);
+  const setFolded = (next: Set<string>) => {
     try { localStorage.setItem(foldKey, JSON.stringify([...next])); } catch { /* folded for now only */ }
     setFoldState({ key: foldKey, names: next });
   };
-  /** Add step *id* to the header selection, or take it out; its popover under that header. */
-  const selectHeader = (id: string) => {
+  const toggleFold = (name: string) => {
+    const next = new Set(folded);
+    if (!next.delete(name)) next.add(name);
+    setFolded(next);
+  };
+  /** Make step *id* a group of its own and open its settings, to add steps to it. */
+  const makeGroup = (id: string) => {
+    const name = groupSteps([id]);
     const header = document.querySelector(`[data-testid="operation-column-${id}"] .op-header`);
-    setHeaderSelection((sel) => {
-      const ids = sel?.ids.includes(id) ? sel.ids.filter((x) => x !== id) : [...(sel?.ids ?? []), id];
-      return ids.length && header ? { ids, at: popUnder(header.getBoundingClientRect()) } : null;
-    });
+    if (header) setGroupSettings({ name, at: popUnder(header.getBoundingClientRect()) });
   };
   // The resource column (spec 017) and the overview read the same state.
   const resourceState = useResourceState(workflow.resources, workflow.steps);
@@ -995,10 +996,23 @@ export default function MainLayout() {
               name: grp.name,
               color: grp.meta?.color ?? groupColor(groupIndex),
               first: grp.steps[0] === step.id,
+              last: grp.steps[grp.steps.length - 1] === step.id,
               // Running while any of its steps is (a Run group in flight).
               run: workflow.steps.some((s) => grp.steps.includes(s.id) && s.status === 'running')
                 ? { kind: 'running' as const, text: 'running' } : groupRunState(grp),
             };
+            // The group's buttons, inline on its band (run options, notes, settings, fold).
+            const controls = grp && (
+              <GroupControls
+                workflow={workflow}
+                group={grp}
+                folded={folded.has(grp.name)}
+                onRun={(name, force) => { void runGroup(name, force); }}
+                onMeta={setGroupMeta}
+                onSettings={(rect) => setGroupSettings({ name: grp.name, at: popUnder(rect) })}
+                onFold={() => toggleFold(grp.name)}
+              />
+            );
             // Folded: the group is one header on its first step's place; its
             // other steps keep an empty place, so the steps' map stays in step.
             if (grp && group && folded.has(grp.name)) {
@@ -1019,8 +1033,9 @@ export default function MainLayout() {
                     run={group.run}
                     steps={members}
                     zIndex={workflow.steps.length - index}
-                    onOpenGroup={(rect) => setOpenGroup({ name: grp.name, at: popUnder(rect) })}
+                    controls={controls}
                     onUnfold={() => toggleFold(grp.name)}
+                    onOpenStep={(id) => { toggleFold(grp.name); if (!expandedStepIds.has(id)) toggleStep(id); }}
                   />
                 </div>
               );
@@ -1056,7 +1071,7 @@ export default function MainLayout() {
                   progress={stepProgress[step.id]}
                   pipelineStatus={pipelineStatus}
                   pipelineCursorIndex={pipelineCursorIndex}
-                  onActivate={() => { setHeaderSelection(null); toggleStep(step.id); }}
+                  onActivate={() => toggleStep(step.id)}
                   onUpdate={(id, updates) => updateStep(id, updates)}
                   onRun={runStep}
                   onDeclare={declareWorkflow}
@@ -1074,45 +1089,35 @@ export default function MainLayout() {
                   onDefineResource={defineResource}
                   onDetach={(pos) => handleDetach(step.id, pos)}
                   group={group}
-                  onSelectHeader={() => selectHeader(step.id)}
-                  headerSelected={!!headerSelection?.ids.includes(step.id)}
-                  onOpenGroup={grp ? (rect) => setOpenGroup({ name: grp.name, at: popUnder(rect) }) : undefined}
+                  onFoldGroup={grp ? () => toggleFold(grp.name) : undefined}
+                  groupControls={controls}
+                  onMakeGroup={() => makeGroup(step.id)}
                 />
               </div>
             );
           })}
-          {headerSelection && (
-            <SelectionPop
+          {groupSettings && (
+            <GroupSettingsPop
+              key={groupSettings.name}
               workflow={workflow}
-              selection={headerSelection}
-              onClose={() => setHeaderSelection(null)}
-              onGroup={(ids) => {
-                const name = groupSteps(ids);
-                setOpenGroup({ name, at: headerSelection.at });   // name it straight away
-                setHeaderSelection(null);
-              }}
-            />
-          )}
-          {openGroup && (
-            <GroupPop
-              key={openGroup.name}
-              workflow={workflow}
-              open={openGroup}
-              onRename={(from, to) => {
-                const ok = renameGroup(from, to);
-                if (ok && to.trim() !== from) setOpenGroup((g) => g && { ...g, name: to.trim() });
-                return ok;
-              }}
+              open={groupSettings}
               color={(() => {
-                const i = (workflow.groups ?? []).findIndex((g) => g.name === openGroup.name);
+                const i = (workflow.groups ?? []).findIndex((g) => g.name === groupSettings.name);
                 return workflow.groups?.[i]?.meta?.color ?? groupColor(i);
               })()}
-              onRun={(name, force) => { void runGroup(name, force); }}
+              onRename={(from, to) => {
+                const ok = renameGroup(from, to);
+                const name = to.trim();
+                if (ok && name !== from) {
+                  if (folded.has(from)) setFolded(new Set([...folded].map((n) => (n === from ? name : n))));
+                  setGroupSettings((g) => g && { ...g, name });
+                }
+                return ok;
+              }}
+              onSteps={setGroupSteps}
               onMeta={setGroupMeta}
-              folded={folded.has(openGroup.name)}
-              onFold={toggleFold}
-              onUngroup={(name) => { ungroup(name); setOpenGroup(null); }}
-              onClose={() => setOpenGroup(null)}
+              onUngroup={(name) => { ungroup(name); setGroupSettings(null); }}
+              onClose={() => setGroupSettings(null)}
             />
           )}
           <div className="add-step-container">

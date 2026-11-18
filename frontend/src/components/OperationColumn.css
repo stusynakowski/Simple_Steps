@@ -1832,35 +1832,72 @@ body.is-resizing-step * { cursor: ew-resize !important; }
 }
 .group-half:hover { background: rgba(255, 255, 255, 0.08); }
 .column-wrapper:first-child > .operation-column .group-half { padding-left: 14px; }
-/* A header in the selection (shift-click, for Group steps): outlined white. */
-.operation-column.header-selected .arrow-status { background: #fff; }
-/* The group's popover: its name, its steps. */
-.group-pop-name { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
-.group-pop-name input {
-  flex: 1;
-  min-width: 140px;
-  padding: 3px 6px;
-  border: 1px solid #555;
-  border-radius: 3px;
-  background: #1e1e1e;
-  color: #eee;
-  font: inherit;
+/* The group's controls, inline at the end of its band (its last step), as a
+   step header's controls sit on it: run options, notes, settings, fold. */
+.group-half.last { padding-right: 4px; }
+.group-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
-.group-pop-name input[aria-invalid='true'] { border-color: #f87171; }
-.group-pop-error { margin-top: 4px; color: #f87171; font-size: 0.75rem; }
-.group-pop-steps { margin-top: 6px; color: #9ca3af; font-size: 0.75rem; }
-.group-pop-status { margin-top: 6px; font-size: 0.75rem; color: #9ca3af; }
-.group-pop-status.run-ran { color: #4ade80; }
-.group-pop-status.run-failed { color: #f87171; }
-.group-pop-waiting { margin: 4px 0 0; padding-left: 16px; font-size: 0.72rem; color: #9ca3af; }
-.group-pop-colors { display: flex; gap: 6px; margin-top: 8px; }
+.group-controls .step-header-btn,
+.group-controls .step-menu-toggle.step-header-btn {
+  width: 18px;
+  height: 18px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+}
+.group-controls .step-header-btn:hover,
+.group-controls .step-menu-toggle.step-header-btn.active { background: rgba(0, 0, 0, 0.5); }
+.group-controls .has-notes { box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.7); }
+/* A one-step group's band holds its name too: there the controls show on
+   hover (or while one's popover is open), as a step header's do. */
+.group-half.first.last .group-controls { display: none; }
+.group-half.first.last:hover .group-controls,
+.group-half.first.last .group-controls:has(.active) { display: flex; }
+/* A group's settings: name, steps (a multiselect), colour, ungroup. */
+.group-set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.8rem; }
+.group-set-row > span:first-child { width: 48px; flex-shrink: 0; color: #9ca3af; }
+.group-set-steps-row { align-items: flex-start; }
+.group-set-steps-row > span:first-child { padding-top: 4px; }
+.group-set-name {
+  flex: 1; min-width: 160px; padding: 3px 6px; border: 1px solid #555; border-radius: 3px;
+  background: #1e1e1e; color: #eee; font: inherit;
+}
+.group-set-name[aria-invalid='true'] { border-color: #f87171; }
+.group-set-error { margin: -4px 0 8px 56px; color: #f87171; font-size: 0.75rem; }
+.group-multiselect {
+  flex: 1; display: flex; flex-wrap: wrap; gap: 4px; min-width: 200px; max-width: 320px;
+  padding: 4px; border: 1px solid #555; border-radius: 4px; background: #1e1e1e;
+}
+.group-chip {
+  display: inline-flex; align-items: center; gap: 2px; padding: 1px 2px 1px 8px;
+  border-radius: 10px; background: #3b4a6b; color: #fff; font-size: 0.75rem;
+}
+.group-chip button {
+  display: flex; padding: 1px; border: none; border-radius: 50%; background: transparent;
+  color: #fff; cursor: pointer;
+}
+.group-chip button:hover:not(:disabled) { background: rgba(0, 0, 0, 0.35); }
+.group-chip button:disabled { opacity: 0.35; cursor: default; }
+.group-add {
+  border: none; background: transparent; color: #9ca3af; font: inherit; font-size: 0.75rem; cursor: pointer;
+}
+.group-set-ungroup { width: 100%; margin-top: 4px; }
+.group-pop-colors { display: flex; gap: 6px; }
 .group-pop-swatch {
   width: 18px; height: 18px; border-radius: 4px; padding: 0; cursor: pointer;
   border: 2px solid transparent;
 }
 .group-pop-swatch.checked { border-color: #fff; }
-.group-pop-notes { position: relative; margin-top: 8px; }
-.group-pop-notes textarea { width: 100%; box-sizing: border-box; }
+.group-pop-notes { position: relative; }
+.group-pop-notes textarea { width: 100%; min-width: 260px; box-sizing: border-box; }
 .group-pop-notes .step-notes-body { font-size: 0.78rem; max-height: 160px; overflow: auto; }
 .group-half-name { overflow: hidden; text-overflow: ellipsis; }
 .group-run-icon { display: flex; }
@@ -1869,15 +1906,7 @@ body.is-resizing-step * { cursor: ew-resize !important; }
    One arrow: the group's colour on top (its name, its run icon), its steps
    below as parallelograms in their colours. The strip is clipped to the
    arrow's lower half, so its ends follow the tail's notch and the head. */
-.folded-group .folded-top {
-  position: absolute; top: 4px; left: 0; right: 28px; height: calc(50% - 4px);
-  z-index: 2; cursor: pointer; display: flex; align-items: center; gap: 4px;
-  padding-left: 36px; color: #fff; font-size: 0.72rem; font-weight: 600;
-  letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  white-space: nowrap; overflow: hidden;
-}
-.folded-group .folded-top:hover { background: rgba(255, 255, 255, 0.08); }
-.column-wrapper:first-child > .folded-group .folded-top { padding-left: 14px; }
+.folded-group .op-header { cursor: pointer; }
 .folded-group .folded-steps {
   --b: 4px;
   position: absolute; left: 0; right: 0; bottom: 0; height: 50%;

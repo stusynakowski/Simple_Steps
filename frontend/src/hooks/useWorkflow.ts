@@ -958,6 +958,10 @@ export default function useWorkflow() {
   const ungroup = useCallback((name: string) => {
     setGroups((groups) => groups.filter((g) => g.name !== name));
   }, [setGroups]);
+  /** Group *name*'s steps become *ids* (consecutive steps; core checks them). */
+  const setGroupSteps = useCallback((name: string, ids: string[]) => {
+    setGroups((groups) => groups.map((g) => (g.name === name ? { ...g, steps: [...ids] } : g)));
+  }, [setGroups]);
   /** Change group *name*'s colour or notes (its `meta`); an empty value removes the key. */
   const setGroupMeta = useCallback((name: string, changes: { color?: string; notes?: string }) => {
     const { groups = [], ...rest } = workflowRef.current;
@@ -1333,6 +1337,7 @@ export default function useWorkflow() {
     ungroup,
     setGroupMeta,
     runGroup,
+    setGroupSteps,
     // execution log
     executionLogs,
     clearLogs,

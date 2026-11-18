@@ -82,13 +82,13 @@ interface OperationColumnProps {
    * the group's colour on top, the step's below. The group's first step
    * carries the group's name and run state.
    */
-  group?: { name: string; color: string; first: boolean; run: RunState };
-  /** Shift-click on the header: add this step to (or take it from) the header selection. */
-  onSelectHeader?: () => void;
-  /** In the header selection: marked, for *Group steps*. */
-  headerSelected?: boolean;
-  /** A click on the group's half: open the group's popover under it. */
-  onOpenGroup?: (rect: DOMRect) => void;
+  group?: { name: string; color: string; first: boolean; last: boolean; run: RunState };
+  /** A click on the group's half: fold the group, as a click on a step's header folds the step. */
+  onFoldGroup?: () => void;
+  /** The group's controls (run options, notes, settings, fold), inline on its last step's band. */
+  groupControls?: React.ReactNode;
+  /** Not in a group: the header's group button makes this step a group of its own. */
+  onMakeGroup?: () => void;
 }
 
 /** The rows of an open step its Settings can hide, top to bottom. */
@@ -131,9 +131,9 @@ export default function OperationColumn({
   pipelineStatus = 'idle',
   pipelineCursorIndex = -1,
   group,
-  onSelectHeader,
-  headerSelected = false,
-  onOpenGroup,
+  onFoldGroup,
+  groupControls,
+  onMakeGroup,
 }: OperationColumnProps) {
   const widgetMaxHeight = isMaximized ? 'calc(100vh - 200px)' : '400px';
   // Widgets: any number open at once (toolbar buttons toggle them); each
@@ -322,10 +322,8 @@ export default function OperationColumn({
     }
   };
 
-  const handleColumnClick = (e: React.MouseEvent) => {
+  const handleColumnClick = () => {
     if (detachDrag.consumeClick()) return;
-    // Shift-click selects headers, for Group steps (dev_plan/141 §3.5).
-    if (e.shiftKey && onSelectHeader) { onSelectHeader(); return; }
     if (isActive) {
       if (onMinimize) onMinimize();
     } else {
@@ -336,12 +334,7 @@ export default function OperationColumn({
   // ── Drag-to-detach on header ──────────────────────────────────────────────
   const detachDrag = useDragToDetach(onDetach);
   const isDragHinting = detachDrag.hinting;
-  const handleHeaderMouseDown = (e: React.MouseEvent) => {
-    // A shift-click selects headers; without this the browser also extends a
-    // text selection across the page.
-    if (e.shiftKey) { e.preventDefault(); return; }
-    detachDrag.onMouseDown(e);
-  };
+  const handleHeaderMouseDown = detachDrag.onMouseDown;
 
   // The step's notes (owner, 2026-11-10): the notepad at the header's bottom
   // right drops them down under the header; hover them for the button that
@@ -472,7 +465,7 @@ export default function OperationColumn({
   return (
     <div
       ref={columnRef}
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}${group ? ' in-group' : ''}${headerSelected ? ' header-selected' : ''}`}
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}${group ? ' in-group' : ''}`}
       style={{
         '--step-color': color,
         ...(group ? { '--group-color': group.color } : {}),
@@ -486,15 +479,16 @@ export default function OperationColumn({
         {/* The step's colour; in a group, the group's colour on its top half. */}
         <div className="arrow-background" />
         {/* The group half (dev_plan/141 §3.2): the group's name and run state
-            on its first step; the band carries on over the others. A click
-            anywhere on it opens the group's popover. */}
+            on its first step, its controls inline at the band's end (its last
+            step), as a step header's controls sit on it; the band carries on
+            over the steps between. A click on it folds the group. */}
         {group && (
           <div
-            className="group-half"
+            className={`group-half${group.first ? ' first' : ''}${group.last ? ' last' : ''}`}
             data-testid={group.first ? 'group-half' : undefined}
-            title={`Group ${group.name}: ${group.run.text}`}
+            title={`Group ${group.name}: ${group.run.text}. Click to fold`}
             onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => { e.stopPropagation(); onOpenGroup?.(e.currentTarget.getBoundingClientRect()); }}
+            onClick={(e) => { e.stopPropagation(); onFoldGroup?.(); }}
           >
             {group.first && <span className="group-half-name">{group.name}</span>}
             {group.first && RUN_ICON[group.run.kind] && (
@@ -502,6 +496,7 @@ export default function OperationColumn({
                 <SymbolIcon name={RUN_ICON[group.run.kind]!} size={12} />
               </span>
             )}
+            {group.last && groupControls}
           </div>
         )}
         <div className="arrow-content">
@@ -545,6 +540,19 @@ export default function OperationColumn({
             <StepMenu icon="tune" iconSize={13} label="Step settings" testId="step-settings" className="step-header-btn" align="right">
               {stepSettings}
             </StepMenu>
+          )}
+          {/* Not in a group: make it one (dev_plan/141); its settings open to add steps. */}
+          {!isMinimized && !group && onMakeGroup && (
+            <button
+              type="button"
+              className="step-header-btn"
+              title="Group this step (then add more steps to the group)"
+              aria-label={`Group ${step.label}`}
+              data-testid="step-make-group"
+              onClick={(e) => { e.stopPropagation(); onMakeGroup(); }}
+            >
+              <SymbolIcon name="stacks" size={12} />
+            </button>
           )}
           {!isMinimized && onMinimizeStep && (
             <button
