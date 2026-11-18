@@ -1849,5 +1849,18 @@ body.is-resizing-step * { cursor: ew-resize !important; }
 .group-pop-name input[aria-invalid='true'] { border-color: #f87171; }
 .group-pop-error { margin-top: 4px; color: #f87171; font-size: 0.75rem; }
 .group-pop-steps { margin-top: 6px; color: #9ca3af; font-size: 0.75rem; }
+.group-pop-status { margin-top: 6px; font-size: 0.75rem; color: #9ca3af; }
+.group-pop-status.run-ran { color: #4ade80; }
+.group-pop-status.run-failed { color: #f87171; }
+.group-pop-waiting { margin: 4px 0 0; padding-left: 16px; font-size: 0.72rem; color: #9ca3af; }
+.group-pop-colors { display: flex; gap: 6px; margin-top: 8px; }
+.group-pop-swatch {
+  width: 18px; height: 18px; border-radius: 4px; padding: 0; cursor: pointer;
+  border: 2px solid transparent;
+}
+.group-pop-swatch.checked { border-color: #fff; }
+.group-pop-notes { position: relative; margin-top: 8px; }
+.group-pop-notes textarea { width: 100%; box-sizing: border-box; }
+.group-pop-notes .step-notes-body { font-size: 0.78rem; max-height: 160px; overflow: auto; }
 .group-half-name { overflow: hidden; text-overflow: ellipsis; }
 .group-run-icon { display: flex; }

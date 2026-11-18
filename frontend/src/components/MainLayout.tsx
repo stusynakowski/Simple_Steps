@@ -175,6 +175,8 @@ export default function MainLayout() {
     groupSteps,
     renameGroup,
     ungroup,
+    setGroupMeta,
+    runGroup,
     saveWorkflow,
     fetchWorkflow,
     loadWorkflowObject,
@@ -976,7 +978,9 @@ export default function MainLayout() {
               name: grp.name,
               color: grp.meta?.color ?? groupColor(groupIndex),
               first: grp.steps[0] === step.id,
-              run: groupRunState(grp),
+              // Running while any of its steps is (a Run group in flight).
+              run: workflow.steps.some((s) => grp.steps.includes(s.id) && s.status === 'running')
+                ? { kind: 'running' as const, text: 'running' } : groupRunState(grp),
             };
             const isExpanded = expandedStepIds.has(step.id);
             const isMaximized = maximizedStepId === step.id;
@@ -1056,6 +1060,12 @@ export default function MainLayout() {
                 if (ok && to.trim() !== from) setOpenGroup((g) => g && { ...g, name: to.trim() });
                 return ok;
               }}
+              color={(() => {
+                const i = (workflow.groups ?? []).findIndex((g) => g.name === openGroup.name);
+                return workflow.groups?.[i]?.meta?.color ?? groupColor(i);
+              })()}
+              onRun={(name, force) => { void runGroup(name, force); }}
+              onMeta={setGroupMeta}
               onUngroup={(name) => { ungroup(name); setOpenGroup(null); }}
               onClose={() => setOpenGroup(null)}
             />

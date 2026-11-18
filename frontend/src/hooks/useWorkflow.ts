@@ -958,6 +958,55 @@ export default function useWorkflow() {
   const ungroup = useCallback((name: string) => {
     setGroups((groups) => groups.filter((g) => g.name !== name));
   }, [setGroups]);
+  /** Change group *name*'s colour or notes (its `meta`); an empty value removes the key. */
+  const setGroupMeta = useCallback((name: string, changes: { color?: string; notes?: string }) => {
+    const { groups = [], ...rest } = workflowRef.current;
+    workflowRef.current = { ...rest, groups: groups.map((g) => {
+      if (g.name !== name) return g;
+      const meta = { ...g.meta, ...changes };
+      for (const k of Object.keys(meta) as (keyof typeof meta)[]) if (!meta[k]) delete meta[k];
+      const { meta: _old, ...bare } = g;
+      void _old;
+      return Object.keys(meta).length ? { ...bare, meta } : bare;
+    }) };
+    setWorkflow(workflowRef.current);
+  }, []);
+  /**
+   * Run group *name* (dev_plan/141 §3.4): only its steps, each on what its
+   * inputs show; nothing outside it runs. *force* runs them again when current.
+   */
+  const runGroup = useCallback(async (name: string, force = false) => {
+    const group = (workflowRef.current.groups ?? []).find((g) => g.name === name);
+    if (!group?.steps.length) return;
+    const members = new Set(group.steps);
+    const setStatus = (status: (s: Step) => StepStatus) => {
+      const latest = workflowRef.current;
+      workflowRef.current = { ...latest, steps: latest.steps.map((s) => (members.has(s.id) ? { ...s, status: status(s) } : s)) };
+      setWorkflow(workflowRef.current);
+    };
+    const before = new Map(workflowRef.current.steps.map((s) => [s.id, s.status]));
+    addLog('info', `Running group "${name}"${force ? ' again' : ''}`, { detail: `Steps: ${group.steps.map((id) => workflowRef.current.steps.find((s) => s.id === id)?.label).join(', ')}` });
+    setStatus(() => 'running');
+    const last = workflowRef.current.steps.find((s) => s.id === group.steps[group.steps.length - 1]);
+    try {
+      const res = await runStepApi(
+        last?.id ?? '', '', {}, null, {}, false, undefined, undefined,
+        workflowRef.current.resources, workflowKey(), workflowDecl(),
+        { group: name, force, groups: groupsDecl() },
+      );
+      setStatus((s) => before.get(s.id) ?? s.status);
+      await showOutputs({ ...res.metrics.outputs, ...(last ? { [last.label]: res.output_ref_id } : {}) });
+      applyStepStates(res.metrics.steps);
+      applyGroupStates(res.metrics.groups);
+      addLog('success', `Group "${name}" ran`);
+    } catch (error) {
+      setStatus((s) => before.get(s.id) ?? s.status);
+      const backendErr = (error as { backendError?: BackendError })?.backendError;
+      addLog('error', `Group "${name}" failed: ${backendErr?.detail || (error instanceof Error ? error.message : String(error))}`,
+        { detail: backendErr?.traceback });
+      scheduleSync(0);   // core says where each step stands now
+    }
+  }, [addLog, showOutputs, applyStepStates, applyGroupStates, scheduleSync]);
 
   /** Delete resource *name*. Refused while a step uses it, listing those steps. */
   const removeResource = useCallback((name: string): void => {
@@ -1282,6 +1331,8 @@ export default function useWorkflow() {
     groupSteps,
     renameGroup,
     ungroup,
+    setGroupMeta,
+    runGroup,
     // execution log
     executionLogs,
     clearLogs,

@@ -350,6 +350,8 @@ export async function runStep(
     resources?: Record<string, unknown>,
     workflowKey?: string,
     workflowSteps?: WorkflowStepDecl[],
+    /** Run a group's steps instead of *stepId* (dev_plan/141); *force* runs again what is current. */
+    opts?: { group?: string; force?: boolean; groups?: WorkflowGroupDecl[] },
 ): Promise<StepRunResponse> {
 
   const payload = {
@@ -368,6 +370,9 @@ export async function runStep(
       // core workflow: row links and out-of-date marks carry across steps.
       workflow_key: workflowKey ?? null,
       workflow_steps: workflowSteps ?? null,
+      workflow_groups: opts?.groups ?? null,
+      group: opts?.group ?? null,
+      force: !!opts?.force,
   };
 
   // Wire tap. This records the payload at the fetch boundary — the bytes that
@@ -378,7 +383,7 @@ export async function runStep(
   const startedAt = performance.now();
   emitConsoleRecord({
     stream: 'wire',
-    text: `POST /api/run  ${payload.operation_id || '(none)'}  step=${payload.step_id}${payload.is_preview ? '  [preview]' : ''}`,
+    text: `POST /api/run  ${payload.operation_id || '(none)'}  ${payload.group ? `group=${payload.group}` : `step=${payload.step_id}`}${payload.force ? '  [again]' : ''}${payload.is_preview ? '  [preview]' : ''}`,
     detail: JSON.stringify(payload, null, 2),
   });
 

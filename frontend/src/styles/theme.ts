@@ -18,7 +18,7 @@ const NO_PALETTE = '#5c6370';
  * group; a group's own `meta.color` wins. Nested palettes (a group's steps in
  * shades of its colour) come later.
  */
-const GROUP_PALETTE = ['#3b4a6b', '#2f5d55', '#5b3f6b', '#6b4f2f', '#3f5f7a', '#5a3a3a'];
+export const GROUP_PALETTE = ['#3b4a6b', '#2f5d55', '#5b3f6b', '#6b4f2f', '#3f5f7a', '#5a3a3a'];
 
 /** The colour of group *index* (0-based) in its workflow. */
 export function groupColor(index: number): string {
