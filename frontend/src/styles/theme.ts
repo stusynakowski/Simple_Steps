@@ -12,6 +12,19 @@ export type StepPalette = string[] | { gradient: string[] };
 /** Before the palettes arrive (and if they can't): a neutral grey. */
 const NO_PALETTE = '#5c6370';
 
+/**
+ * Step groups' colours (dev_plan/141): deeper tones than a step's, so a
+ * group's half of the header never matches its steps' half. Used in turn by
+ * group; a group's own `meta.color` wins. Nested palettes (a group's steps in
+ * shades of its colour) come later.
+ */
+const GROUP_PALETTE = ['#3b4a6b', '#2f5d55', '#5b3f6b', '#6b4f2f', '#3f5f7a', '#5a3a3a'];
+
+/** The colour of group *index* (0-based) in its workflow. */
+export function groupColor(index: number): string {
+  return GROUP_PALETTE[index % GROUP_PALETTE.length];
+}
+
 /** The colour of step *index* (0-based) in a workflow of *count* steps. */
 export function paletteColor(palette: StepPalette | undefined, index: number, count: number): string {
   if (!palette) return NO_PALETTE;

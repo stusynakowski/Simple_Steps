@@ -4,7 +4,8 @@ import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
-import { runState } from '../utils/runState';
+import { runState, groupRunState } from '../utils/runState';
+import { groupColor } from '../styles/theme';
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
@@ -952,6 +953,15 @@ export default function MainLayout() {
           } as React.CSSProperties}
         >
           {workflow.steps.map((step, index) => {
+            // Its step group, if any (dev_plan/141): the header's top half.
+            const groupIndex = (workflow.groups ?? []).findIndex((g) => g.steps.includes(step.id));
+            const grp = groupIndex >= 0 ? workflow.groups![groupIndex] : undefined;
+            const group = grp && {
+              name: grp.name,
+              color: grp.meta?.color ?? groupColor(groupIndex),
+              first: grp.steps[0] === step.id,
+              run: groupRunState(grp),
+            };
             const isExpanded = expandedStepIds.has(step.id);
             const isMaximized = maximizedStepId === step.id;
             const isMinimized = !isExpanded && minimizedStepIds.has(step.id);
@@ -1000,6 +1010,7 @@ export default function MainLayout() {
                   resources={workflow.resources}
                   onDefineResource={defineResource}
                   onDetach={(pos) => handleDetach(step.id, pos)}
+                  group={group}
                 />
               </div>
             );

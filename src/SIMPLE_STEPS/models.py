@@ -180,8 +180,9 @@ class PipelineFile(BaseModel):
     #: name → {"source": "defined", "type": "<Class>", "settings": {...}}
     resources: Dict[str, Any] = Field(default_factory=dict)
     #: Step groups (core's stages, dev_plan/141): [{"name", "steps": [step
-    #: names], "meta": {color, notes}}]. Which steps are in a group is core's,
-    #: read back after each edit; meta is the app's.
+    #: ids], "meta": {color, notes}}]; ids, so a step rename keeps its group.
+    #: The UI sends core the steps' names. Which steps are in a group is
+    #: core's, read back after each edit; meta is the app's.
     groups: List[Dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="before")

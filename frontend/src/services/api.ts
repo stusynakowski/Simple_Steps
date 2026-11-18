@@ -121,6 +121,8 @@ interface StepRunResponse {
     warnings?: string[];
     /** Every step's state in the session's core workflow (dev_plan/124 phase 2). */
     steps?: Record<string, WorkflowStepState>;
+    /** Every step group as core has it, after the run (dev_plan/141). */
+    groups?: WorkflowGroupState[];
     /** Steps this one reads that hadn't run in this session, run first… */
     also_ran?: string[];
     /** …and their outputs, by step name. */
@@ -189,16 +191,33 @@ export async function syncWorkflow(
   workflowKey: string,
   steps: WorkflowStepDecl[],
   resources?: Record<string, unknown>,
-): Promise<{ steps: Record<string, WorkflowStepState>; outputs: Record<string, string> }> {
+  groups?: WorkflowGroupDecl[],
+): Promise<{ steps: Record<string, WorkflowStepState>; outputs: Record<string, string>; groups: WorkflowGroupState[] }> {
   const response = await fetch(`${API_BASE}/workflow/sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ workflow_key: workflowKey, workflow_steps: steps, resources: resources || null }),
+    body: JSON.stringify({
+      workflow_key: workflowKey, workflow_steps: steps, resources: resources || null,
+      workflow_groups: groups ?? null,
+    }),
   });
   if (!response.ok) throw new Error(`Backend Error: ${response.statusText}`);
   const body = await response.json();
-  return { steps: body.steps ?? {}, outputs: body.outputs ?? {} };
+  return { steps: body.steps ?? {}, outputs: body.outputs ?? {}, groups: body.groups ?? [] };
+}
+
+/** A step group as the server is told it: its name and its steps' names. */
+export interface WorkflowGroupDecl { name: string; steps: string[] }
+
+/** A step group as core has it (kernels.group_summary): steps by name. */
+export interface WorkflowGroupState {
+  name: string;
+  steps: string[];
+  state: string;
+  needs_run?: Record<string, string>;
+  /** Why core refused it; its steps are then empty. */
+  problem?: string;
 }
 
 /** Structured error returned by the backend when a step execution fails. */

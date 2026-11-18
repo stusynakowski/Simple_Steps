@@ -103,11 +103,31 @@ export interface Step {
 /** A row of an open step that its Settings can hide (owner, 2026-11-13). */
 export type StepRow = 'controls' | 'formula' | 'data';
 
+/**
+ * Consecutive steps under one header (core's stage, dev_plan/141). Which
+ * steps are in it is core's: read back after every sync. Saved in the file
+ * as `{name, steps, meta}`; the rest comes from core and isn't saved.
+ */
+export interface StepGroup {
+  name: string;
+  /** Its steps' ids, in order (ids, so a step rename doesn't lose it). */
+  steps: string[];
+  meta?: { color?: string; notes?: string };
+  /** Core's state for the group as one step. */
+  state?: string;
+  /** Its steps that need a run, by name, and why. */
+  needsRun?: Record<string, string>;
+  /** Why core refused the group, when it did. */
+  problem?: string;
+}
+
 export interface Workflow {
   id: string;
   name: string;
   created_at: string; // ISO timestamp string
   steps: Step[];
+  /** Step groups, in workflow order (dev_plan/141). */
+  groups?: StepGroup[];
   meta?: Record<string, unknown>;
   /** Resources the steps use: name → {source, type, settings} (core 007). */
   resources?: Record<string, unknown>;

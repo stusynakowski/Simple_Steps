@@ -17,6 +17,7 @@ import StepOverview from './StepOverview';
 import StepMenu from './StepMenu';
 import SymbolIcon, { type SymbolName } from './SymbolIcon';
 import { runState, RUN_ICON } from '../utils/runState';
+import type { RunState } from '../utils/runState';
 import Markdown from 'react-markdown';
 import { useStepWiring } from '../context/StepWiringContext';
 import { useSetGridHover } from '../context/StepsStatusContext';
@@ -76,6 +77,12 @@ interface OperationColumnProps {
   onResizeStart?: (edge: 'left' | 'right', e: React.PointerEvent) => void;
   /** Double-click on a side: back to the default width. */
   onResizeReset?: () => void;
+  /**
+   * The step group this step is in (dev_plan/141): its header splits in two,
+   * the group's colour on top, the step's below. The group's first step
+   * carries the group's name and run state.
+   */
+  group?: { name: string; color: string; first: boolean; run: RunState };
 }
 
 /** The rows of an open step its Settings can hide, top to bottom. */
@@ -117,6 +124,7 @@ export default function OperationColumn({
   progress,
   pipelineStatus = 'idle',
   pipelineCursorIndex = -1,
+  group,
 }: OperationColumnProps) {
   const widgetMaxHeight = isMaximized ? 'calc(100vh - 200px)' : '400px';
   // Widgets: any number open at once (toolbar buttons toggle them); each
@@ -448,9 +456,10 @@ export default function OperationColumn({
   return (
     <div
       ref={columnRef}
-      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}`}
-      style={{ 
+      className={`operation-column ${isActive ? 'active' : ''} ${isMaximized ? 'maximized' : ''} ${isSqueezed ? 'squeezed' : ''} ${isMinimized ? 'minimized' : ''} status-${step.status} run-${run.kind}${group ? ' in-group' : ''}`}
+      style={{
         '--step-color': color,
+        ...(group ? { '--group-color': group.color } : {}),
         zIndex: zIndex,
       } as React.CSSProperties}
       data-testid={`operation-column-${step.id}`}
@@ -458,7 +467,20 @@ export default function OperationColumn({
       <div className={`op-header${isDragHinting ? ' drag-detach-hint' : ''}`} onClick={handleColumnClick} onMouseDown={handleHeaderMouseDown} style={{ cursor: 'pointer', position: 'relative' }}>
         {/* The run's colour: the outer arrow, showing round the fill's sides. */}
         <div className="arrow-status run-paint" aria-hidden="true" />
+        {/* The step's colour; in a group, the group's colour on its top half. */}
         <div className="arrow-background" />
+        {/* The group half (dev_plan/141 §3.2): the group's name and run state
+            on its first step; the band carries on over the others. */}
+        {group?.first && (
+          <div className="group-half" data-testid="group-half" title={`Group ${group.name}: ${group.run.text}`}>
+            <span className="group-half-name">{group.name}</span>
+            {RUN_ICON[group.run.kind] && (
+              <span className={`group-run-icon run-icon-${group.run.kind}`}>
+                <SymbolIcon name={RUN_ICON[group.run.kind]!} size={12} />
+              </span>
+            )}
+          </div>
+        )}
         <div className="arrow-content">
             {isMinimized ? (
                  // As small as it gets: just the step's number (owner, 2026-10-30).

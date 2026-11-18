@@ -28,6 +28,20 @@ export const RUN_ICON: Partial<Record<RunKind, SymbolName>> = {
   blocked: 'block',
 };
 
+/** A step group's run state, the group as one step, from core's state for it (dev_plan/141). */
+export function groupRunState(group: { state?: string; needsRun?: Record<string, string>; problem?: string }): RunState {
+  if (group.problem) return { kind: 'blocked', text: `can't group: ${group.problem}` };
+  const waiting = Object.keys(group.needsRun ?? {});
+  const needs = waiting.length ? ` (${waiting.join(', ')} need${waiting.length === 1 ? 's' : ''} a run)` : '';
+  switch (group.state) {
+    case 'completed': return { kind: 'ran', text: 'ran' };
+    case 'stale': return { kind: 'stale', text: `out of date${needs}` };
+    case 'failed': return { kind: 'failed', text: 'a step failed' };
+    case 'invalid': case 'blocked': return { kind: 'blocked', text: `can't run${needs}` };
+    default: return { kind: 'staged', text: `not run${needs}` };
+  }
+}
+
 /** A step's run state, from what the app knows of it; *queued* while a run will reach it. */
 export function runState(step: {
   status: string; uncaughtFailed?: number; outputRows?: number; staleReason?: string;

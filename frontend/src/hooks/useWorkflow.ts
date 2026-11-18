@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Workflow, Step, StepStatus, StepRow, Cell } from '../types/models';
+import type { Workflow, Step, StepStatus, StepRow, Cell, StepGroup } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
 import { declareResource } from '../services/api';
 import { runStep as runStepApi, fetchDataView, fetchStepView, getOperations,
@@ -11,6 +11,7 @@ import { runStep as runStepApi, fetchDataView, fetchStepView, getOperations,
 } from '../services/api';
 import type {
   OperationDefinition, PipelineFile, BackendError, ProgressEvent, WorkflowStepDecl, WorkflowStepState,
+  WorkflowGroupDecl, WorkflowGroupState,
 } from '../services/api';
 import { parseFormula } from '../utils/formulaParser';
 import { errorCell } from '../utils/errorCells';
@@ -28,16 +29,23 @@ import { ROW_PAGE } from '../utils/gridSelection';
  */
 function fileSections(pipeline: PipelineFile): Omit<Workflow, 'steps'> {
   const {
-    id, name, created_at, meta, resources,
+    id, name, created_at, meta, resources, groups,
     steps: _steps, updated_at: _updated, ...sections
   } = pipeline;
   void _steps; void _updated;
+  const saved = Array.isArray(groups) ? (groups as StepGroup[]).map(savedGroup) : [];
   return {
     id, name, created_at,
     ...(meta ? { meta } : {}),
     ...(resources ? { resources } : {}),
+    ...(saved.length ? { groups: saved } : {}),
     ...(Object.keys(sections).length ? { sections } : {}),
   };
+}
+
+/** What a step group saves: its name, its steps' ids, its colour and notes. */
+function savedGroup({ name, steps, meta }: StepGroup): StepGroup {
+  return { name, steps: [...steps], ...(meta && Object.keys(meta).length ? { meta } : {}) };
 }
 
 /**
@@ -133,6 +141,42 @@ export default function useWorkflow() {
   const workflowDecl = (): WorkflowStepDecl[] => workflowRef.current.steps.map((s) => ({
     id: s.id, name: s.label, formula: s.formula ?? '', ...(s.outputRefId ? { ref: s.outputRefId } : {}),
   }));
+  /** The groups as the server is told them: steps by their current names. */
+  const groupsDecl = (): WorkflowGroupDecl[] => {
+    const label = new Map(workflowRef.current.steps.map((s) => [s.id, s.label]));
+    return (workflowRef.current.groups ?? []).map((g) => ({
+      name: g.name, steps: g.steps.map((id) => label.get(id)).filter((n): n is string => !!n),
+    }));
+  };
+  /**
+   * Each group as core has it (dev_plan/141 §4): its steps (core's, after an
+   * insert, move or delete), its state, what needs a run, or why core refused
+   * it. A group none of whose steps remain is gone.
+   */
+  const applyGroupStates = useCallback((states?: WorkflowGroupState[]) => {
+    if (!states) return;
+    const patch = (wf: Workflow): Workflow => {
+      if (!wf.groups?.length) return wf;
+      const idOf = new Map(wf.steps.map((s) => [s.label, s.id]));
+      const present = new Set(wf.steps.map((s) => s.id));
+      const byName = new Map(states.map((g) => [g.name, g]));
+      const groups = wf.groups.flatMap((g): StepGroup[] => {
+        const core = byName.get(g.name);
+        const steps = core && !core.problem
+          ? core.steps.map((n) => idOf.get(n)).filter((id): id is string => !!id)
+          : g.steps.filter((id) => present.has(id));
+        if (!steps.length) return [];
+        return [{
+          ...savedGroup(g), steps,
+          ...(core ? { state: core.state, needsRun: core.needs_run ?? {} } : {}),
+          ...(core?.problem ? { problem: core.problem } : {}),
+        }];
+      });
+      return { ...wf, groups };
+    };
+    workflowRef.current = patch(workflowRef.current);
+    setWorkflow(patch);
+  }, []);
   /**
    * Fetch the view of each step whose view key changed (dev_plan/126 R5, R6):
    * its cells with core's states, types and row ids, and its plan, run or not.
@@ -253,15 +297,16 @@ export default function useWorkflow() {
       syncTimer.current = null;
       // A sync is a courtesy: if it fails, the next run reports any problem.
       Promise.resolve()
-        .then(() => syncWorkflow(workflowKey(), workflowDecl(), workflowRef.current.resources))
-        .then(async ({ steps, outputs }) => {
+        .then(() => syncWorkflow(workflowKey(), workflowDecl(), workflowRef.current.resources, groupsDecl()))
+        .then(async ({ steps, outputs, groups }) => {
           await showOutputs(outputs);
           applyStepStates(steps);
+          applyGroupStates(groups);
         })
         .catch(() => {});
     }, delay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applyStepStates, showOutputs]);
+  }, [applyStepStates, applyGroupStates, showOutputs]);
   /** Enter in a formula bar: declare the workflow now (core checks and plans
    *  every step), running nothing (dev_plan/126 D3). */
   const declareWorkflow = useCallback(() => scheduleSync(0), [scheduleSync]);
@@ -641,6 +686,7 @@ export default function useWorkflow() {
       }
       // Which steps are out of date now, as core sees it.
       applyStepStates(res.metrics.steps);
+      applyGroupStates(res.metrics.groups);
       return 'completed';
     } catch (error) {
       const elapsed = Math.round(performance.now() - startTime);
@@ -1009,6 +1055,7 @@ export default function useWorkflow() {
       ...(current.sections ?? {}),
       ...(current.meta ? { meta: current.meta } : {}),
       ...(current.resources ? { resources: current.resources } : {}),
+      ...(current.groups?.length ? { groups: current.groups.map(savedGroup) } : {}),
       id: pipelineId,
       name: pipelineName,
       created_at: current.created_at ?? new Date().toISOString(),

@@ -1792,3 +1792,43 @@ body.is-resizing-step * { cursor: ew-resize !important; }
 .formula-summary-tool { color: #3dc9b0; }
 .formula-summary-data { color: #4864aa; }
 .formula-summary-punct { color: #dcdcdc; }
+
+/* ── Step groups (dev_plan/141 §3.2) ──────────────────────────────────────
+   A grouped step's arrow in two shades: the group's colour on its top half,
+   shared across the group's steps so they read as one band, and the step's
+   colour below. Same arrow, same height: nothing under the header moves. */
+.operation-column.in-group .arrow-background {
+  background: linear-gradient(to bottom, var(--group-color) 0 50%, var(--step-color) 50% 100%);
+}
+/* The step's name and run icon move down, into the step's half. */
+.operation-column.in-group .arrow-content {
+  align-self: stretch;
+  align-items: flex-end;
+  padding-bottom: 4px;
+}
+.operation-column.in-group .op-name,
+.operation-column.in-group .vertical-label { font-size: 0.85rem; }
+.operation-column.in-group .step-run-icon { top: 75%; }
+/* The group half's name and run state, on the group's first step. */
+.group-half {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  height: calc(50% - 4px);
+  max-width: calc(100% - 40px);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-left: 36px;      /* clear of the tail's notch */
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.column-wrapper:first-child > .operation-column .group-half { padding-left: 14px; }
+.group-half-name { overflow: hidden; text-overflow: ellipsis; }
+.group-run-icon { display: flex; }
