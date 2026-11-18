@@ -4,7 +4,7 @@ import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
-import { runState, groupRunState } from '../utils/runState';
+import { runState, groupRunState, groupErrorLabel } from '../utils/runState';
 import { groupColor } from '../styles/theme';
 import { popUnder } from './StepMenu';
 import { GroupControls, GroupSettingsPop, type OpenSettings } from './StepGroupPops';
@@ -997,6 +997,7 @@ export default function MainLayout() {
               color: grp.meta?.color ?? groupColor(groupIndex),
               first: grp.steps[0] === step.id,
               last: grp.steps[grp.steps.length - 1] === step.id,
+              error: grp.runError && groupErrorLabel(grp.runError),
               // Running while any of its steps is (a Run group in flight).
               run: workflow.steps.some((s) => grp.steps.includes(s.id) && s.status === 'running')
                 ? { kind: 'running' as const, text: 'running' } : groupRunState(grp),

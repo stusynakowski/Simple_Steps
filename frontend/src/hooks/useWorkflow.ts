@@ -170,6 +170,7 @@ export default function useWorkflow() {
           ...savedGroup(g), steps,
           ...(core ? { state: core.state, needsRun: core.needs_run ?? {} } : {}),
           ...(core?.problem ? { problem: core.problem } : {}),
+          ...(g.runError ? { runError: g.runError } : {}),
         }];
       });
       return { ...wf, groups };
@@ -687,6 +688,8 @@ export default function useWorkflow() {
       // Which steps are out of date now, as core sees it.
       applyStepStates(res.metrics.steps);
       applyGroupStates(res.metrics.groups);
+      // A step ran: a group's "run … first" may no longer hold; its next run says.
+      setRunError(null, undefined);
       return 'completed';
     } catch (error) {
       const elapsed = Math.round(performance.now() - startTime);
@@ -975,6 +978,18 @@ export default function useWorkflow() {
     }) };
     setWorkflow(workflowRef.current);
   }, []);
+  /** Group *name*'s last run error (undefined clears it; no name: every group's). */
+  const setRunError = useCallback((name: string | null, why: string | undefined) => {
+    const { groups, ...rest } = workflowRef.current;
+    if (!groups?.some((g) => (name === null || g.name === name) && g.runError !== why)) return;
+    workflowRef.current = { ...rest, groups: groups.map((g) => {
+      if (name !== null && g.name !== name) return g;
+      const { runError: _old, ...bare } = g;
+      void _old;
+      return why ? { ...bare, runError: why } : bare;
+    }) };
+    setWorkflow(workflowRef.current);
+  }, []);
   /**
    * Run group *name* (dev_plan/141 §3.4): only its steps, each on what its
    * inputs show; nothing outside it runs. *force* runs them again when current.
@@ -989,6 +1004,7 @@ export default function useWorkflow() {
       setWorkflow(workflowRef.current);
     };
     const before = new Map(workflowRef.current.steps.map((s) => [s.id, s.status]));
+    setRunError(name, undefined);
     addLog('info', `Running group "${name}"${force ? ' again' : ''}`, { detail: `Steps: ${group.steps.map((id) => workflowRef.current.steps.find((s) => s.id === id)?.label).join(', ')}` });
     setStatus(() => 'running');
     const last = workflowRef.current.steps.find((s) => s.id === group.steps[group.steps.length - 1]);
@@ -1006,11 +1022,13 @@ export default function useWorkflow() {
     } catch (error) {
       setStatus((s) => before.get(s.id) ?? s.status);
       const backendErr = (error as { backendError?: BackendError })?.backendError;
-      addLog('error', `Group "${name}" failed: ${backendErr?.detail || (error instanceof Error ? error.message : String(error))}`,
-        { detail: backendErr?.traceback });
+      const why = backendErr?.detail || (error instanceof Error ? error.message : String(error));
+      addLog('error', `Group "${name}" failed: ${why}`, { detail: backendErr?.traceback });
+      // On the group's band, not only in the log (owner, 2026-11-18).
+      setRunError(name, why.replace(/^Error executing step:\s*/, ''));
       scheduleSync(0);   // core says where each step stands now
     }
-  }, [addLog, showOutputs, applyStepStates, applyGroupStates, scheduleSync]);
+  }, [addLog, showOutputs, applyStepStates, applyGroupStates, scheduleSync, setRunError]);
 
   /** Delete resource *name*. Refused while a step uses it, listing those steps. */
   const removeResource = useCallback((name: string): void => {

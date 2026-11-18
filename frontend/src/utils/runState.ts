@@ -29,8 +29,9 @@ export const RUN_ICON: Partial<Record<RunKind, SymbolName>> = {
 };
 
 /** A step group's run state, the group as one step, from core's state for it (dev_plan/141). */
-export function groupRunState(group: { state?: string; needsRun?: Record<string, string>; problem?: string }): RunState {
+export function groupRunState(group: { state?: string; needsRun?: Record<string, string>; problem?: string; runError?: string }): RunState {
   if (group.problem) return { kind: 'blocked', text: `can't group: ${group.problem}` };
+  if (group.runError) return { kind: 'failed', text: `didn't run: ${group.runError}` };
   const waiting = Object.keys(group.needsRun ?? {});
   const needs = waiting.length ? ` (${waiting.join(', ')} need${waiting.length === 1 ? 's' : ''} a run)` : '';
   switch (group.state) {
@@ -40,6 +41,12 @@ export function groupRunState(group: { state?: string; needsRun?: Record<string,
     case 'invalid': case 'blocked': return { kind: 'blocked', text: `can't run${needs}` };
     default: return { kind: 'staged', text: `not run${needs}` };
   }
+}
+
+/** A group run's error, short enough for its band: "run 'load' first", else "didn't run". */
+export function groupErrorLabel(error: string): string {
+  const reads = error.match(/reads (.+?), which (?:has|have) never run/);
+  return reads ? `run ${reads[1]} first` : "didn't run";
 }
 
 /** A step's run state, from what the app knows of it; *queued* while a run will reach it. */

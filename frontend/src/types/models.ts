@@ -119,6 +119,8 @@ export interface StepGroup {
   needsRun?: Record<string, string>;
   /** Why core refused the group, when it did. */
   problem?: string;
+  /** Why its last Run group was refused or failed, shown on its band; cleared by the next run that works. */
+  runError?: string;
 }
 
 export interface Workflow {

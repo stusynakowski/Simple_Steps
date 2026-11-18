@@ -82,7 +82,7 @@ interface OperationColumnProps {
    * the group's colour on top, the step's below. The group's first step
    * carries the group's name and run state.
    */
-  group?: { name: string; color: string; first: boolean; last: boolean; run: RunState };
+  group?: { name: string; color: string; first: boolean; last: boolean; run: RunState; error?: string };
   /** A click on the group's half: fold the group, as a click on a step's header folds the step. */
   onFoldGroup?: () => void;
   /** The group's controls (run options, notes, settings, fold), inline on its last step's band. */
@@ -495,6 +495,10 @@ export default function OperationColumn({
               <span className={`group-run-icon run-icon-${group.run.kind}`}>
                 <SymbolIcon name={RUN_ICON[group.run.kind]!} size={12} />
               </span>
+            )}
+            {/* Why its last Run group didn't run, on the band (not only the log). */}
+            {group.first && group.error && (
+              <span className="group-run-error" data-testid="group-run-error">{group.error}</span>
             )}
             {group.last && groupControls}
           </div>

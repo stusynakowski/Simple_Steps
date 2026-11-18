@@ -1901,6 +1901,15 @@ body.is-resizing-step * { cursor: ew-resize !important; }
 .group-pop-notes .step-notes-body { font-size: 0.78rem; max-height: 160px; overflow: auto; }
 .group-half-name { overflow: hidden; text-overflow: ellipsis; }
 .group-run-icon { display: flex; }
+/* On a group of several steps, the name (and any run error) run on across
+   the band: earlier columns sit above later ones. */
+.group-half.first:not(.last) { overflow: visible; }
+.group-half.first:not(.last) > * { flex-shrink: 0; overflow: visible; }
+.group-run-error {
+  padding: 0 5px; border-radius: 3px; background: rgba(127, 29, 29, 0.85);
+  color: #fecaca; font-size: 0.68rem; font-weight: 600; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 
 /* ── A folded group (dev_plan/141 §3.3) ──────────────────────────────────
    One arrow: the group's colour on top (its name, its run icon), its steps
