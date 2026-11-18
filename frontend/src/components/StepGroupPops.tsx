@@ -63,7 +63,7 @@ export function SelectionPop({ workflow, selection, onGroup, onClose }: {
  * place), where it stands, Run group / Run again (only its steps), its
  * colour and notes, and Ungroup.
  */
-export function GroupPop({ workflow, open, color, onRename, onRun, onMeta, onUngroup, onClose }: {
+export function GroupPop({ workflow, open, color, folded, onRename, onRun, onMeta, onFold, onUngroup, onClose }: {
   workflow: Workflow;
   open: OpenGroup;
   /** The colour it shows now (its own, or the palette's). */
@@ -72,6 +72,9 @@ export function GroupPop({ workflow, open, color, onRename, onRun, onMeta, onUng
   onRename: (from: string, to: string) => boolean;
   onRun: (name: string, force: boolean) => void;
   onMeta: (name: string, changes: { color?: string; notes?: string }) => void;
+  /** Folded to one header in this browser (§3.3). */
+  folded: boolean;
+  onFold: (name: string) => void;
   onUngroup: (name: string) => void;
   onClose: () => void;
 }) {
@@ -101,6 +104,8 @@ export function GroupPop({ workflow, open, color, onRename, onRun, onMeta, onUng
         { icon: 'refresh', label: 'Run again', testId: 'run-group-again',
           disabled: !!group.problem || running, hint: group.problem ? "core can't run it" : running ? 'running' : undefined,
           onClick: () => onRun(open.name, true) },
+        { icon: folded ? 'unfold_more' : 'unfold_less', label: folded ? 'Unfold group' : 'Fold group',
+          testId: 'fold-group', onClick: () => onFold(open.name) },
         { divider: true },
         { icon: 'ungroup', label: 'Ungroup', onClick: () => onUngroup(open.name), danger: true, testId: 'ungroup' },
       ]}

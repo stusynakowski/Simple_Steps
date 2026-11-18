@@ -8,6 +8,12 @@ import { runState, groupRunState } from '../utils/runState';
 import { groupColor } from '../styles/theme';
 import { popUnder } from './StepMenu';
 import { SelectionPop, GroupPop, type HeaderSelection, type OpenGroup } from './StepGroupPops';
+import FoldedGroup from './FoldedGroup';
+
+/** The groups folded in this browser for the workflow under *key*. */
+function readFolded(key: string): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]') as string[]); } catch { return new Set(); }
+}
 import UnifiedToolbar, { type PipelineMeta } from './UnifiedToolbar';
 import OperationColumn from './OperationColumn';
 import DetachedStepWindow from './DetachedStepWindow';
@@ -195,6 +201,17 @@ export default function MainLayout() {
   // Step groups (dev_plan/141): shift-clicked headers, and the open group's popover.
   const [headerSelection, setHeaderSelection] = useState<HeaderSelection | null>(null);
   const [openGroup, setOpenGroup] = useState<OpenGroup | null>(null);
+  // Folded groups (dev_plan/141 §3.3): each viewer's own, kept in this
+  // browser per workflow, never in the workflow file.
+  const foldKey = `simple-steps:folded-groups:${workflow.id}`;
+  const [foldState, setFoldState] = useState(() => ({ key: foldKey, names: readFolded(foldKey) }));
+  const folded = foldState.key === foldKey ? foldState.names : readFolded(foldKey);
+  const toggleFold = (name: string) => {
+    const next = new Set(folded);
+    if (!next.delete(name)) next.add(name);
+    try { localStorage.setItem(foldKey, JSON.stringify([...next])); } catch { /* folded for now only */ }
+    setFoldState({ key: foldKey, names: next });
+  };
   /** Add step *id* to the header selection, or take it out; its popover under that header. */
   const selectHeader = (id: string) => {
     const header = document.querySelector(`[data-testid="operation-column-${id}"] .op-header`);
@@ -982,6 +999,32 @@ export default function MainLayout() {
               run: workflow.steps.some((s) => grp.steps.includes(s.id) && s.status === 'running')
                 ? { kind: 'running' as const, text: 'running' } : groupRunState(grp),
             };
+            // Folded: the group is one header on its first step's place; its
+            // other steps keep an empty place, so the steps' map stays in step.
+            if (grp && group && folded.has(grp.name)) {
+              if (!group.first) return <div key={step.id} className="column-wrapper folded-away" />;
+              const members = grp.steps
+                .map((id) => workflow.steps.findIndex((s) => s.id === id))
+                .filter((i) => i >= 0)
+                .map((i) => {
+                  const s = workflow.steps[i];
+                  return { id: s.id, label: s.label, color: s.step_color ?? stepColor(i, workflow.steps.length), run: runState(s, false) };
+                });
+              const width = Math.max(150, 40 + 72 * members.length);
+              return (
+                <div key={step.id} className="column-wrapper collapsed" style={{ width, flex: `0 0 ${width}px` }}>
+                  <FoldedGroup
+                    name={grp.name}
+                    color={group.color}
+                    run={group.run}
+                    steps={members}
+                    zIndex={workflow.steps.length - index}
+                    onOpenGroup={(rect) => setOpenGroup({ name: grp.name, at: popUnder(rect) })}
+                    onUnfold={() => toggleFold(grp.name)}
+                  />
+                </div>
+              );
+            }
             const isExpanded = expandedStepIds.has(step.id);
             const isMaximized = maximizedStepId === step.id;
             const isMinimized = !isExpanded && minimizedStepIds.has(step.id);
@@ -1066,6 +1109,8 @@ export default function MainLayout() {
               })()}
               onRun={(name, force) => { void runGroup(name, force); }}
               onMeta={setGroupMeta}
+              folded={folded.has(openGroup.name)}
+              onFold={toggleFold}
               onUngroup={(name) => { ungroup(name); setOpenGroup(null); }}
               onClose={() => setOpenGroup(null)}
             />

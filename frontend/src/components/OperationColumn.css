@@ -1864,3 +1864,45 @@ body.is-resizing-step * { cursor: ew-resize !important; }
 .group-pop-notes .step-notes-body { font-size: 0.78rem; max-height: 160px; overflow: auto; }
 .group-half-name { overflow: hidden; text-overflow: ellipsis; }
 .group-run-icon { display: flex; }
+
+/* ── A folded group (dev_plan/141 §3.3) ──────────────────────────────────
+   One arrow: the group's colour on top (its name, its run icon), its steps
+   below as parallelograms in their colours. The strip is clipped to the
+   arrow's lower half, so its ends follow the tail's notch and the head. */
+.folded-group .folded-top {
+  position: absolute; top: 4px; left: 0; right: 28px; height: calc(50% - 4px);
+  z-index: 2; cursor: pointer; display: flex; align-items: center; gap: 4px;
+  padding-left: 36px; color: #fff; font-size: 0.72rem; font-weight: 600;
+  letter-spacing: 0.02em; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  white-space: nowrap; overflow: hidden;
+}
+.folded-group .folded-top:hover { background: rgba(255, 255, 255, 0.08); }
+.column-wrapper:first-child > .folded-group .folded-top { padding-left: 14px; }
+.folded-group .folded-steps {
+  --b: 4px;
+  position: absolute; left: 0; right: 0; bottom: 0; height: 50%;
+  z-index: 1; display: flex; gap: 3px; cursor: pointer;
+  clip-path: polygon(calc(28px + var(--b)) 0, calc(100% - var(--b)) 0,
+    calc(100% - 28px - var(--b)) 100%, var(--b) 100%);
+  padding: 0 14px 0 14px;
+}
+.column-wrapper:first-child > .folded-group .folded-steps {
+  clip-path: polygon(var(--b) 0, calc(100% - var(--b)) 0,
+    calc(100% - 28px - var(--b)) 100%, var(--b) 100%);
+}
+/* Leaning as the arrow's edges do: 28px across over the 25px half. */
+.folded-step {
+  flex: 1 1 0; min-width: 0;
+  background: var(--fill);
+  transform: skewX(-48deg);
+  display: flex; align-items: center; justify-content: center;
+}
+.folded-step:hover { filter: brightness(1.2); }
+.folded-step-label {
+  transform: skewX(48deg);
+  color: #fff; font-size: 0.68rem; font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  pointer-events: none;
+}
+.column-wrapper.folded-away { flex: 0 0 0; width: 0; overflow: hidden; }
