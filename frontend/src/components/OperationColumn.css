@@ -1410,7 +1410,7 @@
 }
 .step-run-big,
 .step-bar-btn { justify-content: center; }
-.step-bar .step-bar-btn { height: 30px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; overflow: hidden; }
+.step-bar .step-bar-btn { height: 26px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; overflow: hidden; }
 /* A narrow step keeps one line by dropping words, not controls: the named
    buttons show their icons only (each keeps its hover label), and in a
    very narrow one, Run too. */
@@ -1435,7 +1435,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  height: 30px;
+  height: 26px;   /* a little thinner (owner, 2026-11-18) */
   padding: 0 8px 0 4px;
   border: none;
   border-radius: 4px;
@@ -1472,7 +1472,7 @@
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  height: 28px;
+  height: 24px;
   padding: 0 4px 0 6px;
   border: none;
   border-radius: 4px;

@@ -52,11 +52,15 @@ export default function StepMinimap({ scroller, steps, groups = [], onOpen }: {
     const bar = track.current;
     if (!el || !bar) return;
     const measure = () => {
+      // In the scroller's own coordinates (its scroll position added back),
+      // whatever element the columns are positioned in.
+      const base = el.getBoundingClientRect().left - el.scrollLeft;
+      const at = (c: HTMLElement) => Math.round(c.getBoundingClientRect().left - base);
       const cols = Array.from(el.querySelectorAll<HTMLElement>('.column-wrapper'));
-      const next = cols.map((c) => ({ left: c.offsetLeft, width: c.offsetWidth }));
+      const next = cols.map((c) => ({ left: at(c), width: c.offsetWidth }));
       setSpans((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
       const rc = el.querySelector<HTMLElement>('.resource-column');
-      const r = rc && rc.offsetWidth > 0 ? { left: rc.offsetLeft, width: rc.offsetWidth } : null;
+      const r = rc && rc.offsetWidth > 0 ? { left: at(rc), width: rc.offsetWidth } : null;
       setRes((prev) => (prev?.left === r?.left && prev?.width === r?.width ? prev : r));
       const v = { total: Math.max(1, el.scrollWidth), scrollLeft: el.scrollLeft, visible: el.clientWidth, trackWidth: Math.max(1, bar.clientWidth) };
       setView((prev) => (prev.total === v.total && prev.scrollLeft === v.scrollLeft && prev.visible === v.visible
