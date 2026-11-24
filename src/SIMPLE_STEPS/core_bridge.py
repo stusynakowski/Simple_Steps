@@ -21,6 +21,8 @@ Every shim below is tagged with what removes it::
     SHIM(core §C45)  formula() raises SelectionError, not FormulaError, for a
                      selection it won't read (wf["s"][1][2]); read it as the
                      FormulaError it is
+    SHIM(core §K23)  a running step can't be cancelled; stop the thread that
+                     runs it instead
 
 When core lands one of those, delete the tagged block. Nothing else should
 need to change — that is the point of keeping them in one file.
@@ -63,7 +65,37 @@ __all__ = [
     "described_modifiers",
     "simple_step_resource",
     "formula",
+    "RunCancelled",
+    "interrupt",
 ]
+
+
+# --------------------------------------------------------------------------- #
+# Cancelling a run                                                            #
+# --------------------------------------------------------------------------- #
+
+class RunCancelled(BaseException):
+    """Raised inside a running ``k.run`` to stop it (:func:`interrupt`).
+
+    A ``BaseException``, so core's per-row error handling (which records an
+    ``Exception`` as a failed row and goes on) lets it through and the run
+    stops."""
+
+
+def interrupt(thread_id: int) -> bool:
+    """Stop the run in thread *thread_id* at its next Python instruction.
+
+    SHIM(core §K23): core has no ``cancel()``. Run against 1.0.3: raising
+    :class:`RunCancelled` in the thread running ``k.run`` ends it; the steps
+    that had finished stay ``completed``, the interrupted one and those after
+    it stay ``staged`` (nothing half-written), and the next run completes.
+    A tool inside one long C call (numpy, a socket read) stops when that call
+    returns; one that never returns can't be stopped from a thread (138 N2).
+    The caller makes sure the thread is still inside ``k.run``.
+    """
+    import ctypes
+    return ctypes.pythonapi.PyThreadState_SetAsyncExc(
+        ctypes.c_ulong(thread_id), ctypes.py_object(RunCancelled)) == 1
 
 
 # --------------------------------------------------------------------------- #

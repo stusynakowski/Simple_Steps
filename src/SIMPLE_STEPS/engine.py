@@ -181,6 +181,8 @@ def run_operation(
                 store=lambda frame: save_dataframe(frame, session_id=session_id, store_mode=result_store),
                 force=force, group=group, groups=workflow_groups,
             )
+        except kernels.RunCancelledError:
+            raise                      # stopped, not failed: the UI says so
         except Exception as e:
             raise ValueError(f"Error executing step: {e}") from e
     if is_canonical(formula):

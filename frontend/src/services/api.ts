@@ -207,6 +207,19 @@ export async function syncWorkflow(
   return { steps: body.steps ?? {}, outputs: body.outputs ?? {}, groups: body.groups ?? [] };
 }
 
+/** Stop the workflow's run in progress (`/api/run/cancel`). Its run request
+ *  then fails with `error_type: "RunCancelled"`. False when nothing ran. */
+export async function cancelRun(workflowKey: string): Promise<boolean> {
+  const response = await fetch(`${API_BASE}/run/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ workflow_key: workflowKey }),
+  });
+  if (!response.ok) throw new Error(`Backend Error: ${response.statusText}`);
+  return Boolean((await response.json()).cancelled);
+}
+
 /** A step group as the server is told it: its name and its steps' names. */
 export interface WorkflowGroupDecl { name: string; steps: string[] }
 

@@ -181,6 +181,29 @@ today.
 | **N2** | Jobs, progress, cancel | core P7d, or the interim shim | owner's choice |
 | **B4** | Paged reads from disk | core L6 | later |
 
+## Progress
+
+**2026-11-19: N0 and N1 built, and N2's cancel.** Owner's answers: yes to
+N0/N1; while a step runs you can still explore what doesn't interfere
+(look at its data, any step's cells) and cancel it; losing a cancelled step's
+partial results is accepted. Progress is core's, as an execution modifier
+(008 K23, restated); no interim progress shim.
+
+| Piece | What was done | Where |
+|---|---|---|
+| N0 | Every handler that doesn't await is a plain `def` (FastAPI's thread pool). `/api/session` stays `async`, so the connection check answers even when the pool is busy. This also ends the "Disconnected" badge while a table loads: the 4 s connection check was starved by blocking handlers on the loop | `main.py` |
+| N1 | A run marks its kernel `running`. Views read without the lock during it (safe: 008 K23 evidence), and report `running` for the running step. A sync during a run answers at once (`busy`, `running`, the current states) and is queued, latest wins, then applied when the run ends, before its states are reported | `kernels.py` (`_hold`, `_apply_pending`) |
+| N2, cancel | `POST /api/run/cancel {workflow_key}` stops the run (`SHIM(core §K23)`). The run's request answers 409 `RunCancelled`. A first run's step goes back to staged; a re-run keeps its previous result. In the UI, Run on a running step is its Stop (it used to start a second run), and the pipeline's Stop cancels too; a stopped step shows `stopped` and logs it, not an error | `core_bridge.interrupt`, `kernels.cancel`, `useWorkflow.ts` |
+
+Checked with `scripts/probes/probe_run_nonblocking.py`, a 6 s run: another
+user's request 2 ms; the connection check 1 ms; a sync, a view of a finished
+step and a view of the running step about 60 ms each. The queued edit was
+applied; both cancel cases passed. Backend 283 passed, frontend 138 passed.
+
+**Still open here:** N2's progress (waits on core K23), N3, B1–B4. One run
+at a time per workflow: a second Run on another step of the same workflow
+waits for the first.
+
 ## 6. Decisions for the owner
 
 1. **Progress before core's P7d** (N2): build the interim shim now, or wait

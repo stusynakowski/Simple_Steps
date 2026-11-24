@@ -17,6 +17,7 @@ from .models import (
     PipelineFile,
 )
 from .engine import run_operation, get_dataframe, get_value, values
+from .kernels import RunCancelledError
 from .file_manager import (
     list_projects, create_project, delete_project,
     list_pipelines, load_pipeline, save_pipeline, delete_pipeline,
@@ -58,7 +59,7 @@ app.include_router(agent_router)
 
 # --- Formula Parser API ---
 @app.post("/api/parse_formula")
-async def api_parse_formula(payload: dict = Body(...)):
+def api_parse_formula(payload: dict = Body(...)):
     """A formula as the UI needs it: its tool, whether it is valid and why
     not, core's operation, and the step editor's parts
     (``operation_formula.describe``)."""
@@ -67,7 +68,7 @@ async def api_parse_formula(payload: dict = Body(...)):
 
 
 @app.post("/api/format_formula")
-async def api_format_formula(payload: dict = Body(...)):
+def api_format_formula(payload: dict = Body(...)):
     """The step editor's parts (see ``operation_formula.to_parts``) written as a
     formula in core's syntax, with that formula parsed — so the editor and the
     formula bar update from one answer. 400 with the reason if the parts don't
@@ -81,7 +82,7 @@ async def api_format_formula(payload: dict = Body(...)):
 
 
 @app.post("/api/infer_verb")
-async def api_infer_verb(
+def api_infer_verb(
     payload: dict = Body(...),
     session_id: str = Depends(get_session_id),
 ):
@@ -138,7 +139,7 @@ async def session_ping(session_id: str = Depends(get_session_id)):
 
 # --- 0. Workspace Info ---
 @app.get("/api/workspace")
-async def workspace_info():
+def workspace_info():
     """
     Returns information about the current workspace root and what was
     discovered at startup.  The frontend uses this for the sidebar
@@ -179,7 +180,7 @@ class OpenWorkspaceRequest(BaseModel):
 
 
 @app.post("/api/workspace/open")
-async def workspace_open(body: OpenWorkspaceRequest):
+def workspace_open(body: OpenWorkspaceRequest):
     """
     Record ``path`` as the active workspace in ``~/.simple_steps/state.json``
     and push it to the front of the recents list.
@@ -228,7 +229,7 @@ def _in_workspace(path: str) -> tuple:
     return base, target
 
 @app.get("/api/files")
-async def api_list_files(path: str = ""):
+def api_list_files(path: str = ""):
     """
     Return a directory listing relative to the workspace root.
     Each entry has: name, type ("file" | "directory"), path (relative).
@@ -272,7 +273,7 @@ async def api_list_files(path: str = ""):
 
 
 @app.get("/api/files/read")
-async def api_read_file(path: str):
+def api_read_file(path: str):
     """
     Read the contents of a file relative to the workspace root.
     Returns the text content (capped at 1 MB for safety).
@@ -299,7 +300,7 @@ class FileWriteRequest(BaseModel):
 
 
 @app.post("/api/files/write")
-async def api_write_file(body: FileWriteRequest):
+def api_write_file(body: FileWriteRequest):
     """
     Write text content to a file relative to the workspace root.
     Creates parent directories if needed. Refuses writes larger than 1 MB.
@@ -358,7 +359,7 @@ async def api_upload_file(request: Request, path: str, overwrite: bool = False):
 
 
 @app.get("/api/files/download")
-async def api_download_file(path: str):
+def api_download_file(path: str):
     """A workspace file, sent as an attachment: the Explorer's download."""
     _, target = _in_workspace(path)
     if not os.path.isfile(target):
@@ -368,7 +369,7 @@ async def api_download_file(path: str):
 
 # --- 1. Dynamic Discovery ---
 @app.get("/api/operations", response_model=List[OperationDefinition])
-async def list_operations():
+def list_operations():
     """
     The app's tools, as the palette and the step editor show them
     (``catalog.palette``, from the catalog's ``describe()``).
@@ -378,7 +379,7 @@ async def list_operations():
 
 
 @app.get("/api/modifiers")
-async def list_modifiers():
+def list_modifiers():
     """Core's verb vocabulary — every shape verb and execution modifier with
     its class, row rule and typed settings. Served straight from the catalog's
     ``describe()`` so the UI's Orchestration control cannot drift from what
@@ -389,7 +390,7 @@ async def list_modifiers():
 
 
 @app.get("/api/resources")
-async def list_resource_types():
+def list_resource_types():
     """The resource types this app declared (``@simple_step_resource``), each
     with its literal settings, its bound tools (methods marked
     ``@simple_step_tool`` only) and its base types. Served from the catalog's
@@ -400,7 +401,7 @@ async def list_resource_types():
 
 
 @app.get("/api/environment")
-async def get_environment():
+def get_environment():
     """Everything a workflow in this app can use — its tools (the app's and
     core's built-ins) with typed parameters and return types, its resource
     types and its ready-made resources — for the Environment explorer
@@ -410,7 +411,7 @@ async def get_environment():
 
 
 @app.get("/api/resources/loaded")
-async def list_loaded_resources():
+def list_loaded_resources():
     """The ready-made resources this deployment provides: each one's type, its
     settings (never one read from the environment — those appear only as
     ``env:NAME``), and which settings users may not change.
@@ -425,7 +426,7 @@ class _ResourceDeclaration(BaseModel):
 
 
 @app.post("/api/resources/declare")
-async def declare_resource(payload: _ResourceDeclaration):
+def declare_resource(payload: _ResourceDeclaration):
     """Check a resource definition, ``Claude(model="…")``, and return the
     declaration the workflow saves in its ``resources`` section. Nothing is
     built: the live object is made when a step first uses it.
@@ -448,7 +449,7 @@ class _ResourcesLive(BaseModel):
 
 
 @app.post("/api/resources/load")
-async def load_resource(payload: _ResourceLive, session_id: str = Depends(get_session_id)):
+def load_resource(payload: _ResourceLive, session_id: str = Depends(get_session_id)):
     """Build a resource's live object now, in this session, rather than on a
     step's first use (spec 017 REQ-RES-009). Steps then share it."""
     from .resources import ResourceError, live_resource
@@ -460,7 +461,7 @@ async def load_resource(payload: _ResourceLive, session_id: str = Depends(get_se
 
 
 @app.post("/api/resources/clear")
-async def clear_resource(payload: _ResourceLive, session_id: str = Depends(get_session_id)):
+def clear_resource(payload: _ResourceLive, session_id: str = Depends(get_session_id)):
     """Drop this session's live object for one resource; its declaration stays,
     and the next use or Load builds a new one (spec 017 REQ-RES-009)."""
     from .resources import drop_resource
@@ -469,7 +470,7 @@ async def clear_resource(payload: _ResourceLive, session_id: str = Depends(get_s
 
 
 @app.post("/api/resources/status")
-async def resources_status(payload: _ResourcesLive, session_id: str = Depends(get_session_id)):
+def resources_status(payload: _ResourcesLive, session_id: str = Depends(get_session_id)):
     """Which of a workflow's resources have a live object in this session
     (spec 017 REQ-RES-011): ``{name: true | false}``, or the reason it can't be
     built, ``{name: "…"}``."""
@@ -487,12 +488,12 @@ async def resources_status(payload: _ResourcesLive, session_id: str = Depends(ge
 
 # Projects (folders)
 @app.get("/api/projects", response_model=List[ProjectInfo])
-async def get_projects():
+def get_projects():
     """List all project folders with their pipeline filenames."""
     return list_projects()
 
 @app.post("/api/projects", response_model=ProjectInfo)
-async def create_new_project(body: dict = Body(...)):
+def create_new_project(body: dict = Body(...)):
     """Create a new project folder."""
     name = body.get("name", "").strip()
     if not name:
@@ -500,7 +501,7 @@ async def create_new_project(body: dict = Body(...)):
     return create_project(name)
 
 @app.delete("/api/projects/{project_id}")
-async def remove_project(project_id: str):
+def remove_project(project_id: str):
     """Delete an entire project folder and all its pipelines."""
     if not delete_project(project_id):
         raise HTTPException(status_code=404, detail="Project not found")
@@ -508,12 +509,12 @@ async def remove_project(project_id: str):
 
 # Pipelines (files inside a project folder)
 @app.get("/api/projects/{project_id}/pipelines", response_model=List[PipelineFile])
-async def get_pipelines(project_id: str):
+def get_pipelines(project_id: str):
     """List all pipeline definitions in a project."""
     return list_pipelines(project_id)
 
 @app.get("/api/projects/{project_id}/pipelines/{pipeline_id}")
-async def get_pipeline(project_id: str, pipeline_id: str):
+def get_pipeline(project_id: str, pipeline_id: str):
     """Load a single pipeline definition, with each step in the shape the UI
     hydrates from (see ``StepConfig.ui_dict``)."""
     pipeline = load_pipeline(project_id, pipeline_id)
@@ -522,7 +523,7 @@ async def get_pipeline(project_id: str, pipeline_id: str):
     return {**pipeline.model_dump(), "steps": [s.ui_dict() for s in pipeline.steps]}
 
 @app.post("/api/projects/{project_id}/pipelines", response_model=PipelineFile)
-async def upsert_pipeline(project_id: str, pipeline: PipelineFile, overwrite: bool = True):
+def upsert_pipeline(project_id: str, pipeline: PipelineFile, overwrite: bool = True):
     """Create or overwrite a pipeline file inside a project.
 
     ``?overwrite=false`` makes it create-only: a workflow whose name maps to
@@ -541,7 +542,7 @@ async def upsert_pipeline(project_id: str, pipeline: PipelineFile, overwrite: bo
         raise HTTPException(status_code=422, detail=str(e))
 
 @app.delete("/api/projects/{project_id}/pipelines/{pipeline_id}")
-async def remove_pipeline(project_id: str, pipeline_id: str):
+def remove_pipeline(project_id: str, pipeline_id: str):
     """Delete a single pipeline file."""
     if not delete_pipeline(project_id, pipeline_id):
         raise HTTPException(status_code=404, detail="Pipeline not found")
@@ -590,6 +591,11 @@ async def execute_step(
             output_ref_id=out_ref,
             metrics=metrics
         )
+    except RunCancelledError as e:
+        # Stopped by /api/run/cancel: not a failure, so no traceback.
+        print(f"■ {e}")
+        return JSONResponse(status_code=409, content={
+            "detail": str(e), "error_type": "RunCancelled", "step_id": payload.step_id})
     except Exception as e:
         # Return structured error with traceback for frontend log panel
         error_tb = tb_module.format_exc()
@@ -605,8 +611,20 @@ async def execute_step(
             }
         )
 
+@app.post("/api/run/cancel")
+def cancel_run(payload: dict = Body(...), session_id: str = Depends(get_session_id)):
+    """Stop the workflow's run in progress (``{"workflow_key": …}``). The run's
+    own request then answers 409, ``error_type: "RunCancelled"``; the steps it
+    hadn't finished are staged, their partial results dropped (dev_plan/138 N2,
+    ``SHIM(core §K23)``). ``{"cancelled": false}`` when nothing was running."""
+    from . import kernels
+    from .engine import _normalize_session_id
+    return {"cancelled": kernels.cancel(_normalize_session_id(session_id),
+                                        str(payload.get("workflow_key") or ""))}
+
+
 @app.post("/api/workflow/sync")
-async def sync_workflow(
+def sync_workflow(
     payload: WorkflowSyncRequest,
     session_id: str = Depends(get_session_id),
 ):
@@ -680,12 +698,12 @@ async def stream_progress(
 from .settings import settings_payload, update_settings
 
 @app.get("/api/settings")
-async def read_settings():
+def read_settings():
     """Return current runtime settings, and the step palettes on offer."""
     return settings_payload()
 
 @app.post("/api/settings")
-async def write_settings(body: dict = Body(...)):
+def write_settings(body: dict = Body(...)):
     """
     Update runtime settings. Example:
       POST /api/settings  {"result_store": "parquet"}
@@ -699,7 +717,7 @@ async def write_settings(body: dict = Body(...)):
 
 # --- 3. Data View (Query) ---
 @app.get("/api/data/{ref_id}")
-async def get_data_view(
+def get_data_view(
     ref_id: str,
     offset: int = 0,
     limit: int = 50,
@@ -746,7 +764,7 @@ async def get_data_view(
 
 
 @app.get("/api/view")
-async def get_step_view(
+def get_step_view(
     workflow_key: str,
     step: str,
     offset: int = 0,
@@ -767,7 +785,7 @@ async def get_step_view(
 
 
 @app.get("/api/cell/{ref_id}")
-async def get_cell_view(
+def get_cell_view(
     ref_id: str,
     row: int,
     column: str,
@@ -789,7 +807,7 @@ async def get_cell_view(
 
 
 @app.get("/api/data-meta/{ref_id}")
-async def get_data_meta(
+def get_data_meta(
     ref_id: str,
     index: bool = False,
     session_id: str = Depends(get_session_id),

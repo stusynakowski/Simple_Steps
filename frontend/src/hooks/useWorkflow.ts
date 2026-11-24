@@ -8,6 +8,7 @@ import { runStep as runStepApi, fetchDataView, fetchStepView, getOperations,
   listenProgress,
   fetchDataMeta,
   syncWorkflow,
+  cancelRun,
 } from '../services/api';
 import type {
   OperationDefinition, PipelineFile, BackendError, ProgressEvent, WorkflowStepDecl, WorkflowStepState,
@@ -528,6 +529,13 @@ export default function useWorkflow() {
     const currentSteps = workflowRef.current.steps;
     const step = currentSteps.find((s) => s.id === id);
     if (!step) return;
+    // Run on a running step is its Stop: the run in progress ends, and its own
+    // request reports it (RunCancelled, below). It never starts a second run.
+    if (step.status === 'running') {
+      addLog('info', `Stopping step "${step.label}"…`, { stepId: id, stepLabel: step.label });
+      await cancelRun(workflowKey()).catch(() => false);
+      return;
+    }
 
     // ── Derive operation_id and args from the formula (the canonical source) ──
     // If a config override is explicitly passed (e.g. from runPipeline), use it
@@ -698,6 +706,16 @@ export default function useWorkflow() {
       // ── Log: Step failed ──
       const backendErr = (error as { backendError?: BackendError })?.backendError;
       const errorMessage = backendErr?.detail || (error instanceof Error ? error.message : String(error));
+      if (backendErr?.error_type === 'RunCancelled') {
+        // Stopped, not failed: a step that had a result keeps it (core leaves
+        // an interrupted re-run's output alone); core says where each stands.
+        addLog('info', errorMessage, { stepId: id, stepLabel: step.label, durationMs: elapsed });
+        const latest = workflowRef.current;
+        workflowRef.current = { ...latest, steps: latest.steps.map((s) => (s.id === id ? { ...s, status: 'stopped' as const } : s)) };
+        setWorkflow(workflowRef.current);
+        scheduleSync(0);
+        throw error;
+      }
       const errorDetail = [
         backendErr?.error_type ? `Error Type: ${backendErr.error_type}` : null,
         `Message: ${errorMessage}`,
@@ -735,7 +753,7 @@ export default function useWorkflow() {
     } finally {
       stopListening();
     }
-  }, [addLog, waitForStableOutput]);
+  }, [addLog, waitForStableOutput, scheduleSync]);
 
   /**
    * Preview a step: core's view of it, run or not, as core's `wf.preview` —
@@ -870,17 +888,13 @@ export default function useWorkflow() {
   }, [setPipelineStatus]);
 
   const stopPipeline = useCallback(() => {
+    // No further step starts, and the one running now stops on the server
+    // (its run then reports RunCancelled and marks it stopped). Completed
+    // steps keep their results.
     setPipelineStatus('idle');
-    setWorkflow(prev => {
-        const next = prev.steps.map(s => {
-             // Reset running to suspended/error or keep as is?
-             // Usually Stop means "Abort".
-             if (s.status === 'running') return { ...s, status: 'stopped' as const };
-             // Do we reset others? Keeping completed is good.
-             return s;
-        });
-        return { ...prev, steps: next };
-    });
+    if (workflowRef.current.steps.some((s) => s.status === 'running')) {
+      void cancelRun(workflowKey()).catch(() => false);
+    }
   }, [setPipelineStatus]);
 
   // ── Resources ────────────────────────────────────────────────────────────

@@ -31,6 +31,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from simple_steps_core import Kernel as CoreKernel
 from simple_steps_core import Operation
 
+from .core_bridge import RunCancelled, interrupt
 from .grid_runner import GridStepError, _engine_metrics
 
 
@@ -49,6 +50,31 @@ class Kernel:
     #: When it was last used (time.monotonic), for the idle culler.
     last_used: float = 0.0
     lock: threading.RLock = field(default_factory=threading.RLock)
+    #: The steps a run in progress may run; empty when none is (dev_plan/138 N1).
+    running: List[str] = field(default_factory=list)
+    #: The thread inside ``k.run``, while it's there (for :func:`cancel`).
+    run_thread: Optional[int] = None
+    #: The latest sync sent during a run, ``(steps, groups)``: applied when it ends.
+    pending: Optional[Tuple[List[Dict[str, Any]], Any]] = None
+    #: Guards ``run_thread``, so a cancel never lands outside ``k.run``.
+    guard: threading.Lock = field(default_factory=threading.Lock)
+
+
+class RunCancelledError(GridStepError):
+    """The run was stopped (:func:`cancel`): its unfinished steps are staged."""
+
+
+def _hold(s: Kernel) -> bool:
+    """Take *s*'s lock for a read, unless a run holds it: then False, and the
+    read goes ahead without it. Run against core 1.0.3 (dev_plan/138 N1):
+    ``k.view``, ``k.cell``, step states and ``needs_run`` read from another
+    thread during ``k.run`` 1,115 times without an error; a running step's
+    cells read ``pending``. A sync holds the lock only briefly, so it's waited
+    for."""
+    while not s.lock.acquire(timeout=0.05):
+        if s.running:
+            return False
+    return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -162,11 +188,12 @@ def _kernel_for(session_id: str, key: str, declarations: Dict[str, Any]) -> Kern
         _cull_idle(now)
         live = _LIVE.setdefault(session_id, {})
         s = live.get(key)
-        if s is not None and s.declarations != declarations:
+        # Never rebuilt mid-run: the run would go on in a kernel nobody sees.
+        if s is not None and s.declarations != declarations and not s.running:
             # Resources changed: a kernel is built around its resources.
             del live[key]
             s = None
-        if s is not None and s.k.catalog is not cat:
+        if s is not None and s.k.catalog is not cat and not s.running:
             # A tool was declared since: a kernel's catalog is fixed, so the
             # steps move to a new kernel with the new catalog (outputs aren't kept).
             s.k = CoreKernel.from_json(s.k.to_json(), cat)
@@ -448,7 +475,8 @@ def view(session_id: str, key: str, name: str, start: int = 0, stop: int = 50) -
         s = _LIVE.get(session_id, {}).get(key)
     if s is None:
         return None
-    with s.lock:
+    held = _hold(s)
+    try:
         if name in s.problems:
             return {"step": name, "state": "invalid", "summary": s.problems[name],
                     "problems": [s.problems[name]], "plan": None, "columns": [],
@@ -476,7 +504,11 @@ def view(session_id: str, key: str, name: str, start: int = 0, stop: int = 50) -
             "columns": [{"name": str(c["name"]), "type": c.get("type")} for c in columns],
             "row_count": _plain(v["row_count"]), "window": _plain(v.get("window")),
             "cells": cells,
+            "running": name in s.running,
         }
+    finally:
+        if held:
+            s.lock.release()
 
 
 def _bindings(k: Any, name: str, columns: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -550,37 +582,53 @@ def run_step(session_id: str, key: str, steps: List[Dict[str, Any]], name: Optio
         upstream = members or _upstream(s, name)
         needed = {r for n in upstream for r in (s.k.step(n).operation.resources
                                                  if s.k.step(n).operation is not None else ())}
+        # From here until it ends, reads of this workflow answer at once and a
+        # sync is queued (dev_plan/138 N1).
+        s.running = list(upstream)
         try:
-            for res in needed:
-                s.k.resources.attach(res, live(res, s.declarations[res]))
-        except Exception as exc:
-            raise GridStepError(str(exc)) from exc
+            try:
+                for res in needed:
+                    s.k.resources.attach(res, live(res, s.declarations[res]))
+            except Exception as exc:
+                raise GridStepError(str(exc)) from exc
 
-        before = {n: s.k.step(n).output.version for n in upstream}
-        try:
-            for n in members or [name]:
-                s.k.run(n, fresh=not members, force=force)
-        except Exception as exc:
-            raise GridStepError(str(exc)) from exc
-        ran = [n for n in upstream if s.k.step(n).output.version != before[n] or n == name
-               or (force and members is not None)]
-        for n in ran:
-            output = s.k.step(n).output
-            if output.meta.get("verb") == "source" and len(output.failed):
-                # One call, so one unit: if it failed there is no output to show.
-                raise GridStepError(str(output.failed.iloc[0].get("error", "the tool failed")))
-        outputs = {n: store(s.k.step(n).data) for n in ran}
+            before = {n: s.k.step(n).output.version for n in upstream}
+            try:
+                with s.guard:
+                    s.run_thread = threading.get_ident()
+                for n in members or [name]:
+                    s.k.run(n, fresh=not members, force=force)
+                with s.guard:
+                    s.run_thread = None
+            except RunCancelled:
+                raise RunCancelledError(f"Run of '{name}' stopped: what hadn't finished keeps what it had before") from None
+            except Exception as exc:
+                raise GridStepError(str(exc)) from exc
+            ran = [n for n in upstream if s.k.step(n).output.version != before[n] or n == name
+                   or (force and members is not None)]
+            for n in ran:
+                output = s.k.step(n).output
+                if output.meta.get("verb") == "source" and len(output.failed):
+                    # One call, so one unit: if it failed there is no output to show.
+                    raise GridStepError(str(output.failed.iloc[0].get("error", "the tool failed")))
+            outputs = {n: store(s.k.step(n).data) for n in ran}
 
-        from .engine import values
-        step = s.k.step(name)
-        frame = values(step.data)
-        metrics = {
-            "rows": len(frame),
-            "columns": [str(c) for c in frame.columns],
-            **_engine_metrics(step.spec.operation, step, step.output),
-            "steps": summary(s),
-            "groups": group_summary(s, refused),
-        }
+            from .engine import values
+            step = s.k.step(name)
+            frame = values(step.data)
+            metrics = {
+                "rows": len(frame),
+                "columns": [str(c) for c in frame.columns],
+                **_engine_metrics(step.spec.operation, step, step.output),
+            }
+        finally:
+            with s.guard:
+                s.run_thread = None
+            s.running = []
+            # Edits made during the run, now: what's reported below includes them.
+            _apply_pending(s)
+        metrics["steps"] = summary(s)
+        metrics["groups"] = group_summary(s, refused)
         first = [n for n in reversed(ran) if n != name]
         if first:
             metrics["also_ran"] = first
@@ -604,7 +652,13 @@ def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
     "groups": each group as core has it}`` (:func:`group_summary`).
     """
     s = _kernel_for(session_id, key, declarations or {})
-    with s.lock:
+    if not _hold(s):
+        # A run has the kernel: the edit waits for it to end (latest wins), and
+        # the answer is where the steps stand now, at once (dev_plan/138 N1).
+        s.pending = (steps, groups)
+        return {"steps": summary(s), "outputs": {}, "groups": group_summary(s),
+                "busy": True, "running": list(s.running)}
+    try:
         sync(s, steps)
         refused = sync_groups(s, groups)
         outputs: Dict[str, str] = {}
@@ -617,3 +671,30 @@ def sync_only(session_id: str, key: str, steps: List[Dict[str, Any]],
                 if ran.state in ("completed", "stale", "failed"):
                     outputs[name] = store(ran.data)
         return {"steps": summary(s), "outputs": outputs, "groups": group_summary(s, refused)}
+    finally:
+        s.lock.release()
+
+
+def _apply_pending(s: Kernel) -> None:
+    """Apply the sync queued during a run, if any. Holds ``s.lock``."""
+    pending, s.pending = s.pending, None
+    if pending is None:
+        return
+    steps, groups = pending
+    try:
+        sync(s, steps)
+        sync_groups(s, groups)
+    except Exception as exc:          # the next sync reports it
+        print(f"  kernel '{s.key}': the edits made during the run weren't applied: {exc}")
+
+
+def cancel(session_id: str, key: str) -> bool:
+    """Stop the workflow's run in progress (``SHIM(core §K23)``, via
+    :func:`core_bridge.interrupt`). False when nothing is running. The run's
+    request then answers with :class:`RunCancelledError`."""
+    with _GUARD:
+        s = _LIVE.get(session_id, {}).get(key)
+    if s is None:
+        return False
+    with s.guard:
+        return s.run_thread is not None and interrupt(s.run_thread)
