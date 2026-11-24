@@ -1123,6 +1123,8 @@
 /* maybe: planned, but a filter or slice may drop the row. */
 .grid-cell.cell-maybe { background: #eef4fc; border-bottom-style: dashed; }
 .cell-staged-type { color: #7f9cc4; font-family: Menlo, Monaco, Consolas, monospace; font-size: 0.7rem; }
+/* A staged table's rows not drawn: `⋮` in every column (DataOutputGrid). */
+.grid-ellipsis-row > .grid-cell { color: #9aa9bd; text-align: center; line-height: 1; padding-top: 1px; padding-bottom: 1px; cursor: default; }
 .grid-cell.cell-failed { background: #ffebee; color: #b71c1c; }
 .grid-cell.cell-stale { color: #9a9a9a; }
 .grid-cell.cell-absent { background: #e4e4e4; }

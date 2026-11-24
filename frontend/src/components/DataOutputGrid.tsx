@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { isErrorCell } from '../utils/errorCells';
 import { referenceBoxes, selectionText } from '../utils/selection';
 import { useStepWiring } from '../context/StepWiringContext';
@@ -62,6 +62,9 @@ const emptyFrameCell = (column: string): Cell => ({
   metadata: { empty: true },
 });
 const isEmptyFrameCell = (cell?: Cell) => cell?.metadata?.empty === true;
+
+/** A staged table's rows drawn before its `⋮` (then its last row). */
+const STAGED_HEAD = 3;
 
 /** A cell's tooltip: its value, and core's state when it isn't plainly known. */
 function cellTitle(cell?: Cell): string {
@@ -159,16 +162,24 @@ function Grid({
   // only the setter is used — kept for when they are.
   const [, setHoveredCell] = useState<string | null>(null);
 
-  // Memoize grid structure calculation
-  const { cols, rows, gridData, structureType } = useMemo(() => {
+  // Memoize grid structure calculation. `gap`: a staged table drawn compactly
+  // (owner, 2026-11-20): `⋮` after row `after`, standing for `hidden` rows, a
+  // number when core knows the row count, 'unknown' when it doesn't.
+  const { cols, rows, gridData, structureType, gap } = useMemo(() => {
     const safeCells = cells ?? [];
+    let gap: { after: number; hidden: number | 'unknown' } | null = null;
 
     if (safeCells.length === 0 && columns?.length) {
-      // Planned but no rows yet (a staged step whose row count isn't known):
-      // its typed header, and the plan's reason below it.
+      // Planned but its row count isn't known (a source, or reading one, that
+      // hasn't run): the first row, pending in its typed columns, then `⋮`;
+      // the plan's reason below.
+      const pending: Record<string, Cell> = {};
+      for (const c of columns) {
+        pending[`0:${c.name}`] = { row_id: 0, column_id: c.name, value: null, display_value: '', state: 'pending', type: c.type };
+      }
       return {
-        cols: columns.map((c) => c.name), rows: [] as number[], gridData: {} as Record<string, Cell>,
-        structureType: 'grid',
+        cols: columns.map((c) => c.name), rows: [0], gridData: pending,
+        structureType: 'grid', gap: { after: 0, hidden: 'unknown' as const },
       };
     }
 
@@ -178,12 +189,12 @@ function Grid({
       // one cell says "empty", drawn by the same grid as any other output.
       return {
         cols: [stepName], rows: [0], gridData: { [`0:${stepName}`]: emptyFrameCell(stepName) },
-        structureType: 'grid',
+        structureType: 'grid', gap,
       };
     }
 
     const uniqueCols = Array.from(new Set(safeCells.map((c) => c.column_id)));
-    const uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort(
+    let uniqueRows = Array.from(new Set(safeCells.map((c) => c.row_id))).sort(
       (a, b) => a - b
     );
 
@@ -193,6 +204,22 @@ function Grid({
       dataMap[`${c.row_id}:${c.column_id}`] = c;
     });
 
+    // Every cell pending (staged, or running with nothing back yet) and core
+    // knows how many rows: its first rows, `⋮` for the rest, and its last row,
+    // rather than a page of identical pending cells. The last row is the first
+    // one's pending cells at its position; core's plan gives both.
+    const allPending = safeCells.every((c) => c.state === 'pending' || c.state === 'maybe');
+    const first = uniqueRows[0] ?? 0;
+    if (allPending && first === 0 && rowCount !== undefined && rowCount > STAGED_HEAD + 2) {
+      const last = rowCount - 1;
+      uniqueRows = [...uniqueRows.slice(0, STAGED_HEAD), last];
+      for (const c of uniqueCols) {
+        const like = dataMap[`0:${c}`];
+        if (like) dataMap[`${last}:${c}`] = { ...like, row_id: last, id: last };
+      }
+      gap = { after: STAGED_HEAD - 1, hidden: rowCount - STAGED_HEAD - 1 };
+    }
+
     // Determine visualization type — always use grid for tabular consistency
     const type = 'grid';
 
@@ -201,8 +228,9 @@ function Grid({
       rows: uniqueRows,
       gridData: dataMap,
       structureType: type,
+      gap,
     };
-  }, [cells, columns, stepName]);
+  }, [cells, columns, stepName, rowCount]);
 
   // Core's type for each column, and its row id for each row (dev_plan/126 R5, D8).
   const typeOf = useMemo(() => {
@@ -545,7 +573,8 @@ function Grid({
   // shown ROW_PAGE rows a page with a pager under the grid (owner, 2026-11-10).
   const total = rowCount ?? rows.length;
   const pages = Math.max(1, Math.ceil(total / ROW_PAGE));
-  const paged = cells.length > 0 && total > rows.length;
+  // A compact staged table has no pages: nothing is in them yet.
+  const paged = cells.length > 0 && total > rows.length && !gap;
   const first = rows.length ? rows[0] : 0;
   const size = `${total.toLocaleString()} row${total !== 1 ? 's' : ''} × ${cols.length} col${cols.length !== 1 ? 's' : ''}`;
   const sizeTitle = `The step's size: ${size}${paged ? ` (${rows.length.toLocaleString()} shown on this page)` : ''}`;
@@ -783,7 +812,8 @@ function Grid({
 
         {/* Data Rows */}
         {rows.map((r) => (
-          <div key={r} className="grid-row" role="row">
+          <Fragment key={r}>
+          <div className="grid-row" role="row">
             {/* The row's # cell selects the row (Shift: range, ⌘/Ctrl: add, drag). */}
             <div
               className={`grid-cell row-index${shownSel?.kind === 'rows' && inGridSel(shownSel, r, cols[0]) ? ' is-selected' : ''}`}
@@ -860,6 +890,16 @@ function Grid({
               );
             })}
           </div>
+          {gap?.after === r && (
+            <div className="grid-row grid-ellipsis-row" role="row"
+              title={gap.hidden === 'unknown'
+                ? 'More rows: how many is known once it runs'
+                : `${gap.hidden.toLocaleString()} more row${gap.hidden === 1 ? '' : 's'}, not run yet`}>
+              <div className="grid-cell row-index" role="rowheader">⋮</div>
+              {cols.map((c) => <div key={c} className="grid-cell" role="gridcell">⋮</div>)}
+            </div>
+          )}
+          </Fragment>
         ))}
         {(cells ?? []).length === 0 && planNote && (
           <div className="grid-plan-note" role="note">rows not known yet: {planNote}</div>
