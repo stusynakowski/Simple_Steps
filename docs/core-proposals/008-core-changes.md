@@ -1632,6 +1632,31 @@ cell as it moves through its states (pending → running → known / failed), to
 a callback the host passes in, plus `cancel()` on a running step. The host
 (terminal or app) decides how to show it; core only reports.
 
+**Restated by the owner (2026-11-19):** progress changes how a tool is
+executed, so it belongs with the execution modifiers, and they chain: a
+mapped step with progress shows which cells are still pending and how far
+the step has got. It matters most for large mapped steps.
+
+**Run against 1.0.3 (`adfaf87`), 2026-11-19**
+(`scripts/probes/probe_run_nonblocking.py`, and a core-only probe):
+
+- Reads from another thread during `k.run` are safe: `k.view`, `k.cell`,
+  step states and `needs_run` read 1,115 times during one run without an
+  error. The running step's cells read `pending`; its state is `staged`
+  until it completes. Core has no `running` state (the app tracks it).
+- Raising a `BaseException` in the thread running `k.run` stops it cleanly.
+  A step that had never run stays `staged`. A forced re-run of a completed
+  step keeps its previous output and `completed` state. Steps finished
+  before the stop stay `completed`. The next run completes normally.
+- An `Exception` raised by a tool is recorded as a failed row and the run
+  goes on, so a cancel has to be a `BaseException`.
+
+**App shim until core has `cancel()`:** `core_bridge.interrupt` raises
+`RunCancelled` in the run's thread (`SHIM(core §K23)`). Its limit: a tool
+inside one long C call stops only when that call returns, and one that never
+returns can't be stopped. Core's own cancel, checked between cells, has the
+same limit, unless runs move to a subprocess (app 129).
+
 ### K24. No state shared between workflows
 
 **Decided by the owner (2026-10-26):** users and workflows must never share
@@ -2309,6 +2334,12 @@ clear a step's output, keeping its expression (back to `staged`, readers
 `stale`, memory freed); and clear it to the empty step. The owner is adding
 this to core's next version.
 
+**New finding** (2026-11-20, `scripts/core_probes/probe_editing_asks.py`):
+`k["f"] = None`, then the same formula put back, gives `completed` with the
+old values `[51.0, 101.76, 69.0]`, without running: core keeps results by
+run key. A clear must drop the kept result too, so the next run really
+runs. [015](015-asks-at-adfaf87-editing.md).
+
 ### C54. Run only a stage's steps
 
 **Run** (2026-11-17, v1.0.3; `src → a → b → c → d`, stage `g` = `b..c`):
@@ -2319,6 +2350,48 @@ fresh=False)`: only the stage's steps, on what their inputs show; an input
 outside it that has never run blocks the stage, naming it. App plan
 [141](../dev_plan/141-step-groups.md) §3.4 (owner: "runs only the steps in
 the group").
+
+### C55. Each cell's own expression
+
+**Run** (2026-11-20, v1.0.3, `scripts/core_probes/probe_editing_asks.py`):
+`k.cell("f", 1, "f")` gives `value`, `inputs` (step, row, columns, values)
+and `lineage`, but not the expression that gives the cell. **Ask:** the
+plain call, no modifiers, that gives exactly this cell, by reference
+(`to_f(temp_c=wf["p"][1][cols["temp_c"]], offset=1.0)`) and by value
+(`to_f(38.2, offset=1.0)`), for each verb; `expand` needs core to decide how
+an index into one call's result is written. The owner is building it.
+[015](015-asks-at-adfaf87-editing.md).
+
+### C56. A copy step
+
+**Run** (same probe): `mod.copy` is linked (recomputes, keeps lineage) and
+refuses to run without `columns=`. **Ask:** a copy **by value** (a new data
+step holding the values as literals, editable: app 135 E8), and `mod.copy()`
+with no `columns=` copying every column. The owner is deciding which kind
+core gives, and whether a by-value copy remembers its source.
+[015](015-asks-at-adfaf87-editing.md).
+
+### C57. `k.cell` inputs are wrong for a sliced input
+
+**Run** (same probe): for `g = to_f[mod.map()](wf["f"][1:3])`, cell `g[0]`
+has lineage `{"#f": 1}` (right) but inputs `row: null, rows: [0, 1, 2]` (the
+whole of `f`). **Ask:** inputs name the rows each cell actually read, as
+lineage does; C55 builds on them. [015](015-asks-at-adfaf87-editing.md).
+
+### C58. A parameter's declared type isn't checked under `mod.table()`
+
+**Run** (same probe): `arr(m: np.ndarray)` as `arr[mod.table()](wf["n"][1:3])`
+is called with a `DataFrame`. Without `mod.table()`, core refuses the
+mismatch before the call. **Ask:** the same check under `mod.table()` (or a
+stated conversion). [015](015-asks-at-adfaf87-editing.md).
+
+### C59. Reading the kernel during a run stays safe
+
+**Run** (same probe): 1,750 reads of `k.view`, `k.cell`, step states and
+`needs_run` from another thread during one `k.run`, no errors. The app
+relies on it since 2026-11-19 (plan 138 N1: views and states answer during a
+run without waiting for it). **Ask:** part of core's contract, with a test.
+[015](015-asks-at-adfaf87-editing.md).
 
 ## Core's plan at `core-handover` `73933ba` (reviewed 2026-11-16)
 
