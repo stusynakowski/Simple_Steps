@@ -33,8 +33,8 @@ export default function StepMenu({ icon, label, items = [], children, align = 'l
   icon: SymbolName | SymbolName[];
   label: string;
   items?: StepMenuItem[];
-  /** The popover's content, drawn in place of `items`. */
-  children?: ReactNode;
+  /** The popover's content, drawn in place of `items`; a function gets `close`. */
+  children?: ReactNode | ((close: () => void) => ReactNode);
   /** Which edge of the button the pop-up lines up with. */
   align?: 'left' | 'right';
   testId?: string;
@@ -83,7 +83,7 @@ export default function StepMenu({ icon, label, items = [], children, align = 'l
       {open && at && (
         <StepPop at={at} label={label} title={text ?? label} items={items} anchor={button}
           onClose={() => setOpen(false)}>
-          {children}
+          {typeof children === 'function' ? children(() => setOpen(false)) : children}
         </StepPop>
       )}
     </div>

@@ -511,21 +511,26 @@ export default function OperationColumn({
           )}
           {!isMinimized && !isSqueezed && (
             <StepMenu icon="tune" iconSize={13} label="Step settings" testId="step-settings" className="step-header-btn" align="right">
-              {stepSettings}
+              {(close) => (
+                <>
+                  {stepSettings}
+                  {/* Not in a group: make it one (dev_plan/141); the group's settings open to add steps. */}
+                  {!group && onMakeGroup && (
+                    <button
+                      type="button"
+                      className="step-menu-item"
+                      title="Group this step (then add more steps to the group)"
+                      aria-label={`Group ${step.label}`}
+                      data-testid="step-make-group"
+                      onClick={() => { close(); onMakeGroup(); }}
+                    >
+                      <SymbolIcon name="stacks" size={15} />
+                      <span className="step-menu-label">Group this step</span>
+                    </button>
+                  )}
+                </>
+              )}
             </StepMenu>
-          )}
-          {/* Not in a group: make it one (dev_plan/141); its settings open to add steps. */}
-          {!isMinimized && !group && onMakeGroup && (
-            <button
-              type="button"
-              className="step-header-btn"
-              title="Group this step (then add more steps to the group)"
-              aria-label={`Group ${step.label}`}
-              data-testid="step-make-group"
-              onClick={(e) => { e.stopPropagation(); onMakeGroup(); }}
-            >
-              <SymbolIcon name="stacks" size={12} />
-            </button>
           )}
           {!isMinimized && onMinimizeStep && (
             <button
