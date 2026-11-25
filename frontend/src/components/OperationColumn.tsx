@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Step, StepRow } from '../types/models';
 import type { OperationDefinition, ResourceDeclaration } from '../services/api';
 import type { ProgressEvent } from '../services/api';
@@ -93,6 +93,32 @@ const ROW_TOGGLES: { row: StepRow; icon: SymbolName; label: string; hint: string
   { row: 'formula', icon: 'function', label: 'Formula bar', hint: 'The first row: fx, the formula and ▶' },
   { row: 'data', icon: 'dataset', label: 'Data', hint: "The second row: the step's data" },
 ];
+
+/**
+ * A squeezed step's name (owner, 2026-11-25): upright while it fits in the
+ * header; when it doesn't, it tilts to the arrow's angle and hangs below the
+ * header, so a long name makes the step taller, never wider. The upright
+ * copy stays laid out (hidden) to measure whether it fits.
+ */
+function SqueezedName({ label }: { label: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [tilt, setTilt] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setTilt(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [label]);
+  return (
+    <>
+      <span ref={ref} className={`vertical-label${tilt ? ' is-tilted-away' : ''}`}>{label}</span>
+      {tilt && <span className="tilted-name" title={label}>{label}</span>}
+    </>
+  );
+}
 
 export default function OperationColumn({
   step,
@@ -515,7 +541,7 @@ export default function OperationColumn({
                  // As small as it gets: just the step's number (owner, 2026-10-30).
                  <span className="vertical-label" title={`Step ${stepIndex + 1} · ${step.label} · ${run.text}`}>{stepIndex + 1}</span>
             ) : isSqueezed ? (
-                 <span className="vertical-label">{step.label}</span>
+                 <SqueezedName label={step.label} />
             ) : (
                 <div className="header-titles header-one-line">
                     <h3 className="op-name">{step.label}</h3>

@@ -179,6 +179,44 @@
   min-height: 0;
 }
 .steps-stack > .main-content { min-height: 0; }
+.steps-stack { position: relative; }
+
+/* The zoom (CanvasZoom; owner, 2026-11-25): the canvas's bottom-right
+   corner, just above the steps' map, near the Steps bar. */
+.canvas-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 30px;                    /* over the 22px map, with room */
+  z-index: 55;                     /* above the canvas (50) */
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 6px;
+  background: rgba(30, 30, 30, 0.92);
+  border: 1px solid #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+.canvas-zoom button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  min-width: 24px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #aaa;
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.canvas-zoom button:hover:not(:disabled) { color: #ddd; background: rgba(255, 255, 255, 0.08); }
+.canvas-zoom button:disabled { opacity: 0.35; cursor: default; }
+.canvas-zoom .canvas-zoom__level { min-width: 40px; }
 .console-region {
   display: flex;
   flex-direction: column;
@@ -523,6 +561,11 @@
   overflow-x: auto;
   overflow-y: hidden;
   background-color: #121212;
+  /* Faint dots (owner, 2026-11-25): one surface behind the steps. They
+     scale with the zoom and move at half the scroll (CanvasZoom). */
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.09) 1px, transparent 1.4px);
+  background-size: var(--dots-size, 22px) var(--dots-size, 22px);
+  background-position: var(--dots-x, 0px) 0;
   /* The steps' map below replaces the scrollbar (StepMinimap); the area
      still scrolls by trackpad, Shift+wheel or the map. */
   scrollbar-width: none;

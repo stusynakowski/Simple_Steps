@@ -4,6 +4,7 @@ import { Allotment, type AllotmentHandle } from 'allotment';
 import WorkflowTabs, { type WorkflowTab } from './WorkflowTabs';
 import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
+import CanvasZoom, { useCanvasZoom } from './CanvasZoom';
 import { runState, groupRunState, groupErrorLabel } from '../utils/runState';
 import GroupBand from './GroupBand';
 import { GroupControls } from './StepGroupPops';
@@ -287,6 +288,8 @@ export default function MainLayout() {
   // The visible width of the step canvas — what a maximized step fills, so it
   // widens within the main layout instead of under the side panels.
   const canvasRef = useRef<HTMLElement | null>(null);
+  // The whole workflow, zoomed (CanvasZoom): out to see every step, in to one.
+  const canvasZoom = useCanvasZoom(canvasRef, columnsRef);
   const [canvasWidth, setCanvasWidth] = useState(900);
   useEffect(() => {
     const el = canvasRef.current;
@@ -1043,12 +1046,17 @@ export default function MainLayout() {
           className="columns-container"
           data-testid="columns-container"
           style={{
-            '--canvas-width': `${canvasWidth}px`,
+            // Zoomed, the container's own lengths are divided by the zoom, so
+            // on screen a maximized step still fills the canvas and the
+            // columns still reach its bottom.
+            zoom: canvasZoom.zoom,
+            '--canvas-width': `${canvasWidth / canvasZoom.zoom}px`,
+            height: `${100 / canvasZoom.zoom}%`,
             // Auto-fit: lay the columns out against the full available height
             // so they can be measured (see the steps/console split).
             // Less the steps' map under the canvas: a container taller than the
             // canvas let a click or focus scroll the whole canvas up.
-            ...(autoFit && bodyHeight > 0 ? { height: `${Math.max(0, maxAutoSteps - STEPS_MAP_HEIGHT)}px` } : {}),
+            ...(autoFit && bodyHeight > 0 ? { height: `${Math.max(0, maxAutoSteps - STEPS_MAP_HEIGHT) / canvasZoom.zoom}px` } : {}),
           } as React.CSSProperties}
         >
           {workflow.steps.map((step, index) => {
@@ -1298,6 +1306,14 @@ export default function MainLayout() {
                         })}
                         // A click on a step jumps to it and opens it.
                         onOpen={(id) => { if (!expandedStepIds.has(id)) toggleStep(id); }}
+                      />
+                      {/* Bottom right of the canvas, over the map's end: the zoom. */}
+                      <CanvasZoom
+                        zoom={canvasZoom.zoom}
+                        onIn={canvasZoom.zoomIn}
+                        onOut={canvasZoom.zoomOut}
+                        onReset={() => canvasZoom.zoomTo(1)}
+                        onFit={canvasZoom.fit}
                       />
                       </div>
                     </div>
