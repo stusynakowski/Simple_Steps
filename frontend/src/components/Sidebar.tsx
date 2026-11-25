@@ -163,7 +163,25 @@ const StepColorsCard: React.FC = () => {
 
 // ── Main Sidebar ───────────────────────────────────────────────────────────
 
+type View = Exclude<ActivityView, null>;
+
 const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) => {
+  // Pinned panels stay open together, in the order pinned; each folds on its bar.
+  const [pinned, setPinned] = useState<View[]>([]);
+  const [folded, setFolded] = useState<Set<View>>(new Set());
+  const togglePin = (view: View) => setPinned((p) => (p.includes(view) ? p.filter((v) => v !== view) : [...p, view]));
+  const toggleFold = (view: View) => setFolded((f) => {
+    const next = new Set(f);
+    if (next.has(view)) next.delete(view); else next.add(view);
+    return next;
+  });
+  // Choosing a pinned panel on the activity bar unfolds it.
+  const [chosen, setChosen] = useState(currentView);
+  if (chosen !== currentView) {
+    setChosen(currentView);
+    if (currentView && folded.has(currentView)) setFolded(new Set([...folded].filter((v) => v !== currentView)));
+  }
+
   if (!isVisible) return null;
 
   const encodeWorkspaceProjectId = (relDir: string): string => {
@@ -208,44 +226,71 @@ const Sidebar: React.FC<SidebarProps> = ({ isVisible, currentView, ...rest }) =>
     }
   };
 
-  const titles: Record<string, string> = {
+  const titles: Record<View, string> = {
     explorer: 'Explorer',
     environment: 'Environment',
     docs: 'User Docs',
     settings: 'Settings',
   };
 
+  const body = (view: View) => {
+    switch (view) {
+      case 'explorer': return (
+        <>
+          {/* The explorer's toolbar, above the root folder (owner, 2026-11-15). */}
+          {rest.onEditFiles && (
+            <div className="explorer-toolbar" role="toolbar" aria-label="Explorer">
+              <button type="button" className="explorer-toolbar-btn" onClick={rest.onEditFiles}
+                      title="Edit the workspace's files" data-testid="edit-files">
+                <SymbolIcon name="edit" size={14} />
+                <span>Edit Files</span>
+              </button>
+            </div>
+          )}
+          <FileTree onFileClick={handleExplorerFileClick} onPipelineOpen={handleExplorerFileClick} />
+        </>
+      );
+      case 'environment': return <EnvironmentExplorer workflowResources={rest.workflowResources} />;
+      case 'docs': return <DocsPanel />;
+      case 'settings': return <SettingsPanel />;
+    }
+  };
+
+  // The panels shown (owner, 2026-11-25): every pinned one, as a bar that
+  // folds, and the activity bar's choice above them when it isn't pinned.
+  const current = currentView ?? 'explorer';
+  const shown: View[] = pinned.includes(current) ? pinned : [current, ...pinned];
+
   return (
     <div className="sidebar">
-      <div className="sidebar-header">
-        <span>{titles[currentView ?? ''] ?? 'Explorer'}</span>
-      </div>
-
-      {/* The explorer's toolbar, above the root folder (owner, 2026-11-15). */}
-      {currentView === 'explorer' && rest.onEditFiles && (
-        <div className="explorer-toolbar" role="toolbar" aria-label="Explorer">
-          <button type="button" className="explorer-toolbar-btn" onClick={rest.onEditFiles}
-                  title="Edit the workspace's files" data-testid="edit-files">
-            <SymbolIcon name="edit" size={14} />
-            <span>Edit Files</span>
-          </button>
-        </div>
-      )}
-
-      {currentView === 'explorer' && (
-        <FileTree
-          onFileClick={handleExplorerFileClick}
-          onPipelineOpen={handleExplorerFileClick}
-        />
-      )}
-
-      {currentView === 'environment' && (
-        <EnvironmentExplorer workflowResources={rest.workflowResources} />
-      )}
-
-      {currentView === 'docs' && <DocsPanel />}
-
-      {currentView === 'settings' && <SettingsPanel />}
+      {shown.map((view) => {
+        const isPinned = pinned.includes(view);
+        const open = !isPinned || !folded.has(view);
+        return (
+          <section key={view} className={`sidebar-panel${open ? ' open' : ''}${isPinned ? ' pinned' : ''}`}
+                   data-testid={`sidebar-panel-${view}`}>
+            <div className="sidebar-header sidebar-panel-bar">
+              {isPinned ? (
+                <button type="button" className="sidebar-panel-title" aria-expanded={open}
+                        title={open ? 'Fold' : 'Unfold'} onClick={() => toggleFold(view)}>
+                  <SymbolIcon name="chevron_right" size={14} className="sidebar-panel-caret" />
+                  {titles[view]}
+                </button>
+              ) : (
+                <span className="sidebar-panel-title">{titles[view]}</span>
+              )}
+              <button type="button" className={`sidebar-pin${isPinned ? ' on' : ''}`}
+                      aria-pressed={isPinned}
+                      title={isPinned ? 'Unpin: back to one panel at a time' : 'Pin: keep this panel open beside the others'}
+                      aria-label={isPinned ? `Unpin ${titles[view]}` : `Pin ${titles[view]}`}
+                      onClick={() => togglePin(view)}>
+                <SymbolIcon name={isPinned ? 'keep_off' : 'push_pin'} size={14} />
+              </button>
+            </div>
+            {open && <div className="sidebar-panel-body">{body(view)}</div>}
+          </section>
+        );
+      })}
     </div>
   );
 };

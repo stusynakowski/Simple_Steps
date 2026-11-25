@@ -6,7 +6,7 @@
     flex-direction: column;
     justify-content: space-between;
     align-items: center;
-    padding-top: 10px;
+    padding-top: 0;
     padding-bottom: 10px;
     z-index: 200;
     flex-shrink: 0;
@@ -58,3 +58,25 @@
     width: 24px;
     height: 24px;
 }
+
+/* The sidebar's fold, at the very top (owner, 2026-11-25): drawn as the
+   resources' rail chevron, nudging the way it will move on hover. */
+.activity-chevron {
+    flex: none;
+    width: 48px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: #aaa;
+    cursor: pointer;
+}
+.activity-chevron:hover { background: #3c3c3c; color: #fff; }
+.activity-chevron:focus-visible { outline: 2px solid #4d7cc7; outline-offset: -2px; }
+.activity-chevron .symbol-icon { transition: transform 0.15s ease; }
+.activity-chevron:hover .symbol-icon { transform: translateX(-2px); }
+.activity-bar.folded .activity-chevron:hover .symbol-icon { transform: translateX(2px); }

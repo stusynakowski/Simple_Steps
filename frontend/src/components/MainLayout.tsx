@@ -1210,24 +1210,17 @@ export default function MainLayout() {
     // can report what the pointer is over to the steps bar.
     <StepsStatusProvider>
     <div className="main-layout" data-testid="main-layout">
-      <ActivityBar activeView={activeActivityView} onViewChange={handleViewChange} />
+      <ActivityBar
+        activeView={activeActivityView}
+        onViewChange={handleViewChange}
+        sidebarOpen={leftPaneVisible}
+        onToggleSidebar={() => setLeftPaneVisible((v) => !v)}
+      />
 
       {/* ── Three-pane shell: left sidebar | content | right chat ───────── */}
       <div className="main-layout__panes">
         {/* Peek tabs — visible only when the matching pane is collapsed.
             Provide a clear, clickable affordance to bring the pane back. */}
-        {!leftPaneVisible && (
-          <button
-            type="button"
-            className="pane-peek-tab pane-peek-tab--left"
-            onClick={() => setLeftPaneVisible(true)}
-            title="Show sidebar"
-            aria-label="Show sidebar"
-          >
-            <Icon name="chevron-right" size={12} />
-          </button>
-        )}
-
         <Allotment onChange={handleOuterSizes} proportionalLayout={false}>
           {/* Left sidebar (Explorer / Packs / Search / History / Settings) */}
           <Allotment.Pane
@@ -1253,8 +1246,8 @@ export default function MainLayout() {
                 onDeletePipeline={removePipeline}
                 onEditFiles={handleOpenFileEditor}
               />
-              {/* Collapse toggle pinned to the inner edge — click to hide the
-                  sidebar.  A matching peek-tab (rendered below) brings it back. */}
+              {/* On hover, at the middle of the sidebar's edge: hide it. The
+                  activity bar's chevron brings it back (owner, 2026-11-25). */}
               <button
                 type="button"
                 className="pane-collapse-toggle pane-collapse-toggle--left"
@@ -1330,7 +1323,7 @@ export default function MainLayout() {
                       {!rightPaneVisible && (
                         <button
                           type="button"
-                          className="pane-peek-tab pane-peek-tab--right pane-peek-tab--agent"
+                          className="pane-peek-tab pane-peek-tab--right pane-peek-tab--edge pane-peek-tab--agent"
                           onClick={() => setRightPaneVisible(true)}
                           title="Open the assistant"
                           aria-label="Open the assistant"

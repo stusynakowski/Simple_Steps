@@ -904,3 +904,34 @@
   clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%);
 }
 .step-palette-check { grid-column: 2; grid-row: 1; color: #4f8fd6; }
+
+/* ── Panels, pinnable (owner, 2026-11-25) ──────────────────────────────────
+   Each panel is a section under its own bar. A pinned panel stays when the
+   activity bar picks another, folding to its bar; open panels share the
+   height, each scrolling inside itself. */
+.sidebar-panel { display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
+.sidebar-panel.open { flex: 1 1 0; min-height: 80px; }
+.sidebar-panel + .sidebar-panel { border-top: 1px solid #333; }
+.sidebar-panel-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: auto; }
+.sidebar-panel-bar { flex: none; padding: 6px 8px 6px 20px; gap: 6px; }
+.sidebar-panel.pinned .sidebar-panel-bar { padding-left: 6px; }
+.sidebar-panel-title {
+  display: inline-flex; align-items: center; gap: 2px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0; border: none; background: none;
+  color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit;
+}
+button.sidebar-panel-title { cursor: pointer; }
+button.sidebar-panel-title:hover { color: #ccc; background: none; }
+.sidebar-panel-caret { transition: transform 0.12s ease; }
+.sidebar-panel.open .sidebar-panel-caret { transform: rotate(90deg); }
+.sidebar-pin {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; padding: 0;
+  border: none; border-radius: 4px; background: none;
+  color: #666; cursor: pointer; opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+.sidebar-panel-bar:hover .sidebar-pin, .sidebar-pin:focus-visible, .sidebar-pin.on { opacity: 1; }
+.sidebar-pin:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.sidebar-pin.on { color: #4ea1ff; }

@@ -114,12 +114,6 @@
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.pane-peek-tab--left {
-  left: 0;
-  border-left: none;
-  border-radius: 0 4px 4px 0;
-}
-
 .pane-peek-tab--right {
   right: 0;
   border-right: none;
@@ -131,10 +125,10 @@
   color: #fff;
 }
 
-/* The assistant's tab (owner, 2026-11-25): a smart-toy icon on the canvas's
-   right edge, just above the zoom. Quiet until the pointer is on it, then it
-   slides out, fully shown. */
-.pane-peek-tab--agent {
+/* The assistant's tab (a smart-toy icon), on the canvas's right edge just
+   above the zoom (owner, 2026-11-25). Quiet until the pointer is on it,
+   then it slides out, fully shown. */
+.pane-peek-tab--edge {
   top: auto;
   bottom: 70px;                    /* the zoom sits at 30px, ~30px tall */
   transform: none;
@@ -144,8 +138,8 @@
   opacity: 0.55;
   transition: opacity 0.15s ease, width 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.pane-peek-tab--agent:hover,
-.pane-peek-tab--agent:focus-visible {
+.pane-peek-tab--edge:hover,
+.pane-peek-tab--edge:focus-visible {
   opacity: 1;
   width: 32px;
   color: #fff;
@@ -797,4 +791,3 @@
   flex: 0 0 760px;
   width: 760px;
 }
-
