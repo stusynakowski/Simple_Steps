@@ -1,32 +1,37 @@
 import { useState } from 'react';
 import Markdown from 'react-markdown';
 import type { StepGroup, Workflow } from '../types/models';
-import StepMenu, { StepPop, type PopAt } from './StepMenu';
+import StepMenu, { StepMenuItems } from './StepMenu';
 import SymbolIcon from './SymbolIcon';
 import { useGroupTones } from '../context/StepPaletteContext';
 import { groupRunState } from '../utils/runState';
 
 /**
- * A step group's controls (dev_plan/141, owner 2026-11-17): buttons inline
- * on the group's half of its steps' headers, as a step header's controls
- * sit on it, each with its popover: run options, notes, settings (name,
- * steps, colour, ungroup) and fold.
+ * A step group's controls (dev_plan/141), laid out as a step header's
+ * (owner, 2026-11-24): named Notes and Group menu buttons, then minimize
+ * (fold the group: its steps collapse into one header) and maximize (open
+ * every one of its steps). The Group menu holds running the group, then its
+ * settings (name, steps, colour, Ungroup), folded.
  */
-
-/** The group whose settings are open, and where. */
-export interface OpenSettings { name: string; at: PopAt }
-
-/** The buttons on a group's band: Run options, Notes, Settings, Fold. */
-export function GroupControls({ workflow, group, folded, onRun, onMeta, onSettings, onFold }: {
+export function GroupControls({ workflow, group, color, folded, allOpen, onRun, onMeta, onRename, onSteps, onUngroup, onFold, onOpenAll }: {
   workflow: Workflow;
   group: StepGroup;
+  color: string;
   folded: boolean;
+  /** Every one of its steps is open. */
+  allOpen: boolean;
   onRun: (name: string, force: boolean) => void;
   onMeta: (name: string, changes: { color?: string; notes?: string }) => void;
-  onSettings: (rect: DOMRect) => void;
+  /** Rename; false when refused (empty, or another group has the name). */
+  onRename: (from: string, to: string) => boolean;
+  onSteps: (name: string, ids: string[]) => void;
+  onUngroup: (name: string) => void;
   onFold: () => void;
+  /** Open every one of its steps, or close them when all are open. */
+  onOpenAll: () => void;
 }) {
   const [editingNotes, setEditingNotes] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const running = workflow.steps.some((s) => group.steps.includes(s.id) && s.status === 'running');
   const run = groupRunState(group);
   const waiting = Object.keys(group.needsRun ?? {}).length;
@@ -35,21 +40,7 @@ export function GroupControls({ workflow, group, folded, onRun, onMeta, onSettin
   const notes = group.meta?.notes ?? '';
   return (
     <span className="group-controls" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-      <StepMenu
-        icon="playlist_play"
-        iconSize={13}
-        label={`Run options for ${group.name}`}
-        testId="group-run-options"
-        className="step-header-btn"
-        align="right"
-        items={[
-          { icon: 'play_arrow', label: 'Run group', hint: blocked ?? `${status}${waiting ? ` · ${waiting} to run` : ''}`,
-            disabled: !!blocked, onClick: () => onRun(group.name, false), testId: 'run-group' },
-          { icon: 'refresh', label: 'Run again', hint: blocked ?? 'even if up to date',
-            disabled: !!blocked, onClick: () => onRun(group.name, true), testId: 'run-group-again' },
-        ]}
-      />
-      <StepMenu icon="sticky_note_2" iconSize={12} label={`${group.name}'s notes`} testId="group-notes-menu"
+      <StepMenu icon="sticky_note_2" iconSize={14} text="Notes" label={`${group.name}'s notes`} testId="group-notes-menu"
         className={`step-header-btn${notes ? ' has-notes' : ''}`} align="right">
         <div className="group-pop-notes">
           {editingNotes || !notes ? (
@@ -75,14 +66,44 @@ export function GroupControls({ workflow, group, folded, onRun, onMeta, onSettin
           )}
         </div>
       </StepMenu>
-      <button type="button" className="step-header-btn" title="Group settings: name, steps, colour"
-        aria-label={`${group.name}'s settings`} data-testid="group-settings-btn"
-        onClick={(e) => onSettings(e.currentTarget.getBoundingClientRect())}>
-        <SymbolIcon name="tune" size={13} />
+      <StepMenu icon="more_horiz" iconSize={16} text="Group menu" label={`${group.name}'s menu`} testId="group-menu"
+        className="step-header-btn" align="right">
+        {(close) => (
+          <>
+            <StepMenuItems onClose={close} items={[
+              { icon: 'play_arrow', label: 'Run group', hint: blocked ?? `${status}${waiting ? ` · ${waiting} to run` : ''}`,
+                disabled: !!blocked, onClick: () => onRun(group.name, false), testId: 'run-group' },
+              { icon: 'refresh', label: 'Run again', hint: blocked ?? 'even if up to date',
+                disabled: !!blocked, onClick: () => onRun(group.name, true), testId: 'run-group-again' },
+            ]} />
+            <div className="step-menu-divider" role="separator" />
+            <button
+              type="button"
+              className={`step-rows-head${settingsOpen ? ' open' : ''}`}
+              aria-expanded={settingsOpen}
+              data-testid="group-settings-toggle"
+              onClick={() => setSettingsOpen((o) => !o)}
+            >
+              Settings
+              <SymbolIcon name="chevron_right" size={14} className="step-rows-caret" />
+            </button>
+            {settingsOpen && (
+              <GroupSettings key={group.name} workflow={workflow} group={group} color={color}
+                onRename={onRename} onSteps={onSteps} onMeta={onMeta}
+                onUngroup={(name) => { close(); onUngroup(name); }} />
+            )}
+          </>
+        )}
+      </StepMenu>
+      <button type="button" className="step-header-btn" title={folded ? 'Unfold the group' : 'Minimize: fold the group into one header'}
+        aria-label={folded ? `Unfold ${group.name}` : `Minimize ${group.name}`} data-testid="group-fold" onClick={onFold}>
+        <SymbolIcon name="minimize" size={13} />
       </button>
-      <button type="button" className="step-header-btn" title={folded ? 'Unfold the group' : 'Fold the group'}
-        aria-label={folded ? `Unfold ${group.name}` : `Fold ${group.name}`} data-testid="group-fold" onClick={onFold}>
-        <SymbolIcon name={folded ? 'unfold_more' : 'unfold_less'} size={13} />
+      <button type="button" className="step-header-btn"
+        title={allOpen ? 'Close all its steps' : 'Maximize: open all its steps'}
+        aria-label={allOpen ? `Close ${group.name}'s steps` : `Open all of ${group.name}'s steps`}
+        data-testid="group-open-all" onClick={onOpenAll}>
+        <SymbolIcon name={allOpen ? 'close_fullscreen' : 'open_in_full'} size={12} />
       </button>
     </span>
   );
@@ -97,39 +118,34 @@ function canAdd(workflow: Workflow, group: StepGroup, id: string): boolean {
 }
 
 /**
- * A group's settings: its name, its steps as a multiselect (a chip per step,
- * × to take it out, a list to add one: a group is consecutive steps, so
- * adding a step further away brings in the steps between), its colour, and
- * Ungroup.
+ * A group's settings, folded under its menu's actions: its name, its steps
+ * as a multiselect (a chip per step, × to take it out, a list to add one: a
+ * group is consecutive steps, so adding a step further away brings in the
+ * steps between), its colour, and Ungroup.
  */
-export function GroupSettingsPop({ workflow, open, color, onRename, onSteps, onMeta, onUngroup, onClose }: {
+function GroupSettings({ workflow, group, color, onRename, onSteps, onMeta, onUngroup }: {
   workflow: Workflow;
-  open: OpenSettings;
+  group: StepGroup;
   color: string;
-  /** Rename; false when refused (empty, or another group has the name). */
   onRename: (from: string, to: string) => boolean;
-  /** The group's steps become *ids* (consecutive, in order). */
   onSteps: (name: string, ids: string[]) => void;
   onMeta: (name: string, changes: { color?: string; notes?: string }) => void;
   onUngroup: (name: string) => void;
-  onClose: () => void;
 }) {
-  const group = (workflow.groups ?? []).find((g) => g.name === open.name);
-  const [name, setName] = useState(open.name);
+  const [name, setName] = useState(group.name);
   const [refused, setRefused] = useState(false);
   // The colours on offer: the step palette's tones, deeper (as a group's own).
   const tones = useGroupTones();
-  if (!group) return null;
   const order = workflow.steps.map((s) => s.id);
   const label = (id: string) => workflow.steps.find((s) => s.id === id)?.label ?? id;
-  const commit = () => setRefused(!onRename(open.name, name));
+  const commit = () => setRefused(!onRename(group.name, name));
   const add = (id: string) => {
     const at = [...group.steps, id].map((x) => order.indexOf(x));
     onSteps(group.name, order.slice(Math.min(...at), Math.max(...at) + 1));
   };
   const addable = workflow.steps.filter((s) => !group.steps.includes(s.id) && canAdd(workflow, group, s.id));
   return (
-    <StepPop at={open.at} label={`Group ${open.name}`} title="Group settings" testId="group-settings" onClose={() => { commit(); onClose(); }}>
+    <div className="group-settings" data-testid="group-settings">
       <label className="group-set-row">
         <span>Name</span>
         <input
@@ -201,6 +217,6 @@ export function GroupSettingsPop({ workflow, open, color, onRename, onSteps, onM
         <SymbolIcon name="ungroup" size={15} />
         <span className="step-menu-label">Ungroup</span>
       </button>
-    </StepPop>
+    </div>
   );
 }

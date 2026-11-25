@@ -6,8 +6,8 @@ import { WorkflowNotesPanel, WorkflowNotesToggle } from './WorkflowNotes';
 import StepMinimap from './StepMinimap';
 import { runState, groupRunState, groupErrorLabel } from '../utils/runState';
 import GroupBand from './GroupBand';
-import { popUnder } from './StepMenu';
-import { GroupControls, GroupSettingsPop, type OpenSettings } from './StepGroupPops';
+import { GroupControls } from './StepGroupPops';
+import WorkflowMenu from './WorkflowMenu';
 import FoldedGroup from './FoldedGroup';
 
 /** The groups folded in this browser for the workflow under *key*. */
@@ -233,8 +233,9 @@ export default function MainLayout() {
     box.querySelectorAll('.column-wrapper').forEach((c) => ro?.observe(c));
     return () => ro?.disconnect();
   });
-  // Step groups (dev_plan/141): the group whose settings are open.
-  const [groupSettings, setGroupSettings] = useState<OpenSettings | null>(null);
+  // The toolbar's Workflow menu (owner, 2026-11-24): open, and the step a
+  // step's "Group this step" opened it with.
+  const [workflowMenu, setWorkflowMenu] = useState<{ open: boolean; pick: string | null }>({ open: false, pick: null });
   // Folded groups (dev_plan/141 §3.3): each viewer's own, kept in this
   // browser per workflow, never in the workflow file.
   const foldKey = `simple-steps:folded-groups:${workflow.id}`;
@@ -249,11 +250,25 @@ export default function MainLayout() {
     if (!next.delete(name)) next.add(name);
     setFolded(next);
   };
-  /** Make step *id* a group of its own and open its settings, to add steps to it. */
-  const makeGroup = (id: string) => {
-    const name = groupSteps([id]);
-    const header = document.querySelector(`[data-testid="operation-column-${id}"] .op-header`);
-    if (header) setGroupSettings({ name, at: popUnder(header.getBoundingClientRect()) });
+  /** A step's "Group this step": the Workflow menu, with that step picked for a new group. */
+  const makeGroup = (id: string) => setWorkflowMenu({ open: true, pick: id });
+  /** Group *ids* as *name* (or the next `group N` when empty). */
+  const newGroup = (ids: string[], name: string) => {
+    const made = groupSteps(ids);
+    if (name) renameGroup(made, name);
+  };
+  /** Rename group *from*, keeping it folded if it was; false when refused. */
+  const renameGroupKeepingFold = (from: string, to: string) => {
+    const ok = renameGroup(from, to);
+    const name = to.trim();
+    if (ok && name !== from && folded.has(from)) setFolded(new Set([...folded].map((n) => (n === from ? name : n))));
+    return ok;
+  };
+  /** A group's maximize: open every one of its steps (unfolding it), or close them when all are open. */
+  const openGroupSteps = (g: { name: string; steps: string[] }) => {
+    if (folded.has(g.name)) toggleFold(g.name);
+    if (g.steps.every((id) => expandedStepIds.has(id))) g.steps.forEach(collapseStep);
+    else g.steps.filter((id) => !expandedStepIds.has(id)).forEach(toggleStep);
   };
   // The resource column (spec 017) and the overview read the same state.
   const resourceState = useResourceState(workflow.resources, workflow.steps);
@@ -957,13 +972,26 @@ export default function MainLayout() {
             resources={resourceState.summary}
           />
         }
-        workflowSlot={
+        workflowSlot={<>
+          <WorkflowMenu
+            workflow={workflow}
+            open={workflowMenu.open}
+            pick={workflowMenu.pick}
+            onOpen={() => setWorkflowMenu({ open: true, pick: null })}
+            onClose={() => setWorkflowMenu({ open: false, pick: null })}
+            colorOfStep={(id) => {
+              const i = workflow.steps.findIndex((s) => s.id === id);
+              return workflow.steps[i]?.step_color ?? stepColor(Math.max(0, i), workflow.steps.length);
+            }}
+            colorOfGroup={colorOfGroup}
+            onGroup={newGroup}
+          />
           <WorkflowNotesToggle
             open={notesOpen}
             hasNotes={typeof workflow.meta?.notes === 'string' && !!workflow.meta.notes.trim()}
             onToggle={() => setNotesOpen((v) => !v)}
           />
-        }
+        </>}
         betweenRows={
           <WorkflowNotesPanel
             open={notesOpen}
@@ -1120,42 +1148,25 @@ export default function MainLayout() {
               error={g.runError && groupErrorLabel(g.runError)}
               at={bandAt[g.name]}
               first={workflow.steps[0]?.id === g.steps[0]}
-              controlsOpen={groupSettings?.name === g.name}
               onFold={() => toggleFold(g.name)}
               controls={(
                 <GroupControls
                   workflow={workflow}
                   group={g}
+                  color={colorOfGroup(g)}
                   folded={folded.has(g.name)}
+                  allOpen={g.steps.every((id) => expandedStepIds.has(id))}
                   onRun={(name, force) => { void runGroup(name, force); }}
                   onMeta={setGroupMeta}
-                  onSettings={(rect) => setGroupSettings({ name: g.name, at: popUnder(rect) })}
+                  onRename={renameGroupKeepingFold}
+                  onSteps={setGroupSteps}
+                  onUngroup={ungroup}
                   onFold={() => toggleFold(g.name)}
+                  onOpenAll={() => openGroupSteps(g)}
                 />
               )}
             />
           ))}
-          {groupSettings && (
-            <GroupSettingsPop
-              key={groupSettings.name}
-              workflow={workflow}
-              open={groupSettings}
-              color={colorOfGroup((workflow.groups ?? []).find((g) => g.name === groupSettings.name) ?? { steps: [] })}
-              onRename={(from, to) => {
-                const ok = renameGroup(from, to);
-                const name = to.trim();
-                if (ok && name !== from) {
-                  if (folded.has(from)) setFolded(new Set([...folded].map((n) => (n === from ? name : n))));
-                  setGroupSettings((g) => g && { ...g, name });
-                }
-                return ok;
-              }}
-              onSteps={setGroupSteps}
-              onMeta={setGroupMeta}
-              onUngroup={(name) => { ungroup(name); setGroupSettings(null); }}
-              onClose={() => setGroupSettings(null)}
-            />
-          )}
           <div className="add-step-container">
             <button className="rectangular-add-btn" onClick={() => addStepAt(workflow.steps.length)} title="Add New Step">
               + Add Step

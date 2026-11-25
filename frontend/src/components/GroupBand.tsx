@@ -10,7 +10,7 @@ import { RUN_ICON, type RunState } from '../utils/runState';
  * step's point. Its name, run state, and why its last run didn't run; its
  * controls at its end, shown on hover. A click folds the group.
  */
-export default function GroupBand({ name, color, run, error, at, first, controlsOpen, controls, onFold }: {
+export default function GroupBand({ name, color, run, error, at, first, controls, onFold }: {
   name: string;
   color: string;
   run: RunState;
@@ -19,14 +19,12 @@ export default function GroupBand({ name, color, run, error, at, first, controls
   at: { left: number; top: number; width: number; height: number };
   /** Over the workflow's first step: no tail notch, as that step's header. */
   first: boolean;
-  /** One of its popovers is open: keep the controls showing. */
-  controlsOpen: boolean;
   controls: ReactNode;
   onFold: () => void;
 }) {
   return (
     <div
-      className={`group-band run-${run.kind}${first ? ' first' : ''}${controlsOpen ? ' controls-open' : ''}`}
+      className={`group-band run-${run.kind}${first ? ' first' : ''}`}
       style={{ left: at.left, top: at.top, width: at.width, height: at.height, '--group-color': color } as React.CSSProperties}
       data-testid={`group-band-${name}`}
       onClick={onFold}
