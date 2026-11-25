@@ -655,8 +655,8 @@
     font-weight: 700;
     color: #555;
     padding: 3px 6px;
-    border-bottom: 1px solid #ddd;
-    border-right: 1px solid #e8e8e8;
+    border-bottom: 1px solid #d0d0d0;    /* the one darker line: under the headers */
+    border-right: 1px solid var(--grid-line, #e6e6e6);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -665,7 +665,7 @@
 
 .row-index-header {
   position: relative;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--grid-line, #e6e6e6);
   background: #eaeaea;
   padding-left: 4px;
   padding-right: 4px;
@@ -680,6 +680,19 @@
    reference folds or unfolds the table; the icon and its caret show which.
    The reference, in the middle, is drawn as a column header (the same grey,
    weight and lines), as wide as its text: the whole step, to click. */
+/* One frame (owner, 2026-11-25): the dark bar and the grid inside one
+   bordered, rounded box, its edges even all round. `overflow: clip`, not
+   hidden, so the bar still sticks while the rows scroll. */
+.data-table {
+  --grid-line: #e6e6e6;            /* every cell line; only the headers' bottom is darker */
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  overflow: clip;
+  background: #fff;
+}
+.data-table.is-collapsed { background: #1e1e1e; }
+/* The last column's right line would double the frame. */
+.grid-row > .grid-cell:last-child { border-right: none; }
 .data-head {
   position: sticky;
   top: 0;
@@ -687,7 +700,6 @@
   display: grid;
   grid-template-columns: 1fr auto 1fr;   /* the reference centred, as wide as its text */
   height: 30px;                    /* as tall as the formula bar's row */
-  margin-right: 5px;               /* as wide as the grid (its wrapper's 5px) */
   background: #1e1e1e;             /* the step bar's and formula row's shade (owner, 2026-11-15) */
   font-size: 12px;
   line-height: 30px;
@@ -723,11 +735,9 @@
 .data-head-caret { transition: transform 0.12s ease; }
 .data-head-toggle.open .data-head-caret { transform: rotate(90deg); }
 
-/* Open (owner, 2026-11-15): the header is two rows — the dark bar (the data
-   toggle, and room for widgets that edit the data), then the step itself as
-   the table's top row: wf["step"] across the whole table, right above the
-   column names, drawn as they are but bolder; one line, the step's size at
-   its right end. */
+/* Open (owner, 2026-11-25): the same one bar, now the table's top, the
+   frame rounding it. wf["step"] stays in its middle; there is no second
+   wf["step"] row. */
 .data-table:not(.is-collapsed) .data-head {
   grid-template-rows: 30px auto;
   height: auto;
@@ -766,25 +776,6 @@
   text-overflow: ellipsis;
   transition: background 0.1s ease;
 }
-.data-table:not(.is-collapsed) .data-head .data-head-ref {
-  grid-row: 2;
-  grid-column: 1 / -1;            /* the whole table's width */
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 26px;                   /* one line, as tall as a column header */
-  padding: 0 12px;
-  line-height: 26px;
-  /* A column header's lines (.grid-header-cell), bolder, and a shade darker
-     (owner, 2026-11-15): dark bar, then this, then the lighter headers. */
-  background: #e4e4e4;
-  border: none;
-  border-bottom: 1px solid #d0d0d0;
-  color: #333;
-  font-size: 0.86rem;
-  font-weight: 800;
-}
 /* Analytics' fold (owner, 2026-11-24): at the right of the dark bar, drawn
    as the data toggle is — lit on hover, blue while open. */
 .data-head .data-head-analytics {
@@ -800,32 +791,27 @@
 .data-head .data-head-analytics:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
 .data-head .data-head-analytics.open { color: #4ea1ff; background: #1f3a5f; }
 .data-head-analytics.open .data-head-caret { transform: rotate(90deg); }
-/* Open, it is the header's second row: under the dark bar, above wf["step"]. */
+/* Open, it is the header's second row: under the dark bar, above the column
+   headers. */
 .data-head .data-analytics-fold { grid-row: 2; grid-column: 1 / -1; cursor: default; }
-.data-table:not(.is-collapsed) .data-head { grid-template-rows: 30px auto auto; }
-.data-table:not(.is-collapsed) .data-head .data-head-ref { grid-row: 3; }
 .data-analytics { background: #1e1e1e; line-height: normal; }
 
-/* The step's size, at the right end of the same line (owner, 2026-11-15). */
-.data-head-dims {
-  position: absolute;
-  right: 8px;
-  color: #777;
-  font-size: 11px;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
+/* wf["step"] in the bar's middle, open or folded: lit on hover, blue while
+   the whole table is selected (owner, 2026-11-25). */
+.data-head .data-head-ref {
+  grid-row: 1;
+  grid-column: 2;
+  height: 24px;
+  align-self: center;
+  line-height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #ccc;
 }
-.data-head .data-head-ref:hover { background: #e6f7ff; color: #0b5cad; }
-.data-head .data-head-ref.is-selected { background: #d4d7dc; color: #222; }
-/* Open, the step's row hovers with the same slight blue as the cells
-   (owner, 2026-11-15), over its darker grey. */
-.data-table:not(.is-collapsed) .data-head .data-head-ref:hover { background: #d6e3f0; color: #0b5cad; }
-.data-table:not(.is-collapsed) .data-head .data-head-ref.is-selected { background: #d4d7dc; color: #222; }
-.data-table.is-collapsed .data-head .data-head-ref { background: transparent; border-color: transparent; color: #ccc; }
-.data-table.is-collapsed .data-head .data-head-ref:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
-/* The size: under the name while open, at the bar's right while folded. */
-.data-table.is-collapsed .data-head-dims { display: none; }
-.data-table:not(.is-collapsed) .data-head-size { display: none; }
+.data-head .data-head-ref:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+.data-head .data-head-ref.is-selected { background: #1f3a5f; color: #4ea1ff; }
+/* The step's size, at the bar's right. */
 .data-head-size {
   min-width: 0;
   overflow: hidden;
@@ -848,8 +834,8 @@
 
 .grid-cell {
     padding: 3px 6px;
-    border-bottom: 1px solid #f0f0f0;
-    border-right: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--grid-line, #e6e6e6);
+    border-right: 1px solid var(--grid-line, #e6e6e6);
     color: #333;
     white-space: nowrap;
     overflow: hidden;
@@ -861,7 +847,7 @@
   background: #f9f9f9;
   font-weight: 600;
   color: #888;
-  border-right: 1px solid #ddd;
+  border-right: 1px solid var(--grid-line, #e6e6e6);
   text-align: center;
   /* As narrow as its widest id allows (the column is max-content), never cut. */
   padding-left: 4px;
@@ -925,7 +911,7 @@
 
 .output-container.grid-wrapper {
   overflow-x: auto;
-  padding: 0 5px 5px 0;      /* flush under the Data bar; room for a selection's drag handle below and right */
+  padding: 0;                /* flush in the frame; the selection's handle sits inside its corner */
 }
 
 /* ── Wiring mode styles ──────────────────────────────────────────────────── */
@@ -1380,7 +1366,9 @@
   height: 8px;
   border: 1.5px solid #fff;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
+  /* Inside the selection's bottom-right corner, so the table's edge never
+     cuts it (the grid has no padding for it any more). */
+  transform: translate(-100%, -100%);
   cursor: crosshair;
   box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25);
 }
