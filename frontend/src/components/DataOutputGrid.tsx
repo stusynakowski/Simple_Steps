@@ -17,6 +17,7 @@ import type { SymbolName } from './SymbolIcon';
 import './OperationColumn.css'; // Ensure grid styles are available
 import './CellViewer.css';
 import Fold from './Fold';
+import StepMenu from './StepMenu';
 
 /** The selection's outline when the step has no colour (spec 014 REQ-VIS-012). */
 const SELECTION_EDGE = '#1f2937';
@@ -62,6 +63,41 @@ const emptyFrameCell = (column: string): Cell => ({
   metadata: { empty: true },
 });
 const isEmptyFrameCell = (cell?: Cell) => cell?.metadata?.empty === true;
+
+/**
+ * What the table is for right now, chosen on its header bar (owner, 2026-11-25):
+ * view looks and selects; edit types values into the step's cells; modify
+ * changes the formula that made them. Each is only a way of writing the
+ * step's one formula (dev_plan/134 R-A, 135).
+ */
+export type TableMode = 'view' | 'edit' | 'modify';
+
+const MODES: { mode: TableMode; icon: SymbolName; label: string }[] = [
+  { mode: 'view', icon: 'visibility', label: 'View' },
+  { mode: 'edit', icon: 'edit', label: 'Edit values' },
+  { mode: 'modify', icon: 'function', label: 'Modify formula' },
+];
+
+/** The empty step's one cell, being typed into: Enter writes it, Esc lets go. */
+function CellInput({ onCommit }: { onCommit: (text: string) => void }) {
+  const [text, setText] = useState('');
+  return (
+    <input
+      className="cell-input"
+      autoFocus
+      value={text}
+      placeholder="value or =formula"
+      aria-label="Type a value, or = and a formula"
+      onChange={(e) => setText(e.target.value)}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && text.trim()) { e.preventDefault(); onCommit(text); }
+        if (e.key === 'Escape') setText('');
+      }}
+    />
+  );
+}
 
 /** A staged table's rows drawn before its `⋮` (then its last row). */
 const STAGED_HEAD = 3;
@@ -119,6 +155,14 @@ interface DataOutputGridProps {
   /** The step's analytics: what the result holds. Folds open from the data's
    *  header, between it and the grid (owner, 2026-11-24). */
   analytics?: React.ReactNode;
+  /** The table's mode, and its switch on the header bar; without
+   *  onModeChange the bar has no switch. */
+  mode?: TableMode;
+  onModeChange?: (mode: TableMode) => void;
+  /** Why edit or modify can't be chosen now; absent when it can. */
+  modeBlocked?: Partial<Record<TableMode, string>>;
+  /** Edit: what was typed into the empty cell. */
+  onWriteCell?: (text: string) => void;
 }
 
 /**
@@ -149,8 +193,11 @@ function Grid({
   page = 0,
   onPage,
   analytics,
+  mode = 'view',
+  onModeChange,
+  modeBlocked,
+  onWriteCell,
 }: DataOutputGridProps) {
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   // Looking at data (spec 014 §6, §8): a click selects — a cell, a row, a
   // column, the whole table, a block — and draws its outline only. Hovering
@@ -628,31 +675,39 @@ function Grid({
         onMouseLeave={() => setHoveredCol(null)}
       >
         <span className="data-head-name">wf["{stepName}"]</span>
-      </button>
-      {/* At the right of the bar: the size, then the analytics' fold (open).
-          One bar, open or folded: it is the table's top, rounded (owner,
-          2026-11-25). */}
-      <span className="data-head-right">
+        {/* Its size, under the name (owner, 2026-11-25). */}
         <span className="data-head-size" title={sizeTitle}>{size}</span>
+      </button>
+      {/* At the right of the bar: the mode chip and the analytics popover,
+          side by side. One bar, open or folded: the table's rounded top
+          (owner, 2026-11-25). */}
+      <span className="data-head-right">
+        {/* One chip: the mode's icon; a click lists the three (owner, 2026-11-25). */}
+        {onModeChange && !collapsed && (
+          <StepMenu
+            icon={[MODES.find((m) => m.mode === mode)!.icon, 'arrow_drop_down']}
+            iconSize={16}
+            label={`Table mode: ${mode}`}
+            align="right"
+            className={`data-head-mode${mode !== 'view' ? ' on' : ''}`}
+            testId="table-mode"
+            items={MODES.map(({ mode: m, icon, label }) => ({
+              icon,
+              label,
+              hint: modeBlocked?.[m] ?? (mode === m ? 'on' : undefined),
+              disabled: !!modeBlocked?.[m],
+              onClick: () => onModeChange(m),
+            }))}
+          />
+        )}
+        {/* What the step produced, as a popover (owner, 2026-11-25). */}
         {analytics && !collapsed && (
-          <button
-            type="button"
-            className={`data-head-analytics${analyticsOpen ? ' open' : ''}`}
-            aria-expanded={analyticsOpen}
-            title={analyticsOpen ? 'Fold the analytics' : 'Analytics: what this step produced'}
-            onClick={(e) => { e.stopPropagation(); setAnalyticsOpen((o) => !o); }}
-          >
-            <SymbolIcon name="analytics" size={17} />
-            <SymbolIcon name="chevron_right" size={16} className="data-head-caret" />
-          </button>
+          <StepMenu icon="analytics" iconSize={17} label="Analytics: what this step produced"
+            align="right" className="data-head-analytics" testId="data-analytics">
+            <div className="data-analytics">{analytics}</div>
+          </StepMenu>
         )}
       </span>
-      {/* Under the dark bar, above the table: what the step produced. */}
-      {analytics && (
-        <Fold open={analyticsOpen && !collapsed} className="data-analytics-fold">
-          <div className="data-analytics" onClick={(e) => e.stopPropagation()}>{analytics}</div>
-        </Fold>
-      )}
     </div>
   );
   const framed = (body: React.ReactNode) => (
@@ -907,7 +962,9 @@ function Grid({
                     }
                   }}
                 >
-                  {cell?.state === 'pending' || cell?.state === 'maybe'
+                  {mode === 'edit' && onWriteCell && isEmptyFrameCell(cell)
+                    ? <CellInput onCommit={onWriteCell} />
+                    : cell?.state === 'pending' || cell?.state === 'maybe'
                     ? (stagedCellMode !== 'idle'
                       ? <span className="cell-wait-spinner" />
                       : <span className="cell-staged-type">{`<${cell.type ?? 'any'}>`}</span>)

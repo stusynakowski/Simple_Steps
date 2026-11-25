@@ -3,6 +3,7 @@ import type { Step, StepRow } from '../types/models';
 import type { OperationDefinition, ResourceDeclaration } from '../services/api';
 import type { ProgressEvent } from '../services/api';
 import DataOutputGrid from './DataOutputGrid';
+import type { TableMode } from './DataOutputGrid';
 import StepToolbar from './StepToolbar';
 import type { FormulaSummary } from './FormulaEditor';
 import { placePick, stepRef } from '../utils/selection';
@@ -183,6 +184,40 @@ export default function OperationColumn({
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
     setter?.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  // ── The table's mode (owner, 2026-11-25) ─────────────────────────────────
+  // View looks; Edit types into an empty step's cell; Modify changes the
+  // formula of a step that has one. Each writes only the step's formula.
+  const [tableMode, setTableMode] = useState<TableMode>('view');
+  const hasFormula = !!(step.formula || step.operation || '').trim();
+  const modeBlocked: Partial<Record<TableMode, string>> = {
+    ...(isLocked ? { edit: 'locked', modify: 'locked' } : {}),
+    ...(!isLocked && hasFormula ? { edit: 'empty steps only' } : {}),
+    ...(!isLocked && !hasFormula ? { modify: 'no formula yet' } : {}),
+  };
+  const shownMode: TableMode = modeBlocked[tableMode] ? 'view' : tableMode;
+
+  /** Modify: the formula bar takes the caret (Monaco's own input, else the fallback textarea). */
+  const focusFormulaBar = () => {
+    const monaco = columnRef.current?.querySelector<HTMLElement>('.step-formula-field .monaco-editor textarea');
+    (monaco ?? formulaBarRef.current)?.focus();
+  };
+  const chooseTableMode = (mode: TableMode) => {
+    setTableMode(mode);
+    if (mode === 'modify') focusFormulaBar();
+  };
+
+  /** Edit: a typed value becomes the step's formula (`=7`, `="a"`); `=…` is a formula as typed. Enter stages it. */
+  const writeCell = (text: string) => {
+    const t = text.trim();
+    const formula = t.startsWith('=') ? t
+      : /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(t) ? `=${t}`
+      : /^(true|false)$/i.test(t) ? `=${t[0].toUpperCase()}${t.slice(1).toLowerCase()}`
+      : `=${JSON.stringify(t)}`;
+    writeFormulaBar(formula);
+    setTableMode('view');
+    setTimeout(() => onDeclare?.(), 0);
   };
 
   const handleReferencePick = (sourceStep: string, pick: GridPick) => {
@@ -742,6 +777,10 @@ export default function OperationColumn({
                         formula={step.formula}
                         // Analytics describes the result, so it folds open from the data's header (owner, 2026-11-24).
                         analytics={<StepOverview step={step} availableOperations={availableOperations} />}
+                        mode={shownMode}
+                        onModeChange={chooseTableMode}
+                        modeBlocked={modeBlocked}
+                        onWriteCell={writeCell}
                       />
                     </div>
                   </div>

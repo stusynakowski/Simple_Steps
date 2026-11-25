@@ -699,7 +699,7 @@
   z-index: 4;
   display: grid;
   grid-template-columns: 1fr auto 1fr;   /* the reference centred, as wide as its text */
-  height: 30px;                    /* as tall as the formula bar's row */
+  height: 40px;                    /* the name, its size under it */
   background: #1e1e1e;             /* the step bar's and formula row's shade (owner, 2026-11-15) */
   font-size: 12px;
   line-height: 30px;
@@ -735,13 +735,6 @@
 .data-head-caret { transition: transform 0.12s ease; }
 .data-head-toggle.open .data-head-caret { transform: rotate(90deg); }
 
-/* Open (owner, 2026-11-25): the same one bar, now the table's top, the
-   frame rounding it. wf["step"] stays in its middle; there is no second
-   wf["step"] row. */
-.data-table:not(.is-collapsed) .data-head {
-  grid-template-rows: 30px auto;
-  height: auto;
-}
 /* The dark bar (owner, 2026-11-24): the data's expander at the left; at
    the right, the size (folded) and the analytics' fold. */
 .data-head .data-head-lead {
@@ -789,21 +782,52 @@
   transition: background 0.12s ease, color 0.12s ease;
 }
 .data-head .data-head-analytics:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
-.data-head .data-head-analytics.open { color: #4ea1ff; background: #1f3a5f; }
-.data-head-analytics.open .data-head-caret { transform: rotate(90deg); }
+.data-head .data-head-analytics.active { color: #4ea1ff; background: #1f3a5f; }
 /* Open, it is the header's second row: under the dark bar, above the column
    headers. */
-.data-head .data-analytics-fold { grid-row: 2; grid-column: 1 / -1; cursor: default; }
-.data-analytics { background: #1e1e1e; line-height: normal; }
+/* The table's mode (owner, 2026-11-25): view, edit, modify, one lit blue. */
+/* One chip, beside the analytics' fold and drawn as it is (owner,
+   2026-11-25): lit on hover, blue while editing or modifying. */
+.data-head .data-head-right { gap: 2px; }
+.data-head .data-head-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  height: 28px;
+  padding: 0 1px 0 5px;
+  border-radius: 4px;
+  color: #aaa;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.data-head .data-head-mode:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
+.data-head .data-head-mode.on,
+.data-head .data-head-mode.active { color: #4ea1ff; background: #1f3a5f; }
+/* Edit: the empty cell takes typing, as a spreadsheet cell does. */
+.grid-cell .cell-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: none;
+  outline: 2px solid #4ea1ff;
+  outline-offset: -2px;
+  padding: 0 4px;
+  font: inherit;
+  background: #fff;
+  color: inherit;
+}
+.data-analytics { background: #1e1e1e; line-height: normal; border-radius: 4px; max-width: 420px; }
 
 /* wf["step"] in the bar's middle, open or folded: lit on hover, blue while
    the whole table is selected (owner, 2026-11-25). */
 .data-head .data-head-ref {
   grid-row: 1;
   grid-column: 2;
-  height: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
   align-self: center;
-  line-height: 24px;
+  line-height: 15px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -811,12 +835,13 @@
 }
 .data-head .data-head-ref:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
 .data-head .data-head-ref.is-selected { background: #1f3a5f; color: #4ea1ff; }
-/* The step's size, at the bar's right. */
+/* The step's size, small, under its name. */
 .data-head-size {
-  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0 8px 0 6px;
+  font-size: 10.5px;
+  font-weight: 400;
   color: #8a8a8a;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
