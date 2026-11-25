@@ -84,6 +84,8 @@ interface OperationColumnProps {
   group?: { name: string; color: string };
   /** Not in a group: the header's group button makes this step a group of its own. */
   onMakeGroup?: () => void;
+  /** How tall this step's squeezed name runs vertically (null: it fits). Every header's extension takes the tallest. */
+  onNameBand?: (stepId: string, length: number | null) => void;
 }
 
 /** The rows of an open step its Settings can hide, top to bottom. */
@@ -94,29 +96,87 @@ const ROW_TOGGLES: { row: StepRow; icon: SymbolName; label: string; hint: string
   { row: 'data', icon: 'dataset', label: 'Data', hint: "The second row: the step's data" },
 ];
 
-/**
- * A squeezed step's name (owner, 2026-11-25): upright while it fits in the
- * header; when it doesn't, it tilts to the arrow's angle and hangs below the
- * header, so a long name makes the step taller, never wider. The upright
- * copy stays laid out (hidden) to measure whether it fits.
- */
-function SqueezedName({ label }: { label: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [tilt, setTilt] = useState(false);
+/** The header's height; its arrow's tip is 28px deep over half of it. */
+const HEADER_H = 50;
+/** The most the headers' extension grows: about four more lines of a name. */
+const EXT_MAX = 64;
+
+/** Watch whether *ref*'s text overflows its box: its full width when it does, else null. */
+function useOverflow(ref: React.RefObject<HTMLElement | null>, text: string) {
+  const [over, setOver] = useState<number | null>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const check = () => setTilt(el.scrollWidth > el.clientWidth + 1);
+    const check = () => setOver(el.scrollWidth > el.clientWidth + 1 ? el.scrollWidth : null);
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [label]);
+  }, [ref, text]);
+  return over;
+}
+
+/**
+ * A squeezed step's name in its header (owner, 2026-11-25): one line while it
+ * fits. When it doesn't, *onOver* is told, the one line is hidden (it stays
+ * laid out, to measure), and HeaderText draws the name on several lines.
+ */
+function SqueezedName({ label, onOver }: { label: string; onOver: (over: boolean) => void }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const over = useOverflow(ref, label) !== null;
+  useEffect(() => { onOver(over); }, [over, onOver]);
+  return <span ref={ref} className={`vertical-label${over ? ' is-tilted-away' : ''}`}>{label}</span>;
+}
+
+/**
+ * A squeezed step's number and name on several lines (owner, 2026-11-25),
+ * inside its arrow. The lines follow the arrow's edges: two floats shaped as
+ * its outline (shape-outside, OperationColumn.css) keep each line inside it.
+ * *onNeed* is told how much taller than 50px the arrow must be for them; the
+ * layout makes every header the tallest any step needs, so the row of
+ * arrows stays flush.
+ */
+function HeaderText({ number, label, onNeed }: {
+  number: number;
+  label: string;
+  onNeed: (px: number) => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const text = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    const t = text.current;
+    if (!el || !t) return;
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      const scale = el.offsetHeight ? r.height / el.offsetHeight : 1;   // under the canvas zoom
+      const bottom = Math.max(0, ...Array.from(t.getClientRects(), (q) => q.bottom - r.top)) / (scale || 1);
+      onNeed(Math.min(EXT_MAX, Math.max(0, Math.ceil((bottom + 8 - HEADER_H) / 4) * 4)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [label, number, onNeed]);
   return (
-    <>
-      <span ref={ref} className={`vertical-label${tilt ? ' is-tilted-away' : ''}`}>{label}</span>
-      {tilt && <span className="tilted-name" title={label}>{label}</span>}
-    </>
+    <div ref={box} className="header-text" aria-hidden="true">
+      <span className="header-text__left" />
+      <span className="header-text__right" />
+      <p className="header-text__body">
+        {/* A line may break after each underscore. */}
+        <span ref={text}><b>{number}</b> {label.replace(/_/g, '_​')}</span>
+      </p>
+    </div>
+  );
+}
+
+/** A minimized step's number; when even that doesn't fit, only the colour shows (owner, 2026-11-25). */
+function MinimizedNumber({ number, title }: { number: number; title: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const over = useOverflow(ref, String(number));
+  return (
+    <span ref={ref} className="vertical-label" title={title}
+      style={over !== null ? { visibility: 'hidden' } : undefined}>{number}</span>
   );
 }
 
@@ -154,7 +214,16 @@ export default function OperationColumn({
   pipelineCursorIndex = -1,
   group,
   onMakeGroup,
+  onNameBand,
 }: OperationColumnProps) {
+  // A squeezed name that doesn't fit runs up the header's extension; its
+  // length goes to the layout, which sizes every header's extension.
+  const [nameOver, setNameOver] = useState(false);
+  const [nameBand, setNameBand] = useState<number | null>(null);
+  const showHeaderText = isSqueezed && !isMinimized && nameOver;
+  const shownBand = showHeaderText ? nameBand : null;
+  useEffect(() => { onNameBand?.(step.id, shownBand); }, [step.id, shownBand, onNameBand]);
+  useEffect(() => () => onNameBand?.(step.id, null), [step.id, onNameBand]);
   const widgetMaxHeight = isMaximized ? 'calc(100vh - 200px)' : '400px';
   // Widgets: any number open at once (toolbar buttons toggle them); each
   // open one can be collapsed to its name bar.
@@ -539,15 +608,19 @@ export default function OperationColumn({
         <div className="arrow-content">
             {isMinimized ? (
                  // As small as it gets: just the step's number (owner, 2026-10-30).
-                 <span className="vertical-label" title={`Step ${stepIndex + 1} · ${step.label} · ${run.text}`}>{stepIndex + 1}</span>
+                 <MinimizedNumber number={stepIndex + 1} title={`Step ${stepIndex + 1} · ${step.label} · ${run.text}`} />
             ) : isSqueezed ? (
-                 <SqueezedName label={step.label} />
+                 <SqueezedName label={step.label} onOver={setNameOver} />
             ) : (
                 <div className="header-titles header-one-line">
                     <h3 className="op-name">{step.label}</h3>
                 </div>
             )}
         </div>
+        {/* A squeezed name on several lines, inside the arrow (owner, 2026-11-25). */}
+        {showHeaderText && (
+          <HeaderText number={stepIndex + 1} label={step.label} onNeed={setNameBand} />
+        )}
         {/* The run's icon, just ahead of the tail; hover it for the status
             (owner, 2026-11-10: no status word under the name). */}
         {!isMinimized && runIcon}

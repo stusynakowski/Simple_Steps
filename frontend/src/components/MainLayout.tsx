@@ -217,14 +217,17 @@ export default function MainLayout() {
     if (!box) return;
     const measure = () => {
       const origin = box.getBoundingClientRect();
+      // Rects are on screen, the band is placed inside the zoomed container:
+      // divide by the zoom (CanvasZoom).
+      const z = box.offsetWidth ? origin.width / box.offsetWidth : 1;
       const next: typeof bandAt = {};
       for (const g of workflow.groups ?? []) {
         const heads = Array.from(box.querySelectorAll<HTMLElement>('[data-group] > .operation-column > .op-header'))
           .filter((h) => h.closest<HTMLElement>('[data-group]')!.dataset.group === g.name && h.offsetWidth > 0)
           .map((h) => h.getBoundingClientRect());
         if (!heads.length) continue;
-        next[g.name] = { left: heads[0].left - origin.left, top: heads[0].top - origin.top,
-          width: heads[heads.length - 1].right - heads[0].left, height: heads[0].height / 2 };
+        next[g.name] = { left: (heads[0].left - origin.left) / z, top: (heads[0].top - origin.top) / z,
+          width: (heads[heads.length - 1].right - heads[0].left) / z, height: heads[0].height / 2 / z };
       }
       setBandAt((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
     };
@@ -290,6 +293,19 @@ export default function MainLayout() {
   const canvasRef = useRef<HTMLElement | null>(null);
   // The whole workflow, zoomed (CanvasZoom): out to see every step, in to one.
   const canvasZoom = useCanvasZoom(canvasRef, columnsRef);
+  // Squeezed names on several lines, by step: how much header each needs
+  // below the arrow. Every header's extension is the most any needs, so the
+  // row of headers stays flush (owner, 2026-11-25).
+  const [nameBands, setNameBands] = useState<Record<string, number>>({});
+  const reportNameBand = useCallback((id: string, length: number | null) => {
+    setNameBands((prev) => {
+      if ((prev[id] ?? null) === length) return prev;
+      const next = { ...prev };
+      if (length === null) delete next[id]; else next[id] = length;
+      return next;
+    });
+  }, []);
+  const headerExt = Object.values(nameBands).reduce((m, v) => Math.max(m, v), 0);
   const [canvasWidth, setCanvasWidth] = useState(900);
   useEffect(() => {
     const el = canvasRef.current;
@@ -1050,6 +1066,7 @@ export default function MainLayout() {
             // on screen a maximized step still fills the canvas and the
             // columns still reach its bottom.
             zoom: canvasZoom.zoom,
+            '--header-ext': `${headerExt}px`,
             '--canvas-width': `${canvasWidth / canvasZoom.zoom}px`,
             height: `${100 / canvasZoom.zoom}%`,
             // Auto-fit: lay the columns out against the full available height
@@ -1140,6 +1157,7 @@ export default function MainLayout() {
                   onDetach={(pos) => handleDetach(step.id, pos)}
                   group={group}
                   onMakeGroup={() => makeGroup(step.id)}
+                  onNameBand={reportNameBand}
                 />
               </div>
             );

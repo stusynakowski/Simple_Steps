@@ -29,7 +29,7 @@
 /* Header with Arrow */
 .op-header {
   position: relative;
-  height: 50px;
+  height: calc(50px + var(--header-ext, 0px));   /* taller with a wrapped name (MainLayout) */
   display: flex;
   align-items: center;
   padding: 0; 
@@ -129,30 +129,50 @@
 }
 
 /* A squeezed name that doesn't fit (SqueezedName; owner, 2026-11-25): the
-   upright copy is hidden, and the name hangs under the header in a rounded
-   bar tilted to the arrow's angle (its tip: 28px deep, 25px half-height, so
-   atan(25/28) = 42deg), rising toward the tip. It is kept narrower than
-   the column: the step grows taller, never wider. */
+   one line is hidden and HeaderText draws the number and name on several
+   lines. */
 .vertical-label.is-tilted-away { visibility: hidden; }
-.tilted-name {
+
+/* A taller arrow (owner, 2026-11-25): when a squeezed step's name needs more
+   lines, every header grows by the same --header-ext (MainLayout), so the
+   row of arrows stays flush. The tip stays at mid height and 28px deep, so
+   neighbours still interlock; the edges just get steeper. */
+
+/* A squeezed step's number and name on several lines (HeaderText), inside
+   the arrow. Two floats shaped as its outline keep each line inside it: on
+   the left, the tail's notch (in to 28px at mid height); on the right, the
+   tip (out to the full width at mid height). 6px of room inside each edge. */
+.header-text {
   position: absolute;
-  top: calc(100% + 3px);
-  right: 30px;
-  max-width: calc((100% - 40px) * 1.345);   /* 1 / cos 42deg */
-  padding: 2px 9px;
-  border-radius: 10px;
-  background: var(--step-color, #444);
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  white-space: normal;             /* the steps' scroll area is nowrap */
+  pointer-events: none;
+}
+.header-text__left,
+.header-text__right { height: 100%; width: 34px; }
+.header-text__left {
+  float: left;
+  shape-outside: polygon(0 0, 6px 0, 34px 50%, 6px 100%, 0 100%);
+}
+/* The first step's header has no notch: its left side is straight. */
+.column-wrapper:first-child .header-text__left { width: 14px; shape-outside: none; }
+.header-text__right {
+  float: right;
+  shape-outside: polygon(0 0, 100% 0, 100% 100%, 0 100%, 28px 50%);
+}
+.header-text__body {
+  margin: 7px 0 0;
+  text-align: center;
   color: #fff;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 600;
   line-height: 16px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transform-origin: top right;
-  transform: rotate(-42deg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  overflow-wrap: anywhere;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
+.header-text__body b { font-weight: 800; opacity: 0.85; margin-right: 2px; }
 
 /* Squeezed header adjustments */
 .operation-column.squeezed .arrow-content {
@@ -163,7 +183,7 @@
 
 .operation-column.squeezed .op-header {
     /* Keep standard height */
-    height: 50px; 
+    height: calc(50px + var(--header-ext, 0px)); 
     align-items: center;
 }
 
@@ -1972,19 +1992,28 @@ body.is-resizing-step * { cursor: ew-resize !important; }
   clip-path: polygon(var(--b) 0, calc(100% - var(--b)) 0,
     calc(100% - 28px - var(--b)) 100%, var(--b) 100%);
 }
-/* Leaning as the arrow's edges do: 28px across over the 25px half. */
+/* Leaning as the arrow's lower edges do: 28px across over the lower half,
+   whatever the header's height (--header-ext makes it taller). */
+.folded-group {
+  --half: calc((50px + var(--header-ext, 0px)) / 2);
+  --lean: atan2(28px, var(--half));          /* 48deg at the usual 50px */
+}
 .folded-step {
   flex: 1 1 0; min-width: 0;
   background: var(--fill);
-  transform: skewX(-48deg);
+  transform: skewX(calc(-1 * var(--lean)));
   display: flex; align-items: center; justify-content: center;
 }
 .folded-step:hover { filter: brightness(1.2); }
+/* The step's name tilted counter-clockwise along its parallelogram's sides
+   (owner, 2026-11-25): undo the skew, then turn to the sides' angle; as
+   long as a side is. */
 .folded-step-label {
-  transform: skewX(48deg);
-  color: #fff; font-size: 0.68rem; font-weight: 600;
+  transform: skewX(var(--lean)) rotate(calc(var(--lean) - 90deg));
+  color: #fff; font-size: 0.7rem; font-weight: 600; line-height: 1;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: calc(hypot(28px, var(--half)) - 6px);
   pointer-events: none;
 }
 .column-wrapper.folded-away { flex: 0 0 0; width: 0; overflow: hidden; }
