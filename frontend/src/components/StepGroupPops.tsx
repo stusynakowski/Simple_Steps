@@ -40,6 +40,8 @@ export function GroupControls({ workflow, group, color, folded, allOpen, onRun, 
   const notes = group.meta?.notes ?? '';
   return (
     <span className="group-controls" onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+      {/* Minimized, only minimize and maximize show (owner, 2026-11-25). */}
+      {!folded && <>
       <StepMenu icon="sticky_note_2" iconSize={14} text="Notes" label={`${group.name}'s notes`} testId="group-notes-menu"
         className={`step-header-btn${notes ? ' has-notes' : ''}`} align="right">
         <div className="group-pop-notes">
@@ -95,6 +97,7 @@ export function GroupControls({ workflow, group, color, folded, allOpen, onRun, 
           </>
         )}
       </StepMenu>
+      </>}
       <button type="button" className="step-header-btn" title={folded ? 'Unfold the group' : 'Minimize: fold the group into one header'}
         aria-label={folded ? `Unfold ${group.name}` : `Minimize ${group.name}`} data-testid="group-fold" onClick={onFold}>
         <SymbolIcon name="minimize" size={13} />
