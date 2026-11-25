@@ -6,18 +6,22 @@ import { definitionText, pyLiteral, resourceKind, stepsUsingResource, type Resou
 import { needsAttention, STATUS_TEXT, type ResourceState, type ResourceStatus } from '../hooks/useResourceState';
 import StepMenu from './StepMenu';
 import SymbolIcon, { type SymbolName } from './SymbolIcon';
+import Fold from './Fold';
+import { useGroupTones } from '../context/StepPaletteContext';
 import { useDragToDetach } from '../hooks/useDragToDetach';
 import './ResourceColumn.css';
 
 /**
  * The resource column (spec 017): the workflow's resources, ahead of step 1.
  *
- * A header ("Resources") opens a list of one header per resource; a
- * resource's header opens its panel — Load / Refresh / Clear, its status, the
- * formula that defines it, the steps that use it. Several can be open at
- * once, stacked. Unpinned, it sits ahead of step 1 and scrolls with the
- * steps; pinned, it leaves them for the side of the steps, always there.
- * Either way it hides to its thin bar and opens again (owner, 2026-11-12).
+ * A header ("Resources") over one header per resource; a resource's header,
+ * in its colour as a step's is, slides its panel open — Load / Refresh /
+ * Clear, its status, the formula R_i = … that defines it, the steps that use
+ * it. Several can be open at once, stacked. The "Resources" header folds the
+ * column to its bar and widens it to the canvas, as a step's header does
+ * (owner, 2026-11-24); folded, the bar keeps each resource's colour. The pin
+ * sits at the foot of the bar: unpinned, the column scrolls with the steps
+ * ahead of step 1; pinned, it stays at their side (owner, 2026-11-12).
  *
  * Every change goes through `onDefine` / `onRemove` (as the console's
  * `res["x"] = …` does) and `onMeta` (notes, colour).
@@ -74,6 +78,17 @@ function metaOf(decl: unknown): { notes?: string; color?: string } {
   return ((decl as { meta?: Record<string, string> } | undefined)?.meta) ?? {};
 }
 
+/**
+ * Each resource's colour, by name: the one it was given, else the palette's
+ * tones in turn, deepened as a group's are, so a resource reads in the
+ * steps' style without passing for one of them (owner, 2026-11-24).
+ */
+function useResourceColors(entries: [string, ResourceDeclaration][]): Record<string, string> {
+  const tones = useGroupTones();
+  return Object.fromEntries(entries.map(([name, decl], i) =>
+    [name, metaOf(decl).color ?? (tones.length ? tones[i % tones.length] : DEFAULT_COLOR)]));
+}
+
 function templateFor(info: ResourceTypeInfo): string {
   const settings = info.settings
     .map((s) => `${s.name}=${s.required ? '' : pyLiteral(s.default)}`)
@@ -100,12 +115,15 @@ function StatusDot({ status }: { status: ResourceStatus }) {
  * column is this bar alone, with an icon per resource; with no resources, just
  * the word.
  */
-function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHighlight, drag }: {
+function Rail({ entries, colors, state, steps, hidden, attention, pinned, onTogglePin, onToggle, onPick, onHighlight, drag }: {
   entries: [string, ResourceDeclaration][];
+  colors: Record<string, string>;
   state: ResourceState;
   steps: Step[];
   hidden: boolean;
   attention: boolean;
+  pinned: boolean;
+  onTogglePin: () => void;
   onToggle: () => void;
   onPick: (name: string) => void;
   onHighlight: (labels: string[] | null) => void;
@@ -130,7 +148,7 @@ function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHi
           key={name}
           type="button"
           className="rc-rail-item"
-          style={{ '--res-color': metaOf(decl).color ?? DEFAULT_COLOR } as React.CSSProperties}
+          style={{ '--res-color': colors[name] } as React.CSSProperties}
           title={`${name}: ${STATUS_TEXT[state.statusOf(name).kind]}`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onPick(name); }}
@@ -145,6 +163,16 @@ function Rail({ entries, state, steps, hidden, attention, onToggle, onPick, onHi
       ))}
       <span className="rc-rail-label">Resources</span>
       {attention && <span className="rc-attention" title="A resource needs attention" />}
+      <button
+        type="button"
+        className={`rc-btn-icon rc-rail-pin${pinned ? ' on' : ''}`}
+        title={pinned ? 'Unpin: back ahead of step 1, scrolling with the steps' : 'Pin: to the side of the steps, always there'}
+        aria-pressed={pinned}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onTogglePin(); }}
+      >
+        <SymbolIcon name={pinned ? 'push_pin' : 'keep_off'} size={14} />
+      </button>
       {drag && <span className="rc-grip" aria-hidden />}
     </div>
   );
@@ -159,11 +187,12 @@ export default function ResourceColumn(props: ResourceColumnProps) {
   const hasResources = entries.length > 0;
   const [sideCollapsed, setSideCollapsed] = useState(!hasResources);
   useEffect(() => { setSideCollapsed(!hasResources); }, [hasResources]);
-  const [listOpen, setListOpen] = useState(true);
   const [openNames, setOpenNames] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   // Maximized: one resource as a box the size of the canvas.
   const [maximized, setMaximized] = useState<string | null>(null);
+  // Widened: the whole column the width of the canvas (its header's control).
+  const [widened, setWidened] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState(900);
   // A width the viewer dragged to; null follows the content (a step's widths).
   const [width, setWidth] = useState<number | null>(() => {
@@ -197,7 +226,7 @@ export default function ResourceColumn(props: ResourceColumnProps) {
     return next;
   });
   const pick = (name: string) => {
-    setSideCollapsed(false); setListOpen(true);
+    setSideCollapsed(false);
     setOpenNames((s) => new Set(s).add(name));
   };
   const toggleSide = () => {
@@ -219,7 +248,7 @@ export default function ResourceColumn(props: ResourceColumnProps) {
       if (!d) return;
       const dx = e.clientX - d.x;
       if (!d.moved && Math.abs(dx) < 4) return;
-      if (!d.moved) { d.moved = true; setDragging(true); setMaximized(null); }
+      if (!d.moved) { d.moved = true; setDragging(true); setMaximized(null); setWidened(false); }
       const w = d.width + dx;
       setSideCollapsed(w < HIDE_BELOW);
       if (w >= HIDE_BELOW) {
@@ -235,14 +264,15 @@ export default function ResourceColumn(props: ResourceColumnProps) {
 
   const attention = entries.some(([n]) => needsAttention(state.statusOf(n)));
   const unused = Object.entries(state.loaded).filter(([n]) => !(resources && n in resources));
-  const wide = listOpen && (openNames.size > 0 || adding);
-  const railProps = { entries, state, steps, attention, onHighlight: props.onHighlight };
+  const wide = openNames.size > 0 || adding;
+  const colors = useResourceColors(entries);
+  const railProps = { entries, colors, state, steps, attention, pinned, onTogglePin, onHighlight: props.onHighlight };
 
   const maxed = maximized && resources && maximized in resources ? maximized : null;
   const shown = maxed ? entries.filter(([n]) => n === maxed) : entries;
   // The panel keeps its width while the column narrows over it, so hiding
   // and showing slide (0.3s, as a step's do) instead of reflowing.
-  const panelWidth = maxed ? Math.max(450, canvasWidth) - RAIL : width ?? (wide ? 450 : MIN_WIDTH);
+  const panelWidth = maxed || widened ? Math.max(450, canvasWidth) - RAIL : width ?? (wide ? 450 : MIN_WIDTH);
   const columnWidth = sideCollapsed ? RAIL : panelWidth + RAIL;
 
   return (
@@ -256,9 +286,10 @@ export default function ResourceColumn(props: ResourceColumnProps) {
         <div
           className={`rc-head${detachDrag.hinting ? ' drag-detach-hint' : ''}`}
           onMouseDown={detachDrag.onMouseDown}
-          onClick={() => { if (!detachDrag.consumeClick()) setListOpen((v) => !v); }}
+          onClick={() => { if (!detachDrag.consumeClick() && !floating) toggleSide(); }}
           role="button"
-          aria-expanded={listOpen}
+          aria-expanded={!sideCollapsed}
+          title={floating ? undefined : 'Fold the resources to their bar'}
         >
           <SymbolIcon name="database" size={16} />
           <span className="rc-head-title">Resources</span>
@@ -266,21 +297,22 @@ export default function ResourceColumn(props: ResourceColumnProps) {
           {attention && <span className="rc-attention" title="A resource needs attention" />}
           {!floating && (
             <span className="rc-head-controls" onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="rc-btn-icon" title="Minimize: fold to the bar" onClick={toggleSide}>
+                <SymbolIcon name="minimize" size={13} />
+              </button>
               <button
                 type="button"
-                className={`rc-btn-icon${pinned ? ' on' : ''}`}
-                title={pinned ? 'Unpin: back ahead of step 1, scrolling with the steps' : 'Pin: to the side of the steps, always there'}
-                aria-pressed={pinned}
-                onClick={onTogglePin}
+                className={`rc-btn-icon${widened ? ' on' : ''}`}
+                title={widened ? 'Restore the width' : 'Maximize: the width of the canvas'}
+                onClick={() => { setMaximized(null); setWidened((w) => !w); }}
               >
-                <SymbolIcon name={pinned ? 'push_pin' : 'keep_off'} size={13} />
+                <SymbolIcon name={widened ? 'close_fullscreen' : 'open_in_full'} size={13} />
               </button>
             </span>
           )}
         </div>
 
-        {listOpen && (
-          <div className="rc-list">
+        <div className="rc-list">
             {entries.length === 0 && !adding && (
               <div className="rc-empty">None yet. Steps use a resource with res["name"].</div>
             )}
@@ -288,6 +320,8 @@ export default function ResourceColumn(props: ResourceColumnProps) {
               <ResourceCard
                 key={name}
                 {...props}
+                color={colors[name]}
+                index={entries.findIndex(([n]) => n === name) + 1}
                 name={name}
                 decl={decl}
                 open={openNames.has(name) || maxed === name}
@@ -322,7 +356,7 @@ export default function ResourceColumn(props: ResourceColumnProps) {
             )}
 
             {maxed ? null : adding
-              ? <NewResource types={state.types} onDefine={props.onDefine} onDone={(name) => {
+              ? <NewResource index={entries.length + 1} types={state.types} onDefine={props.onDefine} onDone={(name) => {
                   setAdding(false);
                   if (name) setOpenNames((s) => new Set(s).add(name));
                 }} />
@@ -331,8 +365,7 @@ export default function ResourceColumn(props: ResourceColumnProps) {
                   <SymbolIcon name="add" size={14} /> Resource
                 </button>
               )}
-          </div>
-        )}
+        </div>
         </div>
         {!floating && <Rail {...railProps} hidden={sideCollapsed} onToggle={toggleSide} onPick={pick} drag={drag} />}
       </div>
@@ -342,10 +375,13 @@ export default function ResourceColumn(props: ResourceColumnProps) {
 // ── One resource ──────────────────────────────────────────────────────────
 
 function ResourceCard({
-  name, decl, open, maximized, onMaximize, onToggle, onRenamed, steps, state, stepColorOf, onDefine, onRemove, onMeta, onHighlight,
+  name, decl, color, index, open, maximized, onMaximize, onToggle, onRenamed, steps, state, stepColorOf, onDefine, onRemove, onMeta, onHighlight,
 }: ResourceColumnProps & {
   name: string;
   decl: ResourceDeclaration;
+  color: string;
+  /** 1-based, in the column's order: the i of R_i. */
+  index: number;
   open: boolean;
   maximized: boolean;
   onMaximize: () => void;
@@ -356,7 +392,6 @@ function ResourceCard({
   const status = state.statusOf(name);
   const users = stepsUsingResource(steps, name);
   const meta = metaOf(decl);
-  const color = meta.color ?? DEFAULT_COLOR;
   const saved = definitionText(decl, info);
   const [text, setText] = useState(saved);
   const [error, setError] = useState<string | null>(null);
@@ -464,7 +499,7 @@ function ResourceCard({
         )}
       </div>
 
-      {open && notesOpen && (
+      <Fold open={open && notesOpen}>
         <div className="rc-notes">
           {notesEditing ? (
             <textarea
@@ -482,9 +517,9 @@ function ResourceCard({
             </div>
           )}
         </div>
-      )}
+      </Fold>
 
-      {open && (
+      <Fold open={open} className="rc-body-fold">
         <div className="rc-body">
           <div className="rc-toolbar">
             <button type="button" className="rc-btn rc-btn-primary" disabled={busy || status.kind === 'loaded'}
@@ -503,19 +538,21 @@ function ResourceCard({
           </div>
 
           <div className="rc-formula">
-            <span className="rc-formula-label">=</span>
-            <input
-              className="rc-formula-input"
-              aria-label={`${name}'s definition`}
-              spellCheck={false}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onBlur={() => void commit()}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') { e.preventDefault(); void commit(); }
-                if (e.key === 'Escape') { setText(saved); setError(null); }
-              }}
-            />
+            <ResourceSymbol index={index} name={name} />
+            <div className="step-formula-field rc-formula-field">
+              <input
+                className="rc-formula-input"
+                aria-label={`${name}'s definition`}
+                spellCheck={false}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={() => void commit()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); void commit(); }
+                  if (e.key === 'Escape') { setText(saved); setError(null); }
+                }}
+              />
+            </div>
           </div>
           {locked.length > 0 && <div className="rc-meta">Set by the deployment: {locked.join(', ')}</div>}
           {status.kind !== 'loaded' && status.kind !== 'not_loaded' && status.kind !== 'busy' && (
@@ -548,14 +585,27 @@ function ResourceCard({
             </div>
           )}
         </div>
-      )}
+      </Fold>
     </div>
+  );
+}
+
+/**
+ * R_i, in front of a resource's formula as fx is in front of a step's
+ * (owner, 2026-11-24): i is the resource's place in the column.
+ */
+function ResourceSymbol({ index, name }: { index: number; name?: string }) {
+  return (
+    <span className="step-fx rc-fx" title={name ? `R${index}: ${name}` : `R${index}: the new resource`}>
+      R<sub>{index}</sub>
+    </span>
   );
 }
 
 // ── A new resource ────────────────────────────────────────────────────────
 
-function NewResource({ types, onDefine, onDone }: {
+function NewResource({ index, types, onDefine, onDone }: {
+  index: number;
   types: Record<string, ResourceTypeInfo>;
   onDefine: (name: string, definition: string) => Promise<void>;
   onDone: (name: string | null) => void;
@@ -580,10 +630,12 @@ function NewResource({ types, onDefine, onDone }: {
         <input className="rc-input" placeholder="name, e.g. llm" value={name} autoFocus
                onChange={(e) => setName(e.target.value)} onKeyDown={onKey} />
         <div className="rc-formula">
-          <span className="rc-formula-label">=</span>
-          <input className="rc-formula-input" placeholder={'Type(setting=…), e.g. FakeLLM(model="fake-1")'}
-                 spellCheck={false} value={definition}
-                 onChange={(e) => setDefinition(e.target.value)} onKeyDown={onKey} />
+          <ResourceSymbol index={index} />
+          <div className="step-formula-field rc-formula-field">
+            <input className="rc-formula-input" placeholder={'Type(setting=…), e.g. FakeLLM(model="fake-1")'}
+                   spellCheck={false} value={definition}
+                   onChange={(e) => setDefinition(e.target.value)} onKeyDown={onKey} />
+          </div>
         </div>
         <div className="rc-types">
           {Object.values(types).map((info) => (

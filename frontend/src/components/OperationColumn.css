@@ -255,8 +255,10 @@
 }
 
 .operation-column.active .op-body {
-     /* Active body — thin colored accent on left edge only */
-     border-left: 2px solid var(--step-color, #646cff);
+     /* Active body: outlined in the header's colour on every side the
+        header doesn't cover (owner, 2026-11-24). */
+     border: 2px solid var(--step-color, #646cff);
+     border-top: none;
 }
 
 /* Arrow Shape Implementation */
