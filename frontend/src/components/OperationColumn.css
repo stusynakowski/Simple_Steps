@@ -398,6 +398,36 @@
 .step-rows-caret { transition: transform 0.12s ease; }
 .step-rows-head.open .step-rows-caret { transform: rotate(90deg); }
 
+/* The step menu's parts (owner, 2026-11-25): each head a fold, a line
+   between them; open, the part's rows sit under its head. */
+.step-menu-parts { margin: -6px -8px -4px; }
+.step-menu-parts > .step-rows-head + .step-rows-head,
+.step-menu-parts > .step-menu-part + .step-rows-head { border-top: 1px solid #eee; }
+.step-menu-part { padding: 0 4px 6px; }
+.step-menu-part.settings-content { padding: 2px 10px 8px; }
+
+/* Delete's "are you sure?", in place of the item. */
+.step-delete-confirm {
+  margin: 2px 2px 0;
+  padding: 8px;
+  border: 1px solid #f3c9c4;
+  border-radius: 5px;
+  background: #fdf3f2;
+  font-size: 12px;
+  color: #333;
+}
+.step-delete-question { margin-bottom: 8px; line-height: 1.35; }
+.step-delete-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.step-delete-actions button {
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 26px; padding: 0 10px;
+  border-radius: 4px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.step-delete-cancel { border: 1px solid #ccc; background: #fff; color: #333; }
+.step-delete-cancel:hover { background: #f3f3f3; }
+.step-delete-yes { border: 1px solid #c0392b; background: #c0392b; color: #fff; font-weight: 600; }
+.step-delete-yes:hover { background: #a93226; }
+
 /* Step ID / Status rows in Settings: the panel is white, and these inherited
    the app's white text, so they were invisible. */
 .settings-content .summary-item {

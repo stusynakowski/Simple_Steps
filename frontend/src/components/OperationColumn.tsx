@@ -96,6 +96,48 @@ const ROW_TOGGLES: { row: StepRow; icon: SymbolName; label: string; hint: string
   { row: 'data', icon: 'dataset', label: 'Data', hint: "The second row: the step's data" },
 ];
 
+/** The step menu's parts, each folded under its own head. */
+type MenuPart = 'manage' | 'header' | 'panels' | 'details';
+
+/** A part's head in the step menu: its name and a caret; a click folds it. */
+function MenuPartHead({ part, label, open, onToggle }: {
+  part: MenuPart; label: string; open: Set<MenuPart>; onToggle: (part: MenuPart) => void;
+}) {
+  const isOpen = open.has(part);
+  return (
+    <button type="button" className={`step-rows-head${isOpen ? ' open' : ''}`} aria-expanded={isOpen}
+      data-testid={`step-menu-${part}`} onClick={() => onToggle(part)}>
+      {label}
+      <SymbolIcon name="chevron_right" size={14} className="step-rows-caret" />
+    </button>
+  );
+}
+
+/** Delete, asking first (owner, 2026-11-25): a click asks "are you sure?" in
+ *  place; the question goes when the menu closes. */
+function DeleteStep({ label, locked, onDelete }: { label: string; locked: boolean; onDelete: () => void }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) {
+    return (
+      <StepMenuItems onClose={() => {}} items={[
+        { icon: 'delete', label: locked ? 'Delete (unlock first)' : 'Delete step…', onClick: () => setAsking(true),
+          disabled: locked, danger: true, testId: 'btn-delete' },
+      ]} />
+    );
+  }
+  return (
+    <div className="step-delete-confirm" role="alertdialog" aria-label={`Delete ${label}?`}>
+      <div className="step-delete-question">Delete <strong>{label}</strong>? Its formula and data go with it.</div>
+      <div className="step-delete-actions">
+        <button type="button" className="step-delete-cancel" onClick={() => setAsking(false)}>Cancel</button>
+        <button type="button" className="step-delete-yes" data-testid="btn-delete-confirm" autoFocus onClick={onDelete}>
+          <SymbolIcon name="delete" size={14} /> Delete
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** The header's height; its arrow's tip is 28px deep over half of it. */
 const HEADER_H = 50;
 /** The most the headers' extension grows: about four more lines of a name. */
@@ -474,11 +516,35 @@ export default function OperationColumn({
     setNotesEditing(false);
     if (!step.notes?.trim()) setNotesOpen(false);
   };
-  const [showRowsOpen, setShowRowsOpen] = useState(false);
-  // The settings under the ⋯ menu's actions: folded until asked for.
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const stepSettings = (
-      <div className="settings-content">
+  // The step menu's parts, each an expander (owner, 2026-11-25): managing
+  // the step, its header, its panels, and the details core reports.
+  const [openParts, setOpenParts] = useState<Set<MenuPart>>(() => new Set(['manage']));
+  const togglePart = (part: MenuPart) => setOpenParts((open) => {
+    const next = new Set(open);
+    if (next.has(part)) next.delete(part); else next.add(part);
+    return next;
+  });
+  const stepMenu = (close: () => void) => (
+    <div className="step-menu-parts">
+      <MenuPartHead part="manage" label="Step management" open={openParts} onToggle={togglePart} />
+      {openParts.has('manage') && (
+        <div className="step-menu-part">
+          <StepMenuItems onClose={close} items={[
+            { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => setIsLocked(!isLocked) },
+            { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
+            { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1),
+              disabled: !onMove || stepIndex >= (stepCount ?? 1) - 1 },
+            // Not in a group: make it one (dev_plan/141); the group's settings open to add steps.
+            ...(!group && onMakeGroup ? [{ icon: 'stacks' as SymbolName, label: 'Group this step', onClick: onMakeGroup,
+              testId: 'step-make-group' }] : []),
+          ]} />
+          <div className="step-menu-divider" role="separator" />
+          <DeleteStep label={step.label} locked={isLocked} onDelete={() => { close(); onDelete(step.id); }} />
+        </div>
+      )}
+      <MenuPartHead part="header" label="Header" open={openParts} onToggle={togglePart} />
+      {openParts.has('header') && (
+        <div className="step-menu-part settings-content">
          <div className="config-item">
             <label>Step Name</label>
             <input
@@ -516,6 +582,38 @@ export default function OperationColumn({
               )}
             </div>
          </div>
+        </div>
+      )}
+      <MenuPartHead part="panels" label="Panel visibility" open={openParts} onToggle={togglePart} />
+      {openParts.has('panels') && (
+        <div className="step-menu-part">
+           {ROW_TOGGLES.map(({ row, icon, label, hint }) => {
+             const shown = !step.hidden_rows?.includes(row);
+             return (
+               <button
+                 key={row}
+                 type="button"
+                 role="menuitemcheckbox"
+                 aria-checked={shown}
+                 className={`step-menu-item${shown ? ' checked' : ''}`}
+                 title={hint}
+                 onClick={() => {
+                   const hidden = new Set(step.hidden_rows ?? []);
+                   if (shown) hidden.add(row); else hidden.delete(row);
+                   onUpdate?.(step.id, { hidden_rows: hidden.size ? [...hidden] : undefined });
+                 }}
+               >
+                 <SymbolIcon name={icon} size={15} />
+                 <span className="step-menu-label">{label}</span>
+                 <span className="step-menu-check">{shown && <SymbolIcon name="check" size={14} />}</span>
+               </button>
+             );
+           })}
+        </div>
+      )}
+      <MenuPartHead part="details" label="Details" open={openParts} onToggle={togglePart} />
+      {openParts.has('details') && (
+        <div className="step-menu-part settings-content">
          <div className="summary-item">
             <span className="label">Step ID:</span>
             <span className="value" style={{ fontFamily: 'monospace', fontSize: '0.75em' }}>{step.id}</span>
@@ -548,43 +646,9 @@ export default function OperationColumn({
              </ul>
            </div>
          )}
-         {/* Show: which rows of the open step are on (owner, 2026-11-13). Its
-             own section, folded until opened, in the Step Panels menu's look. */}
-         <div className="step-rows">
-           <button
-             type="button"
-             className={`step-rows-head${showRowsOpen ? ' open' : ''}`}
-             aria-expanded={showRowsOpen}
-             title={showRowsOpen ? 'Fold' : "Choose which of the step's rows show"}
-             onClick={() => setShowRowsOpen((o) => !o)}
-           >
-             Show
-             <SymbolIcon name="chevron_right" size={14} className="step-rows-caret" />
-           </button>
-           {showRowsOpen && ROW_TOGGLES.map(({ row, icon, label, hint }) => {
-             const shown = !step.hidden_rows?.includes(row);
-             return (
-               <button
-                 key={row}
-                 type="button"
-                 role="menuitemcheckbox"
-                 aria-checked={shown}
-                 className={`step-menu-item${shown ? ' checked' : ''}`}
-                 title={hint}
-                 onClick={() => {
-                   const hidden = new Set(step.hidden_rows ?? []);
-                   if (shown) hidden.add(row); else hidden.delete(row);
-                   onUpdate?.(step.id, { hidden_rows: hidden.size ? [...hidden] : undefined });
-                 }}
-               >
-                 <SymbolIcon name={icon} size={15} />
-                 <span className="step-menu-label">{label}</span>
-                 <span className="step-menu-check">{shown && <SymbolIcon name="check" size={14} />}</span>
-               </button>
-             );
-           })}
-         </div>
-      </div>
+        </div>
+      )}
+    </div>
   );
 
   return (
@@ -649,47 +713,10 @@ export default function OperationColumn({
             </button>
           )}
           {!isMinimized && !isSqueezed && (
-            // The step menu (owner, 2026-11-24): managing the step, then its
-            // settings (folded under the actions). Other ways to run it are ⋮, by ▶.
+            // The step menu (owner, 2026-11-25): its parts as expanders.
+            // Other ways to run it are ⋮, by ▶.
             <StepMenu icon="more_horiz" iconSize={16} text="Step menu" label="Step menu" testId="step-settings" className="step-header-btn" align="right">
-              {(close) => (
-                <>
-                  <StepMenuItems onClose={close} items={[
-                    { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
-                    { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1),
-                      disabled: !onMove || stepIndex >= (stepCount ?? 1) - 1 },
-                    { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => setIsLocked(!isLocked) },
-                    { divider: true },
-                    { icon: 'delete', label: isLocked ? 'Delete (unlock first)' : 'Delete step', onClick: () => onDelete(step.id),
-                      disabled: isLocked, danger: true, testId: 'btn-delete' },
-                  ]} />
-                  <div className="step-menu-divider" role="separator" />
-                  <button
-                    type="button"
-                    className={`step-rows-head${settingsOpen ? ' open' : ''}`}
-                    aria-expanded={settingsOpen}
-                    onClick={() => setSettingsOpen((o) => !o)}
-                  >
-                    Settings
-                    <SymbolIcon name="chevron_right" size={14} className="step-rows-caret" />
-                  </button>
-                  {settingsOpen && stepSettings}
-                  {/* Not in a group: make it one (dev_plan/141); the group's settings open to add steps. */}
-                  {!group && onMakeGroup && (
-                    <button
-                      type="button"
-                      className="step-menu-item"
-                      title="Group this step (then add more steps to the group)"
-                      aria-label={`Group ${step.label}`}
-                      data-testid="step-make-group"
-                      onClick={() => { close(); onMakeGroup(); }}
-                    >
-                      <SymbolIcon name="stacks" size={15} />
-                      <span className="step-menu-label">Group this step</span>
-                    </button>
-                  )}
-                </>
-              )}
+              {stepMenu}
             </StepMenu>
           )}
         </div>
