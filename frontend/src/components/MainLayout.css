@@ -646,16 +646,17 @@
     transition: all 0.3s ease;
 }
 
+/* 500px (owner, 2026-11-24: was 450): room for ▶ ⋮ fx and a wider formula. */
 .column-wrapper.expanded {
-    flex: 0 0 450px; 
-    width: 450px;
+    flex: 0 0 500px;
+    width: 500px;
 }
 
 /* As wide as the visible canvas (measured in MainLayout), never narrower
    than an expanded step — so it widens within the main layout. */
 .column-wrapper.maximized {
-    flex: 0 0 max(450px, calc(var(--canvas-width, 900px) - 24px));
-    width: max(450px, calc(var(--canvas-width, 900px) - 24px));
+    flex: 0 0 max(500px, calc(var(--canvas-width, 900px) - 24px));
+    width: max(500px, calc(var(--canvas-width, 900px) - 24px));
 }
 
 /* Minimized: just the header, as narrow as the step's name allows. */

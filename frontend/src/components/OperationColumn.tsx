@@ -14,7 +14,7 @@ import ToolEditor from './ToolEditor';
 import StepWidget from './StepWidget';
 import type { PanelId } from './stepPanels';
 import StepOverview from './StepOverview';
-import StepMenu from './StepMenu';
+import StepMenu, { StepMenuItems } from './StepMenu';
 import SymbolIcon, { type SymbolName } from './SymbolIcon';
 import { runState, RUN_ICON } from '../utils/runState';
 import Markdown from 'react-markdown';
@@ -87,9 +87,10 @@ interface OperationColumnProps {
 
 /** The rows of an open step its Settings can hide, top to bottom. */
 const ROW_TOGGLES: { row: StepRow; icon: SymbolName; label: string; hint: string }[] = [
-  { row: 'controls', icon: 'tune', label: 'Step controls', hint: 'The first row: Run, Step Panels, Manage Step' },
-  { row: 'formula', icon: 'function', label: 'Formula bar', hint: 'The second row: fx and the formula' },
-  { row: 'data', icon: 'dataset', label: 'Data', hint: "The third row: the step's data" },
+  // No 'controls' row: the control bar is gone (owner, 2026-11-24); a saved
+  // workflow that hid it still carries the word, harmlessly.
+  { row: 'formula', icon: 'function', label: 'Formula bar', hint: 'The first row: fx, the formula and ▶' },
+  { row: 'data', icon: 'dataset', label: 'Data', hint: "The second row: the step's data" },
 ];
 
 export default function OperationColumn({
@@ -344,6 +345,8 @@ export default function OperationColumn({
     if (!step.notes?.trim()) setNotesOpen(false);
   };
   const [showRowsOpen, setShowRowsOpen] = useState(false);
+  // The settings under the ⋯ menu's actions: folded until asked for.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const stepSettings = (
       <div className="settings-content">
          <div className="config-item">
@@ -487,9 +490,9 @@ export default function OperationColumn({
         {/* The run's icon, just ahead of the tail; hover it for the status
             (owner, 2026-11-10: no status word under the name). */}
         {!isMinimized && runIcon}
-        {/* Hover controls — bottom right of the header: the notes' notepad,
-            settings, minimize, maximize. They stop mousedown so a click never
-            starts the header's drag-to-detach. */}
+        {/* Hover controls — bottom right of the header: Notes and the step
+            menu. They stop mousedown so a click never starts the header's
+            drag-to-detach. */}
         <div
           className="step-header-controls"
           onMouseDown={(e) => e.stopPropagation()}
@@ -505,15 +508,38 @@ export default function OperationColumn({
               data-testid="step-notes-toggle"
               onClick={toggleNotes}
             >
-              <SymbolIcon name="sticky_note_2" size={12} />
-              <SymbolIcon name="arrow_drop_down" size={12} className="step-notes-chevron" />
+              {/* Named (owner, 2026-11-24): the bare icon was too small to find. */}
+              <SymbolIcon name="sticky_note_2" size={14} />
+              <span className="step-header-btn-text">Notes</span>
+              <SymbolIcon name="arrow_drop_down" size={14} className="step-notes-chevron" />
             </button>
           )}
           {!isMinimized && !isSqueezed && (
-            <StepMenu icon="tune" iconSize={13} label="Step settings" testId="step-settings" className="step-header-btn" align="right">
+            // The step menu (owner, 2026-11-24): managing the step, then its
+            // settings (folded under the actions). Other ways to run it are ⋮, by ▶.
+            <StepMenu icon="more_horiz" iconSize={16} text="Step menu" label="Step menu" testId="step-settings" className="step-header-btn" align="right">
               {(close) => (
                 <>
-                  {stepSettings}
+                  <StepMenuItems onClose={close} items={[
+                    { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
+                    { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1),
+                      disabled: !onMove || stepIndex >= (stepCount ?? 1) - 1 },
+                    { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => setIsLocked(!isLocked) },
+                    { divider: true },
+                    { icon: 'delete', label: isLocked ? 'Delete (unlock first)' : 'Delete step', onClick: () => onDelete(step.id),
+                      disabled: isLocked, danger: true, testId: 'btn-delete' },
+                  ]} />
+                  <div className="step-menu-divider" role="separator" />
+                  <button
+                    type="button"
+                    className={`step-rows-head${settingsOpen ? ' open' : ''}`}
+                    aria-expanded={settingsOpen}
+                    onClick={() => setSettingsOpen((o) => !o)}
+                  >
+                    Settings
+                    <SymbolIcon name="chevron_right" size={14} className="step-rows-caret" />
+                  </button>
+                  {settingsOpen && stepSettings}
                   {/* Not in a group: make it one (dev_plan/141); the group's settings open to add steps. */}
                   {!group && onMakeGroup && (
                     <button
@@ -532,6 +558,14 @@ export default function OperationColumn({
               )}
             </StepMenu>
           )}
+        </div>
+        {/* Minimize and maximize: the header's top right, as a window's are
+            (owner, 2026-11-24). Shown on hover, as the controls below. */}
+        <div
+          className="step-header-controls step-header-window"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {!isMinimized && onMinimizeStep && (
             <button
               type="button"
@@ -638,18 +672,14 @@ export default function OperationColumn({
               availableOperations={availableOperations}
               onRun={() => onRun(step.id)}
               onDeclare={onDeclare}
-              onRunAll={onRunAll}
               onRunToEnd={onRunToEnd}
-              onMove={onMove}
-              stepCount={stepCount}
-              onDelete={() => onDelete(step.id)}
+              onRunAll={onRunAll}
               openPanels={openPanels}
               onTogglePanel={togglePanel}
               onFormulaChange={handleFormulaUpdate}
               externalFormula={savedFormula}
               previousStep={previousSteps.length ? previousSteps[previousSteps.length - 1].label : null}
               isLocked={isLocked}
-              onLock={() => setIsLocked(!isLocked)}
               onFormulaBarRef={(el) => { formulaBarRef.current = el; }}
               onReferencePick={handleReferencePick}
               references={barReferences}
@@ -661,13 +691,6 @@ export default function OperationColumn({
           {isActive && (openPanels.length > 0 || isEditMode) && (
             // `op-content-section` is kept so the detached window's taller cap applies.
             <div className="op-content-section step-widget-stack">
-              {/* Analytics */}
-              {isOpen('overview') && (
-                <StepWidget id="overview" collapsed={collapsedPanels.has('overview')} onToggleCollapse={toggleCollapsed} background="transparent" maxHeight={widgetMaxHeight}>
-                  <StepOverview step={step} availableOperations={availableOperations} />
-                </StepWidget>
-              )}
-
               {/* The Formula panel: no name bar, f(x) opens and closes it (owner, 2026-10-30). */}
               {/* Slides open and shut under the bar (Fold), as the steps do sideways. */}
               <Fold open={isOpen('details') && isEditMode}>
@@ -717,6 +740,8 @@ export default function OperationColumn({
                         stepName={step.label}
                         stepColor={color}
                         formula={step.formula}
+                        // Analytics describes the result, so it folds open from the data's header (owner, 2026-11-24).
+                        analytics={<StepOverview step={step} availableOperations={availableOperations} />}
                       />
                     </div>
                   </div>

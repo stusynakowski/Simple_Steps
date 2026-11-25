@@ -707,13 +707,10 @@
 /* The dataset icon and its caret, drawn as f(x) is: a box that lights up
    on hover, blue while the table is open (owner, 2026-11-15). */
 .data-head .data-head-toggle {
-  justify-self: start;
-  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 1px;
   height: 28px;
-  margin-left: 4px;
   padding: 0 3px 0 6px;
   border-radius: 4px;
   color: #aaa;
@@ -733,8 +730,27 @@
   grid-template-rows: 30px auto;
   height: auto;
 }
-.data-table:not(.is-collapsed) .data-head .data-head-toggle { grid-row: 1; }
-.data-head .data-head-ref {
+/* The dark bar (owner, 2026-11-24): the data's expander at the left; at
+   the right, the size (folded) and the analytics' fold. */
+.data-head .data-head-lead {
+  grid-row: 1;
+  grid-column: 1;
+  justify-self: start;
+  align-self: center;
+  display: flex;
+  margin-left: 4px;
+}
+.data-head .data-head-right {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: end;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  margin-right: 4px;
+}.data-head .data-head-ref {
   min-width: 0;
   padding: 0 12px;
   background: #f3f3f3;
@@ -767,6 +783,27 @@
   font-size: 0.86rem;
   font-weight: 800;
 }
+/* Analytics' fold (owner, 2026-11-24): at the right of the dark bar, drawn
+   as the data toggle is — lit on hover, blue while open. */
+.data-head .data-head-analytics {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 28px;
+  padding: 0 3px 0 6px;
+  border-radius: 4px;
+  color: #aaa;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.data-head .data-head-analytics:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
+.data-head .data-head-analytics.open { color: #4ea1ff; background: #1f3a5f; }
+.data-head-analytics.open .data-head-caret { transform: rotate(90deg); }
+/* Open, it is the header's second row: under the dark bar, above wf["step"]. */
+.data-head .data-analytics-fold { grid-row: 2; grid-column: 1 / -1; cursor: default; }
+.data-table:not(.is-collapsed) .data-head { grid-template-rows: 30px auto auto; }
+.data-table:not(.is-collapsed) .data-head .data-head-ref { grid-row: 3; }
+.data-analytics { background: #1e1e1e; line-height: normal; }
+
 /* The step's size, at the right end of the same line (owner, 2026-11-15). */
 .data-head-dims {
   position: absolute;
@@ -788,7 +825,6 @@
 .data-table.is-collapsed .data-head-dims { display: none; }
 .data-table:not(.is-collapsed) .data-head-size { display: none; }
 .data-head-size {
-  justify-self: end;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1194,6 +1230,8 @@
   display: flex;
   gap: 3px;
 }
+/* Minimize and maximize: the header's top right (owner, 2026-11-24). */
+.step-header-controls.step-header-window { top: 3px; bottom: auto; }
 .step-header-controls > * {
   opacity: 0;
   pointer-events: none;
@@ -1213,8 +1251,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
   border-radius: 3px;
@@ -1226,6 +1264,8 @@
 .step-header-btn:hover {
   background: rgba(0, 0, 0, 0.5);
 }
+/* No ring after a click (the app's button:focus draws one); keyboard focus keeps it. */
+.step-header-btn:focus:not(:focus-visible) { outline: none; }
 
 
 /* Minimized: only the header, tight around the step's number. */
@@ -1382,126 +1422,46 @@
 .col-resizer:hover,
 .row-resizer:hover { background: rgba(0, 0, 0, 0.15); }
 
-/* The step's control bar (StepToolbar; owner, 2026-10-29/30, 2026-11-09,
-   dev_plan/126 L1): four groups split by thin dividers — running (Run, Run
-   to the end, run options), Step Panels, Settings & Notes, Manage Step —
-   every button sharing the bar's full width. Each menu pops up over the page
-   (StepMenu) and each button has a hover label (useHoverTip). One line: a
-   narrow step drops the words and keeps the icons. Quiet: no fills, a thin
-   outline on each button (an inset shadow, so no size changes), muted until
-   hovered. Colour only where it informs: Run's play icon, a lock. */
+/* The formula row (StepToolbar; owner, 2026-11-24): ▶, then fx and the
+   formula. The control bar that sat above it is gone; its run options
+   and step management are in the header's step menu, so ▶ is the row's
+   only arrow. ▶ is green in a faint green outline, firmer on hover
+   (owner, 2026-11-24). The row's gaps are 2px: close, no size changed. */
 .toolbar-wrapper { container-type: inline-size; }
-.step-bar {
-  display: flex;
-  flex-wrap: nowrap;           /* always one line (owner, 2026-10-30) */
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-}
-/* Groups grow by how many buttons they hold, so every button is as wide. */
-.step-bar-group { display: flex; flex: 1 1 0; min-width: 0; align-items: center; gap: 4px; }
-.step-bar-group.step-bar-run { flex-grow: 3; }
-.step-bar-group > button,
-.step-bar-group > .step-menu { flex: 1 1 0; min-width: 0; }
-.step-bar-group > .step-menu > .step-menu-toggle { width: 100%; }
-.step-bar-divider {
+.step-run-inline {
   flex: none;
-  align-self: stretch;
-  width: 1px;
-  margin: 3px 0;
-  background: rgba(255, 255, 255, 0.16);
-}
-.step-run-big,
-.step-bar-btn { justify-content: center; }
-.step-bar .step-bar-btn { height: 26px; padding: 0 8px; gap: 5px; font-size: 12px; font-weight: 500; overflow: hidden; }
-/* A narrow step keeps one line by dropping words, not controls: the named
-   buttons show their icons only (each keeps its hover label), and in a
-   very narrow one, Run too. */
-@container (max-width: 560px) {
-  .step-bar:not(.step-bar--settings) .step-bar-btn .step-menu-text { display: none; }
-  .step-bar:not(.step-bar--settings) .step-bar-btn { padding: 0 4px; }
-}
-/* The settings row has the width to itself: words stay until it's narrow. */
-@container (max-width: 360px) {
-  .step-bar--settings .step-bar-btn .step-menu-text { display: none; }
-  .step-bar--settings .step-bar-btn { padding: 0 4px; }
-}
-@container (max-width: 260px) {
-  .step-run-big > span { display: none; }
-  .step-run-big { padding: 0 4px; }
-}
-.step-run-big,
-.step-menu-toggle { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13); }
-.step-run-big:hover,
-.step-menu-toggle:hover { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
-.step-run-big {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  height: 26px;   /* a little thinner (owner, 2026-11-18) */
-  padding: 0 8px 0 4px;
+  justify-content: center;
+  width: 32px;
+  height: 30px;                   /* as tall as fx */
+  padding: 0;
   border: none;
   border-radius: 4px;
   background: transparent;
-  color: #c9ccd1;
-  font-size: 12px;
-  font-weight: 600;
+  box-shadow: inset 0 0 0 1px #4ade8040;
+  color: #4ade80;
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
-/* Run Step looks and feels like the toolbar's Run Workflow (.ut-btn-run,
-   owner 2026-11-15): green words and icon in a faint green outline; hover
-   tints it green and firms the outline. */
-.step-run-big,
-.step-run-big .symbol-icon { color: #4ade80; }
-.step-run-big { box-shadow: inset 0 0 0 1px #4ade8040; }
-.step-run-big:hover { background: #4ade8018; box-shadow: inset 0 0 0 1px #4ade8080; }
-.step-run-big:hover,
-.step-run-big:hover .symbol-icon { color: #6aff9a; }
+.step-run-inline .symbol-icon { color: inherit; }
+.step-run-inline:hover { background: #4ade8018; box-shadow: inset 0 0 0 1px #4ade8080; color: #6aff9a; }
+.step-run-inline:focus:not(:focus-visible) { outline: none; }
+.step-run-inline.running { color: #f08a8a; box-shadow: inset 0 0 0 1px #f08a8a60; }
+/* ⋮, the run settings: narrow, grey, green on hover; it is the divider
+   between ▶ and fx, so it has no line of its own (owner, 2026-11-24). */
+.step-run-settings {
+  width: 16px;
+  height: 30px;
+  padding: 0;
+  border-radius: 4px;
+  color: #8b9097;
+}
+.step-run-settings:hover,
+.step-run-settings.active { color: #4ade80; background: #4ade8018; }
+.step-run-settings:focus:not(:focus-visible) { outline: none; }
+.step-run-inline.running:hover { background: #f08a8a18; color: #ffb0b0; }
 .step-locked-mark { flex: none; color: #c9a24a; opacity: 0.85; }
-
-/* The step bar (owner, 2026-11-15): Run Step, as wide as its words, at the
-   top left; open space; the Step Settings toggle (and a lock, if any) at the
-   right. */
-.step-bar--main .step-bar-run { flex: none; }
-.step-bar--main .step-bar-run + * { margin-left: auto; }
-
-/* Step Settings: drawn as f(x) and the data icon are, a box that lights on
-   hover and turns blue while open, its chevron turning down.
-   Icons only; its name is the hover label. It slides the settings row (run
-   options, step panels, manage step) open under the bar (Fold). */
-.step-settings-toggle {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  height: 24px;
-  padding: 0 4px 0 6px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #aaa;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.step-settings-toggle:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
-.step-settings-toggle.active { color: #4ea1ff; background: #1f3a5f; }
-.step-settings-caret { transition: transform 0.12s ease; }
-.step-settings-toggle.active .step-settings-caret { transform: rotate(90deg); }
-/* A thin line between the step toolbar and the formula bar, exactly as the
-   one under the formula bar (the wrapper's 1px #333, edge to edge, 4px under
-   the bar): the -4px reaches past the wrapper's padding (owner, 2026-11-15). */
-.step-controls--lined {
-  margin: 0 -4px;
-  padding: 0 4px 4px;
-  border-bottom: 1px solid #333;
-}
-/* The settings row sits under the bar, the bars' usual 4px apart. */
-.step-bar--settings { margin-top: 4px; }
 
 /* A step toolbar expander (StepMenu): a button that pops up its actions. */
 .step-menu { display: flex; }
@@ -1571,9 +1531,10 @@
 }
 .step-fx:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
 .step-fx.active { color: #4ea1ff; background: #1f3a5f; }
-/* No outline; a caret, as on the data header's icon, turns down while the
-   Formula panel is open (owner, 2026-11-13). */
-.step-fx { gap: 1px; padding: 0 3px 0 6px; }
+/* In the formula row: a caret, as on the data header's icon, turns down
+   while the Formula panel is open (owner, 2026-11-13); a size up
+   (owner, 2026-11-24), close to its field without touching it. */
+.formula-bar > .step-fx { gap: 1px; height: 30px; padding: 0 2px 0 7px; font-size: 19px; }
 .step-fx-caret { transition: transform 0.12s ease; }
 .step-fx.active .step-fx-caret { transform: rotate(90deg); }
 
@@ -1672,15 +1633,21 @@
 .run-icon-partial, .run-icon-stale { color: #fcd34d; }
 .run-icon-failed, .run-icon-blocked { color: #fca5a5; }
 
-/* The notes' notepad: wider, a notepad and an arrow that turns when open. */
-.step-header-controls .step-notes-toggle { width: auto; padding: 0 2px; gap: 0; }
+/* Notes and the step menu, named (owner, 2026-11-24: the bare icons were
+   too small): a notepad, "Notes" and an arrow that turns when open; "Step
+   menu" and its ⋯. */
+.step-header-controls .step-notes-toggle { width: auto; height: 20px; padding: 0 3px 0 6px; gap: 3px; }
+.step-header-btn-text { font-size: 11px; font-weight: 600; line-height: 1; white-space: nowrap; }
 .step-notes-chevron { transform: rotate(-90deg); transition: transform 0.12s ease; }
 .step-notes-toggle.open .step-notes-chevron { transform: none; }
 .step-header-controls .step-menu-toggle.step-header-btn {
-  width: 18px;
-  height: 18px;
+  width: auto;
+  height: 20px;
   min-width: 0;
-  padding: 0;
+  gap: 4px;
+  padding: 0 4px 0 7px;
+  font-size: 11px;
+  font-weight: 600;
   border: none;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.28);

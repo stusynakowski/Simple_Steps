@@ -1,14 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import type { PanelId } from './stepPanels';
-import { PANEL_META } from './stepPanels';
-import type { SymbolName } from './SymbolIcon';
-
-/** Each panel's icon in the Panels menu. */
-const PANEL_ICON: Record<'overview' | 'data', SymbolName> = {
-  overview: 'analytics',
-  data: 'database',
-};
 import type { GridPick } from '../utils/selection';
 import type { Step } from '../types/models';
 import type { OperationDefinition } from '../services/api';
@@ -18,7 +10,6 @@ import type { ParsedFormula } from '../utils/formulaParser';
 import { useStepWiring } from '../context/StepWiringContext';
 import SymbolIcon from './SymbolIcon';
 import StepMenu from './StepMenu';
-import Fold from './Fold';
 import { useHoverTip } from './useHoverTip';
 
 // Lazy-load the Monaco-backed formula editor so the ~2 MB editor bundle
@@ -44,19 +35,12 @@ interface StepToolbarProps {
   stepIndex?: number;
   availableOperations?: OperationDefinition[];
   onRun?: (id: string) => void;
-  /** Run every step (the pipeline). */
-  onRunAll?: () => void;
-  /** Run this step and every step after it. */
-  onRunToEnd?: () => void;
-  /** Drop this step's output. */
-  onClearOutput?: () => void;
-  /** Move this step to a position, 0 the first (core's `k.move`). */
-  onMove?: (to: number) => void;
-  /** How many steps the workflow has, so a move knows its ends. */
-  stepCount?: number;
   /** Enter in the formula bar: declare the step, running nothing. */
   onDeclare?: () => void;
-  onDelete?: (id: string) => void;
+  /** Run this step and every step after it (the run settings, ⋮). */
+  onRunToEnd?: () => void;
+  /** Run every step. */
+  onRunAll?: () => void;
   onEdit?: (id: string) => void;
   onFormulaChange?: (id: string, formula: string, parsed: ParsedFormula) => void;
   /** The step a newly chosen tool reads by default (wf["…"]); null for the first step. */
@@ -66,7 +50,6 @@ interface StepToolbarProps {
   // Widget toggles — any number of widgets can be open at once
   openPanels: PanelId[];
   onTogglePanel: (panel: PanelId) => void;
-  onLock?: (id: string) => void;
   isLocked?: boolean;
   onConfigure?: (id: string) => void;
   /** Called once with a ref to the formula bar input so parents can focus it. */
@@ -83,20 +66,15 @@ export default function StepToolbar({
   step,
   stepIndex = 0,
   availableOperations = [], 
-  onRun, 
+  onRun,
   onDeclare,
-  onRunAll,
   onRunToEnd,
-  onClearOutput,
-  onMove,
-  stepCount = 1,
-  onDelete, 
+  onRunAll,
   onFormulaChange,
   previousStep = null,
   externalFormula,
   openPanels,
   onTogglePanel,
-  onLock,
   isLocked,
   onFormulaBarRef,
   onReferencePick,
@@ -109,9 +87,6 @@ export default function StepToolbar({
   // Enter commits what the bar shows; read it through a ref so the handler
   // never sees an older formula than the one on screen.
   const [showSuggestions, setShowSuggestions] = useState(false);
-  // The Step Settings row (run options, panels, manage step): folded by
-  // default, so a step shows only what development needs (owner, 2026-11-15).
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<OperationDefinition[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // The suggestions open over the whole page (a portal, fixed under the
@@ -253,145 +228,53 @@ export default function StepToolbar({
   const isOpen = (panel: PanelId) => openPanels.includes(panel);
   const runLabel = step.status === 'running' ? 'Stop' : 'Run this step (⌘/Ctrl+Enter in the formula bar; Enter only stages it)';
   const runTip = useHoverTip(runLabel);
-  const settingsTip = useHoverTip('Step Settings');
 
-  // Rows the step's Settings turned off (owner, 2026-11-13). Hidden, not
-  // removed: the formula bar stays mounted for whoever focuses it.
-  const hides = (row: 'controls' | 'formula') => !!step.hidden_rows?.includes(row);
-  const bothHidden = hides('controls') && hides('formula');
+  // The formula row can be turned off in the step's settings (owner,
+  // 2026-11-13). Hidden, not removed: it stays mounted for whoever focuses it.
+  const hidden = !!step.hidden_rows?.includes('formula');
 
   return (
-    <div className="toolbar-wrapper" style={{ display: bothHidden ? 'none' : 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
-
-      {/* The step's control bar (owner, 2026-10-29/30, 2026-11-09; dev_plan/126
-          L1): three groups split by dividers, every button sharing the full
-          width — running (Run Step, and the run options: run to the end, stage,
-          run all, clear; owner, 2026-11-10), the panels menu,
-          then managing the step. The step's settings and notes are in its
-          header (owner, 2026-11-10).
-          Each pops up over the page (StepMenu); each has a hover label. A
-          narrow step shows icons without words (CSS container query). */}
-      {/* Consolidated (owner, 2026-11-15): only Run Step and the Step Settings
-          toggle show; the toggle slides the rest — run options, step panels,
-          managing the step — open in a bar below, as f(x) opens the formula. */}
-      <div
-        className={hides('formula') ? undefined : 'step-controls--lined'}
-        style={hides('controls') ? { display: 'none' } : undefined}
-      >
-      {/* Run Step at the top left, open space, then the Step Settings toggle
-          at the right: icons only, its name on hover (owner, 2026-11-15). */}
-      <div className="toolbar step-bar step-bar--main" data-testid="step-toolbar">
-        <div className="step-bar-group step-bar-run">
-          <button
-            className="step-run-big"
-            onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }}
-            aria-label={step.status === 'running' ? 'Stop' : 'Run this step'}
-            data-testid="btn-run"
-            {...runTip.tipProps}
-          >
-            <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={20} />
-            <span>{step.status === 'running' ? 'Stop' : 'Run Step'}</span>
-          </button>
-          {runTip.tip}
-        </div>
-
-        {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
-        <button
-          type="button"
-          className={`step-settings-toggle${settingsOpen ? ' active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); setSettingsOpen((v) => !v); }}
-          aria-expanded={settingsOpen}
-          aria-label="Step Settings"
-          data-testid="step-settings-toggle"
-          {...settingsTip.tipProps}
-        >
-          <SymbolIcon name="settings" size={17} />
-          <SymbolIcon name="chevron_right" size={16} className="step-settings-caret" />
-        </button>
-        {settingsTip.tip}
-      </div>
-
-      <Fold open={settingsOpen} keepMounted>
-      <div className="toolbar step-bar step-bar--settings">
-        <div className="step-bar-group">
-          <StepMenu
-            icon="playlist_play"
-            iconSize={22}
-            label="Run options"
-            text="Run Options"
-            testId="run-controls"
-            className="step-bar-btn"
-            items={[
-              { icon: step.status === 'running' ? 'stop' : 'play_arrow', label: step.status === 'running' ? 'Stop' : 'Run this step', hint: '⌘↵', onClick: () => onRun?.(step.id) },
-              { icon: 'fast_forward', label: 'Run to the end', hint: 'this step and after', onClick: () => onRunToEnd?.(),
-                disabled: !onRunToEnd, testId: 'btn-run-to-end' },
-              { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
-              { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
-              { divider: true },
-              { icon: 'cleaning_services', label: 'Clear output', hint: onClearOutput ? undefined : 'not yet',
-                onClick: () => onClearOutput?.(), disabled: !onClearOutput, testId: 'btn-clear-output' },
-            ]}
-          />
-        </div>
-
-        <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
-
-        <div className="step-bar-group">
-          <StepMenu
-            icon="splitscreen_add"
-            iconSize={20}
-            label="Step panels"
-            text="Step Panels"
-            testId="panels"
-            className="step-bar-btn"
-            items={(['overview', 'data'] as const).map((panel) => ({
-              icon: PANEL_ICON[panel],
-              label: PANEL_META[panel].name,
-              checked: isOpen(panel),
-              onClick: () => onTogglePanel(panel),
-              testId: `panel-${panel}`,
-            }))}
-          />
-        </div>
-
-
-        <span className="step-bar-divider" role="separator" aria-orientation="vertical" />
-
-        <div className="step-bar-group">
-          <StepMenu
-            icon="swap_horiz"
-            iconSize={20}
-            label="Manage step"
-            text="Manage Step"
-            align="right"
-            testId="step-management"
-            className="step-bar-btn"
-            items={[
-              { icon: 'arrow_back', label: 'Move left', onClick: () => onMove?.(stepIndex - 1), disabled: !onMove || stepIndex <= 0 },
-              { icon: 'arrow_forward', label: 'Move right', onClick: () => onMove?.(stepIndex + 1), disabled: !onMove || stepIndex >= stepCount - 1 },
-              { divider: true },
-              { icon: isLocked ? 'lock_open' : 'lock', label: isLocked ? 'Unlock' : 'Lock', onClick: () => onLock?.(step.id) },
-              { divider: true },
-              { icon: 'delete', label: isLocked ? 'Delete (unlock first)' : 'Delete step', onClick: () => onDelete?.(step.id),
-                disabled: isLocked, danger: true, testId: 'btn-delete' },
-            ]}
-          />
-        </div>
-      </div>
-      </Fold>
-      </div>
+    // One row (owner, 2026-11-24): fx, the formula, then ▶ at its end. The
+    // control bar above it is gone: the run options and managing the step
+    // are in the header's ⋯ menu, so ▶ is the only arrow here.
+    <div className="toolbar-wrapper" data-testid="step-toolbar" style={{ display: hidden ? 'none' : 'flex', flexDirection: 'column', gap: '4px', padding: '4px 4px', borderBottom: '1px solid #333' }}>
 
       {/* The f(x) button and the formula bar, on their own row */}
       <div
         className="formula-bar"
         style={{
-          display: hides('formula') ? 'none' : 'flex',
+          display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: '2px',
           position: 'relative',
         }}
       >
-        
+        {/* ▶ at the start of the formula row (owner, 2026-11-24: it feels
+            better on the left): run what's written (⌘/Ctrl+Enter does the
+            same; Enter only stages). */}
+        <button
+          type="button"
+          className={`step-run-inline${step.status === 'running' ? ' running' : ''}`}
+          onClick={(e) => { e.stopPropagation(); onRun?.(step.id); }}
+          aria-label={step.status === 'running' ? 'Stop' : 'Run this step'}
+          data-testid="btn-run"
+          {...runTip.tipProps}
+        >
+          <SymbolIcon name={step.status === 'running' ? 'stop' : 'play_arrow'} size={24} />
+        </button>
+        {runTip.tip}
+        {/* ⋮, the run settings, is also the divider between running and the
+            formula (owner, 2026-11-24): no line of its own. */}
+        <StepMenu icon="more_vert" iconSize={20} label="Run settings" testId="run-controls" className="step-run-settings"
+          items={[
+            { icon: 'fast_forward', label: 'Run to the end', hint: 'this step and after', onClick: () => onRunToEnd?.(),
+              disabled: !onRunToEnd, testId: 'btn-run-to-end' },
+            { icon: 'check', label: 'Stage this step', hint: '↵', onClick: () => onDeclare?.(), disabled: !onDeclare },
+            { icon: 'play_circle', label: 'Run all steps', onClick: () => onRunAll?.(), disabled: !onRunAll },
+          ]}
+        />
+        {isLocked && <SymbolIcon name="lock" size={13} className="step-locked-mark" />}
+
         {/* Function Button (Fx Icon) - Activated Details */}
         <button
           className={`btn-icon step-fx${isOpen('details') ? ' active' : ''}`}
@@ -400,7 +283,7 @@ export default function StepToolbar({
           aria-expanded={isOpen('details')}
         >
           fx
-          <SymbolIcon name="chevron_right" size={16} className="step-fx-caret" />
+          <SymbolIcon name="chevron_right" size={18} className="step-fx-caret" />
         </button>
 
         {/* The formula field: outlined, so it reads as an input, not text
@@ -592,10 +475,8 @@ export default function StepToolbar({
             document.body,
           )}
         </div>
-      </div>
 
-      {/* Tabs Bar Removed */}
-      <div style={{ display: 'none' }}></div>
+      </div>
     </div>
   );
 }

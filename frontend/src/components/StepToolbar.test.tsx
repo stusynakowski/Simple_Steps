@@ -17,11 +17,10 @@ const sampleStep: Step = {
 describe('StepToolbar', () => {
   it('renders buttons and calls handlers', () => {
     const onRun = vi.fn();
-    const onDelete = vi.fn();
 
     render(
       <StepWiringProvider>
-        <StepToolbar step={sampleStep} onRun={onRun} onDelete={onDelete}
+        <StepToolbar step={sampleStep} onRun={onRun}
           openPanels={[]} onTogglePanel={() => {}} />
       </StepWiringProvider>
     );
@@ -31,10 +30,6 @@ describe('StepToolbar', () => {
 
     fireEvent.click(runBtn);
     expect(onRun).toHaveBeenCalledWith('s-1');
-
-    // Delete is in the step management menu (owner, 2026-10-29, dev_plan/126 L1).
-    fireEvent.click(screen.getByTestId('step-management'));
-    fireEvent.click(screen.getByTestId('btn-delete'));
-    expect(onDelete).toHaveBeenCalledWith('s-1');
+    // Delete moved to the step header's ⋯ menu (owner, 2026-11-24).
   });
 });

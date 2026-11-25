@@ -116,6 +116,9 @@ interface DataOutputGridProps {
   page?: number;
   /** Show another page: the pager under the grid. */
   onPage?: (page: number) => void;
+  /** The step's analytics: what the result holds. Folds open from the data's
+   *  header, between it and the grid (owner, 2026-11-24). */
+  analytics?: React.ReactNode;
 }
 
 /**
@@ -145,7 +148,9 @@ function Grid({
   rowCount,
   page = 0,
   onPage,
+  analytics,
 }: DataOutputGridProps) {
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   // Looking at data (spec 014 §6, §8): a click selects — a cell, a row, a
   // column, the whole table, a block — and draws its outline only. Hovering
@@ -594,18 +599,21 @@ function Grid({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onToggleCollapsed?.(); }}
     >
-      {onToggleCollapsed ? (
-        <button
-          type="button"
-          className={`data-head-toggle${collapsed ? '' : ' open'}`}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Show the data' : 'Fold the data'}
-          title={collapsed ? 'Show the data' : 'Fold the data'}
-        >
-          <SymbolIcon name="dataset" size={20} />
-          <SymbolIcon name="chevron_right" size={16} className="data-head-caret" />
-        </button>
-      ) : <span className="data-head-toggle" aria-label="Data"><SymbolIcon name="dataset" size={20} /></span>}
+      {/* At the left: the data's expander. */}
+      <span className="data-head-lead">
+        {onToggleCollapsed ? (
+          <button
+            type="button"
+            className={`data-head-toggle${collapsed ? '' : ' open'}`}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Show the data' : 'Fold the data'}
+            title={collapsed ? 'Show the data' : 'Fold the data'}
+          >
+            <SymbolIcon name="dataset" size={20} />
+            <SymbolIcon name="chevron_right" size={16} className="data-head-caret" />
+          </button>
+        ) : <span className="data-head-toggle" aria-label="Data"><SymbolIcon name="dataset" size={20} /></span>}
+      </span>
       <button
         type="button"
         className={`data-head-ref${shownSel?.kind === 'all' ? ' is-selected' : ''}`}
@@ -623,8 +631,29 @@ function Grid({
         {/* Open, the size is at the right end of the step's row (owner, 2026-11-15). */}
         <span className="data-head-dims" title={sizeTitle}>{size}</span>
       </button>
-      {/* Folded, at the right of the bar. */}
-      <span className="data-head-size" title={sizeTitle}>{size}</span>
+      {/* At the right of the bar: the size (folded), the analytics' fold
+          (open), then the data's own expander (owner, 2026-11-24). */}
+      <span className="data-head-right">
+        <span className="data-head-size" title={sizeTitle}>{size}</span>
+        {analytics && !collapsed && (
+          <button
+            type="button"
+            className={`data-head-analytics${analyticsOpen ? ' open' : ''}`}
+            aria-expanded={analyticsOpen}
+            title={analyticsOpen ? 'Fold the analytics' : 'Analytics: what this step produced'}
+            onClick={(e) => { e.stopPropagation(); setAnalyticsOpen((o) => !o); }}
+          >
+            <SymbolIcon name="analytics" size={17} />
+            <SymbolIcon name="chevron_right" size={16} className="data-head-caret" />
+          </button>
+        )}
+      </span>
+      {/* Under the dark bar, above the table: what the step produced. */}
+      {analytics && (
+        <Fold open={analyticsOpen && !collapsed} className="data-analytics-fold">
+          <div className="data-analytics" onClick={(e) => e.stopPropagation()}>{analytics}</div>
+        </Fold>
+      )}
     </div>
   );
   const framed = (body: React.ReactNode) => (

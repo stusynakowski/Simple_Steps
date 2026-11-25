@@ -163,6 +163,16 @@ export function StepPop({ at, label, title, items = [], children, anchor, inside
       {/* What this menu is (owner, 2026-10-30): its name, else its label. */}
       <div className="step-menu-header" aria-hidden="true">{title ?? label}</div>
       {children && <div className="step-menu-body">{children}</div>}
+      <StepMenuItems items={items} onClose={() => close.current()} />
+    </div>,
+    document.body,
+  );
+}
+
+/** A step menu's actions and dividers: a menu's whole list, or the top of a popover (the step's ⋯). */
+export function StepMenuItems({ items, onClose }: { items: StepMenuItem[]; onClose: () => void }) {
+  return (
+    <>
       {items.map((item, i) => (item.divider
         ? <div key={`d${i}`} className="step-menu-divider" role="separator" />
         : (
@@ -175,7 +185,7 @@ export function StepPop({ at, label, title, items = [], children, anchor, inside
             disabled={item.disabled}
             data-testid={item.testId}
             title={item.disabled ? item.hint : undefined}
-            onClick={() => { if (item.checked === undefined) close.current(); item.onClick(); }}
+            onClick={() => { if (item.checked === undefined) onClose(); item.onClick(); }}
           >
             <SymbolIcon name={item.icon} size={15} />
             <span className="step-menu-label">{item.label}</span>
@@ -185,7 +195,6 @@ export function StepPop({ at, label, title, items = [], children, anchor, inside
             )}
           </button>
         )))}
-    </div>,
-    document.body,
+    </>
   );
 }
