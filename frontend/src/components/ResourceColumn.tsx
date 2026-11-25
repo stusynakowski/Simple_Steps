@@ -361,8 +361,8 @@ export default function ResourceColumn(props: ResourceColumnProps) {
                   if (name) setOpenNames((s) => new Set(s).add(name));
                 }} />
               : (
-                <button type="button" className="rc-add" onClick={() => setAdding(true)}>
-                  <SymbolIcon name="add" size={14} /> Resource
+                <button type="button" className="rc-add" onClick={() => setAdding(true)} title="Add a resource">
+                  + Add Resource
                 </button>
               )}
         </div>

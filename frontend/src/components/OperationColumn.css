@@ -815,25 +815,9 @@
   text-overflow: ellipsis;
   transition: background 0.1s ease;
 }
-/* Analytics' fold (owner, 2026-11-24): at the right of the dark bar, drawn
-   as the data toggle is — lit on hover, blue while open. */
-.data-head .data-head-analytics {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
-  height: 28px;
-  padding: 0 3px 0 6px;
-  border-radius: 4px;
-  color: #aaa;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-.data-head .data-head-analytics:hover { color: #ddd; background: rgba(255, 255, 255, 0.07); }
-.data-head .data-head-analytics.active { color: #4ea1ff; background: #1f3a5f; }
-/* Open, it is the header's second row: under the dark bar, above the column
-   headers. */
-/* The table's mode (owner, 2026-11-25): view, edit, modify, one lit blue. */
-/* One chip, beside the analytics' fold and drawn as it is (owner,
-   2026-11-25): lit on hover, blue while editing or modifying. */
+/* The table menu (owner, 2026-11-25): one chip, the table-eye icon, lit on
+   hover and blue while editing or modifying. It opens to two tabs: the
+   table's modes, and its analytics. */
 .data-head .data-head-right { gap: 2px; }
 .data-head .data-head-mode {
   display: inline-flex;
@@ -861,6 +845,33 @@
   color: inherit;
 }
 .data-analytics { background: #1e1e1e; line-height: normal; border-radius: 4px; max-width: 420px; }
+.data-menu-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  padding: 2px;
+  border-radius: 5px;
+  background: #f0f1f3;
+}
+.data-menu-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #666;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.data-menu-tab:hover { color: #222; }
+.data-menu-tab.on { background: #fff; color: #1a73e8; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.data-menu-modes { margin: 0 -4px; }
 
 /* wf["step"] in the bar's middle, open or folded: lit on hover, blue while
    the whole table is selected (owner, 2026-11-25). */

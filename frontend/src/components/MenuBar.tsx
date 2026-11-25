@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAnchorRect } from '../hooks/useAnchorRect';
+import SymbolIcon from './SymbolIcon';
 import './MenuBar.css';
 
 export interface MenuBarAction {
@@ -30,6 +31,9 @@ interface MenuBarProps {
   onOpenRecentWorkspace?: (path: string) => void;
   /** Reset workspace back to the launch cwd (no-op in the backend, just clears UI state). */
   onCloseWorkspace?: () => void;
+  /** Whether the assistant's sidebar is open, and its toggle (owner, 2026-11-25). */
+  chatOpen?: boolean;
+  onToggleChat?: () => void;
 }
 
 export default function MenuBar({
@@ -45,6 +49,8 @@ export default function MenuBar({
   onOpenWorkspace,
   onOpenRecentWorkspace,
   onCloseWorkspace,
+  chatOpen,
+  onToggleChat,
 }: MenuBarProps) {
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
   const [recentMenuOpen, setRecentMenuOpen] = useState(false);
@@ -194,7 +200,21 @@ export default function MenuBar({
       </div>
 
       {/* Edit Files moved to the explorer's toolbar (owner, 2026-11-15). */}
-      <div className="menubar-right" />
+      {/* At the right: the assistant's sidebar, open or closed (owner, 2026-11-25). */}
+      <div className="menubar-right">
+        {onToggleChat && (
+          <button
+            type="button"
+            className={`menubar-item menubar-icon${chatOpen ? ' active' : ''}`}
+            onClick={onToggleChat}
+            title={chatOpen ? 'Close the assistant' : 'Open the assistant'}
+            aria-label={chatOpen ? 'Close the assistant' : 'Open the assistant'}
+            aria-pressed={!!chatOpen}
+          >
+            <SymbolIcon name="smart_toy" size={16} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

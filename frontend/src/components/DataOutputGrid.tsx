@@ -17,7 +17,7 @@ import type { SymbolName } from './SymbolIcon';
 import './OperationColumn.css'; // Ensure grid styles are available
 import './CellViewer.css';
 import Fold from './Fold';
-import StepMenu from './StepMenu';
+import StepMenu, { StepMenuItems } from './StepMenu';
 
 /** The selection's outline when the step has no colour (spec 014 REQ-VIS-012). */
 const SELECTION_EDGE = '#1f2937';
@@ -199,6 +199,8 @@ function Grid({
   onWriteCell,
 }: DataOutputGridProps) {
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  /** The table menu's open tab: the modes, or the analytics. */
+  const [menuTab, setMenuTab] = useState<'mode' | 'analytics'>('mode');
   // Looking at data (spec 014 §6, §8): a click selects — a cell, a row, a
   // column, the whole table, a block — and draws its outline only. Hovering
   // the selection's header tab opens the selection inspector. Picking for a
@@ -678,33 +680,54 @@ function Grid({
         {/* Its size, under the name (owner, 2026-11-25). */}
         <span className="data-head-size" title={sizeTitle}>{size}</span>
       </button>
-      {/* At the right of the bar: the mode chip and the analytics popover,
-          side by side. One bar, open or folded: the table's rounded top
-          (owner, 2026-11-25). */}
+      {/* At the right of the bar: the table menu, one widget holding the
+          table's modes and its analytics, each a tab (owner, 2026-11-25). */}
       <span className="data-head-right">
-        {/* One chip: the mode's icon; a click lists the three (owner, 2026-11-25). */}
-        {onModeChange && !collapsed && (
+        {(onModeChange || analytics) && !collapsed && (
           <StepMenu
-            icon={[MODES.find((m) => m.mode === mode)!.icon, 'arrow_drop_down']}
+            icon={['table_eye', 'arrow_drop_down']}
             iconSize={16}
-            label={`Table mode: ${mode}`}
+            label={`Table: ${MODES.find((m) => m.mode === mode)!.label}`}
             align="right"
             className={`data-head-mode${mode !== 'view' ? ' on' : ''}`}
-            testId="table-mode"
-            items={MODES.map(({ mode: m, icon, label }) => ({
-              icon,
-              label,
-              hint: modeBlocked?.[m] ?? (mode === m ? 'on' : undefined),
-              disabled: !!modeBlocked?.[m],
-              onClick: () => onModeChange(m),
-            }))}
-          />
-        )}
-        {/* What the step produced, as a popover (owner, 2026-11-25). */}
-        {analytics && !collapsed && (
-          <StepMenu icon="analytics" iconSize={17} label="Analytics: what this step produced"
-            align="right" className="data-head-analytics" testId="data-analytics">
-            <div className="data-analytics">{analytics}</div>
+            testId="table-menu"
+          >
+            {(close) => (
+              <div className="data-menu">
+                <div className="data-menu-tabs" role="tablist">
+                  {onModeChange && (
+                    <button type="button" role="tab" aria-selected={menuTab === 'mode'}
+                      className={`data-menu-tab${menuTab === 'mode' ? ' on' : ''}`}
+                      onClick={() => setMenuTab('mode')}>
+                      <SymbolIcon name="table_eye" size={14} /> Mode
+                    </button>
+                  )}
+                  {analytics && (
+                    <button type="button" role="tab" aria-selected={menuTab === 'analytics'}
+                      className={`data-menu-tab${menuTab === 'analytics' ? ' on' : ''}`}
+                      onClick={() => setMenuTab('analytics')}>
+                      <SymbolIcon name="analytics" size={14} /> Analytics
+                    </button>
+                  )}
+                </div>
+                {onModeChange && (menuTab === 'mode' || !analytics) ? (
+                  <div className="data-menu-modes" role="tabpanel" data-testid="table-mode">
+                    <StepMenuItems
+                      onClose={close}
+                      items={MODES.map(({ mode: m, icon, label }) => ({
+                        icon,
+                        label,
+                        hint: modeBlocked?.[m] ?? (mode === m ? 'on' : undefined),
+                        disabled: !!modeBlocked?.[m],
+                        onClick: () => onModeChange(m),
+                      }))}
+                    />
+                  </div>
+                ) : (
+                  <div className="data-analytics" role="tabpanel" data-testid="data-analytics">{analytics}</div>
+                )}
+              </div>
+            )}
           </StepMenu>
         )}
       </span>

@@ -131,6 +131,26 @@
   color: #fff;
 }
 
+/* The assistant's tab (owner, 2026-11-25): a smart-toy icon on the canvas's
+   right edge, just above the zoom. Quiet until the pointer is on it, then it
+   slides out, fully shown. */
+.pane-peek-tab--agent {
+  top: auto;
+  bottom: 70px;                    /* the zoom sits at 30px, ~30px tall */
+  transform: none;
+  width: 22px;
+  height: 40px;
+  color: #aaa;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, width 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.pane-peek-tab--agent:hover,
+.pane-peek-tab--agent:focus-visible {
+  opacity: 1;
+  width: 32px;
+  color: #fff;
+}
+
 /* Drag-hint at the bottom of the header — communicates that the toolbar
    strip is itself resizable via the horizontal sash beneath it. */
 .header-resize-hint {

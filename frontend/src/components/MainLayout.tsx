@@ -30,6 +30,7 @@ import SaveModal from './SaveModal';
 import RenameModal from './RenameModal';
 import ExecutionLog, { type LogMode } from './ExecutionLog';
 import Icon from './Icon';
+import SymbolIcon from './SymbolIcon';
 import type { ActivityView } from './ActivityBar';
 import type { Workflow } from '../types/models';
 import { initialWorkflow } from '../mocks/initialData';
@@ -945,6 +946,8 @@ export default function MainLayout() {
         recentWorkspaces={workspaceInfo?.recent_workspaces ?? []}
         onOpenWorkspace={handleOpenWorkspace}
         onOpenRecentWorkspace={handleOpenRecentWorkspace}
+        chatOpen={rightPaneVisible}
+        onToggleChat={toggleChat}
       />
 
       {/* Row 2: file tabs */}
@@ -1224,17 +1227,6 @@ export default function MainLayout() {
             <Icon name="chevron-right" size={12} />
           </button>
         )}
-        {!rightPaneVisible && (
-          <button
-            type="button"
-            className="pane-peek-tab pane-peek-tab--right"
-            onClick={() => setRightPaneVisible(true)}
-            title="Show chat"
-            aria-label="Show chat"
-          >
-            <Icon name="chevron-left" size={12} />
-          </button>
-        )}
 
         <Allotment onChange={handleOuterSizes} proportionalLayout={false}>
           {/* Left sidebar (Explorer / Packs / Search / History / Settings) */}
@@ -1333,6 +1325,19 @@ export default function MainLayout() {
                         onReset={() => canvasZoom.zoomTo(1)}
                         onFit={canvasZoom.fit}
                       />
+                      {/* The assistant's tab, at the canvas's right edge just
+                          above the zoom, out of the steps' way (owner, 2026-11-25). */}
+                      {!rightPaneVisible && (
+                        <button
+                          type="button"
+                          className="pane-peek-tab pane-peek-tab--right pane-peek-tab--agent"
+                          onClick={() => setRightPaneVisible(true)}
+                          title="Open the assistant"
+                          aria-label="Open the assistant"
+                        >
+                          <SymbolIcon name="smart_toy" size={16} />
+                        </button>
+                      )}
                       </div>
                     </div>
 
