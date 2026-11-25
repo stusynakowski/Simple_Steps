@@ -19,6 +19,43 @@ stored beside it (134 R-A, R-B).
 
 ---
 
+## 0. The owner's rule, and where it leads (2026-11-25)
+
+> **E0. A value in a step's grid can be edited only if some change to the
+> step's expression above it would produce that edit.** Otherwise the cell
+> is read-only.
+
+The grid edits the expression and never the data. Standard Python values
+make this possible: a grid defined by literals (int, float, str, bool,
+`None`, lists and dicts of them) can be changed cell by cell, because each
+cell maps to one place in the literal. A computed cell has no such place, so
+it isn't editable (E1). Everything in §1–§3 is a case of E0.
+
+**Run against core 1.0.3 (`adfaf87`), 2026-11-25:**
+
+| Formula | Result |
+|---|---|
+| `=7`, `="hello"`, `=True` | one cell: `int`, `str`, `bool` |
+| `=[1, 2, 3]`, `=[{"a": 1, "b": "x"}, …]`, `={"a": [1, 2], …}` | **one cell** holding the whole list or dict, not a grid |
+| `=identity[mod.table()]({"a": [1, 2]})` | refused: *the input must be a step reference* |
+| `=table[mod.source()](data={"a": [1, 2], "b": ["x", "y"]})`, with `table` an `@tool` returning `pd.DataFrame(data)` | **a typed grid:** `a: int`, `b: str`, 2 rows. Cell (row *r*, column *c*) is `data["c"][r]` |
+| `=table[mod.source(), mod.table()](data=…)` | refused: *2 shape verbs in one step* |
+
+So §4's `table` source tool is the way to a grid of Python values: core has
+no one-formula literal grid (C5). A cell edit rewrites `data["c"][r]`, a new
+row appends to every list and a new column adds a key.
+
+**Where this leads (a note, not yet planned):** the grid becomes **an editor
+for the Python expression at the top**, a second view of the same text. An
+edit in either one rewrites the other. This is a large piece of work (two-way
+mapping between expression positions and cells, keeping the user's
+formatting, undo across both). It will get its own plan when it's taken up.
+The table's mode switch on the data header (View / Edit / Modify, built
+2026-11-25) is where it will live: Edit writes values through the
+expression, and Modify writes the expression directly.
+
+---
+
 ## 1. The rule in one line
 
 > **You can type into a cell exactly when the step's expression *is* its
